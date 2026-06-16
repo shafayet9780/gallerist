@@ -108,6 +108,51 @@
   opacity: 1;
 }
 
+/* ── plugin regions (spec §13) ─────────────────────────────────────────────── */
+/* containers never block gestures; only their injected children are interactive */
+.visora-region {
+  pointer-events: none;
+}
+.visora-region > * {
+  pointer-events: auto;
+}
+.visora-region-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  z-index: 6;
+}
+.visora-region-thumbnails {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+}
+.visora-region-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--visora-thumb-h, 0);
+  z-index: 6;
+}
+.visora-region-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+}
+.visora-region-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 /* ── chrome ────────────────────────────────────────────────────────────────── */
 .visora-chrome {
   position: absolute;

@@ -15,6 +15,7 @@ import {
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
+import { type RegionHosts, aggregateKeymap, mountPluginRegions } from './regions'
 import { reconcileKeys, windowIndices } from './windowing'
 
 export interface MountOptions {
@@ -58,9 +59,17 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const overlay = !opts.container
   const container = opts.container ?? null
   const controls = opts.controls ?? true
-  const adapters = opts.adapters ?? [imageAdapter()]
   const preload = opts.preload ?? { ahead: 2, behind: 1 }
-  const globalOverlays = opts.overlays ?? []
+
+  // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
+  // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
+  const plugins = viewer.getPlugins()
+  const adapters = [
+    ...(opts.adapters ?? [imageAdapter()]),
+    ...plugins.flatMap((p) => p.mediaAdapters ?? []),
+  ]
+  const globalOverlays = [...(opts.overlays ?? []), ...plugins.flatMap((p) => p.overlays ?? [])]
+  let pluginKeymap = aggregateKeymap(plugins)
 
   const pickAdapter = (type: string, item: Parameters<MediaAdapter['mount']>[0]) =>
     adapters.find((a) => (a.match ? a.match(item) : a.type === type))
@@ -81,8 +90,20 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const stage = el('div', 'visora-stage')
   const track = el('div', 'visora-track')
   const viewportLayer = el('div', 'visora-viewport-layer')
-  stage.append(track, viewportLayer)
+  const stageRegion = el('div', 'visora-region visora-region-stage')
+  stage.append(track, viewportLayer, stageRegion)
   root.appendChild(stage)
+
+  // Named region hosts for plugins (spec §13).
+  const regionHosts: RegionHosts = {
+    backdrop: el('div', 'visora-region visora-region-backdrop'),
+    stage: stageRegion,
+    toolbar: el('div', 'visora-region visora-region-toolbar'),
+    thumbnails: el('div', 'visora-region visora-region-thumbnails'),
+    footer: el('div', 'visora-region visora-region-footer'),
+  }
+  root.prepend(regionHosts.backdrop)
+  root.append(regionHosts.toolbar, regionHosts.thumbnails, regionHosts.footer)
 
   const live = el('div', 'visora-live', { 'aria-live': 'polite', role: 'status' })
   root.appendChild(live)
@@ -335,7 +356,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         viewer.goTo(viewer.getCollection().groups.length - 1)
         break
       default:
-        if (/^[1-9]$/.test(e.key)) viewer.goTo(viewer.getState().cursor.g, Number(e.key) - 1)
+        if (/^[1-9]$/.test(e.key)) {
+          viewer.goTo(viewer.getState().cursor.g, Number(e.key) - 1)
+        } else if (pluginKeymap[e.key]) {
+          pluginKeymap[e.key]?.(e)
+        }
         return
     }
     e.preventDefault()
@@ -364,6 +389,14 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     },
   })
 
+  // ── plugin regions (spec §13) ──────────────────────────────────────────────
+  const mountRegions = () => {
+    pluginKeymap = aggregateKeymap(viewer.getPlugins())
+    mountPluginRegions(regionHosts, viewer.getPlugins(), { viewer })
+  }
+  mountRegions()
+  const offPlugins = viewer.onPluginsChanged(mountRegions)
+
   const unsubscribe = viewer.subscribe(sync)
   sync()
 
@@ -371,6 +404,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     root,
     destroy() {
       unsubscribe()
+      offPlugins()
       detachGestures()
       root.removeEventListener('keydown', onKey)
       for (const rec of mounted.values()) teardownSlide(rec)
