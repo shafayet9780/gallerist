@@ -39,13 +39,13 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ## M9 — deep-link + download
 
-- [ ] **T9.1 — @visora/plugin-hash** — read/write `#g=<id>&i=<id>`, `hashchange` + back/forward, open on
+- [x] **T9.1 — @visora/plugin-hash** — read/write `#g=<id>&i=<id>`, `hashchange` + back/forward, open on
   load if hash present, client-only (SSR guard), uses `goToId`/`getCollection`. Verify: unit (parse/format)
   + e2e (URL updates on nav, deep-link opens correct slide, back/forward).
-- [ ] **T9.2 — @visora/plugin-download** — `toolbar` button(s): single (`<a download>`), all-in-group
+- [x] **T9.2 — @visora/plugin-download** — `toolbar` button(s): single (`<a download>`), all-in-group
   (sequential), bulk-range → `await import('client-zip')` → zip. Verify: unit (group/range selection,
   filename) + e2e (single download triggers).
-- [ ] **Checkpoint M9** — gates green; commit.
+- [x] **Checkpoint M9** — gates green; commit.
 
 ## M10 — plugin-thumbnails (grouped) — the differentiator
 
