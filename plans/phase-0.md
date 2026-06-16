@@ -33,7 +33,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
 
 ## Milestones (ordered; each verifiable)
 
-- [ ] **M0 — Scaffold & CI.** pnpm workspace, tsconfig strict, Biome, tsup, vitest (node+happy-dom),
+- [x] **M0 — Scaffold & CI.** pnpm workspace, tsconfig strict, Biome, tsup, vitest (node+happy-dom),
   Playwright, size-limit, Changesets, CI workflow, 3 package skeletons.
   *Verify:* `pnpm -r build`, `pnpm -r typecheck`, `pnpm test`, `pnpm size` run green.
 
