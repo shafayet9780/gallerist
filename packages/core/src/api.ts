@@ -49,8 +49,8 @@ export interface ViewerApi {
   on<K extends keyof EventMap>(event: K, handler: Handler<EventMap[K]>): () => void
   /** Emit an event — used by the renderer, adapters, and plugins to surface events. */
   emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): boolean
-  /** Late plugin registration (spec §8.2). */
-  use(plugin: Plugin): void
+  /** Late plugin registration (spec §8.2); returns a disposer that unregisters the plugin. */
+  use(plugin: Plugin): () => void
   /** Registered plugin instances — consumed by the renderer to mount regions/adapters. */
   getPlugins(): readonly PluginInstance[]
   /** Notify the renderer when the plugin set changes (e.g. late use()). */

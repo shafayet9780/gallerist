@@ -1,0 +1,127 @@
+import {
+  type OverlaySpec,
+  type RegionName,
+  type ViewerApi,
+  type ViewerOptions,
+  createViewer,
+} from '@visora/core'
+import { mount } from '@visora/renderer-dom'
+import {
+  type ReactNode,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from 'react'
+import { createPortal } from 'react-dom'
+import { VisoraContext, useViewerContext } from './context'
+
+export interface VisoraProps extends ViewerOptions {
+  /** controlled visibility. */
+  open?: boolean
+  onClose?: () => void
+  container?: HTMLElement | null
+  controls?: boolean
+  children?: ReactNode
+}
+
+const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref) {
+  const { open, onClose, container, controls, children, ...options } = props
+  // Create the viewer once (core is DOM-free → SSR-safe); options are read at construction.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional create-once
+  const viewer = useMemo(() => createViewer(options), [])
+  useImperativeHandle(ref, () => viewer, [viewer])
+
+  // Mount the renderer once per viewer (client-side); container/controls are mount-time only.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional mount-once
+  useEffect(() => {
+    const handle = mount(viewer, { container: container ?? null, controls })
+    return () => {
+      handle.destroy()
+      viewer.destroy()
+    }
+  }, [viewer])
+
+  useEffect(() => {
+    if (open === undefined) return
+    if (open) viewer.open()
+    else viewer.close()
+  }, [open, viewer])
+
+  useEffect(() => {
+    if (!onClose) return
+    return viewer.on('closed', () => onClose())
+  }, [onClose, viewer])
+
+  return <VisoraContext.Provider value={viewer}>{children}</VisoraContext.Provider>
+})
+
+export interface VisoraOverlayProps {
+  anchor: OverlaySpec['anchor']
+  id?: string
+  layer?: number
+  interactive?: boolean
+  visibleAt?: [number, number]
+  className?: string
+  children?: ReactNode
+}
+
+let overlaySeq = 0
+
+/** Render a React subtree as an image-space / viewport overlay via a portal (decision P0-G). */
+function Overlay(props: VisoraOverlayProps): ReactNode {
+  const viewer = useViewerContext()
+  const [host, setHost] = useState<HTMLElement | null>(null)
+  const id = useMemo(() => props.id ?? `react-overlay-${overlaySeq++}`, [props.id])
+
+  useEffect(() => {
+    const node = document.createElement('div')
+    setHost(node)
+    const spec: OverlaySpec = {
+      id,
+      anchor: props.anchor,
+      layer: props.layer,
+      interactive: props.interactive,
+      visibleAt: props.visibleAt,
+      class: props.className,
+      render: () => node, // stable host; React owns its children through the portal
+    }
+    const dispose = viewer.use(() => ({ name: `overlay:${id}`, overlays: [spec] }))
+    return () => {
+      dispose()
+      setHost(null)
+    }
+  }, [viewer, id, props.anchor, props.layer, props.interactive, props.visibleAt, props.className])
+
+  return host ? createPortal(props.children, host) : null
+}
+
+export interface VisoraRegionProps {
+  name: RegionName
+  children?: ReactNode
+}
+
+/** Render a React subtree into a named renderer region (toolbar, footer, …) via a portal. */
+function Region(props: VisoraRegionProps): ReactNode {
+  const viewer = useViewerContext()
+  const [host, setHost] = useState<HTMLElement | null>(null)
+  const { name } = props
+
+  useEffect(() => {
+    const node = document.createElement('div')
+    setHost(node)
+    const dispose = viewer.use(() => ({
+      name: `region:${name}`,
+      regions: { [name]: () => node },
+    }))
+    return () => {
+      dispose()
+      setHost(null)
+    }
+  }, [viewer, name])
+
+  return host ? createPortal(props.children, host) : null
+}
+
+export const Visora = Object.assign(VisoraBase, { Overlay, Region })

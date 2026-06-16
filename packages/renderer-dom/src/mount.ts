@@ -68,7 +68,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     ...(opts.adapters ?? [imageAdapter()]),
     ...plugins.flatMap((p) => p.mediaAdapters ?? []),
   ]
-  const globalOverlays = [...(opts.overlays ?? []), ...plugins.flatMap((p) => p.overlays ?? [])]
+  // Overlays are recomputed live (plugins/React can add+remove overlays after mount).
+  const currentGlobalOverlays = () => [
+    ...(opts.overlays ?? []),
+    ...viewer.getPlugins().flatMap((p) => p.overlays ?? []),
+  ]
   let pluginKeymap = aggregateKeymap(plugins)
 
   const pickAdapter = (type: string, item: Parameters<MediaAdapter['mount']>[0]) =>
@@ -226,7 +230,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
             rec.overlayEls = paintOverlays(
               viewportLayer,
               rec.overlayHost,
-              gatherOverlays(group, it, globalOverlays),
+              gatherOverlays(group, it, currentGlobalOverlays()),
               {
                 group,
                 item: it,
@@ -393,6 +397,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(viewer.getPlugins())
     mountPluginRegions(regionHosts, viewer.getPlugins(), { viewer })
+    // plugin overlays may have changed (e.g. React <Visora.Overlay> mount/unmount) → force repaint
+    const cur = currentRec()
+    if (cur) cur.overlayItemId = undefined
+    if (attached) renderWindow()
   }
   mountRegions()
   const offPlugins = viewer.onPluginsChanged(mountRegions)

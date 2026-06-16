@@ -59,6 +59,20 @@ describe('plugin registry (spec §13)', () => {
     expect(changed).not.toHaveBeenCalled()
   })
 
+  it('use() returns a disposer that unregisters, runs destroy, and notifies', () => {
+    const destroy = vi.fn()
+    const changed = vi.fn()
+    const v = createViewer(base())
+    v.onPluginsChanged(changed)
+    const off = v.use(() => ({ name: 'temp', destroy }))
+    expect(v.getPlugins().map((i) => i.name)).toEqual(['temp'])
+    changed.mockClear()
+    off()
+    expect(destroy).toHaveBeenCalledOnce()
+    expect(v.getPlugins()).toHaveLength(0)
+    expect(changed).toHaveBeenCalledOnce()
+  })
+
   it('destroy() runs each plugin destroy() in reverse order', () => {
     const calls: string[] = []
     const mk =

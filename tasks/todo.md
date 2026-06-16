@@ -27,15 +27,15 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ## M8 — @visora/react adapter
 
-- [ ] **T8.1 — useVisora hook** — `useSyncExternalStore` over `viewer.subscribe`/`getState`; returns
+- [x] **T8.1 — useVisora hook** — `useSyncExternalStore` over `viewer.subscribe`/`getState`; returns
   `{ state, ...actions }`. Verify: @testing-library/react state sync on nav/zoom. Files: `packages/react/src/useVisora.ts`.
-- [ ] **T8.2 — `<Visora>` component** — controlled `open`/`onClose` + imperative `ref`; mounts renderer;
+- [x] **T8.2 — `<Visora>` component** — controlled `open`/`onClose` + imperative `ref`; mounts renderer;
   SSR placeholder + hydrate; cleanup on unmount. Verify: open/close, ref methods, unmount teardown.
-- [ ] **T8.3 — portal bridge** — `<Visora.Overlay anchor>` + `<Visora.Region name>` portal React children
+- [x] **T8.3 — portal bridge** — `<Visora.Overlay anchor>` + `<Visora.Region name>` portal React children
   into engine host nodes; re-portal on host change (overlay repaint). Verify: JSX overlay/region renders,
   updates, unmounts cleanly. Files: `packages/react/src/overlay.tsx`, `region.tsx`.
-- [ ] **T8.4 — React example** (`examples/react`) + e2e smoke.
-- [ ] **Checkpoint M8** — gates green (+ react peer dev deps installed); commit.
+- [x] **T8.4 — React example** (`examples/react`) + e2e smoke.
+- [x] **Checkpoint M8** — gates green (+ react peer dev deps installed); commit.
 
 ## M9 — deep-link + download
 

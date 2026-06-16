@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config'
 // Default env is node (pure logic: model, FSM, nav math, zoom math, store).
 // DOM tests opt in per-file with:  // @vitest-environment happy-dom
 export default defineConfig({
+  esbuild: { jsx: 'automatic' },
   resolve: {
     alias: {
       '@visora/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
@@ -14,7 +15,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['packages/**/src/**/*.{test,spec}.ts'],
+    include: ['packages/**/src/**/*.{test,spec}.{ts,tsx}'],
     clearMocks: true,
   },
 })

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visora — React adapter</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #111;
+        color: #eee;
+      }
+      main {
+        padding: 24px;
+      }
+      button.open {
+        padding: 10px 16px;
+      }
+      .vbadge {
+        background: var(--visora-accent, #378add);
+        color: #fff;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font: 500 13px system-ui;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.tsx"></script>
+  </body>
+</html>

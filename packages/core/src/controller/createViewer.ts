@@ -51,20 +51,33 @@ export function createViewer(options: ViewerOptions): ViewerApi {
   // ── plugin registry (spec §13) ─────────────────────────────────────────────
   const pluginInstances: PluginInstance[] = []
   const pluginsChanged = new Set<() => void>()
-  const registerPlugin = (plugin: Plugin): void => {
-    if (destroyed) return
+  const notifyPlugins = () => {
+    for (const fn of [...pluginsChanged]) fn()
+  }
+  const registerPlugin = (plugin: Plugin): (() => void) => {
+    if (destroyed) return () => {}
     const inst = plugin(api)
     pluginInstances.push(inst)
+    const offs: (() => void)[] = []
     if (inst.on) {
       for (const [type, fn] of Object.entries(inst.on) as [
         keyof EventMap,
         Handler<EventMap[keyof EventMap]>,
       ][]) {
-        emitter.on(type, fn)
+        offs.push(emitter.on(type, fn))
       }
     }
     inst.init?.()
-    for (const fn of [...pluginsChanged]) fn()
+    notifyPlugins()
+    // disposer — removes the instance, its handlers, runs destroy, re-notifies (used by React)
+    return () => {
+      const idx = pluginInstances.indexOf(inst)
+      if (idx < 0) return
+      pluginInstances.splice(idx, 1)
+      for (const off of offs) off()
+      inst.destroy?.()
+      notifyPlugins()
+    }
   }
 
   // api is referenced by event payloads; assigned below before any emit can run.
@@ -216,7 +229,7 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       return emitter.emit(event, payload)
     },
     use(plugin) {
-      registerPlugin(plugin)
+      return registerPlugin(plugin)
     },
     getPlugins() {
       return pluginInstances
