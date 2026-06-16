@@ -15,15 +15,18 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "size": "size-limit",
+    "e2e": "playwright test",
     "changeset": "changeset"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@changesets/cli": "^2.27.10",
+    "@playwright/test": "^1.49.1",
     "@size-limit/preset-small-lib": "^11.1.6",
     "size-limit": "^11.1.6",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
+    "vite": "^6.0.7",
     "vitest": "^2.1.8"
   },
   "pnpm": {
