@@ -18,6 +18,19 @@ export {
   resolveId,
 } from './nav/nav'
 export { type FsmEvent, type FsmState, initialFsm, reduceFsm } from './fsm/fsm'
+export { type ArbitrationInput, arbitrate, type Intent } from './zoom/arbitration'
+export {
+  clampPan,
+  clampScale,
+  contentToStage,
+  fitScale,
+  fitTransform,
+  focalZoom,
+  type Size,
+  stageToContent,
+  toggleZoom,
+  type Vec2,
+} from './zoom/zoom'
 export {
   type Cancelable,
   type CancelableNavPayload,

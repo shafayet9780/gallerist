@@ -43,7 +43,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
   beforeSlide/beforeItem); vanilla `createViewer` wiring.
   *Verify:* vitest node green — normalize, FSM table, nav matrix, coalescing, store selectors.
 
-- [ ] **M2 — Zoom/pan + arbitration math (pure).** coordinate spaces screen→stage→content;
+- [x] **M2 — Zoom/pan + arbitration math (pure).** coordinate spaces screen→stage→content;
   focal zoom, fit/bounds clamp, rubber-band, inertia, double-tap step; bounds from naturalSize;
   arbitration reducer (§11.3 → navigate|pan|close|zoom|secondary), intent locked per gesture.
   *Verify:* vitest node — zoom round-trips + arbitration rules matrix.
