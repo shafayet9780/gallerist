@@ -1,4 +1,4 @@
-import { type Collection, type Item, createViewer } from '@visora/core'
+import { type Collection, type Item, type OverlaySpec, createViewer } from '@visora/core'
 import { mount } from '@visora/renderer-dom'
 import '@visora/theme-default/visora.css'
 
@@ -7,17 +7,35 @@ const svg = (w: number, h: number, color: string, label: string) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/><text x="40" y="120" fill="white" font-size="120" font-family="sans-serif">${label}</text></svg>`,
   )}`
 
-const imageItem = (id: string, color: string): Item => ({
+const imageItem = (id: string, color: string, overlays?: OverlaySpec[]): Item => ({
   id,
   type: 'image',
   source: svg(3000, 2000, color, id),
   naturalSize: { w: 3000, h: 2000 },
   alt: `image ${id}`,
+  overlays,
 })
+
+const demoOverlays: OverlaySpec[] = [
+  {
+    id: 'badge',
+    anchor: { kind: 'viewport', at: 'top-right', offset: [72, 16] },
+    render: () => '95%',
+  },
+  {
+    id: 'pin',
+    anchor: { kind: 'point', x: 0.5, y: 0.5 },
+    render: () => {
+      const d = document.createElement('div')
+      d.textContent = '📍'
+      return d
+    },
+  },
+]
 
 const collection: Collection = {
   groups: [
-    { id: 'g0', items: [imageItem('a0', '#c0392b')] },
+    { id: 'g0', items: [imageItem('a0', '#c0392b', demoOverlays)] },
     {
       id: 'g1',
       items: [imageItem('b0', '#2980b9'), imageItem('b1', '#27ae60'), imageItem('b2', '#f39c12')],

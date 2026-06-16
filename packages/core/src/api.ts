@@ -2,6 +2,7 @@
 // Defined as an interface first so overlay/plugin types can reference it without a cycle.
 
 import type { EventMap, Handler } from './events/events'
+export type { EventMap, Handler } from './events/events'
 import type {
   Collection,
   CollectionInput,
@@ -42,6 +43,10 @@ export interface ViewerApi {
   refresh(): void
   getState(): Readonly<ViewerState>
   subscribe(fn: (s: Readonly<ViewerState>) => void): () => void
+  /** Runtime event subscription (complements the `on` constructor option, spec §18). */
+  on<K extends keyof EventMap>(event: K, handler: Handler<EventMap[K]>): () => void
+  /** Emit an event — used by the renderer, adapters, and plugins to surface events. */
+  emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): boolean
   destroy(): void
   // navigation/zoom accessors used by overlays & adapters:
   readonly cursor: Cursor

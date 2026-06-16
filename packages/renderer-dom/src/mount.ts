@@ -3,9 +3,10 @@
 // image adapter, minimal chrome, dialog a11y, keyboard map, and the committed zoom transform.
 // Live pan/zoom (imperative RAF) and motion land in M3.4 / M5.
 
-import type { MediaAdapter, Phase, ViewerApi, ZoomState } from '@visora/core'
+import type { MediaAdapter, OverlaySpec, Phase, ViewerApi, ZoomState } from '@visora/core'
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
+import { gatherOverlays, paintOverlays } from './overlays/render'
 import { reconcileKeys, windowIndices } from './windowing'
 
 export interface MountOptions {
@@ -14,6 +15,8 @@ export interface MountOptions {
   controls?: boolean
   adapters?: MediaAdapter[]
   preload?: { ahead: number; behind: number }
+  /** global overlays applied to every slide (spec §8.1, §9). */
+  overlays?: OverlaySpec[]
 }
 
 export interface RendererHandle {
@@ -24,6 +27,7 @@ export interface RendererHandle {
 interface SlideRec {
   slide: HTMLElement
   content: HTMLElement
+  overlayHost: HTMLElement
   itemId?: string
   media?: ReturnType<MediaAdapter['mount']>
   abort?: AbortController
@@ -46,13 +50,14 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const controls = opts.controls ?? true
   const adapters = opts.adapters ?? [imageAdapter()]
   const preload = opts.preload ?? { ahead: 2, behind: 1 }
+  const globalOverlays = opts.overlays ?? []
 
   const pickAdapter = (type: string, item: Parameters<MediaAdapter['mount']>[0]) =>
     adapters.find((a) => (a.match ? a.match(item) : a.type === type))
 
   // ── DOM scaffold ───────────────────────────────────────────────────────────
   const root = el('div', 'visora')
-  root.classList.add(overlay ? 'visora-overlay' : 'visora-inline')
+  root.setAttribute('data-visora-mode', overlay ? 'overlay' : 'inline')
   if (overlay) {
     root.setAttribute('role', 'dialog')
     root.setAttribute('aria-modal', 'true')
@@ -65,7 +70,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   if (overlay) root.appendChild(el('div', 'visora-backdrop'))
   const stage = el('div', 'visora-stage')
   const track = el('div', 'visora-track')
-  stage.appendChild(track)
+  const viewportLayer = el('div', 'visora-viewport-layer')
+  stage.append(track, viewportLayer)
   root.appendChild(stage)
 
   const live = el('div', 'visora-live', { 'aria-live': 'polite', role: 'status' })
@@ -122,9 +128,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     for (const k of enter) {
       const slide = el('div', 'visora-slide', { 'data-group': k })
       const content = el('div', 'visora-content')
+      const overlayHost = el('div', 'visora-overlays-content')
+      content.appendChild(overlayHost)
       slide.appendChild(content)
       track.appendChild(slide)
-      mounted.set(k, { slide, content })
+      mounted.set(k, { slide, content, overlayHost })
     }
 
     for (const [k, rec] of mounted) {
@@ -138,7 +146,6 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       if (it && rec.itemId !== it.id) {
         rec.abort?.abort()
         rec.media?.destroy()
-        rec.content.replaceChildren()
         const abort = new AbortController()
         rec.media = pickAdapter(it.type, it)?.mount(it, rec.content, {
           signal: abort.signal,
@@ -146,14 +153,28 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         })
         rec.abort = abort
         rec.itemId = it.id
+        rec.content.appendChild(rec.overlayHost) // keep overlays above the media
       }
       if (isCurrent) {
         rec.slide.setAttribute('data-visora-current', '')
         rec.content.setAttribute('data-visora-current', '')
         applyTransform(rec.content, state.zoom)
+        const r = stage.getBoundingClientRect()
+        const stageSize = { w: r.width, h: r.height }
+        if (it) {
+          paintOverlays(viewportLayer, rec.overlayHost, gatherOverlays(group, it, globalOverlays), {
+            group,
+            item: it,
+            viewer,
+            zoom: state.zoom,
+            stage: stageSize,
+            natural: rec.media?.naturalSize?.() ?? stageSize,
+          })
+        }
       } else {
         rec.slide.removeAttribute('data-visora-current')
         rec.content.removeAttribute('data-visora-current')
+        rec.overlayHost.replaceChildren()
       }
     }
   }

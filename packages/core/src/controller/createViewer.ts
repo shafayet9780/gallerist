@@ -181,6 +181,12 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     subscribe(fn) {
       return store.subscribe(fn)
     },
+    on(event, handler) {
+      return emitter.on(event, handler)
+    },
+    emit(event, payload) {
+      return emitter.emit(event, payload)
+    },
     destroy() {
       if (destroyed) return
       destroyed = true

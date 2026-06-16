@@ -55,7 +55,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
   minimal chrome; a11y baseline (dialog, focus trap+restore, aria-live, keymap, ≥44px).
   *Verify:* happy-dom units (windowing/pool/scheduler/srcset) + Playwright (gestures/keyboard/axe).
 
-- [ ] **M4 — Overlay engine.** viewport layer + content layer (shared matrix); region scale-with-image,
+- [x] **M4 — Overlay engine.** viewport layer + content layer (shared matrix); region scale-with-image,
   point counter-scale; visibleAt, layer, interactive → overlayClick; non-visible slides render none.
   *Verify:* Playwright visual regression at multiple zoom levels.
 

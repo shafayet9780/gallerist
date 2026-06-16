@@ -1,0 +1,89 @@
+// Overlay rendering (spec §9). Paints viewport-layer and content-layer overlays for the current
+// slide. Content overlays live inside the transformed content layer so they track pan/zoom for
+// free; point overlays are counter-scaled to hold a constant screen size (decision per §9.1).
+
+import type { Group, Item, OverlaySpec, ViewerApi, ZoomState } from '@visora/core'
+import {
+  type Size,
+  contentAnchorBox,
+  counterScaleTransform,
+  orderByLayer,
+  resolveScaleWithImage,
+  viewportAnchorStyle,
+} from './position'
+
+export interface OverlayPaintCtx {
+  group: Group
+  item: Item
+  viewer: ViewerApi
+  zoom: ZoomState
+  stage: Size
+  natural: Size
+}
+
+export function gatherOverlays(group: Group, item: Item, globals: OverlaySpec[]): OverlaySpec[] {
+  return [...globals, ...(group.overlays ?? []), ...(item.overlays ?? [])]
+}
+
+export function paintOverlays(
+  viewportHost: HTMLElement,
+  contentHost: HTMLElement,
+  specs: OverlaySpec[],
+  ctx: OverlayPaintCtx,
+): void {
+  viewportHost.replaceChildren()
+  contentHost.replaceChildren()
+
+  for (const spec of orderByLayer(specs)) {
+    const host = document.createElement('div')
+    host.className = spec.class ? `visora-overlay ${spec.class}` : 'visora-overlay'
+    host.dataset.overlay = spec.id
+    host.style.position = 'absolute'
+    if (spec.layer !== undefined) host.style.zIndex = String(spec.layer)
+    host.style.pointerEvents = spec.interactive ? 'auto' : 'none'
+
+    const visible =
+      !spec.visibleAt ||
+      (ctx.zoom.scale >= spec.visibleAt[0] && ctx.zoom.scale <= spec.visibleAt[1])
+    if (!visible) host.style.display = 'none'
+
+    if (spec.interactive) {
+      host.tabIndex = 0
+      host.addEventListener('click', () =>
+        ctx.viewer.emit('overlayClick', {
+          viewer: ctx.viewer,
+          cursor: ctx.viewer.getState().cursor,
+          group: ctx.group,
+          item: ctx.item,
+          id: spec.id,
+        }),
+      )
+    } else {
+      host.setAttribute('aria-hidden', 'true')
+    }
+
+    const out = spec.render({
+      group: ctx.group,
+      item: ctx.item,
+      zoom: ctx.zoom,
+      viewer: ctx.viewer,
+    })
+    if (typeof out === 'string') host.textContent = out
+    else host.appendChild(out)
+
+    if (spec.anchor.kind === 'viewport') {
+      Object.assign(host.style, viewportAnchorStyle(spec.anchor.at, spec.anchor.offset))
+      viewportHost.appendChild(host)
+    } else {
+      const box = contentAnchorBox(spec.anchor, ctx.stage, ctx.natural)
+      host.style.left = `${box.left}px`
+      host.style.top = `${box.top}px`
+      if (box.width !== null) host.style.width = `${box.width}px`
+      if (box.height !== null) host.style.height = `${box.height}px`
+      if (!resolveScaleWithImage(spec.anchor, spec.scaleWithImage)) {
+        host.style.transform = counterScaleTransform(ctx.zoom.scale)
+      }
+      contentHost.appendChild(host)
+    }
+  }
+}

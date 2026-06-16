@@ -20,13 +20,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── modes ─────────────────────────────────────────────────────────────────── */
-.visora-overlay {
+/* ── modes (data-attribute, not a class — avoids colliding with .visora-overlay elements) ── */
+.visora[data-visora-mode="overlay"] {
   position: fixed;
   inset: 0;
   z-index: 2147483000;
 }
-.visora-inline {
+.visora[data-visora-mode="inline"] {
   position: relative;
   width: 100%;
   height: 100%;
@@ -64,6 +64,22 @@
   inset: 0;
   transform-origin: 0 0;
   will-change: transform;
+}
+
+/* ── overlays (spec §9) ────────────────────────────────────────────────────── */
+.visora-viewport-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.visora-overlays-content {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.visora-overlay {
+  pointer-events: none;
 }
 .visora-media {
   position: absolute;
