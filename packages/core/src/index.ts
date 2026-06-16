@@ -16,3 +16,4 @@ export {
   prevItem,
   resolveId,
 } from './nav/nav'
+export { type FsmEvent, type FsmState, initialFsm, reduceFsm } from './fsm/fsm'
