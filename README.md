@@ -1,0 +1,84 @@
+# Visora
+
+A **headless, framework-agnostic media viewer** for grouped / nested galleries, with image-space
+overlays and virtualized rendering at scale. MIT licensed; zero runtime dependencies in the core.
+
+Every other lightbox models a gallery as a flat 1-D strip. The real web is galleries-of-galleries
+— product variants × angles, posts × images, moments × monitors, documents × pages. Visora makes
+**nesting a first-class primitive**, lets you anchor interactive content to points *on the image*,
+and holds 60fps across thousands of items.
+
+> **Status:** Phase 0 (engine MVP) complete — headless core + DOM renderer + default theme + image
+> adapter + vanilla API. See `docs/IMPLEMENTATION.md` for the as-built design and
+> `plans/phase-0.md` for the milestone tracker. Phase 1 (React adapter + plugins) is next.
+
+## Quick start
+
+```bash
+pnpm install
+pnpm --filter @visora/example-monitoring dev   # grouped reviewer demo (nested, overlays)
+pnpm --filter @visora/example-vanilla dev      # flat gallery demo
+```
+
+```ts
+import { createViewer } from '@visora/core'
+import { mount } from '@visora/renderer-dom'
+import '@visora/theme-default/visora.css'
+
+// flat gallery — items[] is normalized to singleton groups internally
+const viewer = createViewer({ items: [{ id: 'a', type: 'image', source: 'a.jpg' }] })
+mount(viewer)            // overlay/lightbox mode; pass { container } for inline
+viewer.open()
+```
+
+Grouped (two-axis) — the reason Visora exists:
+
+```ts
+const viewer = createViewer({
+  collection: {
+    groups: [
+      { id: 'moment-1', items: [screenA, screenB, screenC] }, // ← swipe ↑/↓ between screens
+      { id: 'moment-2', items: [screenD] },                   // ← swipe ←/→ between moments
+    ],
+  },
+  itemMemory: 'preserve', // stay on the same screen index across moments
+})
+mount(viewer)
+```
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `pnpm build` | Build all packages (tsup → ESM + CJS + .d.ts) |
+| `pnpm test` | Unit tests (vitest: node + happy-dom) |
+| `pnpm e2e` | Browser tests (Playwright: gestures, a11y/axe, overlays) |
+| `pnpm typecheck` | TypeScript strict typecheck, all packages |
+| `pnpm lint` / `pnpm format` | Biome check / write |
+| `pnpm size` | size-limit budget gate (core ≤ 12 KB, core+renderer ≤ 16 KB gz) |
+
+## Packages
+
+| Package | What it does |
+|---|---|
+| `@visora/core` | Headless engine: data model, signal store, FSM, two-axis nav, zoom/gesture math, events, spring sampler, `createViewer`. **No DOM, zero deps.** |
+| `@visora/renderer-dom` | Default DOM renderer: windowed slides, image adapter, live gestures, image-space overlays, dialog a11y, chrome. The only ring that writes DOM. |
+| `@visora/theme-default` | Pure-CSS skin driven by `--visora-*` tokens; distinct axis motion; reduced-motion safe. |
+
+## Architecture
+
+The **headless core** owns state and logic and touches no DOM. The **renderer** is the only ring
+that writes to the DOM, and it is replaceable — that's what lets anyone build a fully custom UI on
+the same engine. Design rationale, the coordinate model, the data flow, and known gotchas are in
+[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md). The full spec (with the 14 locked decisions) is
+in [`docs/VISORA_SPEC.md`](docs/VISORA_SPEC.md).
+
+```
+theme-default (CSS) ─┐
+renderer-dom ────────┼─► core   (zero runtime deps, DOM-free)
+react/vue/svelte (P1)┘
+```
+
+## License
+
+MIT, with a DCO for contributions (no CLA). Clean-room: no GPL lightbox source consulted.
