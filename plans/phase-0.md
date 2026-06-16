@@ -37,7 +37,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
   Playwright, size-limit, Changesets, CI workflow, 3 package skeletons.
   *Verify:* `pnpm -r build`, `pnpm -r typecheck`, `pnpm test`, `pnpm size` run green.
 
-- [ ] **M1 — Core spine (no DOM).** types; `normalize`; `setCollection` diff; ~40-line signal store;
+- [x] **M1 — Core spine (no DOM).** types; `normalize`; `setCollection` diff; ~40-line signal store;
   FSM reducer (phase + interaction, re-open cancel, nav coalescing); two-axis nav math
   (loop, itemMemory reset/preserve/clamp, goTo/goToId); typed event emitter (cancelable
   beforeSlide/beforeItem); vanilla `createViewer` wiring.

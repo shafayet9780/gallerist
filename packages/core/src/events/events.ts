@@ -27,8 +27,9 @@ function isCancelable(p: unknown): p is Cancelable {
 export interface ViewerEventPayload {
   viewer: ViewerApi
   cursor: Cursor
-  group: Group
-  item: Item
+  // optional: absent for empty collections / lifecycle edges
+  group?: Group
+  item?: Item
 }
 export type CancelableNavPayload = ViewerEventPayload & Cancelable
 

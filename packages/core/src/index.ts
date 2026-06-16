@@ -3,7 +3,8 @@
 export const VERSION = '0.0.0'
 
 export type * from './types'
-export type { ViewerApi, ViewerOptions } from './api'
+export type { EventHandlers, ViewerApi, ViewerOptions } from './api'
+export { createViewer } from './controller/createViewer'
 export { normalize } from './model/normalize'
 export { createStore, type Store } from './store/store'
 export {

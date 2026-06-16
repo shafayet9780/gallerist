@@ -1,6 +1,7 @@
 // Public API contract (spec §8). Implemented by createViewer (M1.6).
 // Defined as an interface first so overlay/plugin types can reference it without a cycle.
 
+import type { EventMap, Handler } from './events/events'
 import type {
   Collection,
   CollectionInput,
@@ -11,6 +12,8 @@ import type {
   ZoomState,
 } from './types'
 
+export type EventHandlers = { [K in keyof EventMap]?: Handler<EventMap[K]> }
+
 export interface ViewerOptions extends CollectionInput {
   startAt?: { g?: number; i?: number }
   /** default true. */
@@ -20,6 +23,7 @@ export interface ViewerOptions extends CollectionInput {
   /** default false. */
   keepZoomOnNav?: boolean
   overlays?: OverlaySpec[]
+  on?: EventHandlers
 }
 
 export interface ViewerApi {
