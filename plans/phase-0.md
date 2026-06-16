@@ -48,7 +48,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
   arbitration reducer (§11.3 → navigate|pan|close|zoom|secondary), intent locked per gesture.
   *Verify:* vitest node — zoom round-trips + arbitration rules matrix.
 
-- [ ] **M3 — renderer-dom.** structural DOM; overlay-portal / inline modes; scroll-lock;
+- [x] **M3 — renderer-dom.** structural DOM; overlay-portal / inline modes; scroll-lock;
   slide windowing + node pool; load scheduling (AbortController, decode-before-reveal, srcset,
   fetchpriority); image adapter + LQIP placeholder cross-fade; ResizeObserver; Pointer Events →
   arbitration → pan/zoom/nav/close (imperative transform via RAF, commit on end); region mounts;

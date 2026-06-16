@@ -84,7 +84,6 @@ export function attachGestures(opts: GestureOptions): () => void {
   }
 
   const onDown = (e: PointerEvent) => {
-    ;(stage as Element).setPointerCapture?.(e.pointerId)
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
     startZoom = { ...viewer.getState().zoom }
     live = { ...startZoom }
@@ -96,6 +95,19 @@ export function attachGestures(opts: GestureOptions): () => void {
       if (a && b) pinchStartDist = dist(a, b)
       intent = 'zoom'
     }
+  }
+
+  const resolveIntent = (dx: number, dy: number): Intent => {
+    const g = getGeometry()
+    return arbitrate({
+      pointerCount: pointers.size === 0 ? 1 : pointers.size,
+      dx,
+      dy,
+      scale: startZoom.scale,
+      fitScale: g.naturalSize ? fit() : startZoom.scale,
+      grouped: currentGroupHasMultiple(viewer),
+      threshold,
+    })
   }
 
   const onMove = (e: PointerEvent) => {
@@ -116,19 +128,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     const dx = e.clientX - start.x
     const dy = e.clientY - start.y
 
-    if (intent === 'none') {
-      const g = getGeometry()
-      const grouped = currentGroupHasMultiple(viewer)
-      intent = arbitrate({
-        pointerCount: pointers.size,
-        dx,
-        dy,
-        scale: startZoom.scale,
-        fitScale: g.naturalSize ? fit() : startZoom.scale,
-        grouped,
-        threshold,
-      })
-    }
+    if (intent === 'none') intent = resolveIntent(dx, dy)
 
     if (intent === 'pan') {
       live = { scale: startZoom.scale, x: startZoom.x + dx, y: startZoom.y + dy }
@@ -144,15 +144,20 @@ export function attachGestures(opts: GestureOptions): () => void {
 
   const onUp = (e: PointerEvent) => {
     if (!pointers.has(e.pointerId)) return
-    const last = pointers.get(e.pointerId)
     pointers.delete(e.pointerId)
     if (frame) {
       caf(frame)
       frame = 0
     }
 
-    const dx = start && last ? last.x - start.x : 0
-    const dy = start && last ? last.y - start.y : 0
+    // Use the up event's own coordinates: coalesced input may have fired no pointermove,
+    // leaving the stored position stale at the down point.
+    const dx = start ? e.clientX - start.x : 0
+    const dy = start ? e.clientY - start.y : 0
+
+    // Resolve at release too: synthetic/coalesced input may deliver no pointermove
+    // before pointerup, leaving intent unresolved otherwise.
+    if (intent === 'none') intent = resolveIntent(dx, dy)
 
     switch (intent) {
       case 'pan': {

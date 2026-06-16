@@ -1,14 +1,190 @@
 /*
- * @visora/theme-default — pure CSS skin for Visora.
- * Every color/size/timing is a --visora-* custom property (token prefix locked: --visora-*).
- * Dark mode via prefers-color-scheme + [data-visora-theme] override.
- * Full token set + chrome material + motion fallbacks land in M5.
+ * @visora/theme-default — pure CSS skin for Visora (token prefix locked: --visora-*).
+ * M3 ships the structural layout + a minimal dark skin so the renderer is usable and
+ * e2e-testable. Motion (springs, FLIP, axis transitions, auto-hide) lands in M5.
  */
+
 .visora {
+  /* tokens */
   --visora-backdrop: rgb(8 8 10 / 0.94);
   --visora-fg: #fff;
   --visora-accent: #378add;
   --visora-radius: 8px;
   --visora-speed: 300ms;
-  --visora-thumb-h: 80px;
+  --visora-chrome-bg: rgb(10 10 14 / 0.45);
+  --visora-hairline: rgb(255 255 255 / 0.08);
+  --visora-target: 44px;
+
+  color: var(--visora-fg);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── modes ─────────────────────────────────────────────────────────────────── */
+.visora-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+}
+.visora-inline {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.visora-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--visora-backdrop);
+}
+
+/* ── stage / slides ────────────────────────────────────────────────────────── */
+.visora-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none; /* gestures are owned by the engine (spec §11) */
+}
+.visora-track {
+  position: absolute;
+  inset: 0;
+}
+.visora-slide {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.visora-slide[data-visora-current] {
+  display: flex;
+}
+.visora-content {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.visora-media {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+.visora-media-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+.visora-media-image[data-visora-loaded] {
+  opacity: 1;
+}
+
+/* ── chrome ────────────────────────────────────────────────────────────────── */
+.visora-chrome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.visora-chrome > * {
+  pointer-events: auto;
+}
+.visora-chrome button {
+  position: absolute;
+  min-width: var(--visora-target);
+  min-height: var(--visora-target);
+  display: grid;
+  place-items: center;
+  border: 0.5px solid var(--visora-hairline);
+  border-radius: var(--visora-radius);
+  background: var(--visora-chrome-bg);
+  color: var(--visora-fg);
+  cursor: pointer;
+  backdrop-filter: blur(20px) saturate(180%);
+}
+.visora-chrome button:focus-visible {
+  outline: 2px solid var(--visora-accent);
+  outline-offset: 2px;
+}
+.visora-close {
+  top: 12px;
+  right: 12px;
+}
+.visora-close::before {
+  content: "✕";
+}
+.visora-prev {
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+}
+.visora-prev::before {
+  content: "‹";
+  font-size: 24px;
+}
+.visora-next {
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+}
+.visora-next::before {
+  content: "›";
+  font-size: 24px;
+}
+.visora-item-prev {
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.visora-item-prev::before {
+  content: "˄";
+}
+.visora-item-next {
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.visora-item-next::before {
+  content: "˅";
+}
+.visora-zoom-reset {
+  bottom: 12px;
+  right: 12px;
+}
+.visora-zoom-reset::before {
+  content: "⌂";
+}
+.visora-counter {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: var(--visora-radius);
+  background: var(--visora-chrome-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* ── a11y live region (visually hidden) ────────────────────────────────────── */
+.visora-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visora-media-image {
+    transition-duration: 0ms;
+  }
 }

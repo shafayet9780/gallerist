@@ -272,9 +272,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     getContent: () => currentRec()?.content ?? null,
     getGeometry: () => {
       const r = stage.getBoundingClientRect()
+      // Phase 0 coordinate model: the media is CSS-contained (object-fit) so the content
+      // layer fills the stage and scale 1 == fit. Pan bounds therefore use the stage size;
+      // the media's true pixel size drives only the CSS layout. (Natural-coordinate overlays
+      // map through the contained rect in M4.)
       return {
         stageRect: { left: r.left, top: r.top, width: r.width, height: r.height },
-        naturalSize: currentRec()?.media?.naturalSize?.() ?? null,
+        naturalSize: { w: r.width, h: r.height },
       }
     },
   })
