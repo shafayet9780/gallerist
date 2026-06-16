@@ -1,0 +1,22 @@
+{
+  "name": "@visora/plugin-video-youtube",
+  "version": "0.0.0",
+  "description": "Visora plugin — YouTube IFrame API media adapter (split provider sub-plugin).",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": { "build": "tsup", "typecheck": "tsc --noEmit" },
+  "peerDependencies": { "@visora/core": "workspace:^" },
+  "devDependencies": { "@visora/core": "workspace:*", "tsup": "^8.3.5", "typescript": "^5.7.2" }
+}

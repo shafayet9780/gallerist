@@ -42,6 +42,7 @@ interface SlideRec {
   abort?: AbortController
   overlayEls?: OverlayEntry[]
   overlayItemId?: string
+  activated?: boolean
 }
 
 function el(tag: string, className?: string, attrs?: Record<string, string>): HTMLElement {
@@ -214,7 +215,16 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         })
         rec.abort = abort
         rec.itemId = it.id
+        rec.activated = false
         rec.content.appendChild(rec.overlayHost) // keep overlays above the media
+      }
+      // activate/deactivate media on slide enter/leave (spec §12 — play/pause for video)
+      if (isCurrent && !rec.activated) {
+        rec.media?.activate?.()
+        rec.activated = true
+      } else if (!isCurrent && rec.activated) {
+        rec.media?.deactivate?.()
+        rec.activated = false
       }
       if (isCurrent) {
         tagAxis(rec.slide, cur)

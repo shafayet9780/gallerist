@@ -66,12 +66,12 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ## M12 — video (HTML5) + youtube
 
-- [ ] **T12.1 — @visora/plugin-video** — HTML5 `<video>` MediaAdapter; `activate/deactivate` → play/pause;
+- [x] **T12.1 — @visora/plugin-video** — HTML5 `<video>` MediaAdapter; `activate/deactivate` → play/pause;
   advance-on-ended → `next()`/`nextItem()`; poster via `placeholder`. Verify: happy-dom (mount, activate plays,
   deactivate pauses) + e2e (play/pause on enter/leave, advance on ended).
-- [ ] **T12.2 — @visora/plugin-video-youtube** — IFrame API adapter (async script, guarded); `match` by URL;
+- [x] **T12.2 — @visora/plugin-video-youtube** — IFrame API adapter (async script, guarded); `match` by URL;
   activate/deactivate. Verify: unit (mock IFrame API); e2e behind opt-in flag.
-- [ ] **Checkpoint M12** — gates green; commit.
+- [x] **Checkpoint M12** — gates green; commit.
 
 ## M13 — hardening + ship
 
