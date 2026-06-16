@@ -23,6 +23,33 @@ export type MediaSource =
   | { loader: (signal: AbortSignal) => Promise<string | HTMLElement> }
   | { tiles: DZIDescriptor }
 
+// ── Media adapters (spec §12) ────────────────────────────────────────────────
+// Interfaces only; DOM types are type-only so core stays DOM-free. Concrete adapters
+// (e.g. the image adapter) ship with the renderer, which is the ring that touches the DOM.
+
+export interface AdapterCtx {
+  signal: AbortSignal
+  priority?: 'high' | 'low' | 'auto'
+  stageSize?: () => { w: number; h: number }
+}
+
+export interface MountedMedia {
+  element: HTMLElement
+  /** resolves when displayable (decoded). */
+  ready: Promise<void>
+  naturalSize?(): { w: number; h: number } | null
+  supportsZoom: boolean
+  activate?(): void
+  deactivate?(): void
+  destroy(): void
+}
+
+export interface MediaAdapter {
+  type: string
+  match?(item: Item): boolean
+  mount(item: Item, slot: HTMLElement, ctx: AdapterCtx): MountedMedia
+}
+
 // ── Overlays (spec §9; render signature frozen per decision P0-G) ─────────────
 
 export type OverlaySpace = 'natural' | 'normalized'
