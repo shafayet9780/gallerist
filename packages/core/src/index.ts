@@ -26,6 +26,7 @@ export {
 } from './nav/nav'
 export { type FsmEvent, type FsmState, initialFsm, reduceFsm } from './fsm/fsm'
 export { sampleSpring, type SpringParams, type SpringSample, SPRINGS } from './motion/spring'
+export { type KeyReconcile, reconcileKeys, windowIndices } from './windowing'
 export { type ArbitrationInput, arbitrate, type Intent } from './zoom/arbitration'
 export {
   clampPan,

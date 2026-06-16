@@ -153,6 +153,73 @@
   z-index: 0;
 }
 
+/* ── thumbnails rail (plugin-thumbnails) ───────────────────────────────────── */
+.visora-thumbs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  overflow-x: auto;
+  background: var(--visora-chrome-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+.visora-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: calc(var(--visora-thumb-h) * 1.4);
+  height: var(--visora-thumb-h);
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #1a1a1f;
+}
+.visora-thumb[data-active] {
+  border-color: var(--visora-accent);
+}
+.visora-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.visora-thumb-stacked {
+  box-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
+}
+.visora-thumb-count {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font: 600 11px system-ui;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 8px;
+}
+.visora-thumb-items {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding-left: 8px;
+  margin-left: 8px;
+  border-left: 1px solid var(--visora-hairline);
+}
+.visora-thumb-item {
+  flex: 0 0 auto;
+  width: calc(var(--visora-thumb-h) * 0.8);
+  height: calc(var(--visora-thumb-h) * 0.7);
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #1a1a1f;
+}
+.visora-thumb-item[data-active] {
+  border-color: var(--visora-accent);
+}
+
 /* ── chrome ────────────────────────────────────────────────────────────────── */
 .visora-chrome {
   position: absolute;

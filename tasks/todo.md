@@ -49,13 +49,13 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ## M10 — plugin-thumbnails (grouped) — the differentiator
 
-- [ ] **T10.1 — windowed rail** in `thumbnails` region (reuse `windowIndices`/`reconcileKeys`); click → `goTo`;
+- [x] **T10.1 — windowed rail** in `thumbnails` region (reuse `windowIndices`/`reconcileKeys`); click → `goTo`;
   active indicator tracks cursor; keymap. Verify: happy-dom (windowed count, active tracking) + e2e (click navigates).
-- [ ] **T10.2 — grouped stacked cards + expand** — multi-item groups show a stacked card; expand → lazy item
+- [x] **T10.2 — grouped stacked cards + expand** — multi-item groups show a stacked card; expand → lazy item
   thumbs via IntersectionObserver. a11y: listbox/option for the secondary axis. Verify: happy-dom (card vs flat,
   expand) + e2e.
-- [ ] **T10.3 — perf** — 10k items → <200 live thumb nodes (§20). Verify: perf test/trace.
-- [ ] **Checkpoint M10** — gates + thumbnails size budget; commit.
+- [x] **T10.3 — perf** — 10k items → <200 live thumb nodes (§20). Verify: perf test/trace.
+- [x] **Checkpoint M10** — gates + thumbnails size budget; commit.
 
 ## M11 — plugin-grid (in-viewer mode)
 
