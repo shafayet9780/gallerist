@@ -5,6 +5,7 @@
 
 import type { MediaAdapter, Phase, ViewerApi, ZoomState } from '@visora/core'
 import { imageAdapter } from './adapters/image'
+import { attachGestures } from './gestures'
 import { reconcileKeys, windowIndices } from './windowing'
 
 export interface MountOptions {
@@ -260,6 +261,24 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   }
   root.addEventListener('keydown', onKey)
 
+  // ── live gestures (spec §11; imperative during gesture, decision P0-E) ─────────
+  const currentRec = () => {
+    const key = viewer.getCollection().groups[viewer.getState().cursor.g]?.id
+    return key ? mounted.get(key) : undefined
+  }
+  const detachGestures = attachGestures({
+    stage,
+    viewer,
+    getContent: () => currentRec()?.content ?? null,
+    getGeometry: () => {
+      const r = stage.getBoundingClientRect()
+      return {
+        stageRect: { left: r.left, top: r.top, width: r.width, height: r.height },
+        naturalSize: currentRec()?.media?.naturalSize?.() ?? null,
+      }
+    },
+  })
+
   const unsubscribe = viewer.subscribe(sync)
   sync()
 
@@ -267,6 +286,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     root,
     destroy() {
       unsubscribe()
+      detachGestures()
       root.removeEventListener('keydown', onKey)
       for (const rec of mounted.values()) teardownSlide(rec)
       mounted.clear()
