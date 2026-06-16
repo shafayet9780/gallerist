@@ -1,0 +1,14 @@
+/*
+ * @visora/theme-default — pure CSS skin for Visora.
+ * Every color/size/timing is a --visora-* custom property (token prefix locked: --visora-*).
+ * Dark mode via prefers-color-scheme + [data-visora-theme] override.
+ * Full token set + chrome material + motion fallbacks land in M5.
+ */
+.visora {
+  --visora-backdrop: rgb(8 8 10 / 0.94);
+  --visora-fg: #fff;
+  --visora-accent: #378add;
+  --visora-radius: 8px;
+  --visora-speed: 300ms;
+  --visora-thumb-h: 80px;
+}

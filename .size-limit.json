@@ -1,0 +1,14 @@
+[
+  {
+    "name": "@visora/core + renderer-dom (gz)",
+    "path": ["packages/core/dist/index.js", "packages/renderer-dom/dist/index.js"],
+    "limit": "16 kB",
+    "gzip": true
+  },
+  {
+    "name": "@visora/core (gz)",
+    "path": "packages/core/dist/index.js",
+    "limit": "12 kB",
+    "gzip": true
+  }
+]
