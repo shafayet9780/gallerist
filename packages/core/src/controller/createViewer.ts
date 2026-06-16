@@ -169,6 +169,9 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       }))
       emitter.emit('collectionChange', { viewer: api })
     },
+    getCollection() {
+      return collection
+    },
     refresh() {
       // renderer re-measures; no-op in the headless core.
     },

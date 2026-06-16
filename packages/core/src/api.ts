@@ -38,6 +38,7 @@ export interface ViewerApi {
   zoomTo(scale: number, focal?: { x: number; y: number }): void
   resetZoom(): void
   setCollection(next: Collection): void
+  getCollection(): Readonly<Collection>
   refresh(): void
   getState(): Readonly<ViewerState>
   subscribe(fn: (s: Readonly<ViewerState>) => void): () => void
