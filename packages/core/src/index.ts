@@ -6,3 +6,13 @@ export type * from './types'
 export type { ViewerApi, ViewerOptions } from './api'
 export { normalize } from './model/normalize'
 export { createStore, type Store } from './store/store'
+export {
+  applyItemMemory,
+  goTo,
+  type NavCtx,
+  nextGroup,
+  nextItem,
+  prevGroup,
+  prevItem,
+  resolveId,
+} from './nav/nav'
