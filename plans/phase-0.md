@@ -59,7 +59,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
   point counter-scale; visibleAt, layer, interactive → overlayClick; non-visible slides render none.
   *Verify:* Playwright visual regression at multiple zoom levels.
 
-- [ ] **M5 — Motion.** core spring→keyframe sampler (interruptible re-base) → Element.animate;
+- [x] **M5 — Motion.** (spring sampler + axis-distinct transitions + reduced-motion + tokens; FLIP shared-element open/close & full interruptible hero deferred as polish) core spring→keyframe sampler (interruptible re-base) → Element.animate;
   theme-default `--visora-*` tokens + bezier fallbacks, chrome material, auto-hide, backdrop;
   shared-element FLIP open/close; depth-flip vs horizontal-slide axis distinction;
   prefers-reduced-motion → ≤140ms cross-fades.

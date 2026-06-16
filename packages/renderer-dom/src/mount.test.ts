@@ -133,6 +133,21 @@ describe('mount — zoom transform', () => {
   })
 })
 
+describe('mount — motion axis', () => {
+  const current = () => document.querySelector('.visora-slide[data-visora-current]')
+  it('tags the current slide with the axis of motion (group vs item)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open({ g: 1 })
+    v.next() // group axis
+    expect(current()?.getAttribute('data-visora-enter')).toBe('group')
+    v.prev()
+    v.open({ g: 1 })
+    v.nextItem() // item axis
+    expect(current()?.getAttribute('data-visora-enter')).toBe('item')
+  })
+})
+
 describe('mount — destroy', () => {
   it('removes the root and stops reacting', () => {
     const v = createViewer({ collection: collection() })

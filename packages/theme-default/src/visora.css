@@ -15,6 +15,13 @@
   --visora-hairline: rgb(255 255 255 / 0.08);
   --visora-target: 44px;
 
+  /* motion (spec §27.2) — bezier approximations of the named springs */
+  --visora-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --visora-ease-pop: cubic-bezier(0.34, 1.3, 0.5, 1);
+  --visora-dur-hero: 420ms;
+  --visora-dur-snappy: 340ms;
+  --visora-dur-gentle: 280ms;
+
   color: var(--visora-fg);
   font-family: system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
@@ -199,8 +206,53 @@
   border: 0;
 }
 
+/* ── motion: distinct axis transitions (spec §27.5) ────────────────────────── */
+@keyframes visora-enter-group {
+  from {
+    opacity: 0;
+    transform: translateX(6%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes visora-enter-item {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(2%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes visora-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* time axis = horizontal slide; screen axis = depth pop — never the same motion */
+.visora-slide[data-visora-enter="group"] {
+  animation: visora-enter-group var(--visora-dur-snappy) var(--visora-ease-out);
+}
+.visora-slide[data-visora-enter="item"] {
+  animation: visora-enter-item var(--visora-dur-snappy) var(--visora-ease-pop);
+}
+.visora[data-visora-mode="overlay"] {
+  animation: visora-fade var(--visora-dur-gentle) var(--visora-ease-out);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .visora-media-image {
     transition-duration: 0ms;
+  }
+  .visora-slide[data-visora-enter],
+  .visora[data-visora-mode="overlay"] {
+    animation: none;
   }
 }

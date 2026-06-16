@@ -102,6 +102,19 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   // ── slide window ─────────────────────────────────────────────────────────────
   const mounted = new Map<string, SlideRec>()
+  let lastCursor: { g: number; i: number } | null = null
+
+  // Tag the current slide with the axis of motion so the theme can use visibly distinct
+  // transitions (spec §27.5): group axis = horizontal time slide, item axis = depth pop.
+  const tagAxis = (currentSlide: HTMLElement, cur: { g: number; i: number }) => {
+    if (lastCursor && (lastCursor.g !== cur.g || lastCursor.i !== cur.i)) {
+      const axis = lastCursor.g !== cur.g ? 'group' : 'item'
+      currentSlide.removeAttribute('data-visora-enter')
+      void currentSlide.offsetWidth // reflow to restart the CSS animation
+      currentSlide.setAttribute('data-visora-enter', axis)
+    }
+    lastCursor = { g: cur.g, i: cur.i }
+  }
 
   const teardownSlide = (rec: SlideRec) => {
     rec.abort?.abort()
@@ -156,6 +169,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.content.appendChild(rec.overlayHost) // keep overlays above the media
       }
       if (isCurrent) {
+        tagAxis(rec.slide, cur)
         rec.slide.setAttribute('data-visora-current', '')
         rec.content.setAttribute('data-visora-current', '')
         applyTransform(rec.content, state.zoom)
