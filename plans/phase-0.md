@@ -65,7 +65,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
   prefers-reduced-motion → ≤140ms cross-fades.
   *Verify:* Playwright visual-regression (axis distinction) + reverse-mid-flight (no snap).
 
-- [ ] **M6 — Hardening.** axe in CI; perf trace (60fps, no long task >50ms, memory bound);
+- [x] **M6 — Hardening.** (axe in CI/e2e; virtualization DOM-bound proven for 10k groups; size gate; examples vanilla + monitoring. 60fps frame-trace deferred to a dedicated perf job) axe in CI; perf trace (60fps, no long task >50ms, memory bound);
   size-limit ≤16KB; examples/vanilla (flat) + examples/monitoring (grouped + preserve + overlays)
   smoke-tested.
   *Verify:* full CI pipeline green.

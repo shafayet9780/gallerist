@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visora — monitoring (grouped / nested)</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #0c0c0f;
+        color: #eee;
+      }
+      h1 {
+        padding: 24px;
+        font-weight: 500;
+      }
+      p {
+        padding: 0 24px;
+        color: #999;
+        max-width: 60ch;
+      }
+      .moments {
+        display: flex;
+        gap: 12px;
+        padding: 24px;
+        overflow-x: auto;
+      }
+      .moment button {
+        padding: 0;
+        border: 0;
+        cursor: pointer;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .moment img {
+        width: 220px;
+        height: 140px;
+        object-fit: cover;
+        display: block;
+      }
+      .moment span {
+        display: block;
+        font-size: 12px;
+        color: #aaa;
+        padding-top: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Visora — monitoring reviewer (grouped, <code>itemMemory: 'preserve'</code>)</h1>
+    <p>
+      Each card is a <strong>moment</strong> (time axis →). Each moment has several
+      <strong>monitors</strong> (depth axis ↕). Open one and press ↑/↓ to switch monitor, ←/→ to
+      move through time — the monitor index is preserved across moments.
+    </p>
+    <div class="moments" id="moments"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
