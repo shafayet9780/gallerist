@@ -14,6 +14,7 @@ import {
 import { reduceFsm } from '../fsm/fsm'
 import { normalize } from '../model/normalize'
 import * as nav from '../nav/nav'
+import type { Plugin, PluginInstance } from '../plugins/types'
 import { createStore } from '../store/store'
 import type { Collection, Cursor, ViewerState, ZoomState } from '../types'
 
@@ -46,6 +47,25 @@ export function createViewer(options: ViewerOptions): ViewerApi {
   })
 
   const emitter = createEmitter<EventMap>()
+
+  // ── plugin registry (spec §13) ─────────────────────────────────────────────
+  const pluginInstances: PluginInstance[] = []
+  const pluginsChanged = new Set<() => void>()
+  const registerPlugin = (plugin: Plugin): void => {
+    if (destroyed) return
+    const inst = plugin(api)
+    pluginInstances.push(inst)
+    if (inst.on) {
+      for (const [type, fn] of Object.entries(inst.on) as [
+        keyof EventMap,
+        Handler<EventMap[keyof EventMap]>,
+      ][]) {
+        emitter.on(type, fn)
+      }
+    }
+    inst.init?.()
+    for (const fn of [...pluginsChanged]) fn()
+  }
 
   // api is referenced by event payloads; assigned below before any emit can run.
   // biome-ignore lint/style/useConst: forward reference — helpers close over api, assigned later.
@@ -195,10 +215,25 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     emit(event, payload) {
       return emitter.emit(event, payload)
     },
+    use(plugin) {
+      registerPlugin(plugin)
+    },
+    getPlugins() {
+      return pluginInstances
+    },
+    onPluginsChanged(fn) {
+      pluginsChanged.add(fn)
+      return () => {
+        pluginsChanged.delete(fn)
+      }
+    },
     destroy() {
       if (destroyed) return
       destroyed = true
       emitter.emit('destroy', { viewer: api })
+      for (const inst of [...pluginInstances].reverse()) inst.destroy?.()
+      pluginInstances.length = 0
+      pluginsChanged.clear()
       emitter.clear()
       store.clear()
     },
@@ -219,6 +254,9 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       if (fn) emitter.on(type, fn as Handler<EventMap[keyof EventMap]>)
     }
   }
+
+  // register plugins before init so their on-handlers see the init event
+  if (options.plugins) for (const plugin of options.plugins) registerPlugin(plugin)
 
   emitter.emit('init', { viewer: api })
   return api
