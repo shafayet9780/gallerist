@@ -7,6 +7,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@visora/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
+      '@visora/renderer-dom': fileURLToPath(
+        new URL('./packages/renderer-dom/src/index.ts', import.meta.url),
+      ),
     },
   },
   test: {
