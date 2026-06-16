@@ -15,5 +15,28 @@
     },
     "limit": "16 kB",
     "gzip": true
+  },
+  {
+    "name": "core + renderer-dom + thumbnails (gz)",
+    "path": [
+      "packages/core/dist/index.js",
+      "packages/renderer-dom/dist/index.js",
+      "packages/plugin-thumbnails/dist/index.js"
+    ],
+    "import": {
+      "packages/core/dist/index.js": "{ createViewer }",
+      "packages/renderer-dom/dist/index.js": "{ mount }",
+      "packages/plugin-thumbnails/dist/index.js": "{ thumbnails }"
+    },
+    "limit": "24 kB",
+    "gzip": true
+  },
+  {
+    "name": "@visora/react (gz)",
+    "path": "packages/react/dist/index.js",
+    "import": "{ Visora, useVisora }",
+    "ignore": ["react", "react-dom", "@visora/core", "@visora/renderer-dom"],
+    "limit": "3 kB",
+    "gzip": true
   }
 ]

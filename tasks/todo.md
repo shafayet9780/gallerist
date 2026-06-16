@@ -75,10 +75,10 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ## M13 — hardening + ship
 
-- [ ] **T13.1 — a11y** — axe on thumbnails (listbox), grid, toolbar (≥44px); manual SR pass.
-- [ ] **T13.2 — perf** — traces for thumbnails/grid at 10k; per-package size-limit entries
+- [x] **T13.1 — a11y** — axe on thumbnails (listbox), grid, toolbar (≥44px); manual SR pass.
+- [x] **T13.2 — perf** — traces for thumbnails/grid at 10k; per-package size-limit entries
   (core+thumbnails+image ≤24 KB gz, §20).
-- [ ] **T13.3 — examples + docs** — update examples (React + plugins demo); plugin-authoring guide;
+- [x] **T13.3 — examples + docs** — update examples (React + plugins demo); plugin-authoring guide;
   per-plugin README; CHANGELOG.
-- [ ] **T13.4 — release** — Changesets; tag `v0.1.0-phase1`.
-- [ ] **Checkpoint M13** — full CI green; all budgets met; examples smoke-tested.
+- [x] **T13.4 — release** — Changesets; tag `v0.1.0-phase1`.
+- [x] **Checkpoint M13** — full CI green; all budgets met; examples smoke-tested.

@@ -24,6 +24,7 @@ function lazyImg(src: string | null, observer: IntersectionObserver | null): HTM
   img.className = 'visora-grid-img'
   img.decoding = 'async'
   img.loading = 'lazy'
+  img.alt = '' // decorative — the enclosing cell carries the accessible name
   if (!src) return img
   if (observer) {
     img.dataset.src = src
@@ -76,6 +77,7 @@ export function grid(opts: GridOptions = {}): Plugin {
           cell.type = 'button'
           cell.className = 'visora-grid-cell'
           cell.setAttribute('role', 'option')
+          cell.setAttribute('aria-label', `${header.textContent}, item ${i + 1}`)
           const selected = g === cur.g && i === cur.i
           cell.setAttribute('aria-selected', String(selected))
           if (selected) cell.setAttribute('data-active', '')

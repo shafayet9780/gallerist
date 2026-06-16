@@ -8,9 +8,10 @@ Every other lightbox models a gallery as a flat 1-D strip. The real web is galle
 **nesting a first-class primitive**, lets you anchor interactive content to points *on the image*,
 and holds 60fps across thousands of items.
 
-> **Status:** Phase 0 (engine MVP) complete — headless core + DOM renderer + default theme + image
-> adapter + vanilla API. See `docs/IMPLEMENTATION.md` for the as-built design and
-> `plans/phase-0.md` for the milestone tracker. Phase 1 (React adapter + plugins) is next.
+> **Status:** Phase 1 in progress — engine MVP (Phase 0) + plugin architecture + React adapter +
+> the first plugins (fullscreen, hash, download, thumbnails, grid, video). See
+> `docs/IMPLEMENTATION.md` (as-built engine), `docs/PLUGIN-AUTHORING.md` (writing plugins), and
+> `tasks/plan.md` / `tasks/todo.md` (Phase 1 tracker). `CHANGELOG.md` lists what shipped.
 
 ## Quick start
 
@@ -64,6 +65,8 @@ mount(viewer)
 | `@visora/core` | Headless engine: data model, signal store, FSM, two-axis nav, zoom/gesture math, events, spring sampler, `createViewer`. **No DOM, zero deps.** |
 | `@visora/renderer-dom` | Default DOM renderer: windowed slides, image adapter, live gestures, image-space overlays, dialog a11y, chrome. The only ring that writes DOM. |
 | `@visora/theme-default` | Pure-CSS skin driven by `--visora-*` tokens; distinct axis motion; reduced-motion safe. |
+| `@visora/react` | React adapter: `useVisora()` hook, `<Visora>` component, `<Visora.Overlay>`/`<Visora.Region>` JSX portals. |
+| `@visora/plugin-*` | Tree-shakeable plugins: `fullscreen`, `hash`, `download`, `thumbnails` (grouped), `grid`, `video`, `video-youtube`. |
 
 ## Architecture
 

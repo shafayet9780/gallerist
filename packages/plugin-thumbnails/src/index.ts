@@ -28,6 +28,7 @@ function lazyImg(src: string | null, observer: IntersectionObserver | null): HTM
   img.className = 'visora-thumb-img'
   img.decoding = 'async'
   img.loading = 'lazy'
+  img.alt = '' // decorative — the enclosing button carries the accessible name
   if (!src) return img
   if (observer) {
     img.dataset.src = src
