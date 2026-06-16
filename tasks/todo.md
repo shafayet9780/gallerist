@@ -59,10 +59,10 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ## M11 — plugin-grid (in-viewer mode)
 
-- [ ] **T11.1 — grid region** over the stage: windowed contact sheet, grouped interval headers, lazy thumbs,
+- [x] **T11.1 — grid region** over the stage: windowed contact sheet, grouped interval headers, lazy thumbs,
   toggle on/off, click cell → `goTo` + hide. Verify: happy-dom (cells + headers windowed) + e2e (toggle,
   click → stage at item) + perf (bounded nodes).
-- [ ] **Checkpoint M11** — gates green; commit.
+- [x] **Checkpoint M11** — gates green; commit.
 
 ## M12 — video (HTML5) + youtube
 

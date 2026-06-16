@@ -94,6 +94,18 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/plugin-grid:
+    devDependencies:
+      '@visora/core':
+        specifier: workspace:*
+        version: link:../core
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/plugin-hash:
     devDependencies:
       '@visora/core':
