@@ -90,4 +90,36 @@ describe('imageAdapter', () => {
     m.destroy()
     expect(s.contains(m.element)).toBe(false)
   })
+
+  it('resolves a loader that returns a URL string', async () => {
+    const m = imageAdapter().mount(
+      img({ source: { loader: async () => 'loaded.jpg' } }),
+      slot(),
+      ctx(),
+    )
+    await new Promise((r) => setTimeout(r, 0)) // flush the loader
+    m.element.dispatchEvent(new Event('load'))
+    await expect(m.ready).resolves.toBeUndefined()
+    expect((m.element as HTMLImageElement).src).toContain('loaded.jpg')
+  })
+
+  it('rejects ready when the loader rejects (no unhandled rejection)', async () => {
+    const m = imageAdapter().mount(
+      img({ source: { loader: async () => Promise.reject(new Error('boom')) } }),
+      slot(),
+      ctx(),
+    )
+    await expect(m.ready).rejects.toThrow('boom')
+  })
+
+  it('mounts a custom element returned by the loader and resolves ready', async () => {
+    const custom = document.createElement('div')
+    custom.id = 'custom-media'
+    const s = slot()
+    const m = imageAdapter().mount(img({ source: { loader: async () => custom } }), s, ctx())
+    await expect(m.ready).resolves.toBeUndefined()
+    expect(s.contains(custom)).toBe(true)
+    expect(custom.hasAttribute('data-visora-loaded')).toBe(true)
+    expect(m.element).toBe(custom)
+  })
 })

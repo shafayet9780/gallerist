@@ -7,6 +7,8 @@ export interface Store<S> {
   subscribe(fn: (s: Readonly<S>) => void): () => void
   /** Selector subscription: fires only when the selected slice changes (avoids over-notifying). */
   select<T>(sel: (s: S) => T, fn: (t: T) => void, eq?: (a: T, b: T) => boolean): () => void
+  /** Drop all subscribers (used on viewer destroy to avoid leaking consumer closures). */
+  clear(): void
 }
 
 export function createStore<S>(initial: S): Store<S> {
@@ -45,5 +47,7 @@ export function createStore<S>(initial: S): Store<S> {
     })
   }
 
-  return { get, set, subscribe, select }
+  const clear = () => subs.clear()
+
+  return { get, set, subscribe, select, clear }
 }

@@ -78,6 +78,14 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
 4. Re-render storms → imperative zoom + store selector eq guards.
 5. SSR safety → no DOM at import/construct; node-import smoke test.
 
+## Phase-1 prerequisite (from the Phase-0 review)
+
+- **Region/slot contract belongs in core (decision F).** Phase 0 has no plugins, so the abstract
+  `RegionName` + slot contract isn't built yet. Before the first plugin (thumbnails/grid/…),
+  define it in `@visora/core` so plugins target the abstract contract and survive a renderer
+  swap — building plugins against a `renderer-dom`-specific region API would break the headless
+  moat. (Review finding I5, deferred deliberately — a hollow type now adds nothing.)
+
 ## End-to-end verification
 
 ```

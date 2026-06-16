@@ -96,4 +96,13 @@ describe('createStore', () => {
     // 'b' may fire in the first round (snapshot) but never after it unsubscribes.
     expect(calls.filter((c) => c === 'a')).toHaveLength(2)
   })
+
+  it('clear() drops all subscribers', () => {
+    const s = createStore(initial())
+    const fn = vi.fn()
+    s.subscribe(fn)
+    s.clear()
+    s.set({ a: 2, b: { n: 0 } })
+    expect(fn).not.toHaveBeenCalled()
+  })
 })

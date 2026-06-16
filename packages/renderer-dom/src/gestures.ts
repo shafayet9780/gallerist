@@ -11,6 +11,7 @@ import {
   clampScale,
   fitScale,
   focalZoom,
+  toggleZoom,
 } from '@visora/core'
 
 export interface Geometry {
@@ -60,15 +61,19 @@ export function attachGestures(opts: GestureOptions): () => void {
   let intent: Intent = 'none'
   let live = { scale: 1, x: 0, y: 0 }
   let frame = 0
+  // Geometry snapshot for the active gesture — avoids a getBoundingClientRect (forced layout)
+  // on every pointermove during pinch/pan, which would jeopardize the 60fps budget (§20).
+  let gestureGeom: Geometry | null = null
 
+  const geom = () => gestureGeom ?? getGeometry()
   const fit = () => {
-    const g = getGeometry()
+    const g = geom()
     return g.naturalSize
       ? fitScale({ w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
       : 1
   }
   const toStage = (p: Pt): Pt => {
-    const r = getGeometry().stageRect
+    const r = geom().stageRect
     return { x: p.x - r.left, y: p.y - r.top }
   }
 
@@ -87,6 +92,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
     startZoom = { ...viewer.getState().zoom }
     live = { ...startZoom }
+    gestureGeom = getGeometry() // snapshot once; reused for the gesture (no per-move layout)
     if (pointers.size === 1) {
       start = { x: e.clientX, y: e.clientY }
       intent = 'none'
@@ -98,7 +104,7 @@ export function attachGestures(opts: GestureOptions): () => void {
   }
 
   const resolveIntent = (dx: number, dy: number): Intent => {
-    const g = getGeometry()
+    const g = geom()
     return arbitrate({
       pointerCount: pointers.size === 0 ? 1 : pointers.size,
       dx,
@@ -161,7 +167,7 @@ export function attachGestures(opts: GestureOptions): () => void {
 
     switch (intent) {
       case 'pan': {
-        const g = getGeometry()
+        const g = geom()
         const committed = g.naturalSize
           ? clampPan(live, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
           : live
@@ -188,6 +194,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     if (pointers.size === 0) {
       start = null
       intent = 'none'
+      gestureGeom = null
     }
   }
 
@@ -197,7 +204,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
     const newScale = clampScale(z.scale * factor, fit(), maxScale)
     const next = focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), newScale)
-    const g = getGeometry()
+    const g = geom()
     const committed = g.naturalSize
       ? clampPan(next, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
       : next
@@ -206,9 +213,7 @@ export function attachGestures(opts: GestureOptions): () => void {
 
   const onDblClick = (e: MouseEvent) => {
     const z = viewer.getState().zoom
-    const f = fit()
-    const target =
-      z.scale > f + 1e-3 ? f : clampScale(Math.max(1, f) === f ? maxScale : 1, f, maxScale)
+    const target = toggleZoom(z.scale, fit(), maxScale)
     const next = focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), target)
     viewer.zoomTo(next.scale, { x: next.x, y: next.y })
   }

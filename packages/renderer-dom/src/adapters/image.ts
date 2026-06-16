@@ -15,23 +15,6 @@ function applyPlaceholder(el: HTMLElement, placeholder: string): void {
   }
 }
 
-function resolveSource(img: HTMLImageElement, item: Item, signal: AbortSignal): void {
-  const src = item.source
-  if (typeof src === 'string') {
-    img.src = src
-  } else if ('src' in src) {
-    img.src = src.src
-    if (src.srcset) img.setAttribute('srcset', src.srcset)
-    if (src.sizes) img.setAttribute('sizes', src.sizes)
-  } else if ('loader' in src) {
-    src.loader(signal).then((res) => {
-      if (signal.aborted) return
-      if (typeof res === 'string') img.src = res
-    })
-  }
-  // tiles (DZI) is a v2 seam — not handled here.
-}
-
 export function imageAdapter(): MediaAdapter {
   return {
     type: 'image',
@@ -42,9 +25,10 @@ export function imageAdapter(): MediaAdapter {
       img.className = 'visora-media visora-media-image'
       if (item.alt !== undefined) img.alt = item.alt
       if (item.placeholder) applyPlaceholder(img, item.placeholder)
-
-      resolveSource(img, item, ctx.signal)
       slot.appendChild(img)
+
+      // A loader may resolve to a custom element instead of an <img>; track the live node.
+      let element: HTMLElement = img
 
       const ready = new Promise<void>((resolve, reject) => {
         const abortErr = () => new DOMException('Image load aborted', 'AbortError')
@@ -78,12 +62,45 @@ export function imageAdapter(): MediaAdapter {
         img.addEventListener('load', onLoad)
         img.addEventListener('error', onError)
         ctx.signal.addEventListener('abort', onAbort)
+
+        const src = item.source
+        if (typeof src === 'string') {
+          img.src = src
+        } else if ('src' in src) {
+          img.src = src.src
+          if (src.srcset) img.setAttribute('srcset', src.srcset)
+          if (src.sizes) img.setAttribute('sizes', src.sizes)
+        } else if ('loader' in src) {
+          src
+            .loader(ctx.signal)
+            .then((res) => {
+              if (ctx.signal.aborted) return
+              if (typeof res === 'string') {
+                img.src = res // load/error handlers settle ready
+              } else {
+                // a custom element: swap it in, it is its own ready signal
+                cleanup()
+                img.remove()
+                slot.appendChild(res)
+                res.setAttribute('data-visora-loaded', '')
+                element = res
+                resolve()
+              }
+            })
+            .catch((err) => {
+              cleanup()
+              reject(err instanceof Error ? err : new Error(String(err)))
+            })
+        }
+        // tiles (DZI) is a v2 seam — not handled here.
       })
       // Avoid unhandled-rejection noise if no one awaits ready on a canceled load.
       ready.catch(() => {})
 
       return {
-        element: img,
+        get element() {
+          return element
+        },
         ready,
         supportsZoom: true,
         naturalSize() {
@@ -92,7 +109,7 @@ export function imageAdapter(): MediaAdapter {
         },
         destroy() {
           img.removeAttribute('src')
-          img.remove()
+          element.remove()
         },
       }
     },

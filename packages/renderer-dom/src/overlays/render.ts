@@ -21,8 +21,28 @@ export interface OverlayPaintCtx {
   natural: Size
 }
 
+/** A painted overlay, retained so zoom-only updates can adjust it without re-rendering. */
+export interface OverlayEntry {
+  el: HTMLElement
+  spec: OverlaySpec
+  counterScaled: boolean
+}
+
 export function gatherOverlays(group: Group, item: Item, globals: OverlaySpec[]): OverlaySpec[] {
   return [...globals, ...(group.overlays ?? []), ...(item.overlays ?? [])]
+}
+
+/**
+ * Update retained overlays for a zoom change WITHOUT rebuilding (spec §9.2: no extra layout,
+ * never re-invoke user render()). Refreshes visibleAt visibility and point counter-scale.
+ */
+export function updateOverlays(entries: OverlayEntry[], zoomScale: number): void {
+  for (const { el, spec, counterScaled } of entries) {
+    const visible =
+      !spec.visibleAt || (zoomScale >= spec.visibleAt[0] && zoomScale <= spec.visibleAt[1])
+    el.style.display = visible ? '' : 'none'
+    if (counterScaled) el.style.transform = counterScaleTransform(zoomScale)
+  }
 }
 
 export function paintOverlays(
@@ -30,9 +50,10 @@ export function paintOverlays(
   contentHost: HTMLElement,
   specs: OverlaySpec[],
   ctx: OverlayPaintCtx,
-): void {
+): OverlayEntry[] {
   viewportHost.replaceChildren()
   contentHost.replaceChildren()
+  const entries: OverlayEntry[] = []
 
   for (const spec of orderByLayer(specs)) {
     const host = document.createElement('div')
@@ -71,6 +92,7 @@ export function paintOverlays(
     if (typeof out === 'string') host.textContent = out
     else host.appendChild(out)
 
+    let counterScaled = false
     if (spec.anchor.kind === 'viewport') {
       Object.assign(host.style, viewportAnchorStyle(spec.anchor.at, spec.anchor.offset))
       viewportHost.appendChild(host)
@@ -80,10 +102,11 @@ export function paintOverlays(
       host.style.top = `${box.top}px`
       if (box.width !== null) host.style.width = `${box.width}px`
       if (box.height !== null) host.style.height = `${box.height}px`
-      if (!resolveScaleWithImage(spec.anchor, spec.scaleWithImage)) {
-        host.style.transform = counterScaleTransform(ctx.zoom.scale)
-      }
+      counterScaled = !resolveScaleWithImage(spec.anchor, spec.scaleWithImage)
+      if (counterScaled) host.style.transform = counterScaleTransform(ctx.zoom.scale)
       contentHost.appendChild(host)
     }
+    entries.push({ el: host, spec, counterScaled })
   }
+  return entries
 }

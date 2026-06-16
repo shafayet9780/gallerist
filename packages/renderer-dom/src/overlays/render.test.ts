@@ -2,7 +2,7 @@
 
 import type { Group, Item, OverlaySpec, ViewerApi } from '@visora/core'
 import { describe, expect, it, vi } from 'vitest'
-import { gatherOverlays, paintOverlays } from './render'
+import { gatherOverlays, paintOverlays, updateOverlays } from './render'
 
 const group: Group = { id: 'g', items: [] }
 const item: Item = { id: 'i', type: 'image', source: 'x.jpg' }
@@ -25,8 +25,8 @@ const ctx = (viewer: ViewerApi, scale = 2) => ({
 const paint = (specs: OverlaySpec[], viewer = fakeViewer(), scale = 2) => {
   const vp = document.createElement('div')
   const content = document.createElement('div')
-  paintOverlays(vp, content, specs, ctx(viewer, scale))
-  return { vp, content, viewer }
+  const entries = paintOverlays(vp, content, specs, ctx(viewer, scale))
+  return { vp, content, viewer, entries }
 }
 
 describe('gatherOverlays', () => {
@@ -110,6 +110,34 @@ describe('paintOverlays — interactive + visibility', () => {
       2, // zoom 2 is outside [3,5]
     )
     expect((content.querySelector('[data-overlay="h"]') as HTMLElement).style.display).toBe('none')
+  })
+
+  it('updateOverlays re-counter-scales a point on zoom WITHOUT re-invoking render()', () => {
+    const renderFn = vi.fn(() => '•')
+    const { content, entries } = paint(
+      [{ id: 'pin', anchor: { kind: 'point', x: 0.5, y: 0.5 }, render: renderFn }],
+      fakeViewer(),
+      2,
+    )
+    const el = content.querySelector('[data-overlay="pin"]') as HTMLElement
+    expect(renderFn).toHaveBeenCalledTimes(1)
+    expect(el.style.transform).toContain('scale(0.5)')
+
+    updateOverlays(entries, 4) // zoom 2 → 4
+    expect(renderFn).toHaveBeenCalledTimes(1) // not rebuilt
+    expect(el.style.transform).toContain('scale(0.25)')
+  })
+
+  it('updateOverlays toggles visibleAt visibility on zoom change', () => {
+    const { content, entries } = paint(
+      [{ id: 'h', anchor: { kind: 'point', x: 0, y: 0 }, visibleAt: [3, 5], render: () => 'h' }],
+      fakeViewer(),
+      2, // hidden at zoom 2
+    )
+    const el = content.querySelector('[data-overlay="h"]') as HTMLElement
+    expect(el.style.display).toBe('none')
+    updateOverlays(entries, 4) // now within [3,5]
+    expect(el.style.display).toBe('')
   })
 
   it('orders overlays by layer (z-index)', () => {

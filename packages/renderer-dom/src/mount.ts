@@ -3,10 +3,18 @@
 // image adapter, minimal chrome, dialog a11y, keyboard map, and the committed zoom transform.
 // Live pan/zoom (imperative RAF) and motion land in M3.4 / M5.
 
-import type { MediaAdapter, OverlaySpec, Phase, ViewerApi, ZoomState } from '@visora/core'
+import {
+  type MediaAdapter,
+  type OverlaySpec,
+  type Phase,
+  type ViewerApi,
+  type ZoomState,
+  clampScale,
+  focalZoom,
+} from '@visora/core'
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
-import { gatherOverlays, paintOverlays } from './overlays/render'
+import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
 import { reconcileKeys, windowIndices } from './windowing'
 
 export interface MountOptions {
@@ -31,6 +39,8 @@ interface SlideRec {
   itemId?: string
   media?: ReturnType<MediaAdapter['mount']>
   abort?: AbortController
+  overlayEls?: OverlayEntry[]
+  overlayItemId?: string
 }
 
 function el(tag: string, className?: string, attrs?: Record<string, string>): HTMLElement {
@@ -104,6 +114,19 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const mounted = new Map<string, SlideRec>()
   let lastCursor: { g: number; i: number } | null = null
 
+  // groupId → index, rebuilt only when the collection reference changes (setCollection).
+  // Avoids an O(groups) findIndex per mounted slide on every render (matters at 10k groups).
+  let indexCol: unknown = null
+  let idIndex = new Map<string, number>()
+  const groupIndex = (id: string): number => {
+    const col = viewer.getCollection()
+    if (col !== indexCol) {
+      indexCol = col
+      idIndex = new Map(col.groups.map((g, i) => [g.id, i]))
+    }
+    return idIndex.get(id) ?? -1
+  }
+
   // Tag the current slide with the axis of motion so the theme can use visibly distinct
   // transitions (spec §27.5): group axis = horizontal time slide, item axis = depth pop.
   const tagAxis = (currentSlide: HTMLElement, cur: { g: number; i: number }) => {
@@ -149,7 +172,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
 
     for (const [k, rec] of mounted) {
-      const g = col.groups.findIndex((gr) => gr.id === k)
+      const g = groupIndex(k)
       if (g < 0) continue
       const isCurrent = g === cur.g
       const group = col.groups[g]
@@ -173,22 +196,36 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.slide.setAttribute('data-visora-current', '')
         rec.content.setAttribute('data-visora-current', '')
         applyTransform(rec.content, state.zoom)
-        const r = stage.getBoundingClientRect()
-        const stageSize = { w: r.width, h: r.height }
         if (it) {
-          paintOverlays(viewportLayer, rec.overlayHost, gatherOverlays(group, it, globalOverlays), {
-            group,
-            item: it,
-            viewer,
-            zoom: state.zoom,
-            stage: stageSize,
-            natural: rec.media?.naturalSize?.() ?? stageSize,
-          })
+          // Repaint (re-invokes user render() + rebuilds DOM) only when the item changes.
+          // On a zoom-only change, update retained overlays in place (spec §9.2: no rebuild).
+          if (rec.overlayItemId !== it.id) {
+            const r = stage.getBoundingClientRect()
+            const stageSize = { w: r.width, h: r.height }
+            rec.overlayEls = paintOverlays(
+              viewportLayer,
+              rec.overlayHost,
+              gatherOverlays(group, it, globalOverlays),
+              {
+                group,
+                item: it,
+                viewer,
+                zoom: state.zoom,
+                stage: stageSize,
+                natural: rec.media?.naturalSize?.() ?? stageSize,
+              },
+            )
+            rec.overlayItemId = it.id
+          } else if (rec.overlayEls) {
+            updateOverlays(rec.overlayEls, state.zoom.scale)
+          }
         }
       } else {
         rec.slide.removeAttribute('data-visora-current')
         rec.content.removeAttribute('data-visora-current')
         rec.overlayHost.replaceChildren()
+        rec.overlayEls = undefined
+        rec.overlayItemId = undefined
       }
     }
   }
@@ -254,6 +291,15 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
 
+  // Keyboard zoom pivots on the stage centre (not the transform origin), spec §5.
+  const zoomAroundCenter = (factor: number) => {
+    const r = stage.getBoundingClientRect()
+    const z = viewer.getState().zoom
+    const newScale = clampScale(z.scale * factor, 1, 4) // fit == 1 in the contained model
+    const next = focalZoom(z, { x: r.width / 2, y: r.height / 2 }, newScale)
+    viewer.zoomTo(next.scale, { x: next.x, y: next.y })
+  }
+
   // ── keyboard (spec §5) ───────────────────────────────────────────────────────
   const onKey = (e: KeyboardEvent) => {
     switch (e.key) {
@@ -274,10 +320,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         break
       case '+':
       case '=':
-        viewer.zoomTo(viewer.getState().zoom.scale * 1.25)
+        zoomAroundCenter(1.25)
         break
       case '-':
-        viewer.zoomTo(viewer.getState().zoom.scale / 1.25)
+        zoomAroundCenter(1 / 1.25)
         break
       case '0':
         viewer.resetZoom()

@@ -94,6 +94,14 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     emitter.emit('afterItem', basePayload())
   }
 
+  // A jump within the same group is a secondary-axis move (item events); otherwise it's a
+  // group-axis move (slide events) — keeps the §18 event taxonomy honest for goTo/goToId.
+  const navTo = (target: Cursor): void => {
+    const cur = store.get().cursor
+    if (target.g === cur.g && target.i !== cur.i) itemNav(target)
+    else groupNav(target)
+  }
+
   const commitZoom = (z: ZoomState): void => {
     store.set((s) => ({ ...s, zoom: z }))
     emitter.emit('zoom', { ...basePayload(), zoom: z })
@@ -130,11 +138,11 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       itemNav(nav.prevItem(store.get().cursor, navCtx()))
     },
     goTo(g, i) {
-      groupNav(nav.goTo(g, i, navCtx()))
+      navTo(nav.goTo(g, i, navCtx()))
     },
     goToId(groupId, itemId) {
       const c = nav.resolveId(collection, groupId, itemId)
-      if (c) groupNav(c)
+      if (c) navTo(c)
     },
     zoomTo(scale, focal) {
       if (destroyed) return
@@ -192,6 +200,7 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       destroyed = true
       emitter.emit('destroy', { viewer: api })
       emitter.clear()
+      store.clear()
     },
     get cursor() {
       return store.get().cursor

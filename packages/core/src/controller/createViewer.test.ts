@@ -96,6 +96,18 @@ describe('createViewer — navigation', () => {
     v.goToId('g2', 'c1')
     expect(v.getState().cursor).toEqual({ g: 2, i: 1 })
   })
+
+  it('a same-group jump emits item events, a cross-group jump emits slide events', () => {
+    const slide = vi.fn()
+    const item = vi.fn()
+    const v = createViewer({ collection: grouped(), on: { slide, item } })
+    v.open({ g: 1 })
+    v.goToId('g1', 'b2') // same group → secondary axis
+    expect(item).toHaveBeenCalledTimes(1)
+    expect(slide).not.toHaveBeenCalled()
+    v.goToId('g2', 'c0') // different group → time axis
+    expect(slide).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('createViewer — zoom (committed)', () => {
