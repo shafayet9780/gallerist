@@ -49,6 +49,17 @@ describe('url helpers', () => {
     expect(parseYouTubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=2')).toBe('dQw4w9WgXcQ')
     expect(parseYouTubeId('https://www.youtube.com/embed/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
   })
+  it('parses shorts and live urls', () => {
+    expect(parseYouTubeId('https://www.youtube.com/shorts/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
+    expect(parseYouTubeId('https://www.youtube.com/live/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
+  })
+  it('anchors host matching (rejects look-alike domains)', () => {
+    expect(isYouTube('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(true)
+    expect(isYouTube('https://youtu.be/dQw4w9WgXcQ')).toBe(true)
+    expect(isYouTube('https://evil-youtube.com/x')).toBe(false)
+    expect(isYouTube('https://youtube.com.attacker.test/x')).toBe(false)
+    expect(isYouTube('not a url')).toBe(false)
+  })
 })
 
 describe('youtubeAdapter', () => {

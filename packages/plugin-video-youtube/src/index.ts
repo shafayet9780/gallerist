@@ -14,12 +14,17 @@ function srcOf(source: MediaSource): string | null {
   return null
 }
 
+// Anchor to the hostname so look-alikes (evil-youtube.com, youtube.com.attacker.test) don't match.
 export function isYouTube(url: string): boolean {
-  return /(?:youtube\.com|youtu\.be)/.test(url)
+  try {
+    return /(?:^|\.)(?:youtube\.com|youtu\.be)$/.test(new URL(url).hostname)
+  } catch {
+    return false // not an absolute URL
+  }
 }
 
 export function parseYouTubeId(url: string): string {
-  const m = url.match(/(?:youtu\.be\/|[?&]v=|embed\/)([\w-]{11})/)
+  const m = url.match(/(?:youtu\.be\/|shorts\/|live\/|embed\/|[?&]v=)([\w-]{11})/)
   return m?.[1] ?? ''
 }
 

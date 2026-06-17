@@ -93,10 +93,10 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 ## F1 — Security
 - [x] **T1 — download: URL scheme allowlist + filename/zip-name sanitization** (`plugin-download`)
 - [x] **T2 — image placeholder: reject CSS `url()` breakout** (`renderer-dom/adapters/image`)
-- [ ] **Checkpoint F1** — test + lint + typecheck + size green.
+- [x] **Checkpoint F1** — test + lint + typecheck + size green.
 
 ## F2 — Correctness / contract
-- [ ] **T3 — youtube: `/shorts/`+`/live/` parse, anchored host match** (`plugin-video-youtube`)
+- [x] **T3 — youtube: `/shorts/`+`/live/` parse, anchored host match** (`plugin-video-youtube`)
 - [ ] **T4 — late `mediaAdapters` go live** (`renderer-dom/mount`)
 - [ ] **Checkpoint F2** — gates green; video/youtube e2e pass.
 
