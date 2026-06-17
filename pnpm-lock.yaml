@@ -79,7 +79,7 @@ importers:
         version: 5.9.3
     optionalDependencies:
       client-zip:
-        specifier: ^2.4.5
+        specifier: 2.5.0
         version: 2.5.0
 
   packages/plugin-fullscreen:
