@@ -108,6 +108,24 @@ describe('portal bridge', () => {
     expect(document.querySelector('.visora-viewport-layer')?.textContent).toContain('Badge')
   })
 
+  it('auto-generates a stable overlay id without a module counter', () => {
+    const tree = (
+      <Visora collection={collection} open>
+        <Visora.Overlay anchor={{ kind: 'viewport', at: 'top-right' }}>
+          <span>X</span>
+        </Visora.Overlay>
+      </Visora>
+    )
+    const { rerender } = render(tree)
+    const idOf = () =>
+      document.querySelector('.visora-viewport-layer [data-overlay]')?.getAttribute('data-overlay')
+    const id1 = idOf()
+    expect(id1).toBeTruthy()
+    expect(id1).not.toMatch(/^react-overlay-\d+$/) // no SSR-unsafe module counter
+    rerender(tree)
+    expect(idOf()).toBe(id1) // stable across re-render
+  })
+
   it('removes the overlay when the React node unmounts', () => {
     const { rerender } = render(
       <Visora collection={collection} open>

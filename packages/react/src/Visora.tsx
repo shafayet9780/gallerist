@@ -6,14 +6,7 @@ import {
   createViewer,
 } from '@visora/core'
 import { mount } from '@visora/renderer-dom'
-import {
-  type ReactNode,
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useState,
-} from 'react'
+import { type ReactNode, forwardRef, useEffect, useId, useImperativeHandle, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { VisoraContext, useViewerContext } from './context'
 
@@ -69,13 +62,13 @@ export interface VisoraOverlayProps {
   children?: ReactNode
 }
 
-let overlaySeq = 0
-
 /** Render a React subtree as an image-space / viewport overlay via a portal (decision P0-G). */
 function Overlay(props: VisoraOverlayProps): ReactNode {
   const viewer = useViewerContext()
   const [host, setHost] = useState<HTMLElement | null>(null)
-  const id = useMemo(() => props.id ?? `react-overlay-${overlaySeq++}`, [props.id])
+  // useId is SSR-deterministic (server + client agree), unlike a module-global counter.
+  const autoId = useId()
+  const id = props.id ?? autoId
 
   useEffect(() => {
     const node = document.createElement('div')

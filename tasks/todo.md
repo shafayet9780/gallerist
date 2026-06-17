@@ -107,7 +107,7 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 
 ## F4 — React lifecycle
 - [x] **T7 — stable viewer (`useState`) + decoupled `destroy`** (`react/Visora`)
-- [ ] **T8 — deterministic overlay ids via `useId`** (`react/Visora`)
+- [x] **T8 — deterministic overlay ids via `useId`** (`react/Visora`)
 - [ ] **Checkpoint F4** — gates green; StrictMode example smoke-tested.
 
 ## F5 — Robustness
