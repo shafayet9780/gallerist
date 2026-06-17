@@ -31,7 +31,10 @@ export function hash(opts: HashOptions = {}): Plugin {
   return (viewer) => {
     if (typeof window === 'undefined') return { name: 'hash' } // SSR no-op
 
-    let selfWrite = false
+    // Track the last value we wrote and ignore matching hashchange events. Robust to the browser
+    // coalescing / firing hashchange asynchronously (a boolean latch can get stuck and then swallow
+    // a genuine back/forward); comparing the value can't (review T9).
+    let lastWritten: string | null = null
     const offs: (() => void)[] = []
 
     const applyFromHash = (): boolean => {
@@ -47,15 +50,12 @@ export function hash(opts: HashOptions = {}): Plugin {
       const group = col.groups[cur.g]
       if (!group) return
       const item = group.items[cur.i]
-      selfWrite = true
-      window.location.hash = formatHash(group.id, item?.id)
+      lastWritten = formatHash(group.id, item?.id)
+      window.location.hash = lastWritten
     }
 
     const onHashChange = () => {
-      if (selfWrite) {
-        selfWrite = false
-        return
-      }
+      if (window.location.hash.replace(/^#/, '') === lastWritten) return // our own write
       applyFromHash()
     }
 

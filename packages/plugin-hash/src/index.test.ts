@@ -55,4 +55,30 @@ describe('plugin-hash', () => {
     const v = createViewer({ collection: collection(), plugins: [hash({ open: false })] })
     expect(v.getState().phase).toBe('closed')
   })
+
+  it('does not swallow an external hashchange after a nav (no stuck latch)', () => {
+    const v = createViewer({ collection: collection(), plugins: [hash()] })
+    v.open()
+    v.next() // writes the hash; a boolean latch would arm here with no event to consume it
+    window.location.hash = 'g=g0' // external back navigation
+    window.dispatchEvent(new Event('hashchange'))
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+  })
+
+  it('ignores the echo of its own hash write (no feedback loop)', () => {
+    const v = createViewer({ collection: collection(), plugins: [hash()] })
+    v.open()
+    v.next() // g1
+    window.dispatchEvent(new Event('hashchange')) // browser echo: hash unchanged from our write
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+  })
+
+  it('ignores a malformed hash without throwing', () => {
+    const v = createViewer({ collection: collection(), plugins: [hash()] })
+    v.open()
+    v.next() // g1
+    window.location.hash = 'i=oops' // no g
+    window.dispatchEvent(new Event('hashchange'))
+    expect(v.getState().cursor.g).toBe(1)
+  })
 })

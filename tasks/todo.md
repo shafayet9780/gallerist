@@ -108,10 +108,10 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 ## F4 — React lifecycle
 - [x] **T7 — stable viewer (`useState`) + decoupled `destroy`** (`react/Visora`)
 - [x] **T8 — deterministic overlay ids via `useId`** (`react/Visora`)
-- [ ] **Checkpoint F4** — gates green; StrictMode example smoke-tested.
+- [x] **Checkpoint F4** — gates green; StrictMode example smoke-tested.
 
 ## F5 — Robustness
-- [ ] **T9 — hash: `lastWritten` guard + malformed handling** (`plugin-hash`)
+- [x] **T9 — hash: `lastWritten` guard + malformed handling** (`plugin-hash`)
 - [ ] **T10 — youtube: load resilience + `advanceAxis` parity + typed global** (`plugin-video-youtube`)
 - [ ] **T11 — download: zip resilience (import fallback, `res.ok`, abort)** (`plugin-download`)
 - [ ] **T12 — core: `getPlugins()` returns a copy**
