@@ -53,6 +53,13 @@ dev warn).
   `document` for SSR (see `plugin-hash`).
 - **Reuse core helpers**: `windowIndices` / `reconcileKeys` for windowed UI at scale (keep live DOM
   bounded — see `plugin-thumbnails`/`plugin-grid`).
+- **Treat collection data (URLs, ids, captions, the URL hash) as untrusted** — it often comes from a
+  host app's end users. Prefer `textContent` over `innerHTML` (the renderer is text-first). Before
+  assigning an attacker-influenceable URL to `a.href`/`fetch`, allowlist the scheme
+  (`http`/`https`/`blob`; reject `javascript:`/`data:`/`file:`); sanitize any value used as a
+  filename or zip entry name (strip `/`, `\`, `..`, control chars) — see `plugin-download`. Anchor
+  provider URL matching to the hostname, not a substring — see `plugin-video-youtube`. Inject a
+  third-party `<script>`/iframe only from a hardcoded trusted origin and document the required CSP.
 - **Decorative images get `alt=""`**; interactive controls get an `aria-label` (axe is a CI gate).
 - **Own your cleanup** in `destroy()` (listeners, observers, subscriptions). `viewer.use()` returns a
   disposer for per-instance lifecycles (the React adapter relies on this).

@@ -116,10 +116,10 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 - [x] **T11 — download: zip resilience (import fallback, `res.ok`, abort)** (`plugin-download`)
 - [x] **T12 — core: `getPlugins()` returns a copy**
 - [x] **T13 — supply chain: pin `client-zip` + CI `pnpm audit`**
-- [ ] **Checkpoint F5** — full gates + e2e green.
+- [x] **Checkpoint F5** — full gates + e2e green.
 
 ## Release
-- [ ] **T14 — CHANGELOG + PLUGIN-AUTHORING note + version bump + tag `v0.1.1`**
+- [x] **T14 — CHANGELOG + PLUGIN-AUTHORING note + version bump + tag `v0.1.1`**
 
 ## Deferred → Phase 2
 - [ ] region remount reconcile (`regions.ts`)
