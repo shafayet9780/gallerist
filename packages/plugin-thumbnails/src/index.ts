@@ -61,6 +61,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const overscan = opts.overscan ?? 24
     let root: HTMLElement | null = null
     let unsub: (() => void) | null = null
+    // Rebuild only when the cursor or collection changes — skip unrelated commits (zoom/pan) so the
+    // rail isn't torn down + re-observed on every state tick (review T5 / Important #6).
+    let lastG = -1
+    let lastI = -1
+    let lastCol: object | null = null
     const observer =
       typeof IntersectionObserver !== 'undefined'
         ? new IntersectionObserver((entries) => {
@@ -78,6 +83,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (!root) return
       const col = viewer.getCollection()
       const cur = viewer.getState().cursor
+      if (col === lastCol && cur.g === lastG && cur.i === lastI) return
+      lastG = cur.g
+      lastI = cur.i
+      lastCol = col
       const groupCount = col.groups.length
       root.replaceChildren()
 
@@ -108,7 +117,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (activeGroup && activeGroup.items.length > 1) {
         const itemRow = document.createElement('div')
         itemRow.className = 'visora-thumb-items'
-        itemRow.setAttribute('role', 'listbox')
+        itemRow.setAttribute('role', 'group') // a listbox can't nest inside the rail listbox
         activeGroup.items.forEach((item: Item, i: number) => {
           const ib = thumbButton(`Item ${i + 1}`, 'visora-thumb-item', i === cur.i, () =>
             viewer.goTo(cur.g, i),

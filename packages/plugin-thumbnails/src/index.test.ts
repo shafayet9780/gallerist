@@ -2,7 +2,7 @@
 
 import { type Collection, type Item, createViewer } from '@visora/core'
 import { mount } from '@visora/renderer-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { thumbnails } from './index'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
@@ -67,17 +67,34 @@ describe('plugin-thumbnails', () => {
     expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
   })
 
+  it('does not rebuild the rail on a non-cursor state change (zoom)', () => {
+    const v = open()
+    const rail = document.querySelector('.visora-thumbs') as HTMLElement
+    const spy = vi.spyOn(rail, 'replaceChildren')
+    v.zoomTo(2) // changes zoom state, not cursor/collection → must not rebuild
+    expect(spy).not.toHaveBeenCalled()
+    v.next() // cursor change → must rebuild
+    expect(spy).toHaveBeenCalled()
+  })
+
+  it('uses role=group for the expanded item row (valid nested ARIA)', () => {
+    const v = open()
+    v.next() // g1 active → item row appears
+    expect(document.querySelector('.visora-thumb-items')?.getAttribute('role')).toBe('group')
+  })
+
   it('wires the thumb url for lazy loading', () => {
     open()
     const img = document.querySelector('.visora-thumb .visora-thumb-img') as HTMLImageElement
     expect(img.src || img.dataset.src).toContain('a0.jpg')
   })
 
-  it('windows the rail: a 10k-group collection stays bounded (<200 thumbs)', () => {
+  it('windows the rail: a 10k-group collection stays bounded to the window', () => {
     const big: Collection = {
       groups: Array.from({ length: 10_000 }, (_, i) => ({ id: `g${i}`, items: [item(`it${i}`)] })),
     }
     open(big)
-    expect(document.querySelectorAll('.visora-thumb').length).toBeLessThan(200)
+    // default overscan 24 → at most 2*24+1 group thumbs live; tight bound catches a windowing regression
+    expect(document.querySelectorAll('.visora-thumb').length).toBeLessThanOrEqual(49)
   })
 })
