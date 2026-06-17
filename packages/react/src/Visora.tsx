@@ -28,19 +28,21 @@ export interface VisoraProps extends ViewerOptions {
 
 const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref) {
   const { open, onClose, container, controls, children, ...options } = props
-  // Create the viewer once (core is DOM-free → SSR-safe); options are read at construction.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional create-once
-  const viewer = useMemo(() => createViewer(options), [])
+  // Create the viewer once (core is DOM-free → SSR-safe); options are read at construction. Lazy
+  // useState (not useMemo, which React may discard) guarantees a single stable instance.
+  const [viewer] = useState(() => createViewer(options))
   useImperativeHandle(ref, () => viewer, [viewer])
 
-  // Mount the renderer once per viewer (client-side); container/controls are mount-time only.
+  // Mount the renderer once per viewer (client-side); container/controls are mount-time only. Only
+  // the renderer (the DOM holder) is torn down here. The viewer is NOT destroyed on cleanup: under
+  // StrictMode the simulated unmount would run viewer.destroy() on the stable useState instance,
+  // permanently poisoning it (registerPlugin/nav short-circuit once destroyed) so re-registered
+  // overlays/regions vanish. The viewer is plain JS (no DOM) and is reclaimed by GC once the
+  // component unmounts and the renderer/hook/overlay subscriptions have all cleaned themselves up.
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional mount-once
   useEffect(() => {
     const handle = mount(viewer, { container: container ?? null, controls })
-    return () => {
-      handle.destroy()
-      viewer.destroy()
-    }
+    return () => handle.destroy()
   }, [viewer])
 
   useEffect(() => {

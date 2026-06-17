@@ -103,10 +103,10 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 ## F3 — Perf / a11y
 - [x] **T5 — thumbnails: render-gating + in-place active + `role=group` + tighten 10k bound**
 - [x] **T6 — grid: render-gating (mirror T5)**
-- [ ] **Checkpoint F3** — gates + e2e + size green.
+- [x] **Checkpoint F3** — gates + e2e + size green.
 
 ## F4 — React lifecycle
-- [ ] **T7 — stable viewer (`useState`) + decoupled `destroy`** (`react/Visora`)
+- [x] **T7 — stable viewer (`useState`) + decoupled `destroy`** (`react/Visora`)
 - [ ] **T8 — deterministic overlay ids via `useId`** (`react/Visora`)
 - [ ] **Checkpoint F4** — gates green; StrictMode example smoke-tested.
 

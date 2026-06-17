@@ -2,7 +2,7 @@
 
 import { act, cleanup, render, screen } from '@testing-library/react'
 import type { Collection, ViewerApi } from '@visora/core'
-import { createRef } from 'react'
+import { StrictMode, createRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Visora } from './Visora'
 import { useViewerContext } from './context'
@@ -37,6 +37,23 @@ describe('<Visora>', () => {
     const ref = createRef<ViewerApi>()
     render(<Visora collection={collection} open ref={ref} />)
     expect(ref.current).not.toBeNull()
+    act(() => ref.current?.next())
+    expect(ref.current?.getState().cursor.g).toBe(1)
+  })
+
+  it('survives StrictMode double-mount: one root, usable viewer, overlay renders', () => {
+    const ref = createRef<ViewerApi>()
+    render(
+      <StrictMode>
+        <Visora collection={collection} open ref={ref}>
+          <Visora.Overlay anchor={{ kind: 'viewport', at: 'top-right' }}>
+            <span>Badge</span>
+          </Visora.Overlay>
+        </Visora>
+      </StrictMode>,
+    )
+    expect(document.querySelectorAll('.visora').length).toBe(1)
+    expect(document.querySelector('.visora-viewport-layer')?.textContent).toContain('Badge')
     act(() => ref.current?.next())
     expect(ref.current?.getState().cursor.g).toBe(1)
   })
