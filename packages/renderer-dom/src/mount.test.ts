@@ -148,6 +148,48 @@ describe('mount — motion axis', () => {
   })
 })
 
+describe('mount — late mediaAdapters via use()', () => {
+  it('an adapter registered after mount() can mount a matching item', () => {
+    const col: Collection = {
+      groups: [
+        {
+          id: 'g',
+          items: [
+            { id: 'vid', type: 'video', source: 'v.mp4' },
+            { id: 'img', type: 'image', source: 'a.jpg' },
+          ],
+        },
+      ],
+    }
+    const v = createViewer({ collection: col })
+    mount(v)
+    // register a video adapter AFTER mount — adapters must be resolved live, like overlays
+    v.use(() => ({
+      name: 'late-video',
+      mediaAdapters: [
+        {
+          type: 'video',
+          match: (it: Item) => it.type === 'video',
+          mount: (_it: Item, slot: HTMLElement) => {
+            const elv = document.createElement('video')
+            elv.className = 'late-marker'
+            slot.appendChild(elv)
+            return {
+              element: elv,
+              ready: Promise.resolve(),
+              supportsZoom: false,
+              naturalSize: () => null,
+              destroy: () => elv.remove(),
+            }
+          },
+        },
+      ],
+    }))
+    v.open() // current item is the video → late adapter must be selected
+    expect(document.querySelector('video.late-marker')).not.toBeNull()
+  })
+})
+
 describe('mount — destroy', () => {
   it('removes the root and stops reacting', () => {
     const v = createViewer({ collection: collection() })

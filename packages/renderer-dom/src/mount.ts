@@ -65,11 +65,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
   const plugins = viewer.getPlugins()
-  const adapters = [
-    ...(opts.adapters ?? [imageAdapter()]),
-    ...plugins.flatMap((p) => p.mediaAdapters ?? []),
+  const baseAdapters = opts.adapters ?? [imageAdapter()]
+  // Adapters, overlays, and keymap are recomputed live so a plugin added via use() after mount
+  // contributes all of its extensions, not just regions (review T4 / Important #5).
+  const currentAdapters = () => [
+    ...baseAdapters,
+    ...viewer.getPlugins().flatMap((p) => p.mediaAdapters ?? []),
   ]
-  // Overlays are recomputed live (plugins/React can add+remove overlays after mount).
   const currentGlobalOverlays = () => [
     ...(opts.overlays ?? []),
     ...viewer.getPlugins().flatMap((p) => p.overlays ?? []),
@@ -77,7 +79,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   let pluginKeymap = aggregateKeymap(plugins)
 
   const pickAdapter = (type: string, item: Parameters<MediaAdapter['mount']>[0]) =>
-    adapters.find((a) => (a.match ? a.match(item) : a.type === type))
+    currentAdapters().find((a) => (a.match ? a.match(item) : a.type === type))
 
   // ── DOM scaffold ───────────────────────────────────────────────────────────
   const root = el('div', 'visora')

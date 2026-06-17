@@ -97,7 +97,7 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 
 ## F2 — Correctness / contract
 - [x] **T3 — youtube: `/shorts/`+`/live/` parse, anchored host match** (`plugin-video-youtube`)
-- [ ] **T4 — late `mediaAdapters` go live** (`renderer-dom/mount`)
+- [x] **T4 — late `mediaAdapters` go live** (`renderer-dom/mount`)
 - [ ] **Checkpoint F2** — gates green; video/youtube e2e pass.
 
 ## F3 — Perf / a11y
