@@ -1,64 +1,94 @@
-import type { Collection } from '@visora/core'
-import { Visora } from '@visora/react'
+import type { Collection, Item } from '@visora/core'
+import { download } from '@visora/plugin-download'
+import { fullscreen } from '@visora/plugin-fullscreen'
+import { grid } from '@visora/plugin-grid'
+import { hash } from '@visora/plugin-hash'
+import { thumbnails } from '@visora/plugin-thumbnails'
+import { Visora, useViewerContext, useVisora } from '@visora/react'
 import '@visora/theme-default/visora.css'
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
-const svg = (color: string, label: string) =>
-  `data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600"><rect width="100%" height="100%" fill="${color}"/><text x="60" y="160" fill="white" font-size="130" font-family="sans-serif">${label}</text></svg>`,
-  )}`
+// Real photos via Lorem Picsum seed URLs (deterministic, never 404). Full + thumb derivatives.
+const photo = (seed: string, alt: string): Item => ({
+  id: seed,
+  type: 'image',
+  source: `https://picsum.photos/seed/${seed}/1600/1067`,
+  thumb: `https://picsum.photos/seed/${seed}/320/213`,
+  alt,
+  naturalSize: { w: 1600, h: 1067 },
+})
+
+// Grouped / nested: albums (time axis, ←/→) × photos within an album (screen axis, ↑/↓).
+const album = (id: string, title: string, ...alts: string[]): Collection['groups'][number] => ({
+  id,
+  meta: title,
+  items: alts.map((alt, i) => photo(`${id}-${i + 1}`, alt)),
+})
 
 const collection: Collection = {
   groups: [
-    {
-      id: 'g0',
-      items: [
-        {
-          id: 'a0',
-          type: 'image',
-          source: svg('#2980b9', 'A·1'),
-          naturalSize: { w: 2400, h: 1600 },
-        },
-        {
-          id: 'a1',
-          type: 'image',
-          source: svg('#27ae60', 'A·2'),
-          naturalSize: { w: 2400, h: 1600 },
-        },
-      ],
-    },
-    {
-      id: 'g1',
-      items: [
-        {
-          id: 'b0',
-          type: 'image',
-          source: svg('#c0392b', 'B·1'),
-          naturalSize: { w: 2400, h: 1600 },
-        },
-      ],
-    },
+    album('mountains', 'Mountains', 'Ridge at dawn', 'River valley', 'Misty peak', 'Alpine lake'),
+    album('city', 'City', 'Skyline', 'Rooftops', 'Night bridge'),
+    album('ocean', 'Ocean', 'Open coast', 'Old pier', 'Breaking waves', 'Cliff path', 'Lighthouse'),
+    album('forest', 'Forest', 'Trail', 'Canopy', 'Waterfall'),
   ],
 }
 
+// Live caption in the footer region — reads engine state via useVisora (useSyncExternalStore).
+function Caption() {
+  const viewer = useViewerContext()
+  const { state } = useVisora(viewer)
+  const group = viewer.getCollection().groups[state.cursor.g]
+  const item = group?.items[state.cursor.i]
+  if (!group || !item) return null
+  return (
+    <div className="vcaption">
+      <strong>{String(group.meta)}</strong> · {item.alt}
+      <span className="vpos">
+        {state.cursor.i + 1} / {group.items.length}
+      </span>
+    </div>
+  )
+}
+
 function App() {
-  const [open, setOpen] = useState(false)
+  // initialize open from the URL hash so deep-links (#g=ocean&i=ocean-3) open the viewer on load
+  const [open, setOpen] = useState(() => /(?:^|[#&])g=/.test(window.location.hash))
   return (
     <main>
-      <h1>Visora — React adapter</h1>
+      <h1>Visora</h1>
+      <p className="lede">
+        Headless, framework-agnostic nested media viewer. Grouped galleries, image-space overlays,
+        windowed thumbnails — driven by the React adapter.
+      </p>
       <button type="button" className="open" onClick={() => setOpen(true)}>
-        Open viewer
+        Open gallery
       </button>
+      <p className="hint">
+        ←/→ albums · ↑/↓ photos · scroll/pinch to zoom · <kbd>g</kbd> grid · <kbd>f</kbd> fullscreen
+        · <kbd>d</kbd> download · <kbd>Esc</kbd> close. The URL updates as you browse — copy it and
+        reload to deep-link.
+      </p>
 
-      <Visora collection={collection} loop open={open} onClose={() => setOpen(false)}>
-        {/* JSX into a renderer region (portal bridge) */}
+      <Visora
+        collection={collection}
+        loop
+        open={open}
+        onClose={() => setOpen(false)}
+        plugins={[thumbnails(), grid(), fullscreen(), download(), hash()]}
+      >
+        {/* JSX portaled into a renderer region (the portal bridge) */}
         <Visora.Region name="toolbar">
-          <span className="vbadge">React toolbar</span>
+          <span className="vbadge">Visora · React</span>
         </Visora.Region>
-        {/* JSX as an image-space overlay (counter-scales with zoom) */}
+        {/* live caption in the footer region */}
+        <Visora.Region name="footer">
+          <Caption />
+        </Visora.Region>
+        {/* JSX as an image-space overlay — counter-scales as you zoom */}
         <Visora.Overlay anchor={{ kind: 'point', x: 0.5, y: 0.5 }}>
-          <div style={{ fontSize: 28 }}>📍</div>
+          <div className="vpin">📍 center</div>
         </Visora.Overlay>
       </Visora>
     </main>
