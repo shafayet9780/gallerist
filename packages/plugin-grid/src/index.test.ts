@@ -2,7 +2,7 @@
 
 import { type Collection, type Item, createViewer } from '@visora/core'
 import { mount } from '@visora/renderer-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { grid } from './index'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
@@ -62,6 +62,25 @@ describe('plugin-grid', () => {
       .querySelector('.visora')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
     expect(gridEl().style.display).not.toBe('none')
+  })
+
+  it('does not rebuild while open on a non-cursor change (zoom)', () => {
+    const v = open()
+    ;(document.querySelector('.visora-grid-toggle') as HTMLButtonElement).click() // open
+    const spy = vi.spyOn(gridEl(), 'replaceChildren')
+    v.zoomTo(2) // not a cursor/collection change → must not rebuild
+    expect(spy).not.toHaveBeenCalled()
+    v.next() // cursor change → must rebuild
+    expect(spy).toHaveBeenCalled()
+  })
+
+  it('re-opening with the same cursor still renders cells', () => {
+    open()
+    const toggle = document.querySelector('.visora-grid-toggle') as HTMLButtonElement
+    toggle.click() // open
+    toggle.click() // close
+    toggle.click() // reopen, same cursor → cache must be invalidated on open
+    expect(gridEl().querySelectorAll('.visora-grid-cell').length).toBe(3)
   })
 
   it('windows the grid for a 10k-group collection (bounded cells)', () => {

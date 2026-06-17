@@ -102,7 +102,7 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 
 ## F3 — Perf / a11y
 - [x] **T5 — thumbnails: render-gating + in-place active + `role=group` + tighten 10k bound**
-- [ ] **T6 — grid: render-gating (mirror T5)**
+- [x] **T6 — grid: render-gating (mirror T5)**
 - [ ] **Checkpoint F3** — gates + e2e + size green.
 
 ## F4 — React lifecycle

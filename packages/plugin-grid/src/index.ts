@@ -42,6 +42,10 @@ export function grid(opts: GridOptions = {}): Plugin {
     let toolbarBtn: HTMLElement | null = null
     let open = false
     let unsub: (() => void) | null = null
+    // Rebuild only on cursor/collection change — skip unrelated commits while open (review T6).
+    let lastG = -1
+    let lastI = -1
+    let lastCol: object | null = null
     const observer =
       typeof IntersectionObserver !== 'undefined'
         ? new IntersectionObserver((entries) => {
@@ -59,6 +63,10 @@ export function grid(opts: GridOptions = {}): Plugin {
       if (!root || !open) return
       const col = viewer.getCollection()
       const cur = viewer.getState().cursor
+      if (col === lastCol && cur.g === lastG && cur.i === lastI) return
+      lastG = cur.g
+      lastI = cur.i
+      lastCol = col
       root.replaceChildren()
 
       for (const g of windowIndices(cur.g, col.groups.length, overscan, overscan, false)) {
@@ -101,7 +109,10 @@ export function grid(opts: GridOptions = {}): Plugin {
         root.setAttribute('aria-hidden', String(!open))
       }
       toolbarBtn?.setAttribute('aria-pressed', String(open))
-      if (open) render()
+      if (open) {
+        lastCol = null // invalidate the cache so re-opening always rebuilds
+        render()
+      }
     }
     const toggle = () => setOpen(!open)
 
