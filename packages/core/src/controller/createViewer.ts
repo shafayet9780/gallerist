@@ -232,7 +232,7 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       return registerPlugin(plugin)
     },
     getPlugins() {
-      return pluginInstances
+      return [...pluginInstances] // copy — callers must not mutate the registry
     },
     onPluginsChanged(fn) {
       pluginsChanged.add(fn)

@@ -114,7 +114,7 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 - [x] **T9 — hash: `lastWritten` guard + malformed handling** (`plugin-hash`)
 - [x] **T10 — youtube: load resilience + `advanceAxis` parity + typed global** (`plugin-video-youtube`)
 - [x] **T11 — download: zip resilience (import fallback, `res.ok`, abort)** (`plugin-download`)
-- [ ] **T12 — core: `getPlugins()` returns a copy**
+- [x] **T12 — core: `getPlugins()` returns a copy**
 - [ ] **T13 — supply chain: pin `client-zip` + CI `pnpm audit`**
 - [ ] **Checkpoint F5** — full gates + e2e green.
 

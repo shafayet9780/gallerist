@@ -17,6 +17,14 @@ describe('plugin registry (spec §13)', () => {
     expect(init).toHaveBeenCalledOnce()
   })
 
+  it('getPlugins() returns a copy — mutating it does not affect the registry', () => {
+    const p: Plugin = () => ({ name: 'p' })
+    const v = createViewer({ ...base(), plugins: [p] })
+    const list = v.getPlugins() as unknown as unknown[]
+    list.length = 0 // attempt to mutate the returned array
+    expect(v.getPlugins()).toHaveLength(1)
+  })
+
   it('wires plugin on-handlers (fire on emitted events)', () => {
     const onOpen = vi.fn()
     const p: Plugin = () => ({ name: 'p', on: { open: onOpen } })
