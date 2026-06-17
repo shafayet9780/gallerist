@@ -93,4 +93,30 @@ describe('youtubeAdapter', () => {
     lastPlayer?.events.onStateChange?.({ data: 0 }) // ENDED
     expect(next).toHaveBeenCalled()
   })
+
+  it('advances on the item axis when configured', async () => {
+    const nextItem = vi.fn()
+    const m = youtubeAdapter({ nextItem } as unknown as ViewerApi, { advanceAxis: 'item' }).mount(
+      ytItem('https://youtu.be/dQw4w9WgXcQ'),
+      document.createElement('div'),
+      ctx(),
+    )
+    await m.ready
+    lastPlayer?.events.onStateChange?.({ data: 0 }) // ENDED
+    expect(nextItem).toHaveBeenCalled()
+  })
+
+  it('rejects and clears the memo when the API script fails to load', async () => {
+    // biome-ignore lint/performance/noDelete: test needs the global truly absent
+    delete (window as unknown as { YT?: unknown }).YT
+    const m = youtubeAdapter({} as ViewerApi).mount(
+      ytItem('https://youtu.be/dQw4w9WgXcQ'),
+      document.createElement('div'),
+      ctx(),
+    )
+    const script = document.querySelector('script[data-visora-yt]') as HTMLScriptElement
+    expect(script).not.toBeNull()
+    script.onerror?.(new Event('error'))
+    await expect(m.ready).rejects.toThrow()
+  })
 })

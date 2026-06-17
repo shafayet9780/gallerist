@@ -5,7 +5,12 @@
 import type { AdapterCtx, Item, MediaAdapter, MediaSource, Plugin, ViewerApi } from '@visora/core'
 
 export interface YouTubeOptions {
+  /** advance to the next slide when a video ends (default true). */
   advanceOnEnded?: boolean
+  /** which axis to advance on ended (default 'group'). */
+  advanceAxis?: 'group' | 'item'
+  /** use the privacy-friendly youtube-nocookie.com embed host. */
+  nocookie?: boolean
 }
 
 function srcOf(source: MediaSource): string | null {
@@ -28,27 +33,59 @@ export function parseYouTubeId(url: string): string {
   return m?.[1] ?? ''
 }
 
-// The YouTube IFrame API is an untyped global.
-type YTGlobal = any
+// Minimal typing for the parts of the IFrame API we use (the global is otherwise untyped).
+interface YTPlayer {
+  playVideo(): void
+  pauseVideo(): void
+  destroy(): void
+}
+interface YTPlayerConfig {
+  videoId: string
+  host?: string
+  events: { onReady?: () => void; onStateChange?: (e: { data?: number }) => void }
+}
+interface YTNamespace {
+  Player: new (el: HTMLElement, cfg: YTPlayerConfig) => YTPlayer
+  PlayerState?: { ENDED?: number }
+}
+type YTWindow = { YT?: YTNamespace; onYouTubeIframeAPIReady?: () => void }
 
-let apiPromise: Promise<YTGlobal> | null = null
+let apiPromise: Promise<YTNamespace> | null = null
 
-function loadYouTubeAPI(): Promise<YTGlobal> {
+function loadYouTubeAPI(): Promise<YTNamespace> {
   if (typeof window === 'undefined') return Promise.reject(new Error('no window'))
-  const w = window as unknown as { YT?: YTGlobal; onYouTubeIframeAPIReady?: () => void }
+  const w = window as unknown as YTWindow
   if (w.YT?.Player) return Promise.resolve(w.YT)
   if (apiPromise) return apiPromise
-  apiPromise = new Promise<YTGlobal>((resolve) => {
+  apiPromise = new Promise<YTNamespace>((resolve, reject) => {
+    let settled = false
+    // Don't memoize a forever-pending promise if the script is blocked (CSP/adblock) or never ready.
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      apiPromise = null // allow a retry on the next mount
+      reject(new Error('YouTube IFrame API load timed out'))
+    }, 15_000)
     const prev = w.onYouTubeIframeAPIReady
     w.onYouTubeIframeAPIReady = () => {
       prev?.()
-      resolve(w.YT)
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(w.YT as YTNamespace)
     }
     if (!document.querySelector('script[data-visora-yt]')) {
       const s = document.createElement('script')
       s.src = 'https://www.youtube.com/iframe_api'
       s.async = true
       s.dataset.visoraYt = ''
+      s.onerror = () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        apiPromise = null // allow a retry on the next mount
+        reject(new Error('failed to load the YouTube IFrame API'))
+      }
       document.head.appendChild(s)
     }
   })
@@ -66,20 +103,22 @@ export function youtubeAdapter(viewer: ViewerApi, opts: YouTubeOptions = {}): Me
       const host = document.createElement('div')
       host.className = 'visora-media visora-media-youtube'
       slot.appendChild(host)
-      let player: any = null // untyped YT.Player instance
+      let player: YTPlayer | null = null
 
       const ready = new Promise<void>((resolve, reject) => {
         if (ctx.signal.aborted) return reject(new DOMException('aborted', 'AbortError'))
         loadYouTubeAPI()
-          .then((YT: YTGlobal) => {
+          .then((YT) => {
             if (ctx.signal.aborted) return
             player = new YT.Player(host, {
               videoId: parseYouTubeId(srcOf(item.source) ?? ''),
+              host: opts.nocookie ? 'https://www.youtube-nocookie.com' : undefined,
               events: {
                 onReady: () => resolve(),
-                onStateChange: (e: { data?: number }) => {
+                onStateChange: (e) => {
                   if (opts.advanceOnEnded !== false && e?.data === YT.PlayerState?.ENDED) {
-                    viewer.next()
+                    if (opts.advanceAxis === 'item') viewer.nextItem()
+                    else viewer.next()
                   }
                 },
               },
@@ -94,10 +133,10 @@ export function youtubeAdapter(viewer: ViewerApi, opts: YouTubeOptions = {}): Me
         ready,
         supportsZoom: false,
         naturalSize: () => null,
-        activate: () => player?.playVideo?.(),
-        deactivate: () => player?.pauseVideo?.(),
+        activate: () => player?.playVideo(),
+        deactivate: () => player?.pauseVideo(),
         destroy: () => {
-          player?.destroy?.()
+          player?.destroy()
           host.remove()
         },
       }
