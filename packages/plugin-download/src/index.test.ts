@@ -23,6 +23,8 @@ const collection = (): Collection => ({ groups: [{ id: 'g0', items: [item('a0')]
 afterEach(() => {
   document.body.innerHTML = ''
   vi.restoreAllMocks()
+  vi.doUnmock('client-zip')
+  vi.resetModules()
 })
 
 describe('urlOf / filenameOf', () => {
@@ -92,6 +94,30 @@ describe('downloadItems zip', () => {
 
     await downloadItems([item('a'), item('b')], { zip: true, zipName: 'all.zip' })
     expect(downloadZip).toHaveBeenCalledOnce()
+    vi.unstubAllGlobals()
+  })
+
+  it('falls back to per-file downloads when client-zip is unavailable', async () => {
+    vi.doMock('client-zip', () => {
+      throw new Error('module not installed')
+    })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const { downloadItems: di } = await import('./index')
+    await di([item('a'), item('b')], { zip: true })
+    expect(click).toHaveBeenCalledTimes(2) // one anchor download per item
+  })
+
+  it('skips entries whose fetch is not ok and never zips an empty set', async () => {
+    const downloadZip = vi.fn(() => ({ blob: async () => new Blob(['z']) }))
+    vi.doMock('client-zip', () => ({ downloadZip }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('x', { status: 404 })),
+    )
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const { downloadItems: di } = await import('./index')
+    await di([item('a'), item('b')], { zip: true })
+    expect(downloadZip).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 })

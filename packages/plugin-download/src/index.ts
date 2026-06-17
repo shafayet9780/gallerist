@@ -69,6 +69,8 @@ export async function downloadItem(item: Item): Promise<void> {
 export interface ZipOptions {
   zip?: boolean
   zipName?: string
+  /** aborts the in-flight zip fetches. */
+  signal?: AbortSignal
 }
 
 export async function downloadItems(items: Item[], opts: ZipOptions = {}): Promise<void> {
@@ -76,14 +78,27 @@ export async function downloadItems(items: Item[], opts: ZipOptions = {}): Promi
     for (const item of items) await downloadItem(item)
     return
   }
-  const { downloadZip } = await import('client-zip')
-  const entries = await Promise.all(
-    items.map(async (item) => {
-      const url = await urlOf(item.source)
-      const safe = url ? safeHref(url) : null
-      return { name: filenameOf(item, url), input: safe ? await fetch(safe) : '' }
-    }),
-  )
+  let downloadZip: typeof import('client-zip').downloadZip
+  try {
+    ;({ downloadZip } = await import('client-zip'))
+  } catch {
+    // optional dep not installed → degrade gracefully to per-file downloads
+    for (const item of items) await downloadItem(item)
+    return
+  }
+  const entries = (
+    await Promise.all(
+      items.map(async (item) => {
+        const url = await urlOf(item.source)
+        const safe = url ? safeHref(url) : null
+        if (!safe) return null
+        const res = await fetch(safe, { signal: opts.signal })
+        if (!res.ok) return null // skip failures instead of zipping an error body
+        return { name: filenameOf(item, url), input: res }
+      }),
+    )
+  ).filter((e): e is { name: string; input: Response } => e !== null)
+  if (entries.length === 0) return // nothing fetched → don't produce an empty archive
   const blob = await downloadZip(entries).blob()
   const objectUrl = URL.createObjectURL(blob)
   anchorDownload(objectUrl, opts.zipName ?? 'visora.zip')
