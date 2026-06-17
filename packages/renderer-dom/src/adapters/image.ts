@@ -5,8 +5,13 @@ import type { AdapterCtx, Item, MediaAdapter, MountedMedia } from '@visora/core'
 
 const COLOR_RE = /^(#|rgb|hsl|[a-z]+$)/i
 
+// Chars that could escape the url("…") literal and inject extra CSS (e.g. a second url() that
+// fires an attacker-controlled request). Quotes/backslash/newlines are rejected for the url path.
+const CSS_URL_UNSAFE = /["\\\n\r]/
+
 function applyPlaceholder(el: HTMLElement, placeholder: string): void {
   if (placeholder.startsWith('data:') || placeholder.includes('/')) {
+    if (CSS_URL_UNSAFE.test(placeholder)) return // reject breakout attempts — paint nothing
     el.style.backgroundImage = `url("${placeholder}")`
     el.style.backgroundSize = 'cover'
     el.style.backgroundPosition = 'center'

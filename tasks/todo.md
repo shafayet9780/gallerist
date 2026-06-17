@@ -91,8 +91,8 @@ From `/agent-skills:review` (0 Critical, 8 Important, ~13 Suggestions). Plan: `p
 TDD per task (RED → GREEN → suite → build → commit). Security first (fail fast).
 
 ## F1 — Security
-- [ ] **T1 — download: URL scheme allowlist + filename/zip-name sanitization** (`plugin-download`)
-- [ ] **T2 — image placeholder: reject CSS `url()` breakout** (`renderer-dom/adapters/image`)
+- [x] **T1 — download: URL scheme allowlist + filename/zip-name sanitization** (`plugin-download`)
+- [x] **T2 — image placeholder: reject CSS `url()` breakout** (`renderer-dom/adapters/image`)
 - [ ] **Checkpoint F1** — test + lint + typecheck + size green.
 
 ## F2 — Correctness / contract
