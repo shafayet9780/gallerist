@@ -15,14 +15,45 @@ export async function urlOf(source: MediaSource): Promise<string | null> {
   return null // tiles (DZI) — not downloadable here
 }
 
+// Security: only schemes that fetch/save inert media. Rejects javascript:/data:/file: etc., which
+// could navigate the host frame or exfiltrate. Relative URLs resolve to http(s) and are allowed.
+const SAFE_SCHEMES = new Set(['http:', 'https:', 'blob:'])
+
+/** Return `url` if its scheme is download-safe, else null. */
+export function safeHref(url: string): string | null {
+  try {
+    const base = typeof location !== 'undefined' ? location.href : 'http://localhost/'
+    return SAFE_SCHEMES.has(new URL(url, base).protocol) ? url : null
+  } catch {
+    return null
+  }
+}
+
+/** Strip path separators, traversal, and control chars so a filename can't escape its directory
+ *  (zip-slip) or inject headers. Falls back to 'download'. */
+export function sanitizeName(name: string): string {
+  const stripped = name
+    .replace(/[/\\]/g, '_')
+    .replace(/\.{2,}/g, '_')
+    .replace(/^\.+/, '')
+  let clean = ''
+  for (const ch of stripped) {
+    const c = ch.codePointAt(0) ?? 0
+    clean += c < 0x20 || c === 0x7f ? '_' : ch // drop control chars (CRLF, NUL, …)
+  }
+  return clean.slice(0, 200) || 'download'
+}
+
 export function filenameOf(item: Item, url?: string | null): string {
   const base = url?.split(/[?#]/)[0]?.split('/').pop()
-  return base?.includes('.') ? base : item.id
+  return sanitizeName(base?.includes('.') ? base : item.id)
 }
 
 function anchorDownload(url: string, filename: string): void {
+  const safe = safeHref(url)
+  if (!safe) return // reject javascript:/data:/file: — never click an unsafe scheme
   const a = document.createElement('a')
-  a.href = url
+  a.href = safe
   a.download = filename
   a.rel = 'noopener'
   document.body.appendChild(a)
@@ -49,7 +80,8 @@ export async function downloadItems(items: Item[], opts: ZipOptions = {}): Promi
   const entries = await Promise.all(
     items.map(async (item) => {
       const url = await urlOf(item.source)
-      return { name: filenameOf(item, url), input: url ? await fetch(url) : '' }
+      const safe = url ? safeHref(url) : null
+      return { name: filenameOf(item, url), input: safe ? await fetch(safe) : '' }
     }),
   )
   const blob = await downloadZip(entries).blob()

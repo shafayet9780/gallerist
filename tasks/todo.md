@@ -82,3 +82,47 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
   per-plugin README; CHANGELOG.
 - [x] **T13.4 — release** — Changesets; tag `v0.1.0-phase1`.
 - [x] **Checkpoint M13** — full CI green; all budgets met; examples smoke-tested.
+
+---
+
+# Visora — Phase 1 Review Fixes (`v0.1.1`)
+
+From `/agent-skills:review` (0 Critical, 8 Important, ~13 Suggestions). Plan: `plans/phase-1-fixes.md`.
+TDD per task (RED → GREEN → suite → build → commit). Security first (fail fast).
+
+## F1 — Security
+- [ ] **T1 — download: URL scheme allowlist + filename/zip-name sanitization** (`plugin-download`)
+- [ ] **T2 — image placeholder: reject CSS `url()` breakout** (`renderer-dom/adapters/image`)
+- [ ] **Checkpoint F1** — test + lint + typecheck + size green.
+
+## F2 — Correctness / contract
+- [ ] **T3 — youtube: `/shorts/`+`/live/` parse, anchored host match** (`plugin-video-youtube`)
+- [ ] **T4 — late `mediaAdapters` go live** (`renderer-dom/mount`)
+- [ ] **Checkpoint F2** — gates green; video/youtube e2e pass.
+
+## F3 — Perf / a11y
+- [ ] **T5 — thumbnails: render-gating + in-place active + `role=group` + tighten 10k bound**
+- [ ] **T6 — grid: render-gating (mirror T5)**
+- [ ] **Checkpoint F3** — gates + e2e + size green.
+
+## F4 — React lifecycle
+- [ ] **T7 — stable viewer (`useState`) + decoupled `destroy`** (`react/Visora`)
+- [ ] **T8 — deterministic overlay ids via `useId`** (`react/Visora`)
+- [ ] **Checkpoint F4** — gates green; StrictMode example smoke-tested.
+
+## F5 — Robustness
+- [ ] **T9 — hash: `lastWritten` guard + malformed handling** (`plugin-hash`)
+- [ ] **T10 — youtube: load resilience + `advanceAxis` parity + typed global** (`plugin-video-youtube`)
+- [ ] **T11 — download: zip resilience (import fallback, `res.ok`, abort)** (`plugin-download`)
+- [ ] **T12 — core: `getPlugins()` returns a copy**
+- [ ] **T13 — supply chain: pin `client-zip` + CI `pnpm audit`**
+- [ ] **Checkpoint F5** — full gates + e2e green.
+
+## Release
+- [ ] **T14 — CHANGELOG + PLUGIN-AUTHORING note + version bump + tag `v0.1.1`**
+
+## Deferred → Phase 2
+- [ ] region remount reconcile (`regions.ts`)
+- [ ] React selector overload + inert SSR snapshot
+- [ ] `@visora/renderer-dom` peer → dependency (decision)
+- [ ] hash `replaceState` history mode (decision)
