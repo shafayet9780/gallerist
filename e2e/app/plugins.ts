@@ -33,6 +33,6 @@ const viewer = createViewer({
   loop: true,
   plugins: [thumbnails(), grid(), fullscreen(), hash({ open: false }), download()],
 })
-mount(viewer)
+mount(viewer, { autoHide: false }) // deterministic e2e: no idle-timer chrome fade
 ;(window as unknown as { viewer: typeof viewer }).viewer = viewer
 document.getElementById('open')?.addEventListener('click', () => viewer.open())
