@@ -16,6 +16,7 @@ import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
 import { type IdleController, createIdleController } from './idle'
+import { type PresetName, resolvePreset } from './presets'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
 import { type RegionHosts, aggregateKeymap, mountPluginRegions } from './regions'
 import { reconcileKeys, windowIndices } from './windowing'
@@ -41,6 +42,12 @@ export interface MountOptions {
    * separately (the `t` key / toggle button / fullscreen), tracked as `data-visora-rail`.
    */
   autoHide?: boolean
+  /**
+   * Named layout preset (UX-E) — sets `data-visora-preset` and supplies defaults for `arrows` and
+   * `autoHide` (both still overridable by explicit options above). The preset's preferred
+   * thumbnails() options are exposed via `resolvePreset(name).thumbnails` for the host to apply.
+   */
+  preset?: PresetName
 }
 
 export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
@@ -78,8 +85,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const container = opts.container ?? null
   const controls = opts.controls ?? true
   const preload = opts.preload ?? { ahead: 2, behind: 1 }
-  const arrows: ArrowLayout = opts.arrows ?? 'pill-right'
-  const autoHide = opts.autoHide ?? true
+  const preset = opts.preset ? resolvePreset(opts.preset) : null
+  const arrows: ArrowLayout = opts.arrows ?? preset?.arrows ?? 'pill-right'
+  const autoHide = opts.autoHide ?? preset?.autoHide ?? true
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -105,6 +113,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   root.setAttribute('data-visora-mode', overlay ? 'overlay' : 'inline')
   root.setAttribute('data-visora-arrows', arrows)
   root.setAttribute('data-visora-rail', 'expanded')
+  if (preset) for (const [k, val] of Object.entries(preset.rootAttrs)) root.setAttribute(k, val)
   if (overlay) {
     root.setAttribute('role', 'dialog')
     root.setAttribute('aria-modal', 'true')

@@ -167,6 +167,22 @@ describe('mount — chrome + keyboard', () => {
     expect(root.getAttribute('data-visora-rail')).toBe('expanded')
   })
 
+  it('applies a preset: sets data-visora-preset and its default arrow layout', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { preset: 'reviewer' })
+    v.open()
+    const root = document.querySelector('.visora') as HTMLElement
+    expect(root.getAttribute('data-visora-preset')).toBe('reviewer')
+    expect(root.getAttribute('data-visora-arrows')).toBe('corner-br') // reviewer default
+  })
+
+  it('an explicit arrows option overrides the preset default', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { preset: 'reviewer', arrows: 'dpad' })
+    v.open()
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-arrows')).toBe('dpad')
+  })
+
   it('ArrowRight navigates, Escape closes', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
