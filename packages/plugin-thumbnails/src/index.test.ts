@@ -135,6 +135,29 @@ describe('plugin-thumbnails', () => {
     expect(col?.getAttribute('aria-orientation')).toBe('horizontal')
   })
 
+  it('live-previews the current item on the active group card', () => {
+    const v = open()
+    v.next() // g1 active (b0,b1,b2)
+    const img = document.querySelector(
+      '.visora-thumb[data-group="g1"] .visora-thumb-img',
+    ) as HTMLImageElement
+    v.nextItem() // i → 1
+    expect(img.src || img.dataset.src).toContain('b1.jpg')
+    v.nextItem() // i → 2
+    expect(img.src || img.dataset.src).toContain('b2.jpg')
+  })
+
+  it('restores the group cover when its group is no longer active', () => {
+    const v = open()
+    v.next() // g1
+    v.nextItem() // shows b1 on g1's card
+    v.prev() // back to g0 → g1 card should revert to its cover (items[0] = b0)
+    const img = document.querySelector(
+      '.visora-thumb[data-group="g1"] .visora-thumb-img',
+    ) as HTMLImageElement
+    expect(img.src || img.dataset.src).toContain('b0.jpg')
+  })
+
   it('wires the thumb url for lazy loading', () => {
     open()
     const img = document.querySelector('.visora-thumb .visora-thumb-img') as HTMLImageElement

@@ -86,8 +86,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let lastI = -1
     let lastWindowKey = ''
     let lastActiveGroupId: string | null = null
+    let liveCardId: string | null = null // group card currently showing a live item preview
     const groupBtns = new Map<string, HTMLButtonElement>()
     const itemBtns = new Map<string, HTMLButtonElement>()
+    const coverUrls = new Map<string, string | null>() // group id → its fixed cover thumb
 
     const observer =
       typeof IntersectionObserver !== 'undefined'
@@ -110,7 +112,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         () => viewer.goTo(gIndex),
       )
       btn.dataset.group = group.id
-      btn.appendChild(lazyImg(groupThumb(group), observer))
+      const cover = groupThumb(group)
+      coverUrls.set(group.id, cover)
+      btn.appendChild(lazyImg(cover, observer))
       if (multi) {
         const badge = document.createElement('span')
         badge.className = 'visora-thumb-count'
@@ -134,7 +138,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (root) root.replaceChildren()
       groupBtns.clear()
       itemBtns.clear()
+      coverUrls.clear()
       itemRow = null
+      liveCardId = null
       lastWindowKey = ''
       lastActiveGroupId = null
     }
@@ -190,12 +196,37 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
     }
 
+    // swap a card's thumb image in place (used for the active group's live preview)
+    const setCardImage = (card: HTMLElement, url: string | null) => {
+      const img = card.querySelector<HTMLImageElement>('.visora-thumb-img')
+      if (!img) return
+      img.dataset.src = '' // stop the lazy observer from overriding our explicit src
+      img.src = url ?? ''
+    }
+
     const applyActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
       const activeGroup = col.groups[g]
       const activeGroupId = activeGroup?.id ?? null
       const activeItemId = activeGroup?.items[i]?.id ?? null
       for (const [id, btn] of groupBtns) setActiveAttr(btn, id === activeGroupId)
       for (const [id, btn] of itemBtns) setActiveAttr(btn, id === activeItemId)
+
+      // live-preview (UX-A): the active multi-item group's card mirrors the currently-viewed item;
+      // restore a card's fixed cover once its group is no longer the live one.
+      if (liveCardId && liveCardId !== activeGroupId) {
+        const prev = groupBtns.get(liveCardId)
+        if (prev) setCardImage(prev, coverUrls.get(liveCardId) ?? null)
+        liveCardId = null
+      }
+      if (activeGroupId && activeGroup && activeGroup.items.length > 1) {
+        const card = groupBtns.get(activeGroupId)
+        const it = activeGroup.items[i]
+        const url =
+          thumbUrl(it?.thumb) ?? thumbUrl(it?.source) ?? coverUrls.get(activeGroupId) ?? null
+        if (card) setCardImage(card, url)
+        liveCardId = activeGroupId
+      }
+
       if (activeGroupId) scrollActiveIntoView(groupBtns.get(activeGroupId))
       if (activeItemId) scrollActiveIntoView(itemBtns.get(activeItemId))
     }
@@ -244,7 +275,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         observer?.disconnect()
         groupBtns.clear()
         itemBtns.clear()
+        coverUrls.clear()
         itemRow = null
+        liveCardId = null
         root = null
       },
       regions: {
