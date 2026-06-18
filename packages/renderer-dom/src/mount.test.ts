@@ -96,6 +96,25 @@ describe('mount — chrome + keyboard', () => {
     expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
   })
 
+  it('renders SVG icons (not Unicode glyphs) in every nav button', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    for (const cls of [
+      '.visora-close',
+      '.visora-prev',
+      '.visora-next',
+      '.visora-item-prev',
+      '.visora-item-next',
+      '.visora-zoom-reset',
+    ]) {
+      const btn = document.querySelector(cls) as HTMLElement
+      expect(btn, cls).not.toBeNull()
+      expect(btn.querySelector('svg'), cls).not.toBeNull()
+      expect(btn.textContent ?? '').toBe('') // no text glyph
+    }
+  })
+
   it('ArrowRight navigates, Escape closes', () => {
     const v = createViewer({ collection: collection() })
     mount(v)

@@ -305,53 +305,39 @@
   outline: 2px solid var(--visora-accent);
   outline-offset: 2px;
 }
+.visora-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  pointer-events: none;
+}
 .visora-close {
   top: 12px;
   right: 12px;
-}
-.visora-close::before {
-  content: "✕";
 }
 .visora-prev {
   top: 50%;
   left: 12px;
   transform: translateY(-50%);
 }
-.visora-prev::before {
-  content: "‹";
-  font-size: 24px;
-}
 .visora-next {
   top: 50%;
   right: 12px;
   transform: translateY(-50%);
-}
-.visora-next::before {
-  content: "›";
-  font-size: 24px;
 }
 .visora-item-prev {
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
-.visora-item-prev::before {
-  content: "˄";
-}
 .visora-item-next {
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
-.visora-item-next::before {
-  content: "˅";
-}
 .visora-zoom-reset {
   bottom: 12px;
   right: 12px;
-}
-.visora-zoom-reset::before {
-  content: "⌂";
 }
 .visora-counter {
   position: absolute;

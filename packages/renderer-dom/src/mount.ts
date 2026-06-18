@@ -14,6 +14,7 @@ import {
 } from '@visora/core'
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
+import { ICONS } from './icons'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
 import { type RegionHosts, aggregateKeymap, mountPluginRegions } from './regions'
 import { reconcileKeys, windowIndices } from './windowing'
@@ -119,19 +120,25 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   if (controls) {
     const chrome = el('div', 'visora-chrome')
     const close = el('button', 'visora-close', { type: 'button', 'aria-label': 'Close' })
+    close.innerHTML = ICONS.close
     close.addEventListener('click', () => viewer.close())
     const prev = el('button', 'visora-prev', { type: 'button', 'aria-label': 'Previous' })
+    prev.innerHTML = ICONS.prev
     prev.addEventListener('click', () => viewer.prev())
     const next = el('button', 'visora-next', { type: 'button', 'aria-label': 'Next' })
+    next.innerHTML = ICONS.next
     next.addEventListener('click', () => viewer.next())
     const prevItem = el('button', 'visora-item-prev', {
       type: 'button',
       'aria-label': 'Previous item',
     })
+    prevItem.innerHTML = ICONS.itemPrev
     prevItem.addEventListener('click', () => viewer.prevItem())
     const nextItem = el('button', 'visora-item-next', { type: 'button', 'aria-label': 'Next item' })
+    nextItem.innerHTML = ICONS.itemNext
     nextItem.addEventListener('click', () => viewer.nextItem())
     const reset = el('button', 'visora-zoom-reset', { type: 'button', 'aria-label': 'Reset zoom' })
+    reset.innerHTML = ICONS.zoomReset
     reset.addEventListener('click', () => viewer.resetZoom())
     counter = el('div', 'visora-counter')
     chrome.append(close, prev, next, prevItem, nextItem, reset, counter)
