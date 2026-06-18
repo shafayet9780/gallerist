@@ -1,19 +1,27 @@
 /*
  * @visora/theme-default — pure CSS skin for Visora (token prefix locked: --visora-*).
- * M3 ships the structural layout + a minimal dark skin so the renderer is usable and
- * e2e-testable. Motion (springs, FLIP, axis transitions, auto-hide) lands in M5.
+ * Identity: "pro-review console" (M14 UX-I) — warm graphite surfaces, a single signal accent,
+ * monospaced tabular numerals for counters/timestamps/ticks. Default accent is signal-amber;
+ * cyan + vermilion variants via [data-visora-theme]. System fonts only (no web-font downloads).
  */
 
 .visora {
-  /* tokens */
-  --visora-backdrop: rgb(8 8 10 / 0.94);
-  --visora-fg: #fff;
-  --visora-accent: #378add;
-  --visora-radius: 8px;
-  --visora-speed: 300ms;
-  --visora-chrome-bg: rgb(10 10 14 / 0.45);
-  --visora-hairline: rgb(255 255 255 / 0.08);
+  /* surfaces — warm graphite, not pure black, so media still pops */
+  --visora-backdrop: rgb(14 15 18 / 0.96);
+  --visora-fg: #f2f3f5;
+  --visora-fg-muted: #9aa0ab;
+  --visora-chrome-bg: rgb(20 22 27 / 0.66);
+  --visora-hairline: rgb(255 255 255 / 0.1);
+  --visora-radius: 9px;
   --visora-target: 44px;
+  --visora-thumb-h: 84px;
+  --visora-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  /* signal accent (amber by default). --visora-accent-fg = ink that sits on the accent. */
+  --visora-accent: #ffb000;
+  --visora-accent-fg: #15110a;
+
+  --visora-speed: 300ms;
 
   /* motion (spec §27.2) — bezier approximations of the named springs */
   --visora-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -25,6 +33,16 @@
   color: var(--visora-fg);
   font-family: system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── accent variants (UX-I) ─────────────────────────────────────────────────── */
+.visora[data-visora-theme="cyan"] {
+  --visora-accent: #22d3ee;
+  --visora-accent-fg: #04181c;
+}
+.visora[data-visora-theme="vermilion"] {
+  --visora-accent: #ff5a36;
+  --visora-accent-fg: #fff;
 }
 
 /* ── modes (data-attribute, not a class — avoids colliding with .visora-overlay elements) ── */
@@ -232,10 +250,13 @@
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  background: #1a1a1f;
+  background: #1a1c22;
+  transition: border-color var(--visora-dur-gentle) var(--visora-ease-out), box-shadow
+    var(--visora-dur-gentle) var(--visora-ease-out);
 }
 .visora-thumb[data-active] {
   border-color: var(--visora-accent);
+  box-shadow: 0 0 0 1px var(--visora-accent), 0 8px 22px -8px var(--visora-accent);
 }
 .visora-thumb-img {
   width: 100%;
@@ -256,23 +277,34 @@
   height: var(--visora-thumb-h);
 }
 .visora-thumb-tick {
-  font: 500 11px ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--visora-mono);
+  font-size: 11px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--visora-fg);
-  opacity: 0.66;
+  opacity: 0.6;
   text-align: center;
   padding: 3px 2px 1px;
   border-top: 1px solid var(--visora-hairline);
+  transition: color var(--visora-dur-gentle) var(--visora-ease-out);
+}
+.visora-thumb[data-active] .visora-thumb-tick {
+  color: var(--visora-accent);
+  opacity: 1;
 }
 .visora-thumb-count {
   position: absolute;
-  top: 2px;
+  top: 4px;
   right: 4px;
-  font: 600 11px system-ui;
-  background: rgb(0 0 0 / 0.6);
-  color: #fff;
+  font-family: var(--visora-mono);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: rgb(0 0 0 / 0.62);
+  color: var(--visora-fg);
   padding: 1px 5px;
-  border-radius: 8px;
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
 }
 .visora-thumb-caption {
   position: absolute;
@@ -319,17 +351,19 @@
 .visora-thumb-item {
   position: relative;
   flex: 0 0 auto;
-  width: calc(var(--visora-thumb-h) * 0.8);
+  width: calc(var(--visora-thumb-h) * 1.2);
   height: calc(var(--visora-thumb-h) * 0.7);
   padding: 0;
   border: 2px solid transparent;
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  background: #1a1a1f;
+  background: #1a1c22;
+  transition: border-color var(--visora-dur-gentle) var(--visora-ease-out);
 }
 .visora-thumb-item[data-active] {
   border-color: var(--visora-accent);
+  box-shadow: 0 0 0 1px var(--visora-accent);
 }
 
 /* ── chrome ────────────────────────────────────────────────────────────────── */
@@ -520,7 +554,7 @@
 }
 .visora-pill[data-active] {
   background: var(--visora-accent);
-  color: #fff;
+  color: var(--visora-accent-fg);
   opacity: 1;
 }
 .visora-pill:focus-visible {
@@ -532,7 +566,10 @@
   position: absolute;
   top: 16px;
   left: 16px;
+  font-family: var(--visora-mono);
   font-size: 13px;
+  font-weight: 600;
+  color: var(--visora-fg-muted);
   padding: 6px 10px;
   border-radius: var(--visora-radius);
   background: var(--visora-chrome-bg);
@@ -593,8 +630,26 @@
   animation: visora-fade var(--visora-dur-gentle) var(--visora-ease-out);
 }
 
+/* immersive preset: chrome AND the rail fade together on idle (UX-E). */
+.visora[data-visora-preset="immersive"][data-visora-idle] .visora-region-thumbnails,
+.visora[data-visora-preset="immersive"][data-visora-idle] .visora-region-toolbar {
+  opacity: 0;
+  pointer-events: none;
+}
+.visora[data-visora-preset="immersive"] .visora-region-thumbnails,
+.visora[data-visora-preset="immersive"] .visora-region-toolbar {
+  transition: opacity var(--visora-dur-gentle) var(--visora-ease-out);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .visora-media-image {
+  .visora-media-image,
+  .visora-chrome,
+  .visora-thumb,
+  .visora-thumb-item,
+  .visora-thumb-tick,
+  .visora-rail-toggle .visora-icon,
+  .visora[data-visora-preset="immersive"] .visora-region-thumbnails,
+  .visora[data-visora-preset="immersive"] .visora-region-toolbar {
     transition-duration: 0ms;
   }
   .visora-slide[data-visora-enter],

@@ -16,8 +16,8 @@ import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
 import { type IdleController, createIdleController } from './idle'
-import { type PresetName, resolvePreset } from './presets'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
+import { type PresetName, resolvePreset } from './presets'
 import { type RegionHosts, aggregateKeymap, mountPluginRegions } from './regions'
 import { reconcileKeys, windowIndices } from './windowing'
 
@@ -359,7 +359,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       label.textContent = 'screen'
       position.appendChild(label)
       for (let k = 0; k < M; k++) {
-        const pill = el('button', 'visora-pill', { type: 'button', 'aria-label': `Screen ${k + 1}` })
+        const pill = el('button', 'visora-pill', {
+          type: 'button',
+          'aria-label': `Screen ${k + 1}`,
+        })
         pill.textContent = String(k + 1)
         pill.addEventListener('click', () => viewer.goTo(g, k))
         position.appendChild(pill)
