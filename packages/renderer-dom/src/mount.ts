@@ -149,13 +149,15 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   let railToggle: HTMLButtonElement | undefined
   let railCollapsed = false
   let preFsCollapsed: boolean | null = null
-  const setRailCollapsed = (v: boolean) => {
+  const setRailCollapsed = (v: boolean, manual = false) => {
     railCollapsed = v
     root.setAttribute('data-visora-rail', v ? 'collapsed' : 'expanded')
     if (railToggle) {
       railToggle.setAttribute('aria-pressed', String(v))
       railToggle.setAttribute('aria-label', v ? 'Show thumbnails' : 'Hide thumbnails')
     }
+    // a manual toggle while fullscreen wins over the on-exit restore
+    if (manual) preFsCollapsed = null
   }
 
   let counter: HTMLElement | undefined
@@ -193,7 +195,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }) as HTMLButtonElement
     railToggle.innerHTML = ICONS.collapse
     railToggle.hidden = true // shown only when a thumbnail rail is mounted (see mountRegions)
-    railToggle.addEventListener('click', () => setRailCollapsed(!railCollapsed))
+    railToggle.addEventListener('click', () => setRailCollapsed(!railCollapsed, true))
     counter = el('div', 'visora-counter')
     position = el('div', 'visora-position')
     position.hidden = true
@@ -332,9 +334,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   // within-group position: segmented pills for small groups, a mono counter for large ones (UX-H)
   const PILL_MAX = 8
-  const updatePosition = (g: number, i: number, M: number) => {
+  const updatePosition = (g: number, i: number, itemCount: number) => {
     if (!position) return
-    if (M <= 1) {
+    if (itemCount <= 1) {
       if (posM !== 0) {
         position.replaceChildren()
         position.removeAttribute('data-mode')
@@ -345,20 +347,20 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       return
     }
     position.hidden = false
-    if (M > PILL_MAX) {
+    if (itemCount > PILL_MAX) {
       position.dataset.mode = 'counter'
-      position.textContent = `${i + 1} / ${M}`
+      position.textContent = `${i + 1} / ${itemCount}`
       posG = g
-      posM = M
+      posM = itemCount
       return
     }
-    if (g !== posG || M !== posM || position.dataset.mode !== 'pills') {
+    if (g !== posG || itemCount !== posM || position.dataset.mode !== 'pills') {
       position.dataset.mode = 'pills'
       position.replaceChildren()
       const label = el('span', 'visora-position-label')
       label.textContent = 'screen'
       position.appendChild(label)
-      for (let k = 0; k < M; k++) {
+      for (let k = 0; k < itemCount; k++) {
         const pill = el('button', 'visora-pill', {
           type: 'button',
           'aria-label': `Screen ${k + 1}`,
@@ -368,7 +370,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         position.appendChild(pill)
       }
       posG = g
-      posM = M
+      posM = itemCount
     }
     for (const [k, pill] of position.querySelectorAll('.visora-pill').entries()) {
       if (k === i) pill.setAttribute('data-active', '')
@@ -376,18 +378,24 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
 
+  // gate chrome updates to cursor/collection changes — skip zoom/pan commits (mirrors the rail)
+  let chromeG = -1
+  let chromeI = -1
+  let chromeCol: unknown = null
   const updateChrome = () => {
-    const state = viewer.getState()
     const col = viewer.getCollection()
+    const cur = viewer.getState().cursor
+    if (col === chromeCol && cur.g === chromeG && cur.i === chromeI) return
+    chromeCol = col
+    chromeG = cur.g
+    chromeI = cur.i
     const G = col.groups.length
-    const cur = state.cursor
-    const group = col.groups[cur.g]
-    const M = group?.items.length ?? 0
+    const itemCount = col.groups[cur.g]?.items.length ?? 0
     if (counter) counter.textContent = `${cur.g + 1} / ${G}`
-    updatePosition(cur.g, cur.i, M)
+    updatePosition(cur.g, cur.i, itemCount)
     live.textContent =
-      M > 1
-        ? `Group ${cur.g + 1} of ${G}, screen ${cur.i + 1} of ${M}`
+      itemCount > 1
+        ? `Group ${cur.g + 1} of ${G}, screen ${cur.i + 1} of ${itemCount}`
         : `Group ${cur.g + 1} of ${G}`
   }
 
@@ -395,6 +403,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   let attached = false
   let prevOverflow = ''
   let restoreFocus: HTMLElement | null = null
+
+  // Auto-hide chrome on idle (UX-C); inert under reduced motion. Rail collapse is independent.
+  // Created before attach() so the (TDZ-safe) poke on show works in both overlay and inline modes.
+  const idle: IdleController | null = autoHide ? createIdleController(root) : null
 
   const attach = () => {
     if (attached) return
@@ -405,8 +417,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       document.body.style.overflow = 'hidden'
       document.body.appendChild(root)
       root.focus()
-      idle?.poke()
     }
+    idle?.poke() // start the idle countdown from when the viewer is shown
   }
   const detach = () => {
     if (!attached) return
@@ -422,6 +434,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   if (!overlay && container) {
     container.appendChild(root)
     attached = true
+    idle?.poke()
   }
 
   const sync = () => {
@@ -475,7 +488,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         break
       case 't':
       case 'T':
-        setRailCollapsed(!railCollapsed)
+        setRailCollapsed(!railCollapsed, true)
         break
       case 'Home':
         viewer.goTo(0)
@@ -510,9 +523,6 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
   document.addEventListener('fullscreenchange', onFsChange)
-
-  // Auto-hide chrome on idle (UX-C); inert under reduced motion. Rail collapse is independent.
-  const idle: IdleController | null = autoHide ? createIdleController(root) : null
 
   // ── live gestures (spec §11; imperative during gesture, decision P0-E) ─────────
   const currentRec = () => {

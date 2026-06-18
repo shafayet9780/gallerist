@@ -4,6 +4,8 @@
 
 const ATTR = 'data-visora-idle'
 const ACTIVITY = ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'] as const
+// pointermove fires many times/second — re-arm the timer at most this often to avoid timer churn.
+const REARM_THROTTLE_MS = 200
 
 export interface IdleControllerOptions {
   /** inactivity before idle (ms). default 2500. */
@@ -37,6 +39,7 @@ export function createIdleController(
 
   let timer: ReturnType<typeof setTimeout> | null = null
   let alive = true
+  let lastArm = 0
 
   const goIdle = () => {
     if (alive) root.setAttribute(ATTR, '')
@@ -44,21 +47,29 @@ export function createIdleController(
   const arm = () => {
     if (timer != null) clearTimeout(timer)
     timer = setTimeout(goIdle, delay)
+    lastArm = Date.now()
   }
-  const wake = () => {
+  // forced reset (public poke) — wake immediately and re-arm.
+  const poke = () => {
     root.removeAttribute(ATTR)
     arm()
   }
+  // activity handler — wake instantly, but coalesce re-arming so a stream of pointermoves
+  // doesn't recreate the timer on every event.
+  const onActivity = () => {
+    root.removeAttribute(ATTR)
+    if (Date.now() - lastArm >= REARM_THROTTLE_MS) arm()
+  }
 
-  for (const ev of ACTIVITY) root.addEventListener(ev, wake, { passive: true })
+  for (const ev of ACTIVITY) root.addEventListener(ev, onActivity, { passive: true })
   arm()
 
   return {
-    poke: wake,
+    poke,
     destroy() {
       alive = false
       if (timer != null) clearTimeout(timer)
-      for (const ev of ACTIVITY) root.removeEventListener(ev, wake)
+      for (const ev of ACTIVITY) root.removeEventListener(ev, onActivity)
       root.removeAttribute(ATTR)
     },
   }
