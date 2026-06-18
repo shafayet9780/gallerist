@@ -67,14 +67,45 @@ describe('plugin-thumbnails', () => {
     expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
   })
 
-  it('does not rebuild the rail on a non-cursor state change (zoom)', () => {
+  it('does no work on a non-cursor state change (zoom)', () => {
     const v = open()
     const rail = document.querySelector('.visora-thumbs') as HTMLElement
     const spy = vi.spyOn(rail, 'replaceChildren')
-    v.zoomTo(2) // changes zoom state, not cursor/collection → must not rebuild
+    v.zoomTo(2) // changes zoom state, not cursor/collection → render must early-return
     expect(spy).not.toHaveBeenCalled()
-    v.next() // cursor change → must rebuild
-    expect(spy).toHaveBeenCalled()
+  })
+
+  it('does not tear down the rail (replaceChildren on root) for cursor moves', () => {
+    const v = open()
+    const rail = document.querySelector('.visora-thumbs') as HTMLElement
+    const spy = vi.spyOn(rail, 'replaceChildren')
+    v.next() // group move
+    v.open({ g: 1 })
+    v.nextItem() // item move
+    expect(spy).not.toHaveBeenCalled() // reconciled in place, never wiped
+  })
+
+  it('reconciles item nav in place: stable node identity, active flips, scrolls into view', () => {
+    if (!Element.prototype.scrollIntoView) {
+      Element.prototype.scrollIntoView = () => {}
+    }
+    const v = open()
+    v.next() // g1 (3 items) active
+    const groupBefore = document.querySelector('.visora-thumb[data-group="g1"]')
+    const itemsBefore = [...document.querySelectorAll('.visora-thumb-item')]
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView')
+
+    v.nextItem() // i: 0 → 1, same group — must NOT rebuild
+
+    const itemsAfter = [...document.querySelectorAll('.visora-thumb-item')]
+    expect(itemsAfter[0]).toBe(itemsBefore[0]) // same nodes, no teardown
+    expect(itemsAfter[1]).toBe(itemsBefore[1])
+    expect(document.querySelector('.visora-thumb[data-group="g1"]')).toBe(groupBefore)
+    expect(
+      document.querySelector('.visora-thumb-item[data-active]')?.getAttribute('data-item'),
+    ).toBe('b1')
+    expect(scrollSpy).toHaveBeenCalled()
+    scrollSpy.mockRestore()
   })
 
   it('uses role=group for the expanded item row (valid nested ARIA)', () => {
