@@ -129,6 +129,44 @@ describe('mount — chrome + keyboard', () => {
     expect(document.querySelector('.visora')?.getAttribute('data-visora-arrows')).toBe('corner-br')
   })
 
+  it("the 't' key toggles rail collapse on the root", () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.visora') as HTMLElement
+    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    root.dispatchEvent(key({ key: 't' }))
+    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    root.dispatchEvent(key({ key: 't' }))
+    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+  })
+
+  it('the rail-toggle button toggles collapse and reflects aria-pressed', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.visora') as HTMLElement
+    const btn = document.querySelector('.visora-rail-toggle') as HTMLButtonElement
+    expect(btn).not.toBeNull()
+    expect(btn.getAttribute('aria-pressed')).toBe('false')
+    btn.click()
+    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    expect(btn.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('collapses the rail on entering fullscreen and restores on exit', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.visora') as HTMLElement
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: root })
+    document.dispatchEvent(new Event('fullscreenchange'))
+    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
+    document.dispatchEvent(new Event('fullscreenchange'))
+    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+  })
+
   it('ArrowRight navigates, Escape closes', () => {
     const v = createViewer({ collection: collection() })
     mount(v)

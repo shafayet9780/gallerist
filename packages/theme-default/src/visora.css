@@ -400,6 +400,35 @@
 .visora[data-visora-arrows="dpad"] .visora-item-next {
   bottom: 12px;
 }
+/* ── rail collapse + idle auto-hide (UX-C) ──────────────────────────────────── */
+.visora-rail-toggle {
+  bottom: calc(var(--visora-thumb-h, 96px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.visora-rail-toggle[hidden] {
+  display: none;
+}
+.visora-rail-toggle .visora-icon {
+  transition: transform var(--visora-dur-gentle, 280ms) var(--visora-ease-out, ease);
+}
+.visora-rail-toggle[aria-pressed="true"] .visora-icon {
+  transform: rotate(180deg);
+}
+.visora[data-visora-rail="collapsed"] .visora-region-thumbnails {
+  display: none;
+}
+.visora[data-visora-rail="collapsed"] .visora-rail-toggle {
+  bottom: 12px;
+}
+.visora-chrome {
+  transition: opacity var(--visora-dur-gentle, 280ms) var(--visora-ease-out, ease);
+}
+.visora[data-visora-idle] .visora-chrome {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .visora-counter {
   position: absolute;
   top: 16px;

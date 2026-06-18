@@ -15,6 +15,7 @@ import {
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
+import { type IdleController, createIdleController } from './idle'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
 import { type RegionHosts, aggregateKeymap, mountPluginRegions } from './regions'
 import { reconcileKeys, windowIndices } from './windowing'
@@ -34,6 +35,12 @@ export interface MountOptions {
    * ↑/↓ top/bottom-center.
    */
   arrows?: ArrowLayout
+  /**
+   * Auto-hide the chrome after a period of inactivity (UX-C), flagged as `data-visora-idle` for
+   * the theme. Default true; inert under prefers-reduced-motion. The thumbnail rail collapses
+   * separately (the `t` key / toggle button / fullscreen), tracked as `data-visora-rail`.
+   */
+  autoHide?: boolean
 }
 
 export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
@@ -72,6 +79,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const controls = opts.controls ?? true
   const preload = opts.preload ?? { ahead: 2, behind: 1 }
   const arrows: ArrowLayout = opts.arrows ?? 'pill-right'
+  const autoHide = opts.autoHide ?? true
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -96,6 +104,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const root = el('div', 'visora')
   root.setAttribute('data-visora-mode', overlay ? 'overlay' : 'inline')
   root.setAttribute('data-visora-arrows', arrows)
+  root.setAttribute('data-visora-rail', 'expanded')
   if (overlay) {
     root.setAttribute('role', 'dialog')
     root.setAttribute('aria-modal', 'true')
@@ -127,6 +136,19 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const live = el('div', 'visora-live', { 'aria-live': 'polite', role: 'status' })
   root.appendChild(live)
 
+  // Rail collapse (UX-C): `t` key / toggle button / fullscreen → data-visora-rail.
+  let railToggle: HTMLButtonElement | undefined
+  let railCollapsed = false
+  let preFsCollapsed: boolean | null = null
+  const setRailCollapsed = (v: boolean) => {
+    railCollapsed = v
+    root.setAttribute('data-visora-rail', v ? 'collapsed' : 'expanded')
+    if (railToggle) {
+      railToggle.setAttribute('aria-pressed', String(v))
+      railToggle.setAttribute('aria-label', v ? 'Show thumbnails' : 'Hide thumbnails')
+    }
+  }
+
   let counter: HTMLElement | undefined
   if (controls) {
     const chrome = el('div', 'visora-chrome')
@@ -151,8 +173,16 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const reset = el('button', 'visora-zoom-reset', { type: 'button', 'aria-label': 'Reset zoom' })
     reset.innerHTML = ICONS.zoomReset
     reset.addEventListener('click', () => viewer.resetZoom())
+    railToggle = el('button', 'visora-rail-toggle', {
+      type: 'button',
+      'aria-label': 'Hide thumbnails',
+      'aria-pressed': 'false',
+    }) as HTMLButtonElement
+    railToggle.innerHTML = ICONS.collapse
+    railToggle.hidden = true // shown only when a thumbnail rail is mounted (see mountRegions)
+    railToggle.addEventListener('click', () => setRailCollapsed(!railCollapsed))
     counter = el('div', 'visora-counter')
-    chrome.append(close, prev, next, prevItem, nextItem, reset, counter)
+    chrome.append(close, prev, next, prevItem, nextItem, reset, railToggle, counter)
     root.appendChild(chrome)
   }
 
@@ -316,6 +346,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       document.body.style.overflow = 'hidden'
       document.body.appendChild(root)
       root.focus()
+      idle?.poke()
     }
   }
   const detach = () => {
@@ -383,6 +414,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       case '0':
         viewer.resetZoom()
         break
+      case 't':
+      case 'T':
+        setRailCollapsed(!railCollapsed)
+        break
       case 'Home':
         viewer.goTo(0)
         break
@@ -400,6 +435,25 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     e.preventDefault()
   }
   root.addEventListener('keydown', onKey)
+
+  // Collapse the rail by default while our element is fullscreen; restore the prior state on exit.
+  const isOurFullscreen = () => {
+    const fe = document.fullscreenElement
+    return !!fe && (fe === root || root.contains(fe))
+  }
+  const onFsChange = () => {
+    if (isOurFullscreen()) {
+      if (preFsCollapsed === null) preFsCollapsed = railCollapsed
+      setRailCollapsed(true)
+    } else if (preFsCollapsed !== null) {
+      setRailCollapsed(preFsCollapsed)
+      preFsCollapsed = null
+    }
+  }
+  document.addEventListener('fullscreenchange', onFsChange)
+
+  // Auto-hide chrome on idle (UX-C); inert under reduced motion. Rail collapse is independent.
+  const idle: IdleController | null = autoHide ? createIdleController(root) : null
 
   // ── live gestures (spec §11; imperative during gesture, decision P0-E) ─────────
   const currentRec = () => {
@@ -427,6 +481,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(viewer.getPlugins())
     mountPluginRegions(regionHosts, viewer.getPlugins(), { viewer })
+    // the rail-collapse toggle is only meaningful when a thumbnail rail is mounted
+    if (railToggle) railToggle.hidden = regionHosts.thumbnails.childElementCount === 0
     // plugin overlays may have changed (e.g. React <Visora.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItemId = undefined
@@ -444,6 +500,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       unsubscribe()
       offPlugins()
       detachGestures()
+      idle?.destroy()
+      document.removeEventListener('fullscreenchange', onFsChange)
       root.removeEventListener('keydown', onKey)
       for (const rec of mounted.values()) teardownSlide(rec)
       mounted.clear()
