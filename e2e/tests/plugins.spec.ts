@@ -65,6 +65,18 @@ test('default arrow layout is the right-center pill', async ({ page }) => {
   await expect(page.locator('.visora')).toHaveAttribute('data-visora-arrows', 'pill-right')
 })
 
+test('rail defaults to the bottom position', async ({ page }) => {
+  await expect(page.locator('.visora')).toHaveAttribute('data-visora-rail-pos', 'bottom')
+})
+
+test('the rail-collapse toggle is visible and hides the rail', async ({ page }) => {
+  const toggle = page.locator('.visora-rail-toggle')
+  await expect(toggle).toBeVisible()
+  await toggle.click()
+  await expect(page.locator('.visora')).toHaveAttribute('data-visora-rail', 'collapsed')
+  await expect(page.locator('.visora-region-thumbnails')).toBeHidden()
+})
+
 test('no axe violations with the full plugin set', async ({ page }) => {
   const results = await new AxeBuilder({ page })
     .include('.visora')

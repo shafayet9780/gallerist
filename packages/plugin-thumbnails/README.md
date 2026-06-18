@@ -22,8 +22,9 @@ mount(viewer)
   image; it reverts to the group cover once the group is no longer active.
 - **Vertical item column (default).** The active group's items stack in a column floating above the
   rail, so ↑/↓ moves the highlight up/down — input direction matches visual direction.
-- **Count badge** on grouped (multi-item) cards only; **captions** render only when a string
-  `caption` is provided on the group/item (no `alt` fallback — `alt` stays accessibility text).
+- **Count badge** on grouped (multi-item) cards only; **captions** render as a single label band
+  **beneath the thumbnail**, only when a string `caption` is provided on the group/item (no `alt`
+  fallback — `alt` stays accessibility text). A timestamp is just a caption the host supplies.
 
 ## Options
 
@@ -31,7 +32,6 @@ mount(viewer)
 thumbnails({
   overscan: 24,         // group cards rendered each side of the active group (windowing bound)
   itemAxis: 'vertical', // 'vertical' (default) | 'horizontal' — layout of the active group's items
-  ticks: false,         // render group `meta` as a time-ribbon label under each card (reviewer preset)
 })
 ```
 
@@ -39,13 +39,11 @@ thumbnails({
 |------------|------------------------------|--------------|-------|
 | `overscan` | `number`                     | `24`         | Live group cards ≈ `2·overscan + 1`. |
 | `itemAxis` | `'vertical' \| 'horizontal'` | `'vertical'` | `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. |
-| `ticks`    | `boolean`                    | `false`      | Time-ribbon: stacks each card's image over a monospace `group.meta` label. |
 
-Presets configure these for you — see [layout presets](../../docs/PRESETS.md). `resolvePreset(name).thumbnails`
-returns the `{ itemAxis, ticks }` a preset prefers.
+Presets configure these for you — see [layout presets](../../docs/PRESETS.md). The rail's **position**
+(bottom/top/hidden) is a renderer option (`rail`), not a thumbnails option.
 
 ## Data
 
-- `group.caption?: string` / `item.caption?: string` — optional display caption on the card/thumb.
-- `group.meta` — rendered as the time-ribbon tick label when `ticks` is on.
+- `group.caption?: string` / `item.caption?: string` — optional label shown beneath the card/thumb.
 - `group.thumb` / `item.thumb` — preferred thumbnail source (falls back to the item `source`).

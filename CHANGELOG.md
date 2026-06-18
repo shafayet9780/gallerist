@@ -13,17 +13,20 @@ reproducible via token overrides).
   cards, render-only-if-present (no `alt` fallback).
 - **renderer-dom**: real inline **SVG chrome icons** (replacing Unicode glyphs); configurable
   **arrow placement** (`arrows`: `pill-right` default · `corner-br` · `dpad` · `split`) via
-  `data-visora-arrows`; **rail collapse** (`t` key + toggle button + collapsed-by-default in
-  fullscreen, `data-visora-rail`); **idle auto-hide** of chrome (`autoHide`, `data-visora-idle`,
-  inert under `prefers-reduced-motion`); **layout presets** (`resolvePreset`, `preset` option:
-  `filmstrip`/`immersive`/`reviewer`/`contact`); **segmented position indicator** (pills ≤8 items,
-  mono `n / N` fallback).
-- **plugin-thumbnails**: `itemAxis` (`vertical` default — the ↑/↓ axis now reads top-to-bottom),
-  optional `caption`s, opt-in time-ribbon `ticks` (group `meta` labels).
+  `data-visora-arrows`; **rail placement** (`rail`: `bottom` default · `top` · `hidden`) via
+  `data-visora-rail-pos`; **rail collapse** (`t` key + a top-right toggle button +
+  collapsed-by-default in fullscreen, `data-visora-rail`); **idle auto-hide** of chrome (`autoHide`,
+  `data-visora-idle`, inert under `prefers-reduced-motion`); **layout presets** (`resolvePreset`,
+  `preset` option) that resolve a **visibly distinct** layout — `filmstrip` (bottom rail),
+  `reviewer` (bottom timeline + corner arrows), `immersive` (rail hidden + auto-hide), `contact`
+  (top rail); **segmented position indicator** (pills ≤8 items, mono `n / N` fallback).
+- **plugin-thumbnails**: `itemAxis` (`vertical` default — the ↑/↓ axis reads top-to-bottom);
+  optional **`caption`** rendered as a single label band **beneath each thumbnail** (group + item),
+  shown only when provided.
 - **theme-default**: graphite + signal-amber identity, mono tabular numerals, **accent variants**
   via `data-visora-theme` (`amber` default · `cyan` · `vermilion`).
-- **react**: `preset`, `theme` (reactive), `arrows`, `autoHide` props; re-exports `resolvePreset`
-  and the preset/arrow types.
+- **react**: `preset`, `theme` (reactive), `arrows`, `rail`, `autoHide` props; re-exports
+  `resolvePreset` and the preset/arrow/rail types.
 
 ### Fixed
 - **plugin-thumbnails (bug #5)**: the active thumbnail no longer drifts horizontally when paging
@@ -33,10 +36,21 @@ reproducible via token overrides).
 
 ### Review hardening (pre-release)
 - thumbnails: cover-thumb cache is windowed (no unbounded growth on long traversals); live-preview
-  src pinned via a `dataset.live` flag; time-ribbon ticks render only string/number `meta`.
+  src pinned via a `dataset.live` flag.
 - renderer-dom: chrome counter/pills update only on cursor/collection change (skip zoom/pan);
   idle controller created before mount-attach and armed on show in inline mode too; a manual rail
   toggle during fullscreen survives exit; idle re-arm coalesced to avoid `pointermove` timer churn.
+
+### UX follow-up (pre-release)
+- The **caption is the single under-thumbnail label** — rendered as a band beneath the image, not an
+  overlay. Removed the separate time-ribbon `ticks` concept (a timestamp is just a caption the host
+  supplies).
+- **Presets are now visibly distinct** via rail placement (bottom / top / hidden), not just arrow
+  nuance. Added the `rail` option (renderer + React).
+- Moved the rail-collapse toggle to the **top-right beside Close** so it's no longer hidden behind
+  the footer/caption area.
+- Example: removed the full-width footer caption strip; the timestamp is folded into the
+  per-thumbnail caption; the preset switcher shows what each preset changes.
 
 ## v0.1.1 — Phase 1 review hardening
 

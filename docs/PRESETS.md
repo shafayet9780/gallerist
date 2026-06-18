@@ -5,14 +5,15 @@ and the theme reacts. Presets bundle coherent defaults; everything is overridabl
 
 ## Presets
 
-A preset bundles arrow placement, chrome auto-hide, and the thumbnail rail's secondary-axis layout.
+A preset bundles a **rail placement**, arrow placement, and chrome auto-hide into a visibly
+distinct layout.
 
-| Preset      | Arrows      | Auto-hide | Rail ticks | For |
-|-------------|-------------|-----------|------------|-----|
-| `filmstrip` | `pill-right`| no        | no         | Classic lightbox, persistent chrome (default). |
-| `immersive` | `pill-right`| yes       | no         | Full-bleed viewing; chrome + rail fade on idle. |
-| `reviewer`  | `corner-br` | no        | yes        | Time-series review; time-ribbon under the rail. |
-| `contact`   | `pill-right`| no        | no         | Grid-first browsing (host opens `plugin-grid`). |
+| Preset      | Rail     | Arrows      | Auto-hide | For |
+|-------------|----------|-------------|-----------|-----|
+| `filmstrip` | `bottom` | `pill-right`| no        | Classic lightbox, persistent chrome (default). |
+| `reviewer`  | `bottom` | `corner-br` | no        | Time-series review; labels under each screen. |
+| `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
+| `contact`   | `top`    | `pill-right`| no        | Browse-heavy; rail along the top (pairs with `plugin-grid`). |
 
 ```tsx
 // React
@@ -21,15 +22,23 @@ A preset bundles arrow placement, chrome auto-hide, and the thumbnail rail's sec
 ```
 
 ```ts
-// Vanilla — mount() applies the preset's arrows/auto-hide + data-visora-preset.
+// Vanilla — mount() applies the preset's rail/arrows/auto-hide + data-visora-preset.
 mount(viewer, { preset: 'reviewer' })
 // thumbnails() options aren't owned by mount; apply them from the resolver:
 const { thumbnails: t } = resolvePreset('reviewer')
 createViewer({ collection, plugins: [thumbnails(t)] })
 ```
 
-`resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, thumbnails }`. Unknown
-names fall back to `filmstrip`. Explicit `arrows`/`autoHide` options always win over the preset.
+`resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails }`.
+Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide` options always win over
+the preset.
+
+## Rail placement (`data-visora-rail-pos`)
+
+- `bottom` (default) / `top` — the rail stays **horizontal** so it matches the ←/→ group axis (a
+  vertical side rail would mis-map that axis, so it isn't offered). With `top`, the active group's
+  item column expands downward instead of up.
+- `hidden` — the rail starts collapsed; reveal it with the toggle, the `t` key, or fullscreen exit.
 
 ## Arrow placement (`data-visora-arrows`)
 
