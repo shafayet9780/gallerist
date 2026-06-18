@@ -49,7 +49,11 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
   },
 }
 
-/** Resolve a preset name to its layout config; unknown names fall back to `filmstrip`. */
+/** Resolve a preset name to its layout config; unknown names warn (dev) and fall back to `filmstrip`. */
 export function resolvePreset(name: string): ResolvedPreset {
-  return PRESETS[name as PresetName] ?? PRESETS.filmstrip
+  const preset = PRESETS[name as PresetName]
+  if (!preset && typeof console !== 'undefined') {
+    console.warn(`[visora] unknown preset "${name}" — falling back to "filmstrip"`)
+  }
+  return preset ?? PRESETS.filmstrip
 }

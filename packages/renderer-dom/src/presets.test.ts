@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { resolvePreset } from './presets'
 
 describe('resolvePreset', () => {
@@ -26,7 +26,10 @@ describe('resolvePreset', () => {
     expect(resolvePreset('contact').rootAttrs['data-visora-preset']).toBe('contact')
   })
 
-  it('falls back to filmstrip for an unknown name', () => {
+  it('falls back to filmstrip for an unknown name (and warns)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(resolvePreset('nope')).toEqual(resolvePreset('filmstrip'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unknown preset "nope"'))
+    warn.mockRestore()
   })
 })
