@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.2.0 — UX/UI overhaul ("pristine")
+
+A hands-on pass over the React example drove a focused UX milestone. The default look moves from a
+generic dark-glass lightbox to a distinctive **pro-review console** identity, the within-group axis
+gets a real fix, and layout becomes configurable via smart **presets**. API additions are
+non-breaking; the **default theme appearance changes** (pre-1.0, so semver-minor — old look is
+reproducible via token overrides).
+
+### Added
+- **core**: optional `caption?: string` on `Group` (Item already had `caption`); shown on rail
+  cards, render-only-if-present (no `alt` fallback).
+- **renderer-dom**: real inline **SVG chrome icons** (replacing Unicode glyphs); configurable
+  **arrow placement** (`arrows`: `pill-right` default · `corner-br` · `dpad` · `split`) via
+  `data-visora-arrows`; **rail collapse** (`t` key + toggle button + collapsed-by-default in
+  fullscreen, `data-visora-rail`); **idle auto-hide** of chrome (`autoHide`, `data-visora-idle`,
+  inert under `prefers-reduced-motion`); **layout presets** (`resolvePreset`, `preset` option:
+  `filmstrip`/`immersive`/`reviewer`/`contact`); **segmented position indicator** (pills ≤8 items,
+  mono `n / N` fallback).
+- **plugin-thumbnails**: `itemAxis` (`vertical` default — the ↑/↓ axis now reads top-to-bottom),
+  optional `caption`s, opt-in time-ribbon `ticks` (group `meta` labels).
+- **theme-default**: graphite + signal-amber identity, mono tabular numerals, **accent variants**
+  via `data-visora-theme` (`amber` default · `cyan` · `vermilion`).
+- **react**: `preset`, `theme` (reactive), `arrows`, `autoHide` props; re-exports `resolvePreset`
+  and the preset/arrow types.
+
+### Fixed
+- **plugin-thumbnails (bug #5)**: the active thumbnail no longer drifts horizontally when paging
+  within a group with ↑/↓. The rail **reconciles in place** (keyed nodes, `data-active` flip,
+  `scrollIntoView`) instead of rebuilding on every cursor move; the active group's card
+  **live-previews** the current item.
+
 ## v0.1.1 — Phase 1 review hardening
 
 From an end-to-end five-axis review of Phase 1 (0 critical, 8 important + suggestions). No API breaks.

@@ -126,3 +126,40 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 - [ ] React selector overload + inert SSR snapshot
 - [ ] `@visora/renderer-dom` peer → dependency (decision)
 - [ ] hash `replaceState` history mode (decision)
+
+---
+
+# Visora — M14 UX/UI Overhaul (`v0.2.0`)
+
+From a hands-on run of the React example (behavioral bugs + generic look). Plan in
+`~/.claude/plans/…snazzy-mountain.md` (M14 section). TDD per task (RED → GREEN → suite → build →
+commit). Decisions driven by a UX interview (UX-A … UX-J).
+
+## Phase A — foundations
+- [x] **U1** core: optional `caption` on `Group` (Item already had it)
+- [x] **U2** renderer `idle.ts`: idle timer → `data-visora-idle`; reduced-motion inert
+
+## Phase B — renderer chrome
+- [x] **U3** SVG icon set (`icons.ts`) replacing Unicode glyphs
+- [x] **U4** configurable arrow placement → `data-visora-arrows` (default `pill-right`)
+- [x] **U5** rail collapse (`t` + toggle + fullscreen) + idle auto-hide wired
+
+## Phase C — thumbnails rewrite
+- [x] **U6** reconcile-in-place — fixes #5 (active thumb drift); no teardown on cursor moves
+- [x] **U7** vertical item column (`itemAxis`, default vertical)
+- [x] **U8** live-preview active group card mirrors current item
+- [x] **U9** count badge grouped-only + optional captions (render-if-present)
+- [x] **U10** time-ribbon ticks from `group.meta` (opt-in)
+
+## Phase D — presets + theme
+- [x] **U11** `resolvePreset()` (filmstrip/immersive/reviewer/contact) + `mount({ preset })`
+- [x] **U12** theme overhaul: graphite + signal-amber, cyan/vermilion variants, transitions, reduced-motion
+- [x] **U13** segmented position pills (≤8) + mono `n / N` fallback
+
+## Phase E — React + example + docs
+- [x] **U14** React `<Visora preset theme arrows autoHide>` (theme reactive)
+- [x] **U15** example rebuild (work-session reviewer + preset/accent switchers) + landing redesign
+- [x] **U16** docs: CHANGELOG v0.2.0, thumbnails README, `docs/PRESETS.md`, ADR 0001, this checklist
+
+## Phase F — hardening + ship
+- [ ] **U17** axe + perf (zero rebuild on item nav, <200 nodes @10k) + size re-check + e2e; tag `v0.2.0`

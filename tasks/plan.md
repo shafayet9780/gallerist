@@ -110,3 +110,29 @@ pnpm size     # core ≤12, core+renderer ≤16, core+thumbnails+image ≤24 (gz
 ```
 Manual: React example + plugins demo — thumbnails (grouped, expand), grid toggle, fullscreen,
 deep-link round-trip (`#g=&i=`), download, video play/pause on slide enter/leave.
+
+---
+
+# M14 — UX/UI Overhaul ("pristine") — v0.2.0
+
+A hands-on run of the React example surfaced behavioral bugs and a generic look. M14 makes the
+default UX pristine and the layout configurable, keeping the core DOM-free and plugins
+tree-shakeable. Full plan + the locked UX interview decisions (UX-A … UX-J) live in
+`~/.claude/plans/…snazzy-mountain.md`; the executable checklist is in `tasks/todo.md` (M14).
+
+## Highlights
+- **Bug #5 fixed**: thumbnails reconcile in place (no rebuild on cursor moves) → the active thumb
+  no longer drifts horizontally; the active group card live-previews the current item.
+- **Vertical item column** for the ↑/↓ axis (input ↔ visual match); optional captions; opt-in
+  time-ribbon ticks from `group.meta`.
+- **Configurable chrome**: SVG icons, `data-visora-arrows` placement, rail collapse (`t` / toggle /
+  fullscreen), idle auto-hide (reduced-motion inert), segmented position pills.
+- **Presets** (`resolvePreset`: filmstrip/immersive/reviewer/contact) + **theme variants**
+  (`data-visora-theme`: amber/cyan/vermilion) on a new graphite + signal-amber identity.
+- **React**: `preset`/`theme`/`arrows`/`autoHide` props. **Docs**: CHANGELOG v0.2.0,
+  thumbnails README, `docs/PRESETS.md`, ADR `docs/adr/0001-declarative-layout-presets.md`.
+
+## Architecture
+Declarative layout via root `data-visora-*` attributes consumed by theme CSS (JS only sets
+attributes); presets are a pure resolver; idle/collapse owned by renderer-dom (no new core state,
+only an additive `Group.caption`). See ADR 0001.
