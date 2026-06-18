@@ -31,6 +31,13 @@ reproducible via token overrides).
   `scrollIntoView`) instead of rebuilding on every cursor move; the active group's card
   **live-previews** the current item.
 
+### Review hardening (pre-release)
+- thumbnails: cover-thumb cache is windowed (no unbounded growth on long traversals); live-preview
+  src pinned via a `dataset.live` flag; time-ribbon ticks render only string/number `meta`.
+- renderer-dom: chrome counter/pills update only on cursor/collection change (skip zoom/pan);
+  idle controller created before mount-attach and armed on show in inline mode too; a manual rail
+  toggle during fullscreen survives exit; idle re-arm coalesced to avoid `pointermove` timer churn.
+
 ## v0.1.1 — Phase 1 review hardening
 
 From an end-to-end five-axis review of Phase 1 (0 critical, 8 important + suggestions). No API breaks.
