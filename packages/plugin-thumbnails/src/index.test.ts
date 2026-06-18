@@ -114,6 +114,27 @@ describe('plugin-thumbnails', () => {
     expect(document.querySelector('.visora-thumb-items')?.getAttribute('role')).toBe('group')
   })
 
+  it('lays the item column out vertically by default (matches ↑/↓ input)', () => {
+    const v = open()
+    v.next() // g1 active
+    const col = document.querySelector('.visora-thumb-items')
+    expect(col?.getAttribute('aria-orientation')).toBe('vertical')
+    expect(col?.getAttribute('data-axis')).toBe('vertical')
+  })
+
+  it('honors itemAxis: "horizontal"', () => {
+    const v = createViewer({
+      collection: collection(),
+      plugins: [thumbnails({ itemAxis: 'horizontal' })],
+    })
+    mount(v)
+    v.open()
+    v.next()
+    const col = document.querySelector('.visora-thumb-items')
+    expect(col?.getAttribute('data-axis')).toBe('horizontal')
+    expect(col?.getAttribute('aria-orientation')).toBe('horizontal')
+  })
+
   it('wires the thumb url for lazy loading', () => {
     open()
     const img = document.querySelector('.visora-thumb .visora-thumb-img') as HTMLImageElement

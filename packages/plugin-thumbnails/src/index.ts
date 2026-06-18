@@ -13,6 +13,12 @@ import { windowIndices } from '@visora/core'
 export interface ThumbnailsOptions {
   /** group thumbs rendered on each side of the active group (default 24). */
   overscan?: number
+  /**
+   * Layout of the active group's item thumbs (the secondary ↑/↓ axis). `vertical` (default)
+   * stacks them in a column so the highlight moves up/down with the input direction; `horizontal`
+   * keeps the legacy inline row.
+   */
+  itemAxis?: 'vertical' | 'horizontal'
 }
 
 function thumbUrl(source: MediaSource | undefined): string | null {
@@ -68,6 +74,7 @@ function scrollActiveIntoView(btn: HTMLElement | undefined): void {
 export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
   return (viewer: ViewerApi) => {
     const overscan = opts.overscan ?? 24
+    const itemAxis = opts.itemAxis ?? 'vertical'
     let root: HTMLElement | null = null
     let itemRow: HTMLElement | null = null
     let unsub: (() => void) | null = null
@@ -167,6 +174,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           itemRow = document.createElement('div')
           itemRow.className = 'visora-thumb-items'
           itemRow.setAttribute('role', 'group') // a listbox can't nest inside the rail listbox
+          itemRow.setAttribute('aria-orientation', itemAxis)
+          itemRow.dataset.axis = itemAxis
         }
         itemRow.replaceChildren()
         activeGroup.items.forEach((item, i) => {
