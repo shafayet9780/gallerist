@@ -227,6 +227,30 @@ describe('plugin-thumbnails', () => {
     expect(img.src || img.dataset.src).toContain('a0.jpg')
   })
 
+  it('swaps to a disjoint collection cleanly (resetAll): rebuilt, no orphan nodes', () => {
+    const v = open()
+    v.setCollection({
+      groups: [
+        { id: 'x0', items: [item('x0a')] },
+        { id: 'x1', items: [item('x1a'), item('x1b')] },
+      ],
+    })
+    const rail = document.querySelector('.visora-thumbs') as HTMLElement
+    expect(rail.querySelectorAll('.visora-thumb').length).toBe(2)
+    expect(rail.querySelector('.visora-thumb[data-group="g0"]')).toBeNull() // old ids gone
+    expect(rail.querySelector('.visora-thumb[data-active]')?.getAttribute('data-group')).toBe('x0')
+  })
+
+  it('keeps the rail bounded after a full traversal (no cover-cache leak)', () => {
+    const big: Collection = {
+      groups: Array.from({ length: 400 }, (_, i) => ({ id: `g${i}`, items: [item(`it${i}`)] })),
+    }
+    const v = open(big)
+    for (let i = 0; i < 400; i++) v.goTo(i) // walk the whole collection
+    // windowed rail stays bounded even though every group was visited once
+    expect(document.querySelectorAll('.visora-thumb').length).toBeLessThanOrEqual(49)
+  })
+
   it('windows the rail: a 10k-group collection stays bounded to the window', () => {
     const big: Collection = {
       groups: Array.from({ length: 10_000 }, (_, i) => ({ id: `g${i}`, items: [item(`it${i}`)] })),

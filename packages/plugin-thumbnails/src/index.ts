@@ -116,7 +116,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
             for (const e of entries) {
               if (e.isIntersecting) {
                 const img = e.target as HTMLImageElement
-                if (img.dataset.src) img.src = img.dataset.src
+                // skip imgs pinned by the live-preview (setCardImage); don't clobber their src
+                if (!img.dataset.live && img.dataset.src) img.src = img.dataset.src
                 observer?.unobserve(img)
               }
             }
@@ -143,7 +144,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (ticks) {
         const tick = document.createElement('span')
         tick.className = 'visora-thumb-tick'
-        tick.textContent = group.meta != null ? String(group.meta) : ''
+        // only string/number metas read as a label; objects would render "[object Object]"
+        const m = group.meta
+        tick.textContent = typeof m === 'string' || typeof m === 'number' ? String(m) : ''
         btn.appendChild(tick)
       }
       appendCaption(btn, captionOf(group))
@@ -184,6 +187,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         if (!desiredIds.has(id)) {
           btn.remove()
           groupBtns.delete(id)
+          coverUrls.delete(id) // keep the cover cache windowed too (avoids unbounded growth)
         }
       }
       for (const g of windowIdx) {
@@ -223,11 +227,14 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
     }
 
-    // swap a card's thumb image in place (used for the active group's live preview)
+    // Swap a card's thumb image in place (active group's live preview). `url` is a
+    // collection-provided thumbnail/source URL — same sink class as the main image adapter
+    // (`img.src`, not a navigation/script sink), so no scheme allowlist by design; `data:` LQIP
+    // thumbs are intentionally allowed. The `live` flag pins the src against the lazy observer.
     const setCardImage = (card: HTMLElement, url: string | null) => {
       const img = card.querySelector<HTMLImageElement>('.visora-thumb-img')
       if (!img) return
-      img.dataset.src = '' // stop the lazy observer from overriding our explicit src
+      img.dataset.live = '1'
       img.src = url ?? ''
     }
 
