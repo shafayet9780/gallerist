@@ -1,5 +1,5 @@
 // Two-axis navigation math (spec §5). Pure functions: (cursor, ctx) → cursor.
-// Primary axis (group) wraps when loop; secondary axis (item) clamps, never wraps.
+// Both axes wrap when `loop` is set (group across groups, item within its group); otherwise clamp.
 
 import type { Collection, Cursor, ItemMemory } from '../types'
 
@@ -48,11 +48,18 @@ export function prevGroup(cursor: Cursor, ctx: NavCtx): Cursor {
 
 export function nextItem(cursor: Cursor, ctx: NavCtx): Cursor {
   const count = ctx.counts[cursor.g] ?? 0
-  return { g: cursor.g, i: Math.max(0, Math.min(cursor.i + 1, count - 1)) }
+  if (count <= 0) return { g: cursor.g, i: 0 }
+  let i = cursor.i + 1
+  if (i >= count) i = ctx.loop ? 0 : count - 1
+  return { g: cursor.g, i }
 }
 
-export function prevItem(cursor: Cursor, _ctx: NavCtx): Cursor {
-  return { g: cursor.g, i: Math.max(0, cursor.i - 1) }
+export function prevItem(cursor: Cursor, ctx: NavCtx): Cursor {
+  const count = ctx.counts[cursor.g] ?? 0
+  if (count <= 0) return { g: cursor.g, i: 0 }
+  let i = cursor.i - 1
+  if (i < 0) i = ctx.loop ? count - 1 : 0
+  return { g: cursor.g, i }
 }
 
 export function goTo(g: number, i: number | undefined, ctx: NavCtx): Cursor {

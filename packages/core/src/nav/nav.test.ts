@@ -51,16 +51,25 @@ describe('group axis', () => {
 })
 
 describe('secondary (item) axis', () => {
-  it('nextItem advances within the group, no wrap', () => {
+  it('nextItem advances within the group', () => {
     expect(nextItem(at(1, 0), ctx())).toEqual({ g: 1, i: 1 })
-    expect(nextItem(at(1, 2), ctx())).toEqual({ g: 1, i: 2 }) // at last, no-op
   })
-  it('prevItem retreats within the group, clamped at 0', () => {
-    expect(prevItem(at(1, 1), ctx())).toEqual({ g: 1, i: 0 })
-    expect(prevItem(at(1, 0), ctx())).toEqual({ g: 1, i: 0 })
+  it('nextItem clamps at the last item when not looping', () => {
+    expect(nextItem(at(1, 2), ctx({ loop: false }))).toEqual({ g: 1, i: 2 })
   })
-  it('is a no-op in a single-item group', () => {
-    expect(nextItem(at(0, 0), ctx())).toEqual({ g: 0, i: 0 })
+  it('nextItem wraps to the first item when looping', () => {
+    expect(nextItem(at(1, 2), ctx({ loop: true }))).toEqual({ g: 1, i: 0 })
+  })
+  it('prevItem retreats within the group, clamped at 0 when not looping', () => {
+    expect(prevItem(at(1, 1), ctx({ loop: false }))).toEqual({ g: 1, i: 0 })
+    expect(prevItem(at(1, 0), ctx({ loop: false }))).toEqual({ g: 1, i: 0 })
+  })
+  it('prevItem wraps to the last item when looping', () => {
+    expect(prevItem(at(1, 0), ctx({ loop: true }))).toEqual({ g: 1, i: 2 })
+  })
+  it('is a no-op in a single-item group (even when looping)', () => {
+    expect(nextItem(at(0, 0), ctx({ loop: true }))).toEqual({ g: 0, i: 0 })
+    expect(prevItem(at(0, 0), ctx({ loop: true }))).toEqual({ g: 0, i: 0 })
   })
 })
 

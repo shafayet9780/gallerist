@@ -50,6 +50,16 @@ test('within-group ↑/↓ keeps the highlight in the vertical column (no horizo
   await expect(page.locator('.visora-thumb[data-active]')).toHaveAttribute('data-group', 'g1')
 })
 
+test('item axis loops within a group when loop is set', async ({ page }) => {
+  const root = page.locator('.visora')
+  await root.focus()
+  await page.keyboard.press('ArrowRight') // g1 (3 items), at item 1
+  await page.keyboard.press('ArrowUp') // prevItem at first → wraps to last
+  await expect(page.locator('.visora-position .visora-pill[data-active]')).toHaveText('3')
+  await page.keyboard.press('ArrowDown') // nextItem at last → wraps to first
+  await expect(page.locator('.visora-position .visora-pill[data-active]')).toHaveText('1')
+})
+
 test('segmented position pills reflect the current screen', async ({ page }) => {
   const root = page.locator('.visora')
   await root.focus()
