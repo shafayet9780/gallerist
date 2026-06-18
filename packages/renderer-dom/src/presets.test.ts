@@ -2,28 +2,33 @@ import { describe, expect, it, vi } from 'vitest'
 import { resolvePreset } from './presets'
 
 describe('resolvePreset', () => {
-  it('filmstrip: side pill arrows, persistent chrome, no ticks', () => {
+  it('filmstrip: bottom rail, side pill arrows, persistent chrome', () => {
     const p = resolvePreset('filmstrip')
     expect(p.rootAttrs['data-visora-preset']).toBe('filmstrip')
     expect(p.arrows).toBe('pill-right')
     expect(p.autoHide).toBe(false)
-    expect(p.thumbnails).toEqual({ itemAxis: 'vertical', ticks: false })
+    expect(p.rail).toBe('bottom')
+    expect(p.thumbnails).toEqual({ itemAxis: 'vertical' })
   })
 
-  it('immersive: auto-hides the chrome', () => {
-    expect(resolvePreset('immersive').autoHide).toBe(true)
-    expect(resolvePreset('immersive').rootAttrs['data-visora-preset']).toBe('immersive')
+  it('immersive: rail hidden + chrome auto-hide', () => {
+    const p = resolvePreset('immersive')
+    expect(p.autoHide).toBe(true)
+    expect(p.rail).toBe('hidden')
+    expect(p.rootAttrs['data-visora-preset']).toBe('immersive')
   })
 
-  it('reviewer: corner arrows + time-ribbon ticks', () => {
+  it('reviewer: bottom timeline rail + corner arrows', () => {
     const p = resolvePreset('reviewer')
     expect(p.arrows).toBe('corner-br')
-    expect(p.thumbnails.ticks).toBe(true)
+    expect(p.rail).toBe('bottom')
     expect(p.rootAttrs['data-visora-preset']).toBe('reviewer')
   })
 
-  it('contact: tagged for the grid-first layout', () => {
-    expect(resolvePreset('contact').rootAttrs['data-visora-preset']).toBe('contact')
+  it('contact: top rail', () => {
+    const p = resolvePreset('contact')
+    expect(p.rail).toBe('top')
+    expect(p.rootAttrs['data-visora-preset']).toBe('contact')
   })
 
   it('falls back to filmstrip for an unknown name (and warns)', () => {

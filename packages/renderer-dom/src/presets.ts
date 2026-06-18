@@ -3,7 +3,7 @@
 // name. Pure resolver (no DOM): the renderer applies `rootAttrs` + `arrows`/`autoHide`, and a host
 // (or the React adapter) spreads `thumbnails` into the thumbnails() plugin.
 
-import type { ArrowLayout } from './mount'
+import type { ArrowLayout, RailPlacement } from './mount'
 
 export type PresetName = 'filmstrip' | 'immersive' | 'reviewer' | 'contact'
 
@@ -14,38 +14,44 @@ export interface ResolvedPreset {
   arrows: ArrowLayout
   /** default chrome auto-hide-on-idle (overridable). */
   autoHide: boolean
+  /** default thumbnail rail placement (overridable). */
+  rail: RailPlacement
   /** preferred thumbnails() options for this preset. */
-  thumbnails: { itemAxis: 'vertical' | 'horizontal'; ticks: boolean }
+  thumbnails: { itemAxis: 'vertical' | 'horizontal' }
 }
 
 const PRESETS: Record<PresetName, ResolvedPreset> = {
-  // classic lightbox: side arrows, persistent chrome, vertical item column.
+  // classic lightbox: bottom rail, side arrows, persistent chrome.
   filmstrip: {
     rootAttrs: { 'data-visora-preset': 'filmstrip' },
     arrows: 'pill-right',
     autoHide: false,
-    thumbnails: { itemAxis: 'vertical', ticks: false },
+    rail: 'bottom',
+    thumbnails: { itemAxis: 'vertical' },
   },
-  // full-bleed: chrome auto-hides on idle, minimal UI.
+  // full-bleed: rail hidden by default, chrome auto-hides on idle, minimal UI.
   immersive: {
     rootAttrs: { 'data-visora-preset': 'immersive' },
     arrows: 'pill-right',
     autoHide: true,
-    thumbnails: { itemAxis: 'vertical', ticks: false },
+    rail: 'hidden',
+    thumbnails: { itemAxis: 'vertical' },
   },
-  // time-series reviewer: corner arrow cluster, persistent chrome, time-ribbon ticks.
+  // time-series reviewer: bottom timeline rail with labels, corner arrow cluster.
   reviewer: {
     rootAttrs: { 'data-visora-preset': 'reviewer' },
     arrows: 'corner-br',
     autoHide: false,
-    thumbnails: { itemAxis: 'vertical', ticks: true },
+    rail: 'bottom',
+    thumbnails: { itemAxis: 'vertical' },
   },
-  // browse-heavy / grid-first (the host opens the grid plugin); rail stays available.
+  // browse-heavy: rail along the top (pairs well with the grid plugin).
   contact: {
     rootAttrs: { 'data-visora-preset': 'contact' },
     arrows: 'pill-right',
     autoHide: false,
-    thumbnails: { itemAxis: 'vertical', ticks: false },
+    rail: 'top',
+    thumbnails: { itemAxis: 'vertical' },
   },
 }
 

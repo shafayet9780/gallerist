@@ -217,6 +217,29 @@ describe('mount — chrome + keyboard', () => {
     expect((document.querySelector('.visora-position') as HTMLElement).hidden).toBe(true)
   })
 
+  it('defaults the rail position to bottom', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-rail-pos')).toBe('bottom')
+  })
+
+  it('reflects rail:"top" on the root', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { rail: 'top' })
+    v.open()
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-rail-pos')).toBe('top')
+  })
+
+  it('rail:"hidden" starts collapsed at the bottom', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { rail: 'hidden' })
+    v.open()
+    const root = document.querySelector('.visora') as HTMLElement
+    expect(root.getAttribute('data-visora-rail-pos')).toBe('bottom')
+    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+  })
+
   it('ArrowRight navigates, Escape closes', () => {
     const v = createViewer({ collection: collection() })
     mount(v)

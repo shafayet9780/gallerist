@@ -48,9 +48,16 @@ export interface MountOptions {
    * thumbnails() options are exposed via `resolvePreset(name).thumbnails` for the host to apply.
    */
   preset?: PresetName
+  /**
+   * Thumbnail rail placement (UX-E), surfaced as `data-visora-rail-pos`. `bottom` (default) or
+   * `top` keep the rail horizontal so it matches the ←/→ group axis; `hidden` starts the rail
+   * collapsed (reveal with the toggle / `t` / hover). Overridable; presets supply a default.
+   */
+  rail?: RailPlacement
 }
 
 export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
+export type RailPlacement = 'bottom' | 'top' | 'hidden'
 
 export interface RendererHandle {
   root: HTMLElement
@@ -88,6 +95,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const preset = opts.preset ? resolvePreset(opts.preset) : null
   const arrows: ArrowLayout = opts.arrows ?? preset?.arrows ?? 'pill-right'
   const autoHide = opts.autoHide ?? preset?.autoHide ?? true
+  const rail: RailPlacement = opts.rail ?? preset?.rail ?? 'bottom'
+  const railHidden = rail === 'hidden'
+  const railPos = rail === 'top' ? 'top' : 'bottom'
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -112,7 +122,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const root = el('div', 'visora')
   root.setAttribute('data-visora-mode', overlay ? 'overlay' : 'inline')
   root.setAttribute('data-visora-arrows', arrows)
-  root.setAttribute('data-visora-rail', 'expanded')
+  root.setAttribute('data-visora-rail-pos', railPos)
+  root.setAttribute('data-visora-rail', railHidden ? 'collapsed' : 'expanded')
   if (preset) for (const [k, val] of Object.entries(preset.rootAttrs)) root.setAttribute(k, val)
   if (overlay) {
     root.setAttribute('role', 'dialog')
@@ -147,7 +158,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   // Rail collapse (UX-C): `t` key / toggle button / fullscreen → data-visora-rail.
   let railToggle: HTMLButtonElement | undefined
-  let railCollapsed = false
+  let railCollapsed = railHidden
   let preFsCollapsed: boolean | null = null
   const setRailCollapsed = (v: boolean, manual = false) => {
     railCollapsed = v
