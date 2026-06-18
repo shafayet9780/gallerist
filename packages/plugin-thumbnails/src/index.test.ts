@@ -60,9 +60,7 @@ describe('plugin-thumbnails', () => {
 
   it('shows the count badge only on grouped (multi-item) cards', () => {
     open()
-    expect(
-      document.querySelector('.visora-thumb[data-group="g0"] .visora-thumb-count'),
-    ).toBeNull() // single item → no badge
+    expect(document.querySelector('.visora-thumb[data-group="g0"] .visora-thumb-count')).toBeNull() // single item → no badge
     expect(
       document.querySelector('.visora-thumb[data-group="g2"] .visora-thumb-count')?.textContent,
     ).toBe('2')
@@ -190,6 +188,37 @@ describe('plugin-thumbnails', () => {
       '.visora-thumb[data-group="g1"] .visora-thumb-img',
     ) as HTMLImageElement
     expect(img.src || img.dataset.src).toContain('b0.jpg')
+  })
+
+  it('renders no time-ribbon ticks by default', () => {
+    open({
+      groups: [
+        { id: 'g0', meta: '8:34', items: [item('a0')] },
+        { id: 'g1', meta: '8:44', items: [item('b0'), item('b1')] },
+      ],
+    })
+    expect(document.querySelector('.visora-thumb-tick')).toBeNull()
+  })
+
+  it('renders a time-ribbon tick from group.meta when ticks enabled', () => {
+    const v = createViewer({
+      collection: {
+        groups: [
+          { id: 'g0', meta: '8:34', items: [item('a0')] },
+          { id: 'g1', meta: '8:44', items: [item('b0'), item('b1')] },
+        ],
+      },
+      plugins: [thumbnails({ ticks: true })],
+    })
+    mount(v)
+    v.open()
+    expect(document.querySelector('.visora-thumbs')?.getAttribute('data-ticks')).not.toBeNull()
+    expect(
+      document.querySelector('.visora-thumb[data-group="g0"] .visora-thumb-tick')?.textContent,
+    ).toBe('8:34')
+    expect(
+      document.querySelector('.visora-thumb[data-group="g1"] .visora-thumb-tick')?.textContent,
+    ).toBe('8:44')
   })
 
   it('wires the thumb url for lazy loading', () => {

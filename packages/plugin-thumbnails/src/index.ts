@@ -19,6 +19,11 @@ export interface ThumbnailsOptions {
    * keeps the legacy inline row.
    */
   itemAxis?: 'vertical' | 'horizontal'
+  /**
+   * Render each group's `meta` as a time-ribbon tick label beneath its card (UX-J, the reviewer
+   * preset's signature). Off by default so plain galleries stay uncluttered.
+   */
+  ticks?: boolean
 }
 
 function thumbUrl(source: MediaSource | undefined): string | null {
@@ -88,6 +93,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
   return (viewer: ViewerApi) => {
     const overscan = opts.overscan ?? 24
     const itemAxis = opts.itemAxis ?? 'vertical'
+    const ticks = opts.ticks ?? false
     let root: HTMLElement | null = null
     let itemRow: HTMLElement | null = null
     let unsub: (() => void) | null = null
@@ -133,6 +139,12 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         badge.className = 'visora-thumb-count'
         badge.textContent = String(group.items.length)
         btn.appendChild(badge)
+      }
+      if (ticks) {
+        const tick = document.createElement('span')
+        tick.className = 'visora-thumb-tick'
+        tick.textContent = group.meta != null ? String(group.meta) : ''
+        btn.appendChild(tick)
       }
       appendCaption(btn, captionOf(group))
       return btn
@@ -282,6 +294,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         root.className = 'visora-thumbs'
         root.setAttribute('role', 'listbox')
         root.setAttribute('aria-label', 'Thumbnails')
+        if (ticks) root.dataset.ticks = ''
         render()
         unsub = viewer.subscribe(render)
       },

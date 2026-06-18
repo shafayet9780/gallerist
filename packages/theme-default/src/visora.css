@@ -246,6 +246,24 @@
 .visora-thumb-stacked {
   box-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
 }
+/* time-ribbon (UX-J): when ticks are on, cards stack image + a monospace meta label band. */
+.visora-thumbs[data-ticks] .visora-thumb {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+}
+.visora-thumbs[data-ticks] .visora-thumb > .visora-thumb-img {
+  height: var(--visora-thumb-h);
+}
+.visora-thumb-tick {
+  font: 500 11px ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--visora-fg);
+  opacity: 0.66;
+  text-align: center;
+  padding: 3px 2px 1px;
+  border-top: 1px solid var(--visora-hairline);
+}
 .visora-thumb-count {
   position: absolute;
   top: 2px;
