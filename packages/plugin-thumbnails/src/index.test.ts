@@ -58,6 +58,40 @@ describe('plugin-thumbnails', () => {
     expect(g1?.querySelector('.visora-thumb-count')?.textContent).toBe('3')
   })
 
+  it('shows the count badge only on grouped (multi-item) cards', () => {
+    open()
+    expect(
+      document.querySelector('.visora-thumb[data-group="g0"] .visora-thumb-count'),
+    ).toBeNull() // single item → no badge
+    expect(
+      document.querySelector('.visora-thumb[data-group="g2"] .visora-thumb-count')?.textContent,
+    ).toBe('2')
+  })
+
+  it('renders a group caption only when provided', () => {
+    open({
+      groups: [
+        { id: 'g0', caption: 'Morning', items: [item('a0')] },
+        { id: 'g1', items: [item('b0'), item('b1')] },
+      ],
+    })
+    expect(
+      document.querySelector('.visora-thumb[data-group="g0"] .visora-thumb-caption')?.textContent,
+    ).toBe('Morning')
+    expect(
+      document.querySelector('.visora-thumb[data-group="g1"] .visora-thumb-caption'),
+    ).toBeNull()
+  })
+
+  it('renders item captions only when provided', () => {
+    open({
+      groups: [{ id: 'g1', items: [{ ...item('b0'), caption: 'First screen' }, item('b1')] }],
+    })
+    const items = document.querySelectorAll('.visora-thumb-item')
+    expect(items[0]?.querySelector('.visora-thumb-caption')?.textContent).toBe('First screen')
+    expect(items[1]?.querySelector('.visora-thumb-caption')).toBeNull()
+  })
+
   it('expands the active multi-item group into item thumbs; clicking an item navigates', () => {
     const v = open()
     v.next() // g1 (3 items) active

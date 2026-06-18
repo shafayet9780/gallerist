@@ -50,6 +50,19 @@ function lazyImg(src: string | null, observer: IntersectionObserver | null): HTM
   return img
 }
 
+/** Display caption string, if one was explicitly provided (no `alt` fallback — UX-G). */
+function captionOf(x: { caption?: string | { id: string } }): string | undefined {
+  return typeof x.caption === 'string' ? x.caption : undefined
+}
+
+function appendCaption(btn: HTMLElement, text: string | undefined): void {
+  if (!text) return
+  const cap = document.createElement('span')
+  cap.className = 'visora-thumb-caption'
+  cap.textContent = text
+  btn.appendChild(cap)
+}
+
 function setActiveAttr(btn: HTMLElement, active: boolean): void {
   if (active) btn.setAttribute('data-active', '')
   else btn.removeAttribute('data-active')
@@ -121,6 +134,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         badge.textContent = String(group.items.length)
         btn.appendChild(badge)
       }
+      appendCaption(btn, captionOf(group))
       return btn
     }
 
@@ -130,6 +144,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       )
       btn.dataset.item = item.id
       btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
+      appendCaption(btn, captionOf(item))
       return btn
     }
 

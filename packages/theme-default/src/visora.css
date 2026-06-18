@@ -256,6 +256,21 @@
   padding: 1px 5px;
   border-radius: 8px;
 }
+.visora-thumb-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 6px 6px 3px;
+  font: 500 11px system-ui;
+  line-height: 1.2;
+  color: #fff;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.78), transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
 .visora-thumb-items {
   display: flex;
   gap: 6px;
@@ -284,6 +299,7 @@
   backdrop-filter: blur(20px) saturate(180%);
 }
 .visora-thumb-item {
+  position: relative;
   flex: 0 0 auto;
   width: calc(var(--visora-thumb-h) * 0.8);
   height: calc(var(--visora-thumb-h) * 0.7);
