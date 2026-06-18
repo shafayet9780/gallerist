@@ -5,8 +5,16 @@ import {
   type ViewerOptions,
   createViewer,
 } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
-import { type ReactNode, forwardRef, useEffect, useId, useImperativeHandle, useState } from 'react'
+import { type ArrowLayout, type PresetName, mount } from '@visora/renderer-dom'
+import {
+  type ReactNode,
+  forwardRef,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { VisoraContext, useViewerContext } from './context'
 
@@ -16,11 +24,31 @@ export interface VisoraProps extends ViewerOptions {
   onClose?: () => void
   container?: HTMLElement | null
   controls?: boolean
+  /** layout preset (sets arrow placement, auto-hide, data-visora-preset) — UX-E. */
+  preset?: PresetName
+  /** accent variant, applied as data-visora-theme (reactive) — UX-I. */
+  theme?: 'amber' | 'cyan' | 'vermilion'
+  /** within-group arrow placement (overrides the preset default) — UX-D. */
+  arrows?: ArrowLayout
+  /** auto-hide chrome on idle (overrides the preset default) — UX-C. */
+  autoHide?: boolean
   children?: ReactNode
 }
 
 const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref) {
-  const { open, onClose, container, controls, children, ...options } = props
+  const {
+    open,
+    onClose,
+    container,
+    controls,
+    preset,
+    theme,
+    arrows,
+    autoHide,
+    children,
+    ...options
+  } = props
+  const rootRef = useRef<HTMLElement | null>(null)
   // Create the viewer once (core is DOM-free → SSR-safe); options are read at construction. Lazy
   // useState (not useMemo, which React may discard) guarantees a single stable instance.
   const [viewer] = useState(() => createViewer(options))
@@ -32,11 +60,29 @@ const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref
   // permanently poisoning it (registerPlugin/nav short-circuit once destroyed) so re-registered
   // overlays/regions vanish. The viewer is plain JS (no DOM) and is reclaimed by GC once the
   // component unmounts and the renderer/hook/overlay subscriptions have all cleaned themselves up.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional mount-once
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional mount-once (layout opts read once)
   useEffect(() => {
-    const handle = mount(viewer, { container: container ?? null, controls })
-    return () => handle.destroy()
+    const handle = mount(viewer, {
+      container: container ?? null,
+      controls,
+      preset,
+      arrows,
+      autoHide,
+    })
+    rootRef.current = handle.root
+    return () => {
+      handle.destroy()
+      rootRef.current = null
+    }
   }, [viewer])
+
+  // theme is reactive — reflect it as data-visora-theme on the mounted root.
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    if (theme) root.setAttribute('data-visora-theme', theme)
+    else root.removeAttribute('data-visora-theme')
+  }, [theme])
 
   useEffect(() => {
     if (open === undefined) return

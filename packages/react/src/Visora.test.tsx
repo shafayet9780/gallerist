@@ -24,6 +24,21 @@ describe('<Visora>', () => {
     expect(document.querySelector('.visora-counter')?.textContent).toContain('1 / 2')
   })
 
+  it('applies preset, theme, and arrow layout to the root', () => {
+    render(<Visora collection={collection} open preset="reviewer" theme="cyan" />)
+    const root = document.querySelector('.visora') as HTMLElement
+    expect(root.getAttribute('data-visora-preset')).toBe('reviewer')
+    expect(root.getAttribute('data-visora-arrows')).toBe('corner-br') // reviewer default
+    expect(root.getAttribute('data-visora-theme')).toBe('cyan')
+  })
+
+  it('updates the theme attribute when the theme prop changes', () => {
+    const { rerender } = render(<Visora collection={collection} open theme="cyan" />)
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-theme')).toBe('cyan')
+    rerender(<Visora collection={collection} open theme="vermilion" />)
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-theme')).toBe('vermilion')
+  })
+
   it('closes when open flips to false and fires onClose', () => {
     const onClose = vi.fn()
     const { rerender } = render(<Visora collection={collection} open onClose={onClose} />)
