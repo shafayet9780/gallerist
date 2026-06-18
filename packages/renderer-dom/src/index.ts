@@ -2,5 +2,5 @@
 export const VERSION = '0.0.0'
 
 export { imageAdapter } from './adapters/image'
-export { type MountOptions, mount, type RendererHandle } from './mount'
+export { type ArrowLayout, type MountOptions, mount, type RendererHandle } from './mount'
 export { type KeyReconcile, reconcileKeys, windowIndices } from './windowing'

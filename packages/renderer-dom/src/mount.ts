@@ -27,7 +27,16 @@ export interface MountOptions {
   preload?: { ahead: number; behind: number }
   /** global overlays applied to every slide (spec §8.1, §9). */
   overlays?: OverlaySpec[]
+  /**
+   * Placement of the within-group ↑/↓ arrows, surfaced as `data-visora-arrows` for the theme
+   * (UX-D). `pill-right` (default): ←/→ on the side edges, ↑/↓ as a stacked pill at right-center.
+   * `corner-br`: ↑/↓ paired bottom-right. `dpad`: all four clustered as a d-pad. `split`: legacy
+   * ↑/↓ top/bottom-center.
+   */
+  arrows?: ArrowLayout
 }
+
+export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
 
 export interface RendererHandle {
   root: HTMLElement
@@ -62,6 +71,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const container = opts.container ?? null
   const controls = opts.controls ?? true
   const preload = opts.preload ?? { ahead: 2, behind: 1 }
+  const arrows: ArrowLayout = opts.arrows ?? 'pill-right'
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -85,6 +95,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // ── DOM scaffold ───────────────────────────────────────────────────────────
   const root = el('div', 'visora')
   root.setAttribute('data-visora-mode', overlay ? 'overlay' : 'inline')
+  root.setAttribute('data-visora-arrows', arrows)
   if (overlay) {
     root.setAttribute('role', 'dialog')
     root.setAttribute('aria-modal', 'true')

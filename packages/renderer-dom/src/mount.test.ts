@@ -115,6 +115,20 @@ describe('mount — chrome + keyboard', () => {
     }
   })
 
+  it('defaults the arrow layout to a right-center pill', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-arrows')).toBe('pill-right')
+  })
+
+  it('reflects a configured arrow layout on the root', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'corner-br' })
+    v.open()
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-arrows')).toBe('corner-br')
+  })
+
   it('ArrowRight navigates, Escape closes', () => {
     const v = createViewer({ collection: collection() })
     mount(v)

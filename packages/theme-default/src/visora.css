@@ -339,6 +339,67 @@
   bottom: 12px;
   right: 12px;
 }
+
+/* ── arrow placement (data-visora-arrows, UX-D) ─────────────────────────────── */
+/* base ↑/↓ above are the legacy "split" layout (top/bottom-center). Each layout below overrides. */
+
+/* pill-right (default): ↑/↓ stacked just inboard of the → side arrow. */
+.visora[data-visora-arrows="pill-right"] .visora-item-prev,
+.visora[data-visora-arrows="pill-right"] .visora-item-next {
+  top: 50%;
+  bottom: auto;
+  left: auto;
+  right: 68px;
+}
+.visora[data-visora-arrows="pill-right"] .visora-item-prev {
+  transform: translateY(calc(-50% - 24px));
+}
+.visora[data-visora-arrows="pill-right"] .visora-item-next {
+  transform: translateY(calc(-50% + 24px));
+}
+
+/* corner-br: ↑ ↓ paired in the bottom-right, left of the zoom-reset. */
+.visora[data-visora-arrows="corner-br"] .visora-item-prev,
+.visora[data-visora-arrows="corner-br"] .visora-item-next {
+  top: auto;
+  bottom: 12px;
+  left: auto;
+  transform: none;
+}
+.visora[data-visora-arrows="corner-br"] .visora-item-prev {
+  right: 116px;
+}
+.visora[data-visora-arrows="corner-br"] .visora-item-next {
+  right: 64px;
+}
+
+/* dpad: all four clustered as a directional pad in the bottom-right. */
+.visora[data-visora-arrows="dpad"] .visora-prev,
+.visora[data-visora-arrows="dpad"] .visora-next {
+  top: auto;
+  bottom: 60px;
+  left: auto;
+  transform: none;
+}
+.visora[data-visora-arrows="dpad"] .visora-prev {
+  right: 116px;
+}
+.visora[data-visora-arrows="dpad"] .visora-next {
+  right: 8px;
+}
+.visora[data-visora-arrows="dpad"] .visora-item-prev,
+.visora[data-visora-arrows="dpad"] .visora-item-next {
+  top: auto;
+  left: auto;
+  right: 62px;
+  transform: none;
+}
+.visora[data-visora-arrows="dpad"] .visora-item-prev {
+  bottom: 108px;
+}
+.visora[data-visora-arrows="dpad"] .visora-item-next {
+  bottom: 12px;
+}
 .visora-counter {
   position: absolute;
   top: 16px;
