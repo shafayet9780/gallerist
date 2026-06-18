@@ -69,4 +69,15 @@ describe('normalize', () => {
     normalize({ items })
     expect(items).toEqual(snapshot)
   })
+
+  it('preserves an optional display caption on groups and items', () => {
+    const g: Group = {
+      id: 'g1',
+      caption: 'Morning session',
+      items: [item('a1', { caption: 'First screen' })],
+    }
+    const c = normalize({ groups: [g] })
+    expect(c.groups[0]?.caption).toBe('Morning session')
+    expect(c.groups[0]?.items[0]?.caption).toBe('First screen')
+  })
 })

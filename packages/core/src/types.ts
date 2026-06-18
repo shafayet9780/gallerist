@@ -117,6 +117,8 @@ export interface Group<GM = unknown, IM = unknown> {
   items: Item<IM>[]
   meta?: GM
   thumb?: MediaSource
+  /** display caption for the group (e.g. shown under its rail card); render only if present. */
+  caption?: string
   overlays?: OverlaySpec[]
 }
 
