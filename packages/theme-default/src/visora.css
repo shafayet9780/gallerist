@@ -240,11 +240,13 @@
   background: var(--visora-chrome-bg);
   backdrop-filter: blur(20px) saturate(180%);
 }
+/* cards stack image + (optional) caption band; height grows for the caption */
 .visora-thumb {
   position: relative;
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
   width: calc(var(--visora-thumb-h) * 1.4);
-  height: var(--visora-thumb-h);
   padding: 0;
   border: 2px solid transparent;
   border-radius: 6px;
@@ -260,37 +262,15 @@
 }
 .visora-thumb-img {
   width: 100%;
-  height: 100%;
   object-fit: cover;
   display: block;
 }
-.visora-thumb-stacked {
-  box-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
-}
-/* time-ribbon (UX-J): when ticks are on, cards stack image + a monospace meta label band. */
-.visora-thumbs[data-ticks] .visora-thumb {
-  display: flex;
-  flex-direction: column;
-  height: auto;
-}
-.visora-thumbs[data-ticks] .visora-thumb > .visora-thumb-img {
+.visora-thumb > .visora-thumb-img {
+  flex: 0 0 auto;
   height: var(--visora-thumb-h);
 }
-.visora-thumb-tick {
-  font-family: var(--visora-mono);
-  font-size: 11px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  color: var(--visora-fg);
-  opacity: 0.6;
-  text-align: center;
-  padding: 3px 2px 1px;
-  border-top: 1px solid var(--visora-hairline);
-  transition: color var(--visora-dur-gentle) var(--visora-ease-out);
-}
-.visora-thumb[data-active] .visora-thumb-tick {
-  color: var(--visora-accent);
-  opacity: 1;
+.visora-thumb-stacked {
+  box-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
 }
 .visora-thumb-count {
   position: absolute;
@@ -306,20 +286,20 @@
   border-radius: 999px;
   backdrop-filter: blur(6px);
 }
+/* single label band beneath each thumbnail (UX feedback: caption goes under the thumb) */
 .visora-thumb-caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 6px 6px 3px;
+  flex: 0 0 auto;
+  padding: 4px 6px 5px;
   font: 500 11px system-ui;
   line-height: 1.2;
-  color: #fff;
-  background: linear-gradient(to top, rgb(0 0 0 / 0.78), transparent);
+  color: var(--visora-fg);
+  background: rgb(255 255 255 / 0.03);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  pointer-events: none;
+}
+.visora-thumb[data-active] .visora-thumb-caption {
+  color: var(--visora-accent);
 }
 .visora-thumb-items {
   display: flex;
@@ -350,9 +330,10 @@
 }
 .visora-thumb-item {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 0 0 auto;
   width: calc(var(--visora-thumb-h) * 1.2);
-  height: calc(var(--visora-thumb-h) * 0.7);
   padding: 0;
   border: 2px solid transparent;
   border-radius: 6px;
@@ -360,6 +341,10 @@
   cursor: pointer;
   background: #1a1c22;
   transition: border-color var(--visora-dur-gentle) var(--visora-ease-out);
+}
+.visora-thumb-item > .visora-thumb-img {
+  flex: 0 0 auto;
+  height: calc(var(--visora-thumb-h) * 0.7);
 }
 .visora-thumb-item[data-active] {
   border-color: var(--visora-accent);
@@ -488,10 +473,11 @@
   bottom: 12px;
 }
 /* ── rail collapse + idle auto-hide (UX-C) ──────────────────────────────────── */
+/* toggle sits in the top-right beside the close button — a fixed spot that never collides with
+   the (variable-height) rail or the footer. */
 .visora-rail-toggle {
-  bottom: calc(var(--visora-thumb-h, 96px) + 12px);
-  left: 50%;
-  transform: translateX(-50%);
+  top: 12px;
+  right: 64px;
 }
 .visora-rail-toggle[hidden] {
   display: none;
@@ -505,8 +491,18 @@
 .visora[data-visora-rail="collapsed"] .visora-region-thumbnails {
   display: none;
 }
-.visora[data-visora-rail="collapsed"] .visora-rail-toggle {
-  bottom: 12px;
+/* rail at the top (below the toolbar) — stays horizontal so it still matches the ←/→ group axis;
+   the item column then expands downward instead of up. */
+.visora[data-visora-rail-pos="top"] .visora-region-thumbnails {
+  top: 56px;
+  bottom: auto;
+}
+.visora[data-visora-rail-pos="top"] .visora-region-footer {
+  bottom: 0;
+}
+.visora[data-visora-rail-pos="top"] .visora-thumb-items[data-axis="vertical"] {
+  top: calc(100% + 10px);
+  bottom: auto;
 }
 .visora-chrome {
   transition: opacity var(--visora-dur-gentle, 280ms) var(--visora-ease-out, ease);
