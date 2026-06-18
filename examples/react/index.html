@@ -3,93 +3,151 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Visora — React gallery</title>
+    <title>Visora — review console</title>
     <style>
       :root {
         color-scheme: dark;
+        --ink: #f2f3f5;
+        --muted: #9aa0ab;
+        --amber: #ffb000;
+        --panel: #16181d;
+        --hairline: rgb(255 255 255 / 0.1);
+        --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
         font-family: system-ui, -apple-system, sans-serif;
-        background: radial-gradient(120% 120% at 50% 0%, #1b2233 0%, #0c0e14 60%);
-        color: #e7e9ee;
+        background:
+          radial-gradient(110% 90% at 80% -10%, rgb(255 176 0 / 0.08), transparent 60%),
+          #0e0f12;
+        color: var(--ink);
         min-height: 100vh;
       }
       main {
-        max-width: 680px;
+        max-width: 720px;
         margin: 0 auto;
-        padding: 64px 24px;
+        padding: 72px 24px 96px;
+      }
+      .eyebrow {
+        font: 600 12px var(--mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--amber);
+        margin: 0 0 14px;
       }
       h1 {
-        font-size: 44px;
-        margin: 0 0 8px;
-        letter-spacing: -0.02em;
+        font-size: clamp(48px, 9vw, 76px);
+        line-height: 0.96;
+        letter-spacing: -0.03em;
+        margin: 0 0 16px;
+        font-weight: 680;
       }
       .lede {
-        font-size: 17px;
-        line-height: 1.5;
-        color: #aab2c5;
-        margin: 0 0 24px;
-        max-width: 52ch;
+        font-size: 18px;
+        line-height: 1.55;
+        color: var(--muted);
+        margin: 0 0 32px;
+        max-width: 56ch;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 14px;
+        padding: 16px;
+        border: 1px solid var(--hairline);
+        border-radius: 14px;
+        background: rgb(255 255 255 / 0.02);
+      }
+      .controls label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font: 600 11px var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .controls select {
+        appearance: none;
+        min-width: 132px;
+        padding: 9px 12px;
+        font: 500 14px system-ui;
+        color: var(--ink);
+        background: var(--panel);
+        border: 1px solid var(--hairline);
+        border-radius: 9px;
+        cursor: pointer;
+      }
+      .controls select:focus-visible {
+        outline: 2px solid var(--amber);
+        outline-offset: 2px;
       }
       button.open {
-        padding: 12px 22px;
+        margin-left: auto;
+        padding: 11px 22px;
         font: 600 15px system-ui;
-        color: #fff;
-        background: #378add;
+        color: #15110a;
+        background: var(--amber);
         border: 0;
-        border-radius: 10px;
+        border-radius: 9px;
         cursor: pointer;
       }
       button.open:hover {
-        background: #2f7ac6;
+        filter: brightness(1.07);
       }
       .hint {
-        margin-top: 20px;
+        margin-top: 26px;
         font-size: 13px;
-        line-height: 1.7;
-        color: #7e879c;
-        max-width: 56ch;
+        line-height: 1.9;
+        color: var(--muted);
+        max-width: 60ch;
       }
       kbd {
-        font: 600 11px ui-monospace, monospace;
-        background: #232838;
-        border: 1px solid #333a4f;
-        border-radius: 4px;
+        font: 600 11px var(--mono);
+        background: var(--panel);
+        border: 1px solid var(--hairline);
+        border-bottom-width: 2px;
+        border-radius: 5px;
         padding: 1px 6px;
+        color: var(--ink);
       }
       /* portal-bridge bits rendered inside the viewer */
       .vbadge {
-        background: var(--visora-accent, #378add);
-        color: #fff;
+        font: 600 11px var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--amber);
+        background: rgb(255 176 0 / 0.12);
+        border: 1px solid rgb(255 176 0 / 0.3);
         padding: 5px 11px;
-        border-radius: 6px;
-        font: 600 12px system-ui;
-        letter-spacing: 0.02em;
+        border-radius: 999px;
       }
       .vcaption {
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 10px 16px;
+        padding: 11px 16px;
         font: 14px system-ui;
         color: #fff;
-        background: rgb(10 10 14 / 0.5);
+        background: rgb(14 15 18 / 0.55);
         backdrop-filter: blur(20px);
+      }
+      .vcaption .vtime {
+        font: 700 13px var(--mono);
+        color: var(--amber);
+      }
+      .vcaption .vsep {
+        color: var(--muted);
       }
       .vcaption .vpos {
         margin-left: auto;
+        font: 600 13px var(--mono);
         font-variant-numeric: tabular-nums;
-        color: #aab2c5;
-      }
-      .vpin {
-        font: 600 13px system-ui;
-        color: #fff;
-        background: rgb(0 0 0 / 0.55);
-        padding: 4px 9px;
-        border-radius: 999px;
-        white-space: nowrap;
-        transform: translate(-50%, -50%);
+        color: var(--muted);
       }
     </style>
   </head>
