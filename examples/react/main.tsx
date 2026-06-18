@@ -4,13 +4,13 @@ import { fullscreen } from '@visora/plugin-fullscreen'
 import { grid } from '@visora/plugin-grid'
 import { hash } from '@visora/plugin-hash'
 import { thumbnails } from '@visora/plugin-thumbnails'
-import { type PresetName, Visora, resolvePreset, useViewerContext, useVisora } from '@visora/react'
+import { type PresetName, Visora, resolvePreset } from '@visora/react'
 import '@visora/theme-default/visora.css'
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
-// A work-session reviewer: groups are timestamps (the ←/→ time axis), items are the screens
-// captured in that minute (the ↑/↓ depth axis). Real photos via Lorem Picsum seeds.
+// A work-session reviewer: groups are time buckets (the ←/→ axis), items are the screens captured
+// then (the ↑/↓ axis). The under-thumbnail caption is the single label slot (time + title here).
 type Theme = 'amber' | 'cyan' | 'vermilion'
 
 const shot = (seed: string, alt: string, caption?: string): Item => ({
@@ -30,8 +30,8 @@ const bucket = (
   shots: [string, string?][],
 ): Collection['groups'][number] => ({
   id,
-  meta: time,
-  caption: label,
+  // caption is the under-thumbnail label — fold the timestamp into it (no separate time-ribbon)
+  caption: `${time} · ${label}`,
   items: shots.map(([alt, caption], i) => shot(`${id}-${i + 1}`, alt, caption)),
 })
 
@@ -58,24 +58,11 @@ const collection: Collection = {
 const PRESETS: PresetName[] = ['reviewer', 'filmstrip', 'immersive', 'contact']
 const THEMES: Theme[] = ['amber', 'cyan', 'vermilion']
 
-// Live caption in the footer region — reads engine state via useVisora (useSyncExternalStore).
-function Caption() {
-  const viewer = useViewerContext()
-  const { state } = useVisora(viewer)
-  const group = viewer.getCollection().groups[state.cursor.g]
-  const item = group?.items[state.cursor.i]
-  if (!group || !item) return null
-  return (
-    <div className="vcaption">
-      <span className="vtime">{String(group.meta)}</span>
-      <strong>{group.caption}</strong>
-      <span className="vsep">·</span>
-      {item.caption ?? item.alt}
-      <span className="vpos">
-        {state.cursor.i + 1} / {group.items.length}
-      </span>
-    </div>
-  )
+const BLURB: Record<PresetName, string> = {
+  reviewer: 'bottom timeline rail · corner arrows · labels under each screen',
+  filmstrip: 'classic bottom rail · side arrows · persistent chrome',
+  immersive: 'rail hidden (press t / hover) · chrome auto-hides on idle',
+  contact: 'rail along the top · pairs with the grid (press g)',
 }
 
 function App() {
@@ -119,6 +106,8 @@ function App() {
         </button>
       </div>
 
+      <p className="preset-note">{BLURB[preset]}</p>
+
       <p className="hint">
         ←/→ timeline · ↑/↓ screens · <kbd>t</kbd> hide rail · <kbd>g</kbd> grid · <kbd>f</kbd>{' '}
         fullscreen · <kbd>d</kbd> download · <kbd>Esc</kbd> close. The URL deep-links the current
@@ -126,26 +115,17 @@ function App() {
       </p>
 
       <Visora
-        key={preset} // preset changes are mount-time → remount with fresh layout + plugins
+        key={preset} // preset is a mount-time layout → remount on change
         collection={collection}
         loop
         open={open}
         onClose={() => setOpen(false)}
         preset={preset}
         theme={theme}
-        plugins={[
-          thumbnails({ itemAxis: t.itemAxis, ticks: t.ticks }),
-          grid(),
-          fullscreen(),
-          download(),
-          hash(),
-        ]}
+        plugins={[thumbnails({ itemAxis: t.itemAxis }), grid(), fullscreen(), download(), hash()]}
       >
         <Visora.Region name="toolbar">
           <span className="vbadge">{preset}</span>
-        </Visora.Region>
-        <Visora.Region name="footer">
-          <Caption />
         </Visora.Region>
       </Visora>
     </main>

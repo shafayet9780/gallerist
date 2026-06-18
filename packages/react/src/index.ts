@@ -2,6 +2,7 @@
 export {
   type ArrowLayout,
   type PresetName,
+  type RailPlacement,
   type ResolvedPreset,
   resolvePreset,
 } from '@visora/renderer-dom'

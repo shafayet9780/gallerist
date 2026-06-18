@@ -5,7 +5,7 @@ import {
   type ViewerOptions,
   createViewer,
 } from '@visora/core'
-import { type ArrowLayout, type PresetName, mount } from '@visora/renderer-dom'
+import { type ArrowLayout, type PresetName, type RailPlacement, mount } from '@visora/renderer-dom'
 import {
   type ReactNode,
   forwardRef,
@@ -30,6 +30,8 @@ export interface VisoraProps extends ViewerOptions {
   theme?: 'amber' | 'cyan' | 'vermilion'
   /** within-group arrow placement (overrides the preset default) — UX-D. */
   arrows?: ArrowLayout
+  /** thumbnail rail placement (overrides the preset default) — UX-E. */
+  rail?: RailPlacement
   /** auto-hide chrome on idle (overrides the preset default) — UX-C. */
   autoHide?: boolean
   children?: ReactNode
@@ -44,6 +46,7 @@ const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref
     preset,
     theme,
     arrows,
+    rail,
     autoHide,
     children,
     ...options
@@ -67,6 +70,7 @@ const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref
       controls,
       preset,
       arrows,
+      rail,
       autoHide,
     })
     rootRef.current = handle.root
