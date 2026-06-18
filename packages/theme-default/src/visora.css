@@ -341,7 +341,7 @@
 .visora-chrome > * {
   pointer-events: auto;
 }
-.visora-chrome button {
+.visora-chrome > button {
   position: absolute;
   min-width: var(--visora-target);
   min-height: var(--visora-target);
@@ -354,7 +354,7 @@
   cursor: pointer;
   backdrop-filter: blur(20px) saturate(180%);
 }
-.visora-chrome button:focus-visible {
+.visora-chrome > button:focus-visible {
   outline: 2px solid var(--visora-accent);
   outline-offset: 2px;
 }
@@ -480,6 +480,52 @@
 .visora[data-visora-idle] .visora-chrome {
   opacity: 0;
   pointer-events: none;
+}
+
+/* ── within-group position indicator (UX-H) ─────────────────────────────────── */
+.visora-position {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--visora-chrome-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  font: 600 12px ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--visora-fg);
+}
+.visora-position[hidden] {
+  display: none;
+}
+.visora-position-label {
+  opacity: 0.55;
+  margin-right: 2px;
+}
+.visora-pill {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--visora-fg);
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.visora-pill[data-active] {
+  background: var(--visora-accent);
+  color: #fff;
+  opacity: 1;
+}
+.visora-pill:focus-visible {
+  outline: 2px solid var(--visora-accent);
+  outline-offset: 2px;
 }
 
 .visora-counter {

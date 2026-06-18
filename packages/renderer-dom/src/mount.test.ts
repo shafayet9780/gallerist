@@ -183,6 +183,40 @@ describe('mount — chrome + keyboard', () => {
     expect(document.querySelector('.visora')?.getAttribute('data-visora-arrows')).toBe('dpad')
   })
 
+  it('shows segmented position pills for small multi-item groups (≤8)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open({ g: 1 }) // g1 has 3 items
+    const pos = document.querySelector('.visora-position') as HTMLElement
+    expect(pos.getAttribute('data-mode')).toBe('pills')
+    const pills = pos.querySelectorAll('.visora-pill')
+    expect(pills.length).toBe(3)
+    expect(pos.querySelector('.visora-pill[data-active]')?.textContent).toBe('1')
+    v.nextItem()
+    expect(pos.querySelector('.visora-pill[data-active]')?.textContent).toBe('2')
+    ;(pills[2] as HTMLButtonElement).click()
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+  })
+
+  it('falls back to a mono counter for large groups (>8)', () => {
+    const big: Collection = {
+      groups: [{ id: 'g', items: Array.from({ length: 12 }, (_, i) => item(`x${i}`)) }],
+    }
+    const v = createViewer({ collection: big })
+    mount(v)
+    v.open()
+    const pos = document.querySelector('.visora-position') as HTMLElement
+    expect(pos.getAttribute('data-mode')).toBe('counter')
+    expect(pos.textContent).toContain('1 / 12')
+  })
+
+  it('hides the position indicator for single-item groups', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open() // g0 → single item
+    expect((document.querySelector('.visora-position') as HTMLElement).hidden).toBe(true)
+  })
+
   it('ArrowRight navigates, Escape closes', () => {
     const v = createViewer({ collection: collection() })
     mount(v)

@@ -159,6 +159,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   }
 
   let counter: HTMLElement | undefined
+  let position: HTMLElement | undefined
+  // segmented pills are rebuilt only when the active group / its size changes (UX-H)
+  let posG = -1
+  let posM = -1
   if (controls) {
     const chrome = el('div', 'visora-chrome')
     const close = el('button', 'visora-close', { type: 'button', 'aria-label': 'Close' })
@@ -191,7 +195,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     railToggle.hidden = true // shown only when a thumbnail rail is mounted (see mountRegions)
     railToggle.addEventListener('click', () => setRailCollapsed(!railCollapsed))
     counter = el('div', 'visora-counter')
-    chrome.append(close, prev, next, prevItem, nextItem, reset, railToggle, counter)
+    position = el('div', 'visora-position')
+    position.hidden = true
+    chrome.append(close, prev, next, prevItem, nextItem, reset, railToggle, counter, position)
     root.appendChild(chrome)
   }
 
@@ -324,6 +330,49 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
 
+  // within-group position: segmented pills for small groups, a mono counter for large ones (UX-H)
+  const PILL_MAX = 8
+  const updatePosition = (g: number, i: number, M: number) => {
+    if (!position) return
+    if (M <= 1) {
+      if (posM !== 0) {
+        position.replaceChildren()
+        position.removeAttribute('data-mode')
+        posG = -1
+        posM = 0
+      }
+      position.hidden = true
+      return
+    }
+    position.hidden = false
+    if (M > PILL_MAX) {
+      position.dataset.mode = 'counter'
+      position.textContent = `${i + 1} / ${M}`
+      posG = g
+      posM = M
+      return
+    }
+    if (g !== posG || M !== posM || position.dataset.mode !== 'pills') {
+      position.dataset.mode = 'pills'
+      position.replaceChildren()
+      const label = el('span', 'visora-position-label')
+      label.textContent = 'screen'
+      position.appendChild(label)
+      for (let k = 0; k < M; k++) {
+        const pill = el('button', 'visora-pill', { type: 'button', 'aria-label': `Screen ${k + 1}` })
+        pill.textContent = String(k + 1)
+        pill.addEventListener('click', () => viewer.goTo(g, k))
+        position.appendChild(pill)
+      }
+      posG = g
+      posM = M
+    }
+    for (const [k, pill] of position.querySelectorAll('.visora-pill').entries()) {
+      if (k === i) pill.setAttribute('data-active', '')
+      else pill.removeAttribute('data-active')
+    }
+  }
+
   const updateChrome = () => {
     const state = viewer.getState()
     const col = viewer.getCollection()
@@ -331,10 +380,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const cur = state.cursor
     const group = col.groups[cur.g]
     const M = group?.items.length ?? 0
-    if (counter) {
-      counter.textContent =
-        M > 1 ? `${cur.g + 1} / ${G} · ${cur.i + 1}/${M}` : `${cur.g + 1} / ${G}`
-    }
+    if (counter) counter.textContent = `${cur.g + 1} / ${G}`
+    updatePosition(cur.g, cur.i, M)
     live.textContent =
       M > 1
         ? `Group ${cur.g + 1} of ${G}, screen ${cur.i + 1} of ${M}`
