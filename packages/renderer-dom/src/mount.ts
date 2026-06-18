@@ -156,20 +156,28 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const live = el('div', 'visora-live', { 'aria-live': 'polite', role: 'status' })
   root.appendChild(live)
 
-  // Rail collapse (UX-C): `t` key / toggle button / fullscreen → data-visora-rail.
-  let railToggle: HTMLButtonElement | undefined
+  // Rail collapse (UX-C): a pull-handle attached to the rail's edge + `t` key + fullscreen →
+  // data-visora-rail. The handle lives inside the thumbnails region so it reads as part of the
+  // gallery and slides with it; it's (re)attached in mountRegions since the host is replaceChildren'd.
   let railCollapsed = railHidden
   let preFsCollapsed: boolean | null = null
+  const railHandle = el('div', 'visora-rail-handle')
+  const railToggle = el('button', 'visora-rail-toggle', {
+    type: 'button',
+    'aria-label': railHidden ? 'Show thumbnails' : 'Hide thumbnails',
+    'aria-pressed': String(railHidden),
+  })
+  railToggle.innerHTML = ICONS.collapse
+  railHandle.appendChild(railToggle)
   const setRailCollapsed = (v: boolean, manual = false) => {
     railCollapsed = v
     root.setAttribute('data-visora-rail', v ? 'collapsed' : 'expanded')
-    if (railToggle) {
-      railToggle.setAttribute('aria-pressed', String(v))
-      railToggle.setAttribute('aria-label', v ? 'Show thumbnails' : 'Hide thumbnails')
-    }
+    railToggle.setAttribute('aria-pressed', String(v))
+    railToggle.setAttribute('aria-label', v ? 'Show thumbnails' : 'Hide thumbnails')
     // a manual toggle while fullscreen wins over the on-exit restore
     if (manual) preFsCollapsed = null
   }
+  railToggle.addEventListener('click', () => setRailCollapsed(!railCollapsed, true))
 
   let counter: HTMLElement | undefined
   let position: HTMLElement | undefined
@@ -199,18 +207,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const reset = el('button', 'visora-zoom-reset', { type: 'button', 'aria-label': 'Reset zoom' })
     reset.innerHTML = ICONS.zoomReset
     reset.addEventListener('click', () => viewer.resetZoom())
-    railToggle = el('button', 'visora-rail-toggle', {
-      type: 'button',
-      'aria-label': 'Hide thumbnails',
-      'aria-pressed': 'false',
-    }) as HTMLButtonElement
-    railToggle.innerHTML = ICONS.collapse
-    railToggle.hidden = true // shown only when a thumbnail rail is mounted (see mountRegions)
-    railToggle.addEventListener('click', () => setRailCollapsed(!railCollapsed, true))
     counter = el('div', 'visora-counter')
     position = el('div', 'visora-position')
     position.hidden = true
-    chrome.append(close, prev, next, prevItem, nextItem, reset, railToggle, counter, position)
+    chrome.append(close, prev, next, prevItem, nextItem, reset, counter, position)
     root.appendChild(chrome)
   }
 
@@ -561,8 +561,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(viewer.getPlugins())
     mountPluginRegions(regionHosts, viewer.getPlugins(), { viewer })
-    // the rail-collapse toggle is only meaningful when a thumbnail rail is mounted
-    if (railToggle) railToggle.hidden = regionHosts.thumbnails.childElementCount === 0
+    // attach the pull-handle into the rail region (only when a rail is mounted); mountPluginRegions
+    // replaceChildren'd the host, so prepend it fresh each time.
+    if (regionHosts.thumbnails.childElementCount > 0) {
+      regionHosts.thumbnails.prepend(railHandle)
+    }
     // plugin overlays may have changed (e.g. React <Visora.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItemId = undefined

@@ -32,9 +32,11 @@ test("'t' collapses and expands the thumbnail rail", async ({ page }) => {
   await root.focus()
   await page.keyboard.press('t')
   await expect(root).toHaveAttribute('data-visora-rail', 'collapsed')
-  await expect(page.locator('.visora-region-thumbnails')).toBeHidden()
+  await expect(page.locator('.visora-thumbs')).not.toBeInViewport() // rail slid out of view
+  await expect(page.locator('.visora-rail-toggle')).toBeVisible() // handle stays reachable
   await page.keyboard.press('t')
   await expect(root).toHaveAttribute('data-visora-rail', 'expanded')
+  await expect(page.locator('.visora-thumbs')).toBeInViewport()
 })
 
 test('within-group ↑/↓ keeps the highlight in the vertical column (no horizontal drift)', async ({
@@ -79,12 +81,15 @@ test('rail defaults to the bottom position', async ({ page }) => {
   await expect(page.locator('.visora')).toHaveAttribute('data-visora-rail-pos', 'bottom')
 })
 
-test('the rail-collapse toggle is visible and hides the rail', async ({ page }) => {
-  const toggle = page.locator('.visora-rail-toggle')
+test('the rail handle lives in the gallery and toggles it (slides, stays reachable)', async ({
+  page,
+}) => {
+  const toggle = page.locator('.visora-region-thumbnails .visora-rail-handle .visora-rail-toggle')
   await expect(toggle).toBeVisible()
   await toggle.click()
   await expect(page.locator('.visora')).toHaveAttribute('data-visora-rail', 'collapsed')
-  await expect(page.locator('.visora-region-thumbnails')).toBeHidden()
+  await expect(page.locator('.visora-thumbs')).not.toBeInViewport() // rail slid away
+  await expect(toggle).toBeVisible() // handle peeks so the rail can be reopened
 })
 
 test('no axe violations with the full plugin set', async ({ page }) => {

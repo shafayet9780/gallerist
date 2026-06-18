@@ -141,17 +141,31 @@ describe('mount — chrome + keyboard', () => {
     expect(root.getAttribute('data-visora-rail')).toBe('expanded')
   })
 
-  it('the rail-toggle button toggles collapse and reflects aria-pressed', () => {
-    const v = createViewer({ collection: collection() })
+  it('mounts a rail pull-handle inside the rail region; it toggles collapse', () => {
+    // a minimal plugin that owns the thumbnails region so the handle attaches
+    const railPlugin = () => ({
+      name: 'fake-rail',
+      regions: { thumbnails: () => document.createElement('div') },
+    })
+    const v = createViewer({ collection: collection(), plugins: [railPlugin] })
     mount(v)
     v.open()
     const root = document.querySelector('.visora') as HTMLElement
-    const btn = document.querySelector('.visora-rail-toggle') as HTMLButtonElement
+    const btn = document.querySelector(
+      '.visora-region-thumbnails .visora-rail-handle .visora-rail-toggle',
+    ) as HTMLButtonElement
     expect(btn).not.toBeNull()
     expect(btn.getAttribute('aria-pressed')).toBe('false')
     btn.click()
     expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
     expect(btn.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('does not mount a rail handle when no rail is present', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect(document.querySelector('.visora-rail-handle')).toBeNull()
   })
 
   it('collapses the rail on entering fullscreen and restores on exit', () => {

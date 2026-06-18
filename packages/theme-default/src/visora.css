@@ -15,6 +15,7 @@
   --visora-radius: 9px;
   --visora-target: 44px;
   --visora-thumb-h: 84px;
+  --visora-rail-handle-h: 22px;
   --visora-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
   /* signal accent (amber by default). --visora-accent-fg = ink that sits on the accent. */
@@ -473,29 +474,76 @@
   bottom: 12px;
 }
 /* ── rail collapse + idle auto-hide (UX-C) ──────────────────────────────────── */
-/* toggle sits in the top-right beside the close button — a fixed spot that never collides with
-   the (variable-height) rail or the footer. */
-.visora-rail-toggle {
-  top: 12px;
-  right: 64px;
+/* The rail region stacks [handle][thumbs] and slides as a whole. Collapsing translates it down so
+   only the handle peeks (translate uses the region's own height, so it works at any rail height). */
+.visora-region-thumbnails {
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--visora-dur-snappy, 340ms) var(--visora-ease-out, ease);
 }
-.visora-rail-toggle[hidden] {
-  display: none;
+.visora[data-visora-rail="collapsed"] .visora-region-thumbnails {
+  transform: translateY(calc(100% - var(--visora-rail-handle-h)));
+}
+
+/* the pull-handle: a grip tab on the rail's edge — clearly part of the gallery */
+.visora-rail-handle {
+  flex: 0 0 auto;
+  height: var(--visora-rail-handle-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.visora-rail-toggle {
+  pointer-events: auto;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  min-width: 52px;
+  padding: 0 10px;
+  border: 1px solid var(--visora-hairline);
+  border-radius: 999px;
+  background: var(--visora-chrome-bg);
+  color: var(--visora-fg);
+  cursor: pointer;
+  backdrop-filter: blur(20px) saturate(180%);
+}
+.visora-rail-toggle::before {
+  /* a small grip glyph so the tab reads as draggable/openable */
+  content: "";
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.5;
+}
+.visora-rail-toggle:focus-visible {
+  outline: 2px solid var(--visora-accent);
+  outline-offset: 2px;
 }
 .visora-rail-toggle .visora-icon {
+  width: 16px;
+  height: 16px;
   transition: transform var(--visora-dur-gentle, 280ms) var(--visora-ease-out, ease);
 }
+/* expanded = chevron points down (pull down to hide); collapsed = points up (pull up to show) */
 .visora-rail-toggle[aria-pressed="true"] .visora-icon {
   transform: rotate(180deg);
 }
-.visora[data-visora-rail="collapsed"] .visora-region-thumbnails {
-  display: none;
-}
+
 /* rail at the top (below the toolbar) — stays horizontal so it still matches the ←/→ group axis;
-   the item column then expands downward instead of up. */
+   the handle moves to the bottom lip, the item column expands downward, collapse slides up. */
 .visora[data-visora-rail-pos="top"] .visora-region-thumbnails {
   top: 56px;
   bottom: auto;
+}
+.visora[data-visora-rail-pos="top"] .visora-rail-handle {
+  order: 1;
+}
+.visora[data-visora-rail-pos="top"][data-visora-rail="collapsed"] .visora-region-thumbnails {
+  transform: translateY(calc(-100% + var(--visora-rail-handle-h)));
 }
 .visora[data-visora-rail-pos="top"] .visora-region-footer {
   bottom: 0;
@@ -642,7 +690,7 @@
   .visora-chrome,
   .visora-thumb,
   .visora-thumb-item,
-  .visora-thumb-tick,
+  .visora-region-thumbnails,
   .visora-rail-toggle .visora-icon,
   .visora[data-visora-preset="immersive"] .visora-region-thumbnails,
   .visora[data-visora-preset="immersive"] .visora-region-toolbar {
