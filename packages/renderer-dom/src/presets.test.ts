@@ -25,9 +25,9 @@ describe('resolvePreset', () => {
     expect(p.rootAttrs['data-visora-preset']).toBe('reviewer')
   })
 
-  it('contact: top rail', () => {
+  it('contact: right (vertical) rail', () => {
     const p = resolvePreset('contact')
-    expect(p.rail).toBe('top')
+    expect(p.rail).toBe('right')
     expect(p.rootAttrs['data-visora-preset']).toBe('contact')
   })
 

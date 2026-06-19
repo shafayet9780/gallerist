@@ -49,8 +49,9 @@ export interface MountOptions {
    */
   preset?: PresetName
   /**
-   * Thumbnail rail placement (UX-E), surfaced as `data-visora-rail-pos`. `bottom` (default) or
-   * `top` keep the rail horizontal so it matches the ←/→ group axis; `hidden` starts the rail
+   * Thumbnail rail placement (UX-E), surfaced as `data-visora-rail-pos`. `bottom` (default) keeps
+   * the rail horizontal (group axis = ←/→); `left` / `right` run it vertically and remap the
+   * keys/arrows (group axis = ↑/↓, items = ←/→ — touch swipes stay conventional); `hidden` starts
    * collapsed (reveal with the toggle / `t` / hover). Overridable; presets supply a default.
    */
   rail?: RailPlacement
@@ -68,7 +69,7 @@ export interface MountOptions {
 }
 
 export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
-export type RailPlacement = 'bottom' | 'top' | 'hidden'
+export type RailPlacement = 'bottom' | 'hidden' | 'left' | 'right'
 
 export interface RendererHandle {
   root: HTMLElement
@@ -108,7 +109,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const autoHide = opts.autoHide ?? preset?.autoHide ?? true
   const rail: RailPlacement = opts.rail ?? preset?.rail ?? 'bottom'
   const railHidden = rail === 'hidden'
-  const railPos = rail === 'top' ? 'top' : 'bottom'
+  const railPos = rail === 'hidden' ? 'bottom' : rail // bottom | left | right
+  // left/right rails run vertically, so the group axis becomes ↑/↓ and items ←/→ (point 5). Touch
+  // swipes stay conventional (horizontal = group, swipe-down = dismiss) — only keys/arrows/layout flip.
+  const orientation: 'horizontal' | 'vertical' =
+    rail === 'left' || rail === 'right' ? 'vertical' : 'horizontal'
+  const vertical = orientation === 'vertical'
   const linear = opts.linear ?? false
   const loop = opts.loop ?? false
 
@@ -181,6 +187,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   root.setAttribute('data-visora-mode', overlay ? 'overlay' : 'inline')
   root.setAttribute('data-visora-arrows', arrows)
   root.setAttribute('data-visora-rail-pos', railPos)
+  root.setAttribute('data-visora-orientation', orientation)
   root.setAttribute('data-visora-rail', railHidden ? 'collapsed' : 'expanded')
   if (linear) root.setAttribute('data-visora-linear', 'true')
   if (preset) for (const [k, val] of Object.entries(preset.rootAttrs)) root.setAttribute(k, val)
@@ -248,20 +255,22 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const close = el('button', 'visora-close', { type: 'button', 'aria-label': 'Close' })
     close.innerHTML = ICONS.close
     close.addEventListener('click', () => viewer.close())
+    // Icons follow the orientation: horizontal → group ←/→, item ↑/↓; vertical → group ↑/↓, item ←/→.
+    // (Positions are the CSS counterpart in `[data-visora-orientation="vertical"]`; keep the two in sync.)
     const prev = el('button', 'visora-prev', { type: 'button', 'aria-label': 'Previous' })
-    prev.innerHTML = ICONS.prev
+    prev.innerHTML = vertical ? ICONS.itemPrev : ICONS.prev
     prev.addEventListener('click', () => nav.prev())
     const next = el('button', 'visora-next', { type: 'button', 'aria-label': 'Next' })
-    next.innerHTML = ICONS.next
+    next.innerHTML = vertical ? ICONS.itemNext : ICONS.next
     next.addEventListener('click', () => nav.next())
     const prevItem = el('button', 'visora-item-prev', {
       type: 'button',
       'aria-label': 'Previous item',
     })
-    prevItem.innerHTML = ICONS.itemPrev
+    prevItem.innerHTML = vertical ? ICONS.prev : ICONS.itemPrev
     prevItem.addEventListener('click', () => nav.prevItem())
     const nextItem = el('button', 'visora-item-next', { type: 'button', 'aria-label': 'Next item' })
-    nextItem.innerHTML = ICONS.itemNext
+    nextItem.innerHTML = vertical ? ICONS.next : ICONS.itemNext
     nextItem.addEventListener('click', () => nav.nextItem())
     const reset = el('button', 'visora-zoom-reset', { type: 'button', 'aria-label': 'Reset zoom' })
     reset.innerHTML = ICONS.zoomReset
@@ -538,19 +547,28 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   }
 
   // ── keyboard (spec §5) ───────────────────────────────────────────────────────
+  // Which physical arrow drives which axis depends on orientation (point 5): a vertical (left/right)
+  // rail makes ↑/↓ the group axis and ←/→ the item axis; horizontal keeps the classic mapping.
+  const arrowNav: Record<string, () => void> = vertical
+    ? {
+        ArrowDown: nav.next,
+        ArrowUp: nav.prev,
+        ArrowRight: nav.nextItem,
+        ArrowLeft: nav.prevItem,
+      }
+    : {
+        ArrowRight: nav.next,
+        ArrowLeft: nav.prev,
+        ArrowDown: nav.nextItem,
+        ArrowUp: nav.prevItem,
+      }
   const onKey = (e: KeyboardEvent) => {
     switch (e.key) {
       case 'ArrowRight':
-        nav.next()
-        break
       case 'ArrowLeft':
-        nav.prev()
-        break
-      case 'ArrowDown':
-        nav.nextItem()
-        break
       case 'ArrowUp':
-        nav.prevItem()
+      case 'ArrowDown':
+        arrowNav[e.key]?.()
         break
       case 'Escape':
         viewer.close()

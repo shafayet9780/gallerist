@@ -45,12 +45,12 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     rail: 'bottom',
     thumbnails: { itemAxis: 'vertical' },
   },
-  // browse-heavy: rail along the top (pairs well with the grid plugin).
+  // browse-heavy: a vertical rail down the right edge (pairs well with the grid plugin).
   contact: {
     rootAttrs: { 'data-visora-preset': 'contact' },
     arrows: 'pill-right',
     autoHide: false,
-    rail: 'top',
+    rail: 'right',
     thumbnails: { itemAxis: 'vertical' },
   },
 }

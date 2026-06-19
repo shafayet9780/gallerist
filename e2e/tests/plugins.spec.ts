@@ -219,29 +219,35 @@ test.describe('linear flat traversal', () => {
   })
 })
 
-test.describe('top rail', () => {
+test.describe('vertical rail (right)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/plugins.html?rail=top')
+    await page.goto('/plugins.html?rail=right')
     await page.click('#open')
     await expect(page.locator('.visora')).toBeVisible()
   })
 
-  test('rail sits at the top and the active item panel opens below it, clickable', async ({
-    page,
-  }) => {
-    await expect(page.locator('.visora')).toHaveAttribute('data-visora-rail-pos', 'top')
-    await page.locator('.visora').focus()
-    await page.keyboard.press('ArrowRight') // g1 (3 items)
-    const panel = page.locator('.visora-thumb-items')
-    await expect(panel).toBeVisible()
-    await expect(panel).toBeInViewport() // opens downward into the stage, not off-screen
-    await panel.locator('.visora-thumb-item').nth(1).click() // clickable ⇒ not clipped
+  test('runs vertical and remaps the axes (↑/↓ groups, ←/→ items)', async ({ page }) => {
+    const root = page.locator('.visora')
+    await expect(root).toHaveAttribute('data-visora-rail-pos', 'right')
+    await expect(root).toHaveAttribute('data-visora-orientation', 'vertical')
+    await root.focus()
+    await page.keyboard.press('ArrowDown') // group axis → g1
+    await expect(page.locator('.visora-counter')).toHaveText(/2 \/ 3/)
+    await page.keyboard.press('ArrowRight') // item axis within g1
     await expect(page.locator('.visora-position .visora-pill[data-active]')).toHaveText('2')
   })
 
-  test('no axe violations (top rail + item panel)', async ({ page }) => {
+  test('the active item panel opens toward the stage and a click navigates', async ({ page }) => {
     await page.locator('.visora').focus()
-    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('ArrowDown') // g1 active (multi) → panel shows
+    const panel = page.locator('.visora-thumb-items')
+    await expect(panel).toBeVisible()
+    await expect(panel).toBeInViewport()
+    await panel.locator('.visora-thumb-item').nth(2).click()
+    await expect(page.locator('.visora-position .visora-pill[data-active]')).toHaveText('3')
+  })
+
+  test('no axe violations (vertical rail)', async ({ page }) => {
     const results = await new AxeBuilder({ page })
       .include('.visora')
       .withTags(['wcag2a', 'wcag2aa'])

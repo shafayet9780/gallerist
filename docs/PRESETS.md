@@ -3,6 +3,10 @@
 Visora's chrome layout is **declarative**: the renderer sets `data-visora-*` attributes on the root
 and the theme reacts. Presets bundle coherent defaults; everything is overridable.
 
+> **Breaking (unreleased):** the `top` rail position was removed — `RailPlacement` is now
+> `bottom | left | right | hidden`. The `contact` preset, which defaulted to `top`, now defaults to
+> `right` (a vertical rail, so its group axis is ↑/↓). To keep a horizontal rail, pass `rail="bottom"`.
+
 ## Presets
 
 A preset bundles a **rail placement**, arrow placement, and chrome auto-hide into a visibly
@@ -13,7 +17,7 @@ distinct layout.
 | `filmstrip` | `bottom` | `pill-right`| no        | Classic lightbox, persistent chrome (default). |
 | `reviewer`  | `bottom` | `corner-br` | no        | Time-series review; labels under each screen. |
 | `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
-| `contact`   | `top`    | `pill-right`| no        | Browse-heavy; rail along the top (pairs with `plugin-grid`). |
+| `contact`   | `right`  | `pill-right`| no        | Browse-heavy; vertical rail on the right (pairs with `plugin-grid`). |
 
 ```tsx
 // React
@@ -35,9 +39,11 @@ the preset.
 
 ## Rail placement (`data-visora-rail-pos`)
 
-- `bottom` (default) / `top` — the rail stays **horizontal** so it matches the ←/→ group axis (a
-  vertical side rail would mis-map that axis, so it isn't offered). With `top`, the active group's
-  item column expands downward instead of up.
+- `bottom` (default) — the rail stays **horizontal**, matching the ←/→ group axis.
+- `left` / `right` — the rail runs **vertical** (`data-visora-orientation="vertical"`), so the group
+  axis becomes **↑/↓** and items **←/→**; the keys and on-screen arrows remap to match and the item
+  column / peek open toward the stage (left rail → right, right rail → left). Touch swipes stay
+  conventional (horizontal = group, swipe-down = dismiss) — only keys/arrows/layout flip.
 - `hidden` — the rail starts collapsed; reveal it with the toggle, the `t` key, or fullscreen exit.
 
 ## Group display (`thumbnails({ groupDisplay })`)

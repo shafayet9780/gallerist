@@ -30,7 +30,11 @@ const collection: Collection = {
 
 const params = new URLSearchParams(location.search)
 const groupDisplay = params.get('display') === 'flat' ? 'flat' : 'stacked'
-const rail = params.get('rail') === 'top' ? 'top' : 'bottom'
+const railParam = params.get('rail') ?? ''
+const rail = (['left', 'right'].includes(railParam) ? railParam : 'bottom') as
+  | 'bottom'
+  | 'left'
+  | 'right'
 const linear = params.get('linear') === '1'
 
 const viewer = createViewer({

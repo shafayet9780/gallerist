@@ -16,6 +16,8 @@
   --visora-target: 44px;
   --visora-thumb-h: 84px;
   --visora-rail-handle-h: 22px;
+  --visora-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
+  --visora-rail-w: 130px; /* vertical (left/right) rail width */
   --visora-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
   /* signal accent (amber by default). --visora-accent-fg = ink that sits on the accent. */
@@ -140,7 +142,7 @@
   top: 0;
   left: 0;
   right: 0;
-  min-height: 56px;
+  min-height: var(--visora-toolbar-h);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -651,31 +653,128 @@
   transform: rotate(180deg);
 }
 
-/* rail at the top (below the toolbar) — stays horizontal so it still matches the ←/→ group axis;
-   the handle moves to the bottom lip, the item column expands downward, collapse slides up. */
-.visora[data-visora-rail-pos="top"] .visora-region-thumbnails {
-  top: 56px;
-  bottom: auto;
+/* ── vertical rail (left/right, point 5): the strip runs down a side edge below the toolbar. The
+   group axis is ↑/↓ and items ←/→ (keys/arrows remapped in the renderer); the rail scrolls
+   vertically and the floating panels open toward the stage. ─────────────────────────────────── */
+.visora[data-visora-rail-pos="left"] .visora-region-thumbnails,
+.visora[data-visora-rail-pos="right"] .visora-region-thumbnails {
+  top: var(--visora-toolbar-h); /* clear the toolbar band (kept in sync via the token) */
+  bottom: 0;
+  left: auto;
+  right: auto;
+  flex-direction: row; /* [handle][rail] side by side */
 }
-.visora[data-visora-rail-pos="top"] .visora-rail-handle {
+.visora[data-visora-rail-pos="left"] .visora-region-thumbnails {
+  left: 0;
+}
+.visora[data-visora-rail-pos="right"] .visora-region-thumbnails {
+  right: 0;
+}
+.visora[data-visora-orientation="vertical"] .visora-thumbs-region {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.visora[data-visora-orientation="vertical"] .visora-thumbs {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: var(--visora-rail-w);
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* the handle becomes a vertical grip on the rail's inboard edge; a left rail puts it on the right. */
+.visora[data-visora-rail-pos="left"] .visora-rail-handle {
   order: 1;
 }
-.visora[data-visora-rail-pos="top"][data-visora-rail="collapsed"] .visora-region-thumbnails {
-  transform: translateY(calc(-100% + var(--visora-rail-handle-h)));
+.visora[data-visora-orientation="vertical"] .visora-rail-handle {
+  height: auto;
+  width: var(--visora-rail-handle-h);
 }
-.visora[data-visora-rail-pos="top"] .visora-region-footer {
-  bottom: 0;
+.visora[data-visora-orientation="vertical"] .visora-rail-toggle {
+  grid-auto-flow: row;
+  height: auto;
+  min-width: 0;
+  width: 22px;
+  min-height: 52px;
+  padding: 10px 0;
 }
-.visora[data-visora-rail-pos="top"] .visora-thumb-items[data-axis="vertical"],
-.visora[data-visora-rail-pos="top"] .visora-thumb-peek {
-  top: calc(100% + 10px);
+.visora[data-visora-orientation="vertical"] .visora-rail-toggle::before {
+  width: 3px;
+  height: 22px;
+}
+/* chevron points the way the rail will travel: left rail hides leftward, shows rightward. */
+.visora[data-visora-rail-pos="left"] .visora-rail-toggle .visora-icon {
+  transform: rotate(90deg);
+}
+.visora[data-visora-rail-pos="left"] .visora-rail-toggle[aria-pressed="true"] .visora-icon {
+  transform: rotate(-90deg);
+}
+.visora[data-visora-rail-pos="right"] .visora-rail-toggle .visora-icon {
+  transform: rotate(-90deg);
+}
+.visora[data-visora-rail-pos="right"] .visora-rail-toggle[aria-pressed="true"] .visora-icon {
+  transform: rotate(90deg);
+}
+/* collapse slides the strip out sideways, leaving the handle peeking. */
+.visora[data-visora-rail-pos="left"][data-visora-rail="collapsed"] .visora-region-thumbnails {
+  transform: translateX(calc(-100% + var(--visora-rail-handle-h)));
+}
+.visora[data-visora-rail-pos="right"][data-visora-rail="collapsed"] .visora-region-thumbnails {
+  transform: translateX(calc(100% - var(--visora-rail-handle-h)));
+}
+/* the active item column / peek open toward the stage (away from the rail), top-aligned. */
+.visora[data-visora-rail-pos="left"] .visora-thumb-items[data-axis="vertical"],
+.visora[data-visora-rail-pos="left"] .visora-thumb-peek {
+  left: calc(100% + 10px);
+  right: auto;
+  top: 8px;
   bottom: auto;
 }
-/* with a top rail, the within-group pills move to the bottom so they don't collide with the rail. */
-.visora[data-visora-rail-pos="top"] .visora-position {
-  top: auto;
-  bottom: 14px;
+.visora[data-visora-rail-pos="right"] .visora-thumb-items[data-axis="vertical"],
+.visora[data-visora-rail-pos="right"] .visora-thumb-peek {
+  right: calc(100% + 10px);
+  left: auto;
+  top: 8px;
+  bottom: auto;
 }
+/* arrows in vertical orientation: group ↑/↓ top/bottom-center, item ←/→ flanking the center. This
+   supersedes the `data-visora-arrows` layout (which only positions the horizontal mapping). */
+.visora[data-visora-orientation="vertical"] .visora-prev {
+  top: 12px;
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+.visora[data-visora-orientation="vertical"] .visora-next {
+  bottom: 12px;
+  top: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+.visora[data-visora-orientation="vertical"] .visora-item-prev {
+  top: 50%;
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translate(calc(-50% - 26px), -50%);
+}
+.visora[data-visora-orientation="vertical"] .visora-item-next {
+  top: 50%;
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translate(calc(-50% + 26px), -50%);
+}
+/* drop the within-group pills below the top-center group arrow so they don't collide. */
+.visora[data-visora-orientation="vertical"] .visora-position {
+  top: 64px;
+  bottom: auto;
+}
+
 .visora-chrome {
   transition: opacity var(--visora-dur-gentle, 280ms) var(--visora-ease-out, ease);
 }

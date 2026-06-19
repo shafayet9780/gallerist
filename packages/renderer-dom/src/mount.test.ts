@@ -238,11 +238,11 @@ describe('mount — chrome + keyboard', () => {
     expect(document.querySelector('.visora')?.getAttribute('data-visora-rail-pos')).toBe('bottom')
   })
 
-  it('reflects rail:"top" on the root', () => {
+  it('reflects rail:"left" on the root', () => {
     const v = createViewer({ collection: collection() })
-    mount(v, { rail: 'top' })
+    mount(v, { rail: 'left' })
     v.open()
-    expect(document.querySelector('.visora')?.getAttribute('data-visora-rail-pos')).toBe('top')
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-rail-pos')).toBe('left')
   })
 
   it('rail:"hidden" starts collapsed at the bottom', () => {
@@ -434,5 +434,73 @@ describe('mount — linear flat traversal', () => {
     v.goTo(1, 0)
     press('ArrowRight')
     expect(v.getState().cursor).toEqual({ g: 2, i: 0 }) // group axis, skips g1's remaining items
+  })
+})
+
+describe('mount — vertical rail (left/right) axis remap', () => {
+  const openV = (rail: 'left' | 'right') => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { rail })
+    v.open()
+    return v
+  }
+  const press = (k: string) =>
+    (document.querySelector('.visora') as HTMLElement).dispatchEvent(key({ key: k }))
+
+  it('sets data-visora-rail-pos and orientation=vertical', () => {
+    openV('right')
+    const root = document.querySelector('.visora')
+    expect(root?.getAttribute('data-visora-rail-pos')).toBe('right')
+    expect(root?.getAttribute('data-visora-orientation')).toBe('vertical')
+  })
+
+  it('↑/↓ drive the group axis and ←/→ drive the item axis', () => {
+    const v = openV('left')
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+    press('ArrowDown') // next GROUP (was ArrowRight in horizontal)
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    press('ArrowRight') // next ITEM
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    press('ArrowLeft') // prev ITEM
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    press('ArrowDown') // next GROUP
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+    press('ArrowUp') // prev GROUP
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+  })
+
+  it('horizontal rail keeps the classic mapping (orientation=horizontal)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { rail: 'bottom' })
+    v.open()
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-orientation')).toBe(
+      'horizontal',
+    )
+    v.goTo(1, 0)
+    press('ArrowRight') // group axis in horizontal → next group
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+  })
+
+  it('collapses/expands a vertical rail with the t key (slide direction is CSS)', () => {
+    openV('left')
+    const root = document.querySelector('.visora') as HTMLElement
+    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    press('t')
+    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    press('t')
+    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+  })
+
+  it('vertical + linear: ↑/↓ walk the flattened sequence, ←/→ stay inert', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { rail: 'left', linear: true })
+    v.open()
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+    press('ArrowDown') // primary (vertical) axis → linear step
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    press('ArrowDown')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 }) // crosses into the next item linearly
+    press('ArrowRight') // item axis retired in linear → inert
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
   })
 })
