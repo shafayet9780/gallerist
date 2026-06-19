@@ -34,6 +34,8 @@ export interface VisoraProps extends ViewerOptions {
   rail?: RailPlacement
   /** auto-hide chrome on idle (overrides the preset default) — UX-C. */
   autoHide?: boolean
+  /** linear flat traversal: ←/→ walks the flattened item sequence; pairs with a flat thumbnail rail. */
+  linear?: boolean
   children?: ReactNode
 }
 
@@ -48,6 +50,7 @@ const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref
     arrows,
     rail,
     autoHide,
+    linear,
     children,
     ...options
   } = props
@@ -72,6 +75,8 @@ const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref
       arrows,
       rail,
       autoHide,
+      linear,
+      loop: options.loop,
     })
     rootRef.current = handle.root
     return () => {

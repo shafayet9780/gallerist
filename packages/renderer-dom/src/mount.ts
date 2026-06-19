@@ -54,6 +54,17 @@ export interface MountOptions {
    * collapsed (reveal with the toggle / `t` / hover). Overridable; presets supply a default.
    */
   rail?: RailPlacement
+  /**
+   * Linear traversal (pairs with `thumbnails({ groupDisplay: 'flat' })`). When true, ←/→ walks the
+   * flattened item sequence across groups (1a, 1b, 2a, 2b, 2c, 3a…), ↑/↓ retire, the counter shows
+   * `item N / total`, and the within-group pills hide — surfaced as `data-visora-linear`.
+   */
+  linear?: boolean
+  /**
+   * Whether navigation wraps at the ends (mirror of the core `loop` option). Only consulted for
+   * `linear` traversal, to wrap the flattened sequence at the global first/last item. Default false.
+   */
+  loop?: boolean
 }
 
 export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
@@ -98,6 +109,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const rail: RailPlacement = opts.rail ?? preset?.rail ?? 'bottom'
   const railHidden = rail === 'hidden'
   const railPos = rail === 'top' ? 'top' : 'bottom'
+  const linear = opts.linear ?? false
+  const loop = opts.loop ?? false
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -118,12 +131,58 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const pickAdapter = (type: string, item: Parameters<MediaAdapter['mount']>[0]) =>
     currentAdapters().find((a) => (a.match ? a.match(item) : a.type === type))
 
+  // ── navigation routing (linear flat traversal, point 3) ──────────────────────
+  // In linear mode ←/→ walks the flattened (g,i) sequence across groups (1a,1b,2a,2b,2c,3a…) and
+  // ↑/↓ retire; the flat list is cached and rebuilt only when the collection changes. `nav.*` is the
+  // single seam the keymap, arrow buttons, and gestures route through, so behavior follows the mode.
+  let flatSeq: Array<{ g: number; i: number }> = []
+  let flatIdx = new Map<string, number>()
+  let flatCol: unknown = null
+  const ensureFlat = () => {
+    const col = viewer.getCollection()
+    if (col === flatCol) return
+    flatCol = col
+    flatSeq = []
+    flatIdx = new Map()
+    col.groups.forEach((grp, g) =>
+      grp.items.forEach((_, i) => {
+        flatIdx.set(`${g}:${i}`, flatSeq.length)
+        flatSeq.push({ g, i })
+      }),
+    )
+  }
+  const flatPosition = (g: number, i: number): number => {
+    ensureFlat()
+    return flatIdx.get(`${g}:${i}`) ?? 0
+  }
+  const linearStep = (dir: 1 | -1) => {
+    ensureFlat()
+    if (flatSeq.length === 0) return
+    const { g, i } = viewer.getState().cursor
+    let n = (flatIdx.get(`${g}:${i}`) ?? 0) + dir
+    if (n >= flatSeq.length) n = loop ? 0 : flatSeq.length - 1
+    if (n < 0) n = loop ? flatSeq.length - 1 : 0
+    const t = flatSeq[n]
+    if (t) viewer.goTo(t.g, t.i)
+  }
+  const nav = {
+    next: () => (linear ? linearStep(1) : viewer.next()),
+    prev: () => (linear ? linearStep(-1) : viewer.prev()),
+    nextItem: () => {
+      if (!linear) viewer.nextItem() // the item axis retires in linear mode
+    },
+    prevItem: () => {
+      if (!linear) viewer.prevItem()
+    },
+  }
+
   // ── DOM scaffold ───────────────────────────────────────────────────────────
   const root = el('div', 'visora')
   root.setAttribute('data-visora-mode', overlay ? 'overlay' : 'inline')
   root.setAttribute('data-visora-arrows', arrows)
   root.setAttribute('data-visora-rail-pos', railPos)
   root.setAttribute('data-visora-rail', railHidden ? 'collapsed' : 'expanded')
+  if (linear) root.setAttribute('data-visora-linear', 'true')
   if (preset) for (const [k, val] of Object.entries(preset.rootAttrs)) root.setAttribute(k, val)
   if (overlay) {
     root.setAttribute('role', 'dialog')
@@ -191,19 +250,19 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     close.addEventListener('click', () => viewer.close())
     const prev = el('button', 'visora-prev', { type: 'button', 'aria-label': 'Previous' })
     prev.innerHTML = ICONS.prev
-    prev.addEventListener('click', () => viewer.prev())
+    prev.addEventListener('click', () => nav.prev())
     const next = el('button', 'visora-next', { type: 'button', 'aria-label': 'Next' })
     next.innerHTML = ICONS.next
-    next.addEventListener('click', () => viewer.next())
+    next.addEventListener('click', () => nav.next())
     const prevItem = el('button', 'visora-item-prev', {
       type: 'button',
       'aria-label': 'Previous item',
     })
     prevItem.innerHTML = ICONS.itemPrev
-    prevItem.addEventListener('click', () => viewer.prevItem())
+    prevItem.addEventListener('click', () => nav.prevItem())
     const nextItem = el('button', 'visora-item-next', { type: 'button', 'aria-label': 'Next item' })
     nextItem.innerHTML = ICONS.itemNext
-    nextItem.addEventListener('click', () => viewer.nextItem())
+    nextItem.addEventListener('click', () => nav.nextItem())
     const reset = el('button', 'visora-zoom-reset', { type: 'button', 'aria-label': 'Reset zoom' })
     reset.innerHTML = ICONS.zoomReset
     reset.addEventListener('click', () => viewer.resetZoom())
@@ -402,12 +461,21 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     chromeI = cur.i
     const G = col.groups.length
     const itemCount = col.groups[cur.g]?.items.length ?? 0
-    if (counter) counter.textContent = `${cur.g + 1} / ${G}`
-    updatePosition(cur.g, cur.i, itemCount)
-    live.textContent =
-      itemCount > 1
-        ? `Group ${cur.g + 1} of ${G}, screen ${cur.i + 1} of ${itemCount}`
-        : `Group ${cur.g + 1} of ${G}`
+    if (linear) {
+      // flat linear: one running position across all items; the within-group pills retire.
+      const pos = flatPosition(cur.g, cur.i) + 1 // flatPosition() also rebuilds flatSeq if needed
+      const total = flatSeq.length
+      if (counter) counter.textContent = `${pos} / ${total}`
+      if (position) position.hidden = true
+      live.textContent = `Item ${pos} of ${total}`
+    } else {
+      if (counter) counter.textContent = `${cur.g + 1} / ${G}`
+      updatePosition(cur.g, cur.i, itemCount)
+      live.textContent =
+        itemCount > 1
+          ? `Group ${cur.g + 1} of ${G}, screen ${cur.i + 1} of ${itemCount}`
+          : `Group ${cur.g + 1} of ${G}`
+    }
   }
 
   // ── attach / detach ──────────────────────────────────────────────────────────
@@ -473,16 +541,16 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const onKey = (e: KeyboardEvent) => {
     switch (e.key) {
       case 'ArrowRight':
-        viewer.next()
+        nav.next()
         break
       case 'ArrowLeft':
-        viewer.prev()
+        nav.prev()
         break
       case 'ArrowDown':
-        viewer.nextItem()
+        nav.nextItem()
         break
       case 'ArrowUp':
-        viewer.prevItem()
+        nav.prevItem()
         break
       case 'Escape':
         viewer.close()
@@ -543,6 +611,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const detachGestures = attachGestures({
     stage,
     viewer,
+    nav, // route swipes through the linear/oriented nav seam
     getContent: () => currentRec()?.content ?? null,
     getGeometry: () => {
       const r = stage.getBoundingClientRect()

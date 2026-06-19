@@ -52,6 +52,14 @@ groupDisplay: 'flat' })`.
 - `flat` — every item renders side-by-side, each group bracketed (left accent rule + caption
   header). Item-windowed, so it stays bounded for large galleries and for a single giant group.
 
+## Linear traversal (`mount({ linear })`, `<Visora linear>`)
+
+A renderer option that pairs with the **flat** rail: when set, ←/→ walks the flattened item
+sequence across groups (1a, 1b, 2a, 2b, 2c, 3a…), the ↑/↓ item axis retires, the counter shows
+`item N / total`, and the within-group pills hide — surfaced as `data-visora-linear`. Pass `loop`
+alongside it to wrap at the global first/last item. The React example couples it to the flat rail
+(`linear={groupDisplay === 'flat'}`).
+
 ## Arrow placement (`data-visora-arrows`)
 
 The ←/→ group arrows stay on the side edges; the option controls the within-group ↑/↓ arrows:

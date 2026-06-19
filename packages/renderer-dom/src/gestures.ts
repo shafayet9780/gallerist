@@ -19,6 +19,13 @@ export interface Geometry {
   naturalSize: { w: number; h: number } | null
 }
 
+export interface GestureNav {
+  next(): void
+  prev(): void
+  nextItem(): void
+  prevItem(): void
+}
+
 export interface GestureOptions {
   stage: HTMLElement
   viewer: ViewerApi
@@ -28,6 +35,9 @@ export interface GestureOptions {
   commitNav?: number
   closeDismiss?: number
   maxScale?: number
+  /** navigation seam — lets the renderer route swipes through linear/oriented nav (defaults to the
+   *  viewer's group/item axes). */
+  nav?: GestureNav
   raf?: (cb: () => void) => number
   caf?: (id: number) => void
 }
@@ -50,6 +60,12 @@ export function attachGestures(opts: GestureOptions): () => void {
     commitNav = 60,
     closeDismiss = 120,
     maxScale = 4,
+    nav = {
+      next: () => viewer.next(),
+      prev: () => viewer.prev(),
+      nextItem: () => viewer.nextItem(),
+      prevItem: () => viewer.prevItem(),
+    },
     raf = (cb) => requestAnimationFrame(cb),
     caf = (id) => cancelAnimationFrame(id),
   } = opts
@@ -178,7 +194,7 @@ export function attachGestures(opts: GestureOptions): () => void {
         if (pointers.size === 0) viewer.zoomTo(live.scale, { x: live.x, y: live.y })
         break
       case 'navigate':
-        if (Math.abs(dx) >= commitNav) dx < 0 ? viewer.next() : viewer.prev()
+        if (Math.abs(dx) >= commitNav) dx < 0 ? nav.next() : nav.prev()
         break
       case 'close':
         stage.style.removeProperty('--visora-dismiss')
@@ -186,8 +202,8 @@ export function attachGestures(opts: GestureOptions): () => void {
         else viewer.zoomTo(startZoom.scale, { x: startZoom.x, y: startZoom.y })
         break
       case 'secondary':
-        if (dy < 0) viewer.nextItem()
-        else viewer.prevItem()
+        if (dy < 0) nav.nextItem()
+        else nav.prevItem()
         break
     }
 

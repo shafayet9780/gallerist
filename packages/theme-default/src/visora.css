@@ -523,6 +523,14 @@
   right: 12px;
 }
 
+/* linear flat traversal (data-visora-linear): the item axis retires, so the ↑/↓ arrows and the
+   within-group position pills are removed — ←/→ alone walks the whole flattened sequence. */
+.visora[data-visora-linear="true"] .visora-item-prev,
+.visora[data-visora-linear="true"] .visora-item-next,
+.visora[data-visora-linear="true"] .visora-position {
+  display: none;
+}
+
 /* ── arrow placement (data-visora-arrows, UX-D) ─────────────────────────────── */
 /* base ↑/↓ above are the legacy "split" layout (top/bottom-center). Each layout below overrides. */
 

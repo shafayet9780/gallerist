@@ -185,8 +185,8 @@ function App() {
   ].join('|')
 
   const keys = [
-    '←/→ groups',
-    '↑/↓ screens',
+    groupDisplay === 'flat' ? '←/→ all images (linear)' : '←/→ groups',
+    groupDisplay === 'flat' ? null : '↑/↓ screens',
     rail !== 'hidden' && (
       <span key="t">
         <kbd>t</kbd> rail
@@ -494,6 +494,7 @@ function App() {
         arrows={arrows === 'auto' ? undefined : arrows}
         rail={rail === 'auto' ? undefined : rail}
         autoHide={autoHide === 'auto' ? undefined : autoHide === 'on'}
+        linear={groupDisplay === 'flat'} // flat rail ⇒ linear ←/→ traversal across all items
         plugins={plugins}
       >
         <Visora.Region name="toolbar">

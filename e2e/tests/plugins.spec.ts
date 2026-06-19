@@ -171,6 +171,54 @@ test.describe('flat rail (groupDisplay: flat)', () => {
   })
 })
 
+test.describe('linear flat traversal', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/plugins.html?linear=1')
+    await page.click('#open')
+    await expect(page.locator('.visora')).toBeVisible()
+  })
+
+  test('marks linear and hides the up/down arrows + within-group pills', async ({ page }) => {
+    await expect(page.locator('.visora')).toHaveAttribute('data-visora-linear', 'true')
+    await expect(page.locator('.visora-item-prev')).toBeHidden()
+    await expect(page.locator('.visora-item-next')).toBeHidden()
+    await expect(page.locator('.visora-position')).toBeHidden()
+  })
+
+  test('ArrowRight walks the whole flattened sequence; counter shows item N / total', async ({
+    page,
+  }) => {
+    await page.locator('.visora').focus()
+    await expect(page.locator('.visora-counter')).toHaveText(/1 \/ 6/) // a0
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('.visora-counter')).toHaveText(/2 \/ 6/) // b0 — into the next group
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('.visora-counter')).toHaveText(/3 \/ 6/) // b1 — next item, same group
+    await page.keyboard.press('ArrowDown') // item axis retired → inert
+    await expect(page.locator('.visora-counter')).toHaveText(/3 \/ 6/)
+    await page.keyboard.press('ArrowLeft')
+    await expect(page.locator('.visora-counter')).toHaveText(/2 \/ 6/) // back across the boundary
+  })
+
+  test('no axe violations in linear mode', async ({ page }) => {
+    const results = await new AxeBuilder({ page })
+      .include('.visora')
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    expect(results.violations).toEqual([])
+  })
+
+  test('flat rail + linear: clicking a flat item navigates; counter is item N / total', async ({
+    page,
+  }) => {
+    await page.goto('/plugins.html?display=flat&linear=1')
+    await page.click('#open')
+    await expect(page.locator('.visora-thumbs[data-display="flat"]')).toBeVisible()
+    await page.locator('.visora-thumb-item[data-item="b2"]').click() // b2 = 4th item overall
+    await expect(page.locator('.visora-counter')).toHaveText(/4 \/ 6/)
+  })
+})
+
 test.describe('top rail', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/plugins.html?rail=top')

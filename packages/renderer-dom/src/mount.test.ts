@@ -357,3 +357,82 @@ describe('mount — destroy', () => {
     expect(document.querySelector('.visora')).toBeNull()
   })
 })
+
+describe('mount — linear flat traversal', () => {
+  // flat order over collection(): a0 (g0i0), b0 b1 b2 (g1), c0 c1 (g2) = 6 items
+  const openLinear = (loop = false) => {
+    const v = createViewer({ collection: collection(), loop })
+    mount(v, { linear: true, loop })
+    v.open()
+    return v
+  }
+  const press = (k: string) =>
+    (document.querySelector('.visora') as HTMLElement).dispatchEvent(key({ key: k }))
+
+  it('sets data-visora-linear and hides the within-group pills', () => {
+    openLinear()
+    expect(document.querySelector('.visora')?.getAttribute('data-visora-linear')).toBe('true')
+    expect((document.querySelector('.visora-position') as HTMLElement)?.hidden).toBe(true)
+  })
+
+  it('ArrowRight walks the flattened item sequence across groups (1a,1b,2a…)', () => {
+    const v = openLinear()
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 }) // a0
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 }) // b0 — rolls into the next group
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 }) // b1 — next ITEM, not next group
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 }) // b2
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 }) // c0
+  })
+
+  it('ArrowLeft walks backward across the group boundary into the previous item', () => {
+    const v = openLinear()
+    v.goTo(2, 0) // c0
+    press('ArrowLeft')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 }) // back into g1's LAST item
+  })
+
+  it('the counter shows the running item position / total', () => {
+    const v = openLinear()
+    v.goTo(1, 1) // b1 = flat index 2 of 6
+    expect(document.querySelector('.visora-counter')?.textContent).toContain('3 / 6')
+  })
+
+  it('ArrowUp/ArrowDown are inert (the item axis retires)', () => {
+    const v = openLinear()
+    v.goTo(1, 1)
+    press('ArrowDown')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    press('ArrowUp')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+  })
+
+  it('wraps at the ends when loop is set', () => {
+    const v = openLinear(true)
+    v.goTo(2, 1) // c1 = last
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 }) // wrap to first
+    press('ArrowLeft')
+    expect(v.getState().cursor).toEqual({ g: 2, i: 1 }) // wrap back to last
+  })
+
+  it('clamps at the ends without loop', () => {
+    const v = openLinear(false)
+    v.goTo(2, 1)
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 2, i: 1 }) // stays put
+  })
+
+  it('nested mode (default) keeps the two-axis behavior (ArrowRight = next group)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v) // no linear
+    v.open()
+    expect(document.querySelector('.visora')?.hasAttribute('data-visora-linear')).toBe(false)
+    v.goTo(1, 0)
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 }) // group axis, skips g1's remaining items
+  })
+})
