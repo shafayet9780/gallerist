@@ -16,6 +16,8 @@ export default defineConfig({
       '@visora/plugin-fullscreen': r('../../packages/plugin-fullscreen/src/index.ts'),
       '@visora/plugin-download': r('../../packages/plugin-download/src/index.ts'),
       '@visora/plugin-hash': r('../../packages/plugin-hash/src/index.ts'),
+      '@visora/plugin-video': r('../../packages/plugin-video/src/index.ts'),
+      '@visora/plugin-video-youtube': r('../../packages/plugin-video-youtube/src/index.ts'),
       '@visora/theme-default/visora.css': r('../../packages/theme-default/src/visora.css'),
     },
   },
