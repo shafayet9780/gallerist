@@ -25,6 +25,7 @@ type Theme = 'amber' | 'cyan' | 'vermilion'
 type GroupDisplay = 'stacked' | 'flat'
 type ItemAxis = 'vertical' | 'horizontal'
 type AutoHide = 'auto' | 'on' | 'off'
+type LinearOpt = 'auto' | 'on' | 'off'
 type Opt<T> = T | 'auto'
 
 const shot = (seed: string, alt: string, caption?: string): Item => ({
@@ -95,7 +96,7 @@ const mediaGroup: Collection['groups'][number] = {
 const PRESETS: PresetName[] = ['reviewer', 'filmstrip', 'immersive', 'contact']
 const THEMES: Theme[] = ['amber', 'cyan', 'vermilion']
 const ARROWS: ArrowLayout[] = ['pill-right', 'corner-br', 'dpad', 'split']
-const RAILS: RailPlacement[] = ['bottom', 'top', 'hidden']
+const RAILS: RailPlacement[] = ['bottom', 'left', 'right', 'hidden']
 const MEMORIES: ItemMemory[] = ['reset', 'preserve', 'clamp']
 const GROUP_DISPLAYS: GroupDisplay[] = ['stacked', 'flat']
 const AXES: ItemAxis[] = ['vertical', 'horizontal']
@@ -104,7 +105,7 @@ const BLURB: Record<PresetName, string> = {
   reviewer: 'bottom timeline rail · corner arrows · labels under each screen',
   filmstrip: 'classic bottom rail · side arrows · persistent chrome',
   immersive: 'rail hidden (press t / hover) · chrome auto-hides on idle',
-  contact: 'rail along the top · pairs with the grid (press g)',
+  contact: 'vertical rail on the right · pairs with the grid (press g)',
 }
 
 function App() {
@@ -125,6 +126,8 @@ function App() {
   const [itemMemory, setItemMemory] = useState<ItemMemory>('reset')
   const [keepZoomOnNav, setKeepZoomOnNav] = useState(false)
   const [startGroup, setStartGroup] = useState(0)
+  // linear traversal: 'auto' couples it to the flat rail; 'on'/'off' force it.
+  const [linearOpt, setLinearOpt] = useState<LinearOpt>('auto')
 
   // thumbnails plugin
   const [groupDisplay, setGroupDisplay] = useState<GroupDisplay>('stacked')
@@ -141,6 +144,10 @@ function App() {
   const [showOverlay, setShowOverlay] = useState(false)
 
   const def = resolvePreset(preset)
+  // linear couples to the flat rail by default; the effective rail decides the on-screen axis labels.
+  const linear = linearOpt === 'auto' ? groupDisplay === 'flat' : linearOpt === 'on'
+  const effRail = rail === 'auto' ? def.rail : rail
+  const vertical = effRail === 'left' || effRail === 'right'
 
   const collection: Collection = useMemo(
     () => ({ groups: pMedia ? [...baseGroups, mediaGroup] : baseGroups }),
@@ -172,6 +179,7 @@ function App() {
     itemMemory,
     keepZoomOnNav,
     startGroup,
+    linearOpt,
     groupDisplay,
     itemAxis,
     overscan,
@@ -184,10 +192,13 @@ function App() {
     showOverlay,
   ].join('|')
 
+  // axis labels follow the rail orientation; a vertical (left/right) rail swaps the arrows.
+  const primary = vertical ? '↑/↓' : '←/→'
+  const secondary = vertical ? '←/→' : '↑/↓'
   const keys = [
-    groupDisplay === 'flat' ? '←/→ all images (linear)' : '←/→ groups',
-    groupDisplay === 'flat' ? null : '↑/↓ screens',
-    rail !== 'hidden' && (
+    linear ? `${primary} all images (linear)` : `${primary} groups`,
+    linear ? null : `${secondary} screens`,
+    effRail !== 'hidden' && (
       <span key="t">
         <kbd>t</kbd> rail
       </span>
@@ -331,6 +342,14 @@ function App() {
             />
             Keep zoom on nav
           </label>
+          <label className="field">
+            Linear traversal<span className="def">auto = on with flat</span>
+            <select value={linearOpt} onChange={(e) => setLinearOpt(e.target.value as LinearOpt)}>
+              <option value="auto">auto (flat)</option>
+              <option value="on">on</option>
+              <option value="off">off</option>
+            </select>
+          </label>
         </fieldset>
 
         <fieldset className="group">
@@ -466,6 +485,7 @@ function App() {
             itemMemory,
             keepZoomOnNav,
             startGroup,
+            linear,
             groupDisplay,
             itemAxis,
             overscan,
@@ -494,7 +514,7 @@ function App() {
         arrows={arrows === 'auto' ? undefined : arrows}
         rail={rail === 'auto' ? undefined : rail}
         autoHide={autoHide === 'auto' ? undefined : autoHide === 'on'}
-        linear={groupDisplay === 'flat'} // flat rail ⇒ linear ←/→ traversal across all items
+        linear={linear} // flat rail ⇒ linear by default; the Linear control can force it on/off
         plugins={plugins}
       >
         <Visora.Region name="toolbar">
@@ -522,6 +542,7 @@ function usageSnippet(c: {
   itemMemory: ItemMemory
   keepZoomOnNav: boolean
   startGroup: number
+  linear: boolean
   groupDisplay: GroupDisplay
   itemAxis: ItemAxis
   overscan: number
@@ -558,6 +579,7 @@ function usageSnippet(c: {
     c.arrows !== 'auto' ? `arrows="${c.arrows}"` : null,
     c.rail !== 'auto' ? `rail="${c.rail}"` : null,
     c.autoHide !== 'auto' ? `autoHide={${c.autoHide === 'on'}}` : null,
+    c.linear ? 'linear' : null,
     c.controls ? null : 'controls={false}',
     'open={open}',
   ].filter(Boolean)
