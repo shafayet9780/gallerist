@@ -40,6 +40,18 @@ the preset.
   item column expands downward instead of up.
 - `hidden` — the rail starts collapsed; reveal it with the toggle, the `t` key, or fullscreen exit.
 
+## Group display (`thumbnails({ groupDisplay })`)
+
+A `thumbnails()` option (not a preset/rail field), so set it on the plugin. All presets default to
+`stacked`; opt into `flat` explicitly, e.g. `thumbnails({ ...resolvePreset('contact').thumbnails,
+groupDisplay: 'flat' })`.
+
+- `stacked` (default) — one collapsed card per group. Hover/focus a multi-item card to **peek** its
+  items without navigating in (touch gets an expand affordance); the active group expands its item
+  column as before.
+- `flat` — every item renders side-by-side, each group bracketed (left accent rule + caption
+  header). Item-windowed, so it stays bounded for large galleries and for a single giant group.
+
 ## Arrow placement (`data-visora-arrows`)
 
 The ←/→ group arrows stay on the side edges; the option controls the within-group ↑/↓ arrows:

@@ -1,24 +1,43 @@
-// @visora/plugin-thumbnails — windowed thumbnail rail (spec §10.3, §14). One card per group
-// (grouped stacked cards for multi-item groups); the active multi-item group expands to its item
-// thumbs (secondary axis). Windowed + lazy so 10k-item galleries stay bounded.
+// @visora/plugin-thumbnails — windowed thumbnail rail (spec §10.3, §14).
 //
-// Reconcile-in-place (M14 UX-B): the rail is NOT torn down on cursor moves. The group rail is
-// rebuilt only when the collection or the visible window changes; the item column only when the
-// active group changes. Item/group cursor moves just flip `data-active` and scroll the active node
-// into view — no DOM churn, no scroll reset (fixes the "active thumb drifts horizontally" bug).
+// Two display modes (`groupDisplay`):
+//  • 'stacked' (default): one card per group; multi-item groups stack with a count badge. The
+//    active multi-item group expands its item thumbs (secondary axis), and hovering/focusing any
+//    OTHER multi-item card opens a transient *peek* flyout of its items — preview without
+//    navigating in. Touch (no hover) gets an explicit expand affordance on the card.
+//  • 'flat': every item of every group renders side-by-side as its own card, each group's run
+//    wrapped in a bordered container so it reads as one group. Item-windowed so it stays bounded
+//    even for huge galleries or one giant group.
+//
+// Reconcile-in-place (M14 UX-B): the rail is NOT torn down on cursor moves. It is rebuilt only when
+// the collection or the visible window changes; cursor moves just flip `data-active` and scroll the
+// active node into view — no DOM churn, no scroll reset.
 
-import type { Group, Item, MediaSource, Plugin, ViewerApi } from '@visora/core'
+import type { Group, Item, MediaSource, Plugin, PluginInstance, ViewerApi } from '@visora/core'
 import { windowIndices } from '@visora/core'
 
 export interface ThumbnailsOptions {
-  /** group thumbs rendered on each side of the active group (default 24). */
+  /** group thumbs rendered on each side of the active group (default 24). In `flat` mode this is
+   *  the per-side bound on item cards. */
   overscan?: number
   /**
-   * Layout of the active group's item thumbs (the secondary ↑/↓ axis). `vertical` (default)
-   * stacks them in a column so the highlight moves up/down with the input direction; `horizontal`
-   * keeps the legacy inline row.
+   * Layout of the active group's item thumbs (the secondary ↑/↓ axis), in `stacked` mode.
+   * `vertical` (default) stacks them in a column so the highlight moves up/down with the input
+   * direction; `horizontal` keeps the legacy inline row. Ignored in `flat` mode.
    */
   itemAxis?: 'vertical' | 'horizontal'
+  /**
+   * How multi-item groups are shown in the rail. `stacked` (default) collapses each group to one
+   * card (hover/focus to peek its items, or tap the expand affordance on touch); `flat` lays every
+   * item out side-by-side with each group wrapped in a bordered container.
+   */
+  groupDisplay?: 'stacked' | 'flat'
+  /**
+   * Auto-expand the active multi-item group's item panel (`stacked` mode). Default `true`. Users
+   * can hide/show it with the toolbar items-toggle button or the `e` key; the chosen state persists
+   * as you navigate. Ignored in `flat` mode (every item is already laid out).
+   */
+  expandActive?: boolean
 }
 
 function thumbUrl(source: MediaSource | undefined): string | null {
@@ -69,6 +88,11 @@ function setActiveAttr(btn: HTMLElement, active: boolean): void {
   btn.setAttribute('aria-selected', String(active))
 }
 
+function toggleAttr(el: HTMLElement, name: string, on: boolean): void {
+  if (on) el.setAttribute(name, '')
+  else el.removeAttribute(name)
+}
+
 function thumbButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
   const btn = document.createElement('button')
   btn.type = 'button'
@@ -84,13 +108,37 @@ function scrollActiveIntoView(btn: HTMLElement | undefined): void {
   btn?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
 }
 
+/** Whether the primary pointer can hover (desktop). Defaults true when undetectable (SSR/test). */
+function canHover(): boolean {
+  if (typeof window === 'undefined') return true
+  return window.matchMedia?.('(hover: hover)').matches ?? true
+}
+
+interface FlatEntry {
+  g: number
+  i: number
+  groupId: string
+  itemId: string
+}
+
 export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
   return (viewer: ViewerApi) => {
     const overscan = opts.overscan ?? 24
     const itemAxis = opts.itemAxis ?? 'vertical'
+    const groupDisplay = opts.groupDisplay ?? 'stacked'
+    const expandActive = opts.expandActive ?? true
+    // `regionEl` is the node handed to the renderer's `thumbnails` region; `root` (the scrollable
+    // rail) lives inside it, and the floating panels (item column / peek) are siblings of `root`
+    // inside `regionEl`. The renderer `replaceChildren()`s region hosts on every plugin-set change
+    // (regions.ts) and re-appends only the region node — so the panels MUST live inside `regionEl`
+    // to survive a late `viewer.use()`, not be bare children of the host.
+    let regionEl: HTMLElement | null = null
     let root: HTMLElement | null = null
     let itemRow: HTMLElement | null = null
+    let toolbarBtn: HTMLButtonElement | null = null
+    let panelOpen = expandActive // whether the active group's item panel is shown (toggle: button / `e`)
     let unsub: (() => void) | null = null
+    let hoverCapable = true
 
     // Reconcile state. Group cards + item buttons are keyed by id so we can flip active state and
     // reorder without destroying nodes.
@@ -99,10 +147,23 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let lastI = -1
     let lastWindowKey = ''
     let lastActiveGroupId: string | null = null
+    let lastActiveItemId: string | null = null // flat mode active item
     let liveCardId: string | null = null // group card currently showing a live item preview
     const groupBtns = new Map<string, HTMLButtonElement>()
     const itemBtns = new Map<string, HTMLButtonElement>()
     const coverUrls = new Map<string, string | null>() // group id → its fixed cover thumb
+    const cardHost = new Map<string, HTMLElement>() // group id → node appended to the rail (card or wrap)
+
+    // peek (stacked mode): a transient flyout previewing a non-active group's items.
+    let peekRow: HTMLElement | null = null
+    let peekGroupId: string | null = null
+    let peekTimer: ReturnType<typeof setTimeout> | null = null
+
+    // flat mode: a flattened (g,i) sequence + the group wrappers that bracket runs of items.
+    let flat: FlatEntry[] = []
+    const flatPos = new Map<string, number>() // `${g}:${i}` → flat index
+    const groupIndexById = new Map<string, number>()
+    const groupWraps = new Map<string, HTMLElement>()
 
     const observer =
       typeof IntersectionObserver !== 'undefined'
@@ -118,6 +179,81 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           })
         : null
 
+    const buildItemButton = (item: Item, gIndex: number, iIndex: number): HTMLButtonElement => {
+      const btn = thumbButton(`Item ${iIndex + 1}`, 'visora-thumb-item', () =>
+        viewer.goTo(gIndex, iIndex),
+      )
+      btn.dataset.item = item.id
+      btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
+      appendCaption(btn, captionOf(item))
+      return btn
+    }
+
+    // Fill a column/flyout with one item button per group item; `track` registers them in itemBtns
+    // (the active-state map) — peek flyouts are presentation-only and pass `track: false`.
+    const fillColumn = (container: HTMLElement, group: Group, gIndex: number, track: boolean) => {
+      container.replaceChildren()
+      group.items.forEach((item, i) => {
+        const ib = buildItemButton(item, gIndex, i)
+        if (track) itemBtns.set(item.id, ib)
+        container.appendChild(ib)
+      })
+    }
+
+    // ── peek flyout ──────────────────────────────────────────────────────────
+    const removePeek = () => {
+      if (peekRow) {
+        peekRow.remove()
+        peekRow = null
+      }
+      peekGroupId = null
+    }
+    const cancelPeekClose = () => {
+      if (peekTimer != null) {
+        clearTimeout(peekTimer)
+        peekTimer = null
+      }
+    }
+    const closePeek = () => {
+      cancelPeekClose()
+      removePeek()
+    }
+    const schedulePeekClose = () => {
+      cancelPeekClose()
+      peekTimer = setTimeout(closePeek, 120)
+    }
+    const openPeek = (group: Group, gIndex: number, host: HTMLElement) => {
+      if (!root || groupDisplay === 'flat') return
+      if (group.items.length <= 1) return // nothing to preview
+      // skip only when the active group's own panel is already showing it (avoids a double panel);
+      // if that panel is hidden/dismissed, hovering the active card peeks like any other (point 1).
+      if (group.id === lastActiveGroupId && panelOpen && itemRow) return
+      if (peekGroupId === group.id) return // already open
+      cancelPeekClose()
+      removePeek()
+      const col = document.createElement('div')
+      col.className = 'visora-thumb-peek'
+      // its own listbox (a sibling of the rail on the region host, not nested in it) → valid `option`
+      // children. aria-label distinguishes it from the rail's "Thumbnails" listbox.
+      col.setAttribute('role', 'listbox')
+      col.setAttribute('aria-label', `Group ${gIndex + 1} preview`)
+      col.dataset.axis = itemAxis
+      fillColumn(col, group, gIndex, false)
+      // Mount in `regionEl` (a sibling of the rail), not inside `.visora-thumbs`: the rail's overflow
+      // + backdrop-filter makes it a clipping containing block. `regionEl` is positioned + unclipped
+      // and is preserved across region remounts, so the flyout shows, stays clickable, and survives.
+      const mountEl = regionEl ?? root
+      const cardRect = host.getBoundingClientRect()
+      const baseRect = mountEl.getBoundingClientRect()
+      col.style.left = `${cardRect.left - baseRect.left}px`
+      col.addEventListener('mouseenter', cancelPeekClose)
+      col.addEventListener('mouseleave', schedulePeekClose)
+      mountEl.appendChild(col)
+      peekRow = col
+      peekGroupId = group.id
+    }
+
+    // ── stacked mode ─────────────────────────────────────────────────────────
     const buildGroupCard = (group: Group, gIndex: number): HTMLButtonElement => {
       const multi = group.items.length > 1
       const btn = thumbButton(
@@ -136,29 +272,35 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         btn.appendChild(badge)
       }
       appendCaption(btn, captionOf(group))
-      return btn
-    }
 
-    const buildItemButton = (item: Item, gIndex: number, iIndex: number): HTMLButtonElement => {
-      const btn = thumbButton(`Item ${iIndex + 1}`, 'visora-thumb-item', () =>
-        viewer.goTo(gIndex, iIndex),
-      )
-      btn.dataset.item = item.id
-      btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
-      appendCaption(btn, captionOf(item))
+      // peek wiring (multi-item groups only) — `host` is the node appended to the rail, so the
+      // flyout anchors to it; on touch the card is wrapped so a sibling expand button is valid HTML.
+      let host: HTMLElement = btn
+      if (multi) {
+        btn.addEventListener('focusin', () => openPeek(group, gIndex, host))
+        btn.addEventListener('focusout', schedulePeekClose)
+        if (hoverCapable) {
+          btn.addEventListener('mouseenter', () => openPeek(group, gIndex, host))
+          btn.addEventListener('mouseleave', schedulePeekClose)
+        } else {
+          const wrap = document.createElement('div')
+          wrap.className = 'visora-thumb-wrap'
+          wrap.dataset.group = group.id
+          const caret = document.createElement('button')
+          caret.type = 'button'
+          caret.className = 'visora-thumb-expand'
+          caret.setAttribute('aria-label', `Preview group ${gIndex + 1}`)
+          caret.addEventListener('click', (e) => {
+            e.stopPropagation()
+            openPeek(group, gIndex, wrap)
+          })
+          wrap.appendChild(btn)
+          wrap.appendChild(caret)
+          host = wrap
+        }
+      }
+      cardHost.set(group.id, host)
       return btn
-    }
-
-    // wipe everything (collection identity changed — ids may be entirely different)
-    const resetAll = () => {
-      if (root) root.replaceChildren()
-      groupBtns.clear()
-      itemBtns.clear()
-      coverUrls.clear()
-      itemRow = null
-      liveCardId = null
-      lastWindowKey = ''
-      lastActiveGroupId = null
     }
 
     // rebuild the group rail to the windowed set, reusing existing cards (identity preserved)
@@ -171,9 +313,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
       for (const [id, btn] of groupBtns) {
         if (!desiredIds.has(id)) {
-          btn.remove()
+          ;(cardHost.get(id) ?? btn).remove()
           groupBtns.delete(id)
           coverUrls.delete(id) // keep the cover cache windowed too (avoids unbounded growth)
+          cardHost.delete(id)
         }
       }
       for (const g of windowIdx) {
@@ -184,29 +327,30 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           btn = buildGroupCard(group, g)
           groupBtns.set(group.id, btn)
         }
-        root.appendChild(btn) // moves existing node to the end → reorders, preserves identity
+        root.appendChild(cardHost.get(group.id) ?? btn) // moves existing node → reorders, keeps identity
       }
-      if (itemRow) root.appendChild(itemRow) // keep the item column last
+      // the active item column lives on the region host (see rebuildItemColumn), not the rail.
     }
 
+    // Build/show the active group's item panel when `panelOpen`. Mounted on the region host (not
+    // `.visora-thumbs`, whose overflow + backdrop-filter would clip it) so it's visible + clickable
+    // in every rail position; CSS flips its open direction per `data-visora-rail-pos`.
     const rebuildItemColumn = (activeGroup: Group | undefined, gIndex: number) => {
       if (!root) return
       itemBtns.clear()
-      if (activeGroup && activeGroup.items.length > 1) {
+      const mountEl = regionEl ?? root
+      if (panelOpen && activeGroup && activeGroup.items.length > 1) {
         if (!itemRow) {
           itemRow = document.createElement('div')
           itemRow.className = 'visora-thumb-items'
-          itemRow.setAttribute('role', 'group') // a listbox can't nest inside the rail listbox
+          // its own listbox (host-mounted sibling of the rail, not nested) → valid `option` children
+          itemRow.setAttribute('role', 'listbox')
+          itemRow.setAttribute('aria-label', 'Group items')
           itemRow.setAttribute('aria-orientation', itemAxis)
           itemRow.dataset.axis = itemAxis
         }
-        itemRow.replaceChildren()
-        activeGroup.items.forEach((item, i) => {
-          const ib = buildItemButton(item, gIndex, i)
-          itemBtns.set(item.id, ib)
-          itemRow?.appendChild(ib)
-        })
-        root.appendChild(itemRow)
+        fillColumn(itemRow, activeGroup, gIndex, true)
+        mountEl.appendChild(itemRow)
       } else if (itemRow) {
         itemRow.remove()
         itemRow = null
@@ -251,6 +395,159 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (activeItemId) scrollActiveIntoView(itemBtns.get(activeItemId))
     }
 
+    // re-evaluate the active item panel for the current cursor (used when `panelOpen` toggles, since
+    // the cursor itself didn't change so `render` wouldn't otherwise rebuild it).
+    const syncPanel = () => {
+      const col = viewer.getCollection()
+      const cur = viewer.getState().cursor
+      rebuildItemColumn(col.groups[cur.g], cur.g)
+      applyActive(col, cur.g, cur.i)
+    }
+
+    const toggleActivePanel = () => {
+      panelOpen = !panelOpen
+      toolbarBtn?.setAttribute('aria-pressed', String(panelOpen))
+      if (panelOpen) closePeek() // the persistent panel supersedes a transient peek
+      syncPanel()
+    }
+
+    // ── flat mode ────────────────────────────────────────────────────────────
+    const buildFlatModel = (col: ReturnType<ViewerApi['getCollection']>) => {
+      flat = []
+      flatPos.clear()
+      groupIndexById.clear()
+      col.groups.forEach((grp, g) => {
+        groupIndexById.set(grp.id, g)
+        grp.items.forEach((item, i) => {
+          flatPos.set(`${g}:${i}`, flat.length)
+          flat.push({ g, i, groupId: grp.id, itemId: item.id })
+        })
+      })
+    }
+
+    const buildGroupWrapper = (group: Group, gIndex: number): HTMLElement => {
+      const wrap = document.createElement('div')
+      wrap.className = 'visora-thumb-group'
+      wrap.dataset.group = group.id
+      wrap.setAttribute('role', 'group')
+      wrap.setAttribute('aria-label', `Group ${gIndex + 1}`)
+      const row = document.createElement('div')
+      row.className = 'visora-thumb-group-row'
+      wrap.appendChild(row)
+      return wrap
+    }
+
+    const rebuildRailFlat = (col: ReturnType<ViewerApi['getCollection']>, windowIdx: number[]) => {
+      if (!root) return
+      const desiredItemIds = new Set<string>()
+      const desiredGroupIds = new Set<string>()
+      const minI = new Map<string, number>()
+      const maxI = new Map<string, number>()
+      for (const fi of windowIdx) {
+        const e = flat[fi]
+        if (!e) continue
+        desiredItemIds.add(e.itemId)
+        desiredGroupIds.add(e.groupId)
+        minI.set(e.groupId, Math.min(minI.get(e.groupId) ?? e.i, e.i))
+        maxI.set(e.groupId, Math.max(maxI.get(e.groupId) ?? e.i, e.i))
+      }
+      // evict nodes that left the window
+      for (const [id, btn] of itemBtns) {
+        if (!desiredItemIds.has(id)) {
+          btn.remove()
+          itemBtns.delete(id)
+        }
+      }
+      for (const [id, w] of groupWraps) {
+        if (!desiredGroupIds.has(id)) {
+          w.remove()
+          groupWraps.delete(id)
+        }
+      }
+      // (re)build in window order — appendChild moves existing nodes, so identity is preserved
+      let curGroupId: string | null = null
+      for (const fi of windowIdx) {
+        const e = flat[fi]
+        if (!e) continue
+        const grp = col.groups[e.g]
+        const item = grp?.items[e.i]
+        if (!grp || !item) continue
+        let wrap = groupWraps.get(e.groupId)
+        if (!wrap) {
+          wrap = buildGroupWrapper(grp, e.g)
+          groupWraps.set(e.groupId, wrap)
+        }
+        if (e.groupId !== curGroupId) {
+          root.appendChild(wrap)
+          curGroupId = e.groupId
+        }
+        let ib = itemBtns.get(e.itemId)
+        if (!ib) {
+          ib = buildItemButton(item, e.g, e.i)
+          itemBtns.set(e.itemId, ib)
+        }
+        ;(wrap.querySelector('.visora-thumb-group-row') ?? wrap).appendChild(ib)
+      }
+      // per-wrapper caption header + partial-edge flags
+      for (const [id, wrap] of groupWraps) {
+        const gi = groupIndexById.get(id)
+        if (gi == null) continue
+        const grp = col.groups[gi]
+        if (!grp) continue
+        const mn = minI.get(id) ?? 0
+        const mx = maxI.get(id) ?? 0
+        toggleAttr(wrap, 'data-partial-start', mn > 0)
+        toggleAttr(wrap, 'data-partial-end', mx < grp.items.length - 1)
+        const wantCap = typeof grp.caption === 'string' && mn === 0
+        const first = wrap.firstElementChild
+        const hasCap = !!first && first.classList.contains('visora-thumb-group-cap')
+        if (wantCap && !hasCap) {
+          const cap = document.createElement('span')
+          cap.className = 'visora-thumb-group-cap'
+          cap.textContent = grp.caption as string
+          wrap.insertBefore(cap, wrap.firstChild)
+        } else if (!wantCap && hasCap && first) {
+          first.remove()
+        }
+      }
+    }
+
+    const applyActiveFlat = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
+      const activeItemId = col.groups[g]?.items[i]?.id ?? null
+      if (lastActiveItemId && lastActiveItemId !== activeItemId) {
+        const prev = itemBtns.get(lastActiveItemId)
+        if (prev) setActiveAttr(prev, false)
+      }
+      if (activeItemId) {
+        const cur = itemBtns.get(activeItemId)
+        if (cur) {
+          setActiveAttr(cur, true)
+          scrollActiveIntoView(cur)
+        }
+      }
+      lastActiveItemId = activeItemId
+    }
+
+    // wipe everything (collection identity changed — ids may be entirely different)
+    const resetAll = () => {
+      if (root) root.replaceChildren()
+      groupBtns.clear()
+      itemBtns.clear()
+      coverUrls.clear()
+      cardHost.clear()
+      groupWraps.clear()
+      removePeek()
+      itemRow?.remove() // itemRow lives on the region host, so root.replaceChildren() won't catch it
+      itemRow = null
+      liveCardId = null
+      lastWindowKey = ''
+      lastActiveGroupId = null
+      lastActiveItemId = null
+      flat = []
+      flatPos.clear()
+      groupIndexById.clear()
+    }
+
     const render = () => {
       if (!root) return
       const col = viewer.getCollection()
@@ -260,49 +557,95 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const colChanged = col !== lastCol
       if (colChanged) resetAll()
 
-      const windowIdx = windowIndices(cur.g, col.groups.length, overscan, overscan, false)
-      const windowKey = windowIdx.join(',')
-      if (colChanged || windowKey !== lastWindowKey) {
-        rebuildRail(col, windowIdx)
-        lastWindowKey = windowKey
+      if (groupDisplay === 'flat') {
+        if (colChanged) buildFlatModel(col)
+        const cursorFi = flatPos.get(`${cur.g}:${cur.i}`) ?? 0
+        const windowIdx = windowIndices(cursorFi, flat.length, overscan, overscan, false)
+        const windowKey = `${windowIdx[0] ?? -1}-${windowIdx[windowIdx.length - 1] ?? -1}-${flat.length}`
+        if (colChanged || windowKey !== lastWindowKey) {
+          rebuildRailFlat(col, windowIdx)
+          lastWindowKey = windowKey
+        }
+        applyActiveFlat(col, cur.g, cur.i)
+      } else {
+        const windowIdx = windowIndices(cur.g, col.groups.length, overscan, overscan, false)
+        const windowKey = windowIdx.join(',')
+        if (colChanged || windowKey !== lastWindowKey) {
+          rebuildRail(col, windowIdx)
+          lastWindowKey = windowKey
+        }
+
+        const activeGroup = col.groups[cur.g]
+        const activeGroupId = activeGroup?.id ?? null
+        if (colChanged || activeGroupId !== lastActiveGroupId) {
+          rebuildItemColumn(activeGroup, cur.g)
+          lastActiveGroupId = activeGroupId
+        }
+        if (peekGroupId && peekGroupId === activeGroupId) closePeek() // navigated into the peeked group
+        applyActive(col, cur.g, cur.i)
       }
 
-      const activeGroup = col.groups[cur.g]
-      const activeGroupId = activeGroup?.id ?? null
-      if (colChanged || activeGroupId !== lastActiveGroupId) {
-        rebuildItemColumn(activeGroup, cur.g)
-        lastActiveGroupId = activeGroupId
-      }
-
-      applyActive(col, cur.g, cur.i)
       lastCol = col
       lastG = cur.g
       lastI = cur.i
     }
 
+    const regions: PluginInstance['regions'] = {
+      thumbnails: () => regionEl ?? document.createElement('div'),
+    }
+    const keymap: PluginInstance['keymap'] = {}
+    // the item panel + its toggle only exist in stacked mode (flat lays every item out already).
+    if (groupDisplay === 'stacked') {
+      regions.toolbar = () => toolbarBtn ?? document.createElement('button')
+      keymap.e = () => toggleActivePanel()
+      keymap.E = () => toggleActivePanel()
+    }
+
     return {
       name: 'thumbnails',
       init() {
+        hoverCapable = canHover()
+        regionEl = document.createElement('div')
+        regionEl.className = 'visora-thumbs-region'
         root = document.createElement('div')
         root.className = 'visora-thumbs'
         root.setAttribute('role', 'listbox')
         root.setAttribute('aria-label', 'Thumbnails')
+        regionEl.appendChild(root)
+        if (groupDisplay === 'flat') {
+          root.dataset.display = 'flat'
+        } else {
+          toolbarBtn = document.createElement('button')
+          toolbarBtn.type = 'button'
+          toolbarBtn.className = 'visora-items-toggle'
+          toolbarBtn.setAttribute('aria-label', 'Toggle group items')
+          toolbarBtn.setAttribute('aria-pressed', String(panelOpen))
+          toolbarBtn.textContent = '▤'
+          toolbarBtn.addEventListener('click', toggleActivePanel)
+        }
         render()
         unsub = viewer.subscribe(render)
       },
       destroy() {
         unsub?.()
         observer?.disconnect()
+        cancelPeekClose()
+        removePeek()
         groupBtns.clear()
         itemBtns.clear()
         coverUrls.clear()
+        cardHost.clear()
+        groupWraps.clear()
+        itemRow?.remove()
         itemRow = null
+        toolbarBtn?.removeEventListener('click', toggleActivePanel)
+        toolbarBtn = null
         liveCardId = null
+        regionEl = null
         root = null
       },
-      regions: {
-        thumbnails: () => root ?? document.createElement('div'),
-      },
+      regions,
+      keymap,
     }
   }
 }

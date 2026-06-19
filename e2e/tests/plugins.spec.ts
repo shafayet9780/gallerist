@@ -92,10 +92,112 @@ test('the rail handle lives in the gallery and toggles it (slides, stays reachab
   await expect(toggle).toBeVisible() // handle peeks so the rail can be reopened
 })
 
+test('peek flyout previews a group on hover and an item navigates', async ({ page }) => {
+  const card = page.locator('.visora-thumb[data-group="g1"]')
+  await card.hover()
+  const peek = page.locator('.visora-thumb-peek')
+  await expect(peek).toBeVisible()
+  await expect(peek.locator('.visora-thumb-item')).toHaveCount(3)
+  await expect(page.locator('.visora-counter')).toHaveText(/1 \/ 3/) // hover did not navigate
+  await peek.locator('.visora-thumb-item').nth(2).click()
+  await expect(page.locator('.visora-counter')).toHaveText(/2 \/ 3/) // now on g1
+  await expect(page.locator('.visora-thumb-peek')).toBeHidden() // closed once its group is active
+})
+
+test('active group auto-expands a clickable item panel (host-mounted, un-clipped)', async ({
+  page,
+}) => {
+  await page.locator('.visora').focus()
+  await page.keyboard.press('ArrowRight') // g1 (3 items) active
+  const panel = page.locator('.visora-thumb-items')
+  await expect(panel).toBeVisible()
+  await expect(panel.locator('.visora-thumb-item')).toHaveCount(3)
+  await panel.locator('.visora-thumb-item').nth(2).click() // clickable ⇒ not clipped by the stage
+  await expect(page.locator('.visora-position .visora-pill[data-active]')).toHaveText('3')
+})
+
+test('items-toggle button and the `e` key hide/show the active item panel', async ({ page }) => {
+  await page.locator('.visora').focus()
+  await page.keyboard.press('ArrowRight') // g1 active
+  const btn = page.locator('.visora-items-toggle')
+  await expect(btn).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.visora-thumb-items')).toBeVisible()
+  await btn.click()
+  await expect(btn).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.locator('.visora-thumb-items')).toBeHidden()
+  await page.locator('.visora').focus()
+  await page.keyboard.press('e')
+  await expect(page.locator('.visora-thumb-items')).toBeVisible()
+})
+
+test('hovering the active card peeks once its panel is hidden', async ({ page }) => {
+  await page.locator('.visora').focus()
+  await page.keyboard.press('ArrowRight') // g1 active, panel shown
+  await page.locator('.visora-items-toggle').click() // hide it
+  await page.locator('.visora-thumb[data-group="g1"]').hover()
+  await expect(page.locator('.visora-thumb-peek .visora-thumb-item')).toHaveCount(3)
+})
+
 test('no axe violations with the full plugin set', async ({ page }) => {
   const results = await new AxeBuilder({ page })
     .include('.visora')
     .withTags(['wcag2a', 'wcag2aa'])
     .analyze()
   expect(results.violations).toEqual([])
+})
+
+test.describe('flat rail (groupDisplay: flat)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/plugins.html?display=flat')
+    await page.click('#open')
+    await expect(page.locator('.visora')).toBeVisible()
+  })
+
+  test('renders every item bracketed per group and a card navigates', async ({ page }) => {
+    const rail = page.locator('.visora-thumbs[data-display="flat"]')
+    await expect(rail).toBeVisible()
+    await expect(rail.locator('.visora-thumb-group')).toHaveCount(3)
+    await expect(rail.locator('.visora-thumb-item')).toHaveCount(6) // 1 + 3 + 2
+    await rail.locator('.visora-thumb-item[data-item="b2"]').click()
+    await expect(page.locator('.visora-counter')).toHaveText(/2 \/ 3/)
+  })
+
+  test('no axe violations in flat mode', async ({ page }) => {
+    const results = await new AxeBuilder({ page })
+      .include('.visora')
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    expect(results.violations).toEqual([])
+  })
+})
+
+test.describe('top rail', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/plugins.html?rail=top')
+    await page.click('#open')
+    await expect(page.locator('.visora')).toBeVisible()
+  })
+
+  test('rail sits at the top and the active item panel opens below it, clickable', async ({
+    page,
+  }) => {
+    await expect(page.locator('.visora')).toHaveAttribute('data-visora-rail-pos', 'top')
+    await page.locator('.visora').focus()
+    await page.keyboard.press('ArrowRight') // g1 (3 items)
+    const panel = page.locator('.visora-thumb-items')
+    await expect(panel).toBeVisible()
+    await expect(panel).toBeInViewport() // opens downward into the stage, not off-screen
+    await panel.locator('.visora-thumb-item').nth(1).click() // clickable ⇒ not clipped
+    await expect(page.locator('.visora-position .visora-pill[data-active]')).toHaveText('2')
+  })
+
+  test('no axe violations (top rail + item panel)', async ({ page }) => {
+    await page.locator('.visora').focus()
+    await page.keyboard.press('ArrowRight')
+    const results = await new AxeBuilder({ page })
+      .include('.visora')
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    expect(results.violations).toEqual([])
+  })
 })

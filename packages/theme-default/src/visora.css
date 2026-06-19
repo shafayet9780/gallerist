@@ -232,6 +232,11 @@
 }
 
 /* ── thumbnails rail (plugin-thumbnails) ───────────────────────────────────── */
+/* the region wrapper: holds the scrollable rail plus the floating item/peek panels as siblings, so
+   the panels escape the rail's overflow-clip yet still ride along when the region is re-mounted. */
+.visora-thumbs-region {
+  position: relative;
+}
 .visora-thumbs {
   display: flex;
   gap: 8px;
@@ -350,6 +355,111 @@
 .visora-thumb-item[data-active] {
   border-color: var(--visora-accent);
   box-shadow: 0 0 0 1px var(--visora-accent);
+}
+
+/* ── peek flyout (stacked, UX-A): preview a non-active group's items on hover/focus without
+   navigating in. Mirrors the vertical item column; `left` is set inline to anchor it to the
+   hovered card. ──────────────────────────────────────────────────────────────────────────── */
+.visora-thumb-peek {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  z-index: 7;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--visora-radius);
+  background: var(--visora-chrome-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6);
+}
+.visora-thumb-peek[data-axis="horizontal"] {
+  flex-direction: row;
+  align-items: center;
+}
+
+/* touch (no hover): the group card is wrapped so a sibling expand button is valid HTML; tapping it
+   opens the peek while the card itself still navigates on first tap. */
+.visora-thumb-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+}
+.visora-thumb-expand {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.55);
+  color: var(--visora-fg);
+  font: 700 13px / 1 system-ui;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.visora-thumb-expand::before {
+  content: "⊞";
+}
+
+/* items-toggle: a toolbar button (inherits the toolbar button base) that shows/hides the active
+   group's item panel; accent-tinted while the panel is shown. */
+.visora-items-toggle[aria-pressed="true"] {
+  color: var(--visora-accent);
+  border-color: var(--visora-accent);
+}
+
+/* ── flat rail (groupDisplay: flat): every item side-by-side, each group bracketed so it reads as
+   one group. The accent left-rule + border mark the group; partial flags fade the bracket at the
+   virtualization window edges. ───────────────────────────────────────────────────────────────── */
+.visora-thumbs[data-display="flat"] {
+  align-items: stretch;
+}
+.visora-thumb-group {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--visora-hairline);
+  border-left: 3px solid var(--visora-accent);
+  border-radius: var(--visora-radius);
+  background: rgb(255 255 255 / 0.02);
+}
+/* a group continuing off-window: soften the bracket so it reads as "more before/after". */
+.visora-thumb-group[data-partial-start] {
+  border-left-color: var(--visora-hairline);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.visora-thumb-group[data-partial-end] {
+  border-right-style: dashed;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.visora-thumb-group-cap {
+  font: 600 11px system-ui;
+  line-height: 1.2;
+  color: var(--visora-fg);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.visora-thumb-group-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 
 /* ── chrome ────────────────────────────────────────────────────────────────── */
@@ -548,9 +658,15 @@
 .visora[data-visora-rail-pos="top"] .visora-region-footer {
   bottom: 0;
 }
-.visora[data-visora-rail-pos="top"] .visora-thumb-items[data-axis="vertical"] {
+.visora[data-visora-rail-pos="top"] .visora-thumb-items[data-axis="vertical"],
+.visora[data-visora-rail-pos="top"] .visora-thumb-peek {
   top: calc(100% + 10px);
   bottom: auto;
+}
+/* with a top rail, the within-group pills move to the bottom so they don't collide with the rail. */
+.visora[data-visora-rail-pos="top"] .visora-position {
+  top: auto;
+  bottom: 14px;
 }
 .visora-chrome {
   transition: opacity var(--visora-dur-gentle, 280ms) var(--visora-ease-out, ease);

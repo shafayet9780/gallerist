@@ -17,7 +17,7 @@ export interface ResolvedPreset {
   /** default thumbnail rail placement (overridable). */
   rail: RailPlacement
   /** preferred thumbnails() options for this preset. */
-  thumbnails: { itemAxis: 'vertical' | 'horizontal' }
+  thumbnails: { itemAxis: 'vertical' | 'horizontal'; groupDisplay?: 'stacked' | 'flat' }
 }
 
 const PRESETS: Record<PresetName, ResolvedPreset> = {

@@ -28,11 +28,15 @@ const collection: Collection = {
   ],
 }
 
+const params = new URLSearchParams(location.search)
+const groupDisplay = params.get('display') === 'flat' ? 'flat' : 'stacked'
+const rail = params.get('rail') === 'top' ? 'top' : 'bottom'
+
 const viewer = createViewer({
   collection,
   loop: true,
-  plugins: [thumbnails(), grid(), fullscreen(), hash({ open: false }), download()],
+  plugins: [thumbnails({ groupDisplay }), grid(), fullscreen(), hash({ open: false }), download()],
 })
-mount(viewer, { autoHide: false }) // deterministic e2e: no idle-timer chrome fade
+mount(viewer, { autoHide: false, rail }) // deterministic e2e: no idle-timer chrome fade
 ;(window as unknown as { viewer: typeof viewer }).viewer = viewer
 document.getElementById('open')?.addEventListener('click', () => viewer.open())
