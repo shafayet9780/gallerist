@@ -20,8 +20,16 @@ export function mountPluginRegions(
   for (const plugin of plugins) {
     if (!plugin.regions) continue
     for (const [name, render] of Object.entries(plugin.regions)) {
+      if (!render) continue
       const host = hosts[name]
-      if (!host || !render) continue
+      if (!host) {
+        // RegionName is open-ended in the contract, but the DOM renderer hosts only a fixed set;
+        // warn instead of silently dropping the plugin's UI (review S-A2).
+        console.warn(
+          `[visora] plugin "${plugin.name}" targets region "${name}", which the default renderer does not host`,
+        )
+        continue
+      }
       if (!ADDITIVE.has(name) && claimedBy.has(name)) {
         console.warn(
           `[visora] region "${name}" claimed by multiple plugins; "${plugin.name}" wins over "${claimedBy.get(name)}"`,

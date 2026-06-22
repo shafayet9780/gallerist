@@ -64,6 +64,9 @@
   position: absolute;
   inset: 0;
   background: var(--visora-backdrop);
+  /* recede as the user drags to dismiss so the page behind shows through — the renderer writes
+     --visora-dismiss (0..1) on the root during a close drag (S-R1). */
+  opacity: calc(1 - var(--visora-dismiss, 0) * 0.55);
 }
 
 /* ── stage / slides ────────────────────────────────────────────────────────── */
@@ -874,7 +877,9 @@
   font-family: var(--visora-mono);
   font-size: 13px;
   font-weight: 600;
-  color: var(--visora-fg-muted);
+  /* the position counter is primary info — use full-contrast fg so it clears WCAG AA over the
+     translucent chrome (the muted grey landed ~3.5:1) (S-UX5). */
+  color: var(--visora-fg);
   padding: 6px 10px;
   border-radius: var(--visora-radius);
   background: var(--visora-chrome-bg);

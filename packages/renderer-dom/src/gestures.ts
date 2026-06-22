@@ -70,6 +70,10 @@ export function attachGestures(opts: GestureOptions): () => void {
     caf = (id) => cancelAnimationFrame(id),
   } = opts
 
+  // The drag-to-dismiss progress var lives on the root (not the stage) so sibling layers like the
+  // backdrop — which are not descendants of the stage — can consume it via inheritance (S-R1).
+  const dismissEl = (stage.closest('.visora') as HTMLElement | null) ?? stage
+
   const pointers = new Map<number, Pt>()
   let start: Pt | null = null
   let startZoom = { scale: 1, x: 0, y: 0 }
@@ -174,7 +178,10 @@ export function attachGestures(opts: GestureOptions): () => void {
     } else if (intent === 'close') {
       const k = Math.max(0.5, 1 - Math.abs(dy) / 1000)
       live = { scale: startZoom.scale * k, x: startZoom.x + dx, y: startZoom.y + dy }
-      stage.style.setProperty('--visora-dismiss', String(Math.min(1, Math.abs(dy) / closeDismiss)))
+      dismissEl.style.setProperty(
+        '--visora-dismiss',
+        String(Math.min(1, Math.abs(dy) / closeDismiss)),
+      )
       schedule()
     }
     // navigate / secondary are committed on release (track animation lands in M5)
@@ -226,7 +233,7 @@ export function attachGestures(opts: GestureOptions): () => void {
         if (Math.abs(dx) >= commitNav) dx < 0 ? nav.next() : nav.prev()
         break
       case 'close':
-        stage.style.removeProperty('--visora-dismiss')
+        dismissEl.style.removeProperty('--visora-dismiss')
         if (Math.abs(dy) >= closeDismiss) viewer.close()
         else viewer.zoomTo(startZoom.scale, { x: startZoom.x, y: startZoom.y })
         break
@@ -263,7 +270,8 @@ export function attachGestures(opts: GestureOptions): () => void {
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
-    const g = (wheelGeom ??= getGeometry())
+    if (!wheelGeom) wheelGeom = getGeometry()
+    const g = wheelGeom
     const base = wheelZoom ?? viewer.getState().zoom
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
     const fitW = g.naturalSize
