@@ -233,3 +233,22 @@ afterSlide`, **cancelable** `beforeSlide`), item axis (`beforeItem/item/afterIte
 Plugins, framework adapters (React/Vue/Svelte), video/provider adapters, DZI deep-zoom (v2 seam
 only), FLIP open/close + full interruptible hero, async nav coalescing, and the region/slot
 contract. Phase 1 (spec §25) starts with the React adapter (dogfood-first) and the first plugins.
+
+---
+
+## 10. Known limitations (v0.2.0) — consciously deferred
+
+The Phase-1 publish-readiness review fixed all critical and important findings. Three lower-priority
+items are deferred with rationale (we launch at 0.x, so none is frozen):
+
+- **Image-space overlays on extreme aspect ratios (review S-UX6 / #69).** The coordinate model maps
+  through the *stage* rect, not the contained image rect, so for a very tall portrait in a wide
+  stage (or vice-versa) zoom/pan bounds and point-anchored overlays can be slightly off — they
+  reveal letterbox area and anchor to the stage box rather than the painted image box. The true
+  contained-rect mapping is the spec's M4 work; until then, pass `item.naturalSize` for best results
+  and avoid anchored overlays on extreme ratios.
+- **Public surface breadth (review S-A1).** `@visora/core` still re-exports some engine internals
+  (FSM reducer, store factory, spring tables, raw nav). At 0.x this is harmless; the surface will be
+  split to a deep `@visora/core/internal` entry before 1.0 so the frozen root stays minimal.
+- **Gesture discoverability (review S-UX2).** There is no first-run hint for swipe / pinch /
+  swipe-to-dismiss. Planned as an opt-in coachmark; for now, document the gestures in your UI.
