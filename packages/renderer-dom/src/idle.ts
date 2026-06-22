@@ -40,9 +40,20 @@ export function createIdleController(
   let timer: ReturnType<typeof setTimeout> | null = null
   let alive = true
   let lastArm = 0
+  let isIdle = false
 
+  // Only touch the attribute when the idle state actually flips — onActivity runs on every
+  // pointermove/wheel during gestures, so an unconditional removeAttribute is a wasted DOM call
+  // per input event (S-PERF3).
+  const wake = () => {
+    if (!isIdle) return
+    isIdle = false
+    root.removeAttribute(ATTR)
+  }
   const goIdle = () => {
-    if (alive) root.setAttribute(ATTR, '')
+    if (!alive || isIdle) return
+    isIdle = true
+    root.setAttribute(ATTR, '')
   }
   const arm = () => {
     if (timer != null) clearTimeout(timer)
@@ -51,13 +62,13 @@ export function createIdleController(
   }
   // forced reset (public poke) — wake immediately and re-arm.
   const poke = () => {
-    root.removeAttribute(ATTR)
+    wake()
     arm()
   }
   // activity handler — wake instantly, but coalesce re-arming so a stream of pointermoves
   // doesn't recreate the timer on every event.
   const onActivity = () => {
-    root.removeAttribute(ATTR)
+    wake()
     if (Date.now() - lastArm >= REARM_THROTTLE_MS) arm()
   }
 

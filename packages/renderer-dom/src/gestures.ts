@@ -243,17 +243,42 @@ export function attachGestures(opts: GestureOptions): () => void {
     }
   }
 
+  // Wheel/trackpad zoom: snapshot geometry once per burst (no forced layout per tick), accumulate
+  // the target locally and apply it imperatively via the RAF schedule, then commit to the store
+  // ONCE when the burst settles — instead of a full store commit + render + subscriber fan-out on
+  // every tick (the one continuous interaction that was routed through the store) (I-PERF1).
+  const WHEEL_COMMIT_MS = 90
+  let wheelGeom: Geometry | null = null
+  let wheelZoom: { scale: number; x: number; y: number } | null = null
+  let wheelTimer: ReturnType<typeof setTimeout> | undefined
+
+  const commitWheel = () => {
+    wheelTimer = undefined
+    wheelGeom = null
+    if (wheelZoom) {
+      viewer.zoomTo(wheelZoom.scale, { x: wheelZoom.x, y: wheelZoom.y })
+      wheelZoom = null
+    }
+  }
+
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
-    const z = viewer.getState().zoom
+    const g = (wheelGeom ??= getGeometry())
+    const base = wheelZoom ?? viewer.getState().zoom
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
-    const newScale = clampScale(z.scale * factor, fit(), maxScale)
-    const next = focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), newScale)
-    const g = geom()
-    const committed = g.naturalSize
+    const fitW = g.naturalSize
+      ? fitScale({ w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
+      : 1
+    const newScale = clampScale(base.scale * factor, fitW, maxScale)
+    const focal = { x: e.clientX - g.stageRect.left, y: e.clientY - g.stageRect.top }
+    const next = focalZoom(base, focal, newScale)
+    wheelZoom = g.naturalSize
       ? clampPan(next, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
       : next
-    viewer.zoomTo(committed.scale, { x: committed.x, y: committed.y })
+    live = { ...wheelZoom }
+    schedule()
+    if (wheelTimer) clearTimeout(wheelTimer)
+    wheelTimer = setTimeout(commitWheel, WHEEL_COMMIT_MS)
   }
 
   const onDblClick = (e: MouseEvent) => {
@@ -278,6 +303,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     stage.removeEventListener('wheel', onWheel)
     stage.removeEventListener('dblclick', onDblClick)
     if (frame) caf(frame)
+    if (wheelTimer) clearTimeout(wheelTimer)
   }
 }
 

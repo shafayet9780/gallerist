@@ -55,31 +55,51 @@ afterEach(() => {
 })
 
 describe('wheel zoom', () => {
-  it('zooms in on wheel-up around the cursor', () => {
-    const v = setup()
-    const spy = vi.spyOn(v, 'zoomTo')
-    const e = Object.assign(new Event('wheel', { bubbles: true, cancelable: true }), {
-      deltaY: -100,
+  const wheel = (deltaY: number) =>
+    Object.assign(new Event('wheel', { bubbles: true, cancelable: true }), {
+      deltaY,
       clientX: 500,
       clientY: 400,
     })
-    stage.dispatchEvent(e)
-    expect(spy).toHaveBeenCalled()
-    expect(v.getState().zoom.scale).toBeGreaterThan(1)
+
+  it('zooms in on wheel-up around the cursor (committed on settle)', () => {
+    vi.useFakeTimers()
+    try {
+      const v = setup()
+      const spy = vi.spyOn(v, 'zoomTo')
+      stage.dispatchEvent(wheel(-100))
+      vi.advanceTimersByTime(100) // wheel commit debounce
+      expect(spy).toHaveBeenCalled()
+      expect(v.getState().zoom.scale).toBeGreaterThan(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('floors zoom-out at the fit scale', () => {
-    const v = setup()
-    for (let i = 0; i < 20; i++) {
-      stage.dispatchEvent(
-        Object.assign(new Event('wheel', { bubbles: true, cancelable: true }), {
-          deltaY: 100,
-          clientX: 500,
-          clientY: 400,
-        }),
-      )
+    vi.useFakeTimers()
+    try {
+      const v = setup()
+      for (let i = 0; i < 20; i++) stage.dispatchEvent(wheel(100))
+      vi.advanceTimersByTime(100)
+      expect(v.getState().zoom.scale).toBeCloseTo(0.5, 5)
+    } finally {
+      vi.useRealTimers()
     }
-    expect(v.getState().zoom.scale).toBeCloseTo(0.5, 5)
+  })
+
+  it('commits the store once per wheel burst, not per tick (I-PERF1)', () => {
+    vi.useFakeTimers()
+    try {
+      const v = setup()
+      const spy = vi.spyOn(v, 'zoomTo')
+      for (let i = 0; i < 5; i++) stage.dispatchEvent(wheel(-100))
+      expect(spy).not.toHaveBeenCalled() // imperative during the burst, no store commit yet
+      vi.advanceTimersByTime(100)
+      expect(spy).toHaveBeenCalledTimes(1) // a single commit when it settles
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

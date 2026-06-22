@@ -321,6 +321,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // ── slide window ─────────────────────────────────────────────────────────────
   const mounted = new Map<string, SlideRec>()
   let lastCursor: { g: number; i: number } | null = null
+  // Window-diff cache: a zoom/pan-only commit (same collection + cursor, current slide fully
+  // painted) skips windowIndices/reconcileKeys and just re-applies the transform (I-PERF2).
+  let lastWindowCol: unknown = null
+  let lastWindowG = -1
+  let lastWindowI = -1
 
   // groupId → index, rebuilt only when the collection reference changes (setCollection).
   // Avoids an O(groups) findIndex per mounted slide on every render (matters at 10k groups).
@@ -360,6 +365,21 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const groupCount = col.groups.length
     if (groupCount === 0) return
     const cur = state.cursor
+
+    // Fast path: nothing about the window changed (zoom/pan-only commit) — re-apply the transform
+    // and counter-scale overlays for the current slide, skip the whole diff + allocations (I-PERF2).
+    if (col === lastWindowCol && cur.g === lastWindowG && cur.i === lastWindowI) {
+      const rec = mounted.get(col.groups[cur.g]?.id ?? '')
+      const it = col.groups[cur.g]?.items[cur.i]
+      if (rec && it && rec.itemId === it.id && rec.overlayItemId === it.id) {
+        applyTransform(rec.content, state.zoom)
+        if (rec.overlayEls) updateOverlays(rec.overlayEls, state.zoom.scale)
+        return
+      }
+    }
+    lastWindowCol = col
+    lastWindowG = cur.g
+    lastWindowI = cur.i
 
     const idxs = windowIndices(cur.g, groupCount, preload.ahead, preload.behind, viewer.loop)
     const wantKeys = idxs.map((g) => col.groups[g]?.id ?? '')
