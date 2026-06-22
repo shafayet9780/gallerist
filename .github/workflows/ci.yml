@@ -22,5 +22,14 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: pnpm size
+      # Gate the published type-resolution surface (node10/node16 CJS+ESM/bundler).
+      # theme-default is CSS-only (no types) and is excluded.
+      - name: Check published types (are-the-types-wrong)
+        run: |
+          for d in packages/core packages/renderer-dom packages/react packages/plugin-*; do
+            echo "::group::attw $d"
+            pnpm dlx @arethetypeswrong/cli@latest --pack "$d" --profile node16
+            echo "::endgroup::"
+          done
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e

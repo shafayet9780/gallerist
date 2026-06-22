@@ -16,7 +16,8 @@
     "format": "biome format --write .",
     "size": "size-limit",
     "e2e": "playwright test",
-    "changeset": "changeset"
+    "changeset": "changeset",
+    "release": "changeset publish"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
