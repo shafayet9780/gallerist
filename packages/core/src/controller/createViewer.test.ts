@@ -45,6 +45,25 @@ describe('createViewer — lifecycle', () => {
     expect(close).toHaveBeenCalledOnce()
     expect(closed).toHaveBeenCalledOnce()
   })
+
+  it('open() is idempotent — a second open() does not re-emit (I-C1)', () => {
+    const open = vi.fn()
+    const opened = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { open, opened } })
+    v.open()
+    v.open()
+    expect(open).toHaveBeenCalledOnce()
+    expect(opened).toHaveBeenCalledOnce()
+  })
+
+  it('close() on a never-opened viewer emits nothing (I-C1)', () => {
+    const close = vi.fn()
+    const closed = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { close, closed } })
+    v.close()
+    expect(close).not.toHaveBeenCalled()
+    expect(closed).not.toHaveBeenCalled()
+  })
 })
 
 describe('createViewer — navigation', () => {
@@ -122,6 +141,22 @@ describe('createViewer — zoom (committed)', () => {
     expect(zoomEnd).toHaveBeenCalled()
     v.resetZoom()
     expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+  })
+
+  it('resets committed zoom on group navigation by default (I-C2)', () => {
+    const v = createViewer({ collection: grouped() })
+    v.open()
+    v.zoomTo(3, { x: 50, y: 50 })
+    v.next()
+    expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+  })
+
+  it('keepZoomOnNav retains committed zoom across group navigation (I-C2)', () => {
+    const v = createViewer({ collection: grouped(), keepZoomOnNav: true })
+    v.open()
+    v.zoomTo(3, { x: 50, y: 50 })
+    v.next()
+    expect(v.getState().zoom).toEqual({ scale: 3, x: 50, y: 50 })
   })
 })
 

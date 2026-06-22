@@ -23,6 +23,7 @@ const IDENTITY_ZOOM: ZoomState = { scale: 1, x: 0, y: 0 }
 export function createViewer(options: ViewerOptions): ViewerApi {
   const loop = options.loop ?? true
   const itemMemory = options.itemMemory ?? 'reset'
+  const keepZoomOnNav = options.keepZoomOnNav ?? false
 
   let collection: Collection = normalize(options)
   let destroyed = false
@@ -91,13 +92,15 @@ export function createViewer(options: ViewerOptions): ViewerApi {
   }
   const basePayload = () => payloadAt(store.get().cursor)
 
-  const dispatch = (event: Parameters<typeof reduceFsm>[1]): void => {
+  // Returns whether the FSM actually transitioned, so lifecycle emits can be gated on a real
+  // state change (a no-op OPEN/CLOSE must not re-fire open/close events — review I-C1).
+  const dispatch = (event: Parameters<typeof reduceFsm>[1]): boolean => {
     const s = store.get()
     const prev = { phase: s.phase, interaction: s.interaction }
     const next = reduceFsm(prev, event)
-    if (next !== prev) {
-      store.set((st) => ({ ...st, phase: next.phase, interaction: next.interaction }))
-    }
+    if (next === prev) return false
+    store.set((st) => ({ ...st, phase: next.phase, interaction: next.interaction }))
+    return true
   }
 
   const setCursor = (c: Cursor): boolean => {
@@ -112,7 +115,10 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     const cur = store.get().cursor
     if (cur.g === target.g && cur.i === target.i) return
     if (!emitter.emit('beforeSlide', makeCancelable(payloadAt(target)))) return
-    setCursor(target)
+    // Group change resets committed zoom unless keepZoomOnNav (spec §6/§8.1, review I-C2) —
+    // otherwise you land pre-zoomed/pan-clamped on a differently-sized image. Combined with the
+    // cursor write so subscribers see one coherent update.
+    store.set((s) => ({ ...s, cursor: target, zoom: keepZoomOnNav ? s.zoom : { ...IDENTITY_ZOOM } }))
     emitter.emit('slide', basePayload())
     emitter.emit('afterSlide', basePayload())
   }
@@ -146,15 +152,20 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     open(at) {
       if (destroyed) return
       if (at) setCursor(nav.goTo(at.g ?? store.get().cursor.g, at.i, navCtx()))
-      dispatch({ t: 'OPEN' })
+      // Only emit when OPEN actually transitions — a second open() on an already-open viewer
+      // must not re-fire open/opened (review I-C1).
+      if (!dispatch({ t: 'OPEN' })) return
       emitter.emit('open', basePayload())
       dispatch({ t: 'OPENED' }) // sync settle (renderer overrides in M3)
       emitter.emit('opened', basePayload())
     },
     close() {
       if (destroyed) return
+      // Only emit when CLOSE actually transitions — close() on an already-closed viewer is a
+      // no-op and must not re-fire close/closed (review I-C1; also kills the React controlled
+      // open+onClose double-fire, I-X1).
+      if (!dispatch({ t: 'CLOSE' })) return
       emitter.emit('close', basePayload())
-      dispatch({ t: 'CLOSE' })
       dispatch({ t: 'CLOSED' })
       emitter.emit('closed', basePayload())
     },
