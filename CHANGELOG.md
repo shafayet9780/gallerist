@@ -1,6 +1,32 @@
 # Changelog
 
-## v0.2.0 — UX/UI overhaul ("pristine")
+## v0.2.0 — first public release
+
+This is the first version published to npm. Alongside the UX overhaul below, a multi-axis
+publish-readiness review drove a hardening pass (all critical + important findings fixed):
+
+- **Correctness**: a `ResizeObserver` now re-anchors image-space overlays and re-clamps zoom on
+  resize/rotate; gestures use pointer capture (off-stage releases no longer strand a gesture) and
+  hand off cleanly from pinch to pan; the slide window preloads the wrap neighbour when `loop` is
+  on; overlays repaint once the image decodes; lifecycle events fire only on real transitions;
+  `keepZoomOnNav` is implemented.
+- **Accessibility**: the overlay is a real modal — focus trap + `inert` background, an accessible
+  dialog name, no shortcut-hijacking while typing, a visible broken-image state, and richer live
+  announcements. Logical-property chrome + flipped arrows give basic RTL support.
+- **Plugins**: hash tolerates malformed URLs / `=` in ids and uses `replaceState` (no Back-button
+  trap); fullscreen scopes to its own viewer and supports the WebKit-prefixed API; download defers
+  its blob revoke; the YouTube adapter declines unparseable URLs and sets `playerVars.origin`.
+- **Performance**: wheel/trackpad zoom is RAF-coalesced and committed once per burst; the renderer
+  skips the window diff on zoom/pan-only commits; React no longer leaks plugins across remounts and
+  `useVisora` returns stable action identities.
+- **Release**: every package ships at `0.2.0` with a `VERSION` derived from `package.json`, a
+  LICENSE, a README, lean sourcemaps (no embedded source), correct ESM/CJS types (attw-clean), and
+  full npm metadata; CI gains an attw gate and a changesets release workflow.
+
+See `plans/phase-1-review-report.md` for the full review and `docs/IMPLEMENTATION.md` §10 for the
+consciously-deferred items.
+
+### UX/UI overhaul ("pristine")
 
 A hands-on pass over the React example drove a focused UX milestone. The default look moves from a
 generic dark-glass lightbox to a distinctive **pro-review console** identity, the within-group axis

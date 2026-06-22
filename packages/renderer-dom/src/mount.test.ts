@@ -633,3 +633,15 @@ describe('mount — modal accessibility (WS-3)', () => {
     expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
   })
 })
+
+describe('mount — degenerate collections (#61)', () => {
+  it('opens an empty collection without throwing and renders no media', () => {
+    const v = createViewer({ items: [] })
+    expect(() => {
+      mount(v)
+      v.open()
+    }).not.toThrow()
+    expect(document.querySelector('.visora')).not.toBeNull()
+    expect(document.querySelector('img')).toBeNull()
+  })
+})

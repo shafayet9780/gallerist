@@ -234,4 +234,22 @@ describe('createViewer — setCollection diff', () => {
     expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
     expect(change).toHaveBeenCalledOnce()
   })
+
+  it('keeps committed zoom when the item id survives, resets it when gone (#63)', () => {
+    const v = createViewer({ collection: grouped() })
+    v.open()
+    v.goToId('g1', 'b1')
+    v.zoomTo(2, { x: 10, y: 20 })
+    v.setCollection({ groups: [{ id: 'g1', items: [item('b0'), item('b1')] }] }) // b1 still present
+    expect(v.getState().zoom).toEqual({ scale: 2, x: 10, y: 20 })
+    v.setCollection({ groups: [{ id: 'zz', items: [item('z')] }] }) // b1 gone
+    expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+  })
+
+  it('handles setCollection to an empty collection without throwing', () => {
+    const v = createViewer({ collection: grouped() })
+    v.open()
+    expect(() => v.setCollection({ groups: [] })).not.toThrow()
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+  })
 })
