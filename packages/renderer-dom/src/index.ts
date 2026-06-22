@@ -1,7 +1,8 @@
 // @visora/renderer-dom — default DOM renderer (the only ring that touches the DOM).
-declare const __VISORA_VERSION__: string
-/** Package version, injected from package.json at build time (tsup `define`). */
-export const VERSION = __VISORA_VERSION__
+declare const __VISORA_VERSION__: string | undefined
+/** Package version, injected from package.json at build (tsup `define`). Guarded with `typeof` so
+ *  importing the source without the define (e2e / example fixtures) yields a dev marker, not a crash. */
+export const VERSION = typeof __VISORA_VERSION__ !== 'undefined' ? __VISORA_VERSION__ : '0.0.0-dev'
 
 export { imageAdapter } from './adapters/image'
 export {

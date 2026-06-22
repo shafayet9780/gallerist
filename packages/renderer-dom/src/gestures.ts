@@ -153,7 +153,10 @@ export function attachGestures(opts: GestureOptions): () => void {
   const onDown = (e: PointerEvent) => {
     flushWheel() // commit a pending wheel zoom before snapshotting startZoom from the store
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    capture(e.pointerId)
+    // NB: do NOT capture the pointer here. The stage hosts interactive overlay/plugin UI (e.g. the
+    // grid cells, which live inside .visora-stage); capturing on every pointerdown would redirect
+    // the pointerup and swallow their click. Capture only once a real drag/pinch is recognized
+    // (in onMove, and the pinch branch below), so a tap still delivers its click to the target (C3).
     startZoom = { ...viewer.getState().zoom }
     live = { ...startZoom }
     gestureGeom = getGeometry() // snapshot once; reused for the gesture (no per-move layout)
@@ -164,6 +167,7 @@ export function attachGestures(opts: GestureOptions): () => void {
       const [a, b] = [...pointers.values()]
       if (a && b) pinchStartDist = dist(a, b)
       intent = 'zoom'
+      for (const id of pointers.keys()) capture(id) // a pinch is unambiguously a gesture
     }
   }
 
@@ -198,7 +202,12 @@ export function attachGestures(opts: GestureOptions): () => void {
     const dx = e.clientX - start.x
     const dy = e.clientY - start.y
 
-    if (intent === 'none') intent = resolveIntent(dx, dy)
+    if (intent === 'none') {
+      intent = resolveIntent(dx, dy)
+      // Now that this is a real drag (not a tap), capture so move/up keep flowing even off-stage
+      // — without stealing the click from a tap that never moved (C3).
+      if (intent !== 'none') capture(e.pointerId)
+    }
 
     if (intent === 'pan') {
       live = { scale: startZoom.scale, x: startZoom.x + dx, y: startZoom.y + dy }
