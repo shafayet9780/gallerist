@@ -333,7 +333,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     rec.slide.remove()
   }
 
-  const renderWindow = () => {
+  let rendering = false
+  const renderWindowInner = () => {
     const state = viewer.getState()
     const col = viewer.getCollection()
     const groupCount = col.groups.length
@@ -379,21 +380,26 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.itemId = it.id
         rec.activated = false
         rec.content.appendChild(rec.overlayHost) // keep overlays above the media
-        // Content-anchored overlays map image-space points through the media's natural size.
-        // Before the image decodes naturalSize() is null and paint falls back to the stage rect
-        // (a wrong, full-stage contain rect). Repaint once the media is ready so overlays
-        // re-anchor to the real image box (I-R1).
+        // Surface the media load lifecycle (spec §18: load/loaded/loadError, which also drive
+        // state.loaded). On `loaded`, repaint content overlays: before decode naturalSize() is
+        // null and paint falls back to the stage rect (a wrong full-stage contain rect), so the
+        // overlays re-anchor to the real image box once the natural size is known (I-R1).
         const mountedId = it.id
         const slideKey = k
+        const loadBase = { viewer, cursor: viewer.cursor, group, item: it }
+        viewer.emit('load', { ...loadBase, id: mountedId })
         rec.media?.ready
           ?.then(() => {
+            viewer.emit('loaded', { ...loadBase, id: mountedId })
             const r = mounted.get(slideKey)
             if (!r || r.itemId !== mountedId) return // navigated away / item swapped out
             if (groupIndex(slideKey) !== viewer.getState().cursor.g) return // no longer current
             r.overlayItemId = undefined // force a repaint at the now-known natural size
             if (attached) renderWindow()
           })
-          .catch(() => {}) // load failures are surfaced via the load events, not repainted
+          .catch((error) => {
+            viewer.emit('loadError', { ...loadBase, id: mountedId, error })
+          })
       }
       // activate/deactivate media on slide enter/leave (spec §12 — play/pause for video)
       if (isCurrent && !rec.activated) {
@@ -439,6 +445,17 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.overlayEls = undefined
         rec.overlayItemId = undefined
       }
+    }
+  }
+  // Guard against re-entrancy: emitting load/loaded updates state.loaded, whose store
+  // notification re-enters sync()/renderWindow while we're mid-iteration over `mounted`.
+  const renderWindow = () => {
+    if (rendering) return
+    rendering = true
+    try {
+      renderWindowInner()
+    } finally {
+      rendering = false
     }
   }
 

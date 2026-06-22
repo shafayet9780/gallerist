@@ -160,6 +160,26 @@ describe('createViewer — zoom (committed)', () => {
   })
 })
 
+describe('createViewer — load status + trimmed state (WS-1 hybrid)', () => {
+  it('load/loaded/loadError events drive state.loaded', () => {
+    const v = createViewer({ items: [item('a')] })
+    const base = { viewer: v, cursor: v.cursor, id: 'a' }
+    v.emit('load', base)
+    expect(v.getState().loaded.a).toBe('loading')
+    v.emit('loaded', base)
+    expect(v.getState().loaded.a).toBe('loaded')
+    v.emit('loadError', { ...base, error: new Error('boom') })
+    expect(v.getState().loaded.a).toBe('error')
+  })
+
+  it('public state no longer carries the dead interaction/fullscreen fields', () => {
+    const s = createViewer({ items: [item('a')] }).getState()
+    expect('interaction' in s).toBe(false)
+    expect('fullscreen' in s).toBe(false)
+    expect(s).toHaveProperty('loaded')
+  })
+})
+
 describe('createViewer — subscribe / destroy', () => {
   it('subscribe is notified on state change', () => {
     const v = createViewer({ collection: grouped() })

@@ -48,7 +48,6 @@ export interface EventMap {
   afterItem: ViewerEventPayload
   zoom: ViewerEventPayload & { zoom: ZoomState }
   zoomEnd: ViewerEventPayload & { zoom: ZoomState }
-  pan: ViewerEventPayload & { zoom: ZoomState }
   load: ViewerEventPayload & { id: string }
   loaded: ViewerEventPayload & { id: string }
   loadError: ViewerEventPayload & { id: string; error: unknown }

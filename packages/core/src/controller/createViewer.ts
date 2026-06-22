@@ -11,12 +11,12 @@ import {
   createEmitter,
   makeCancelable,
 } from '../events/events'
-import { reduceFsm } from '../fsm/fsm'
+import { type FsmState, initialFsm, reduceFsm } from '../fsm/fsm'
 import { normalize } from '../model/normalize'
 import * as nav from '../nav/nav'
 import type { Plugin, PluginInstance } from '../plugins/types'
 import { createStore } from '../store/store'
-import type { Collection, Cursor, ViewerState, ZoomState } from '../types'
+import type { Collection, Cursor, LoadStatus, ViewerState, ZoomState } from '../types'
 
 const IDENTITY_ZOOM: ZoomState = { scale: 1, x: 0, y: 0 }
 
@@ -40,14 +40,26 @@ export function createViewer(options: ViewerOptions): ViewerApi {
 
   const store = createStore<ViewerState>({
     phase: 'closed',
-    interaction: 'idle',
     cursor: initialCursor,
     zoom: { ...IDENTITY_ZOOM },
     loaded: {},
-    fullscreen: false,
   })
 
+  // The FSM's `interaction` region is engine-internal (not part of the public ViewerState),
+  // so the machine state lives here and only `phase` is projected into the store.
+  let fsm: FsmState = initialFsm
+
   const emitter = createEmitter<EventMap>()
+
+  // Per-item load status is driven by the load lifecycle events the renderer emits.
+  const setLoadStatus = (id: string, status: LoadStatus) => {
+    store.set((s) =>
+      s.loaded[id] === status ? s : { ...s, loaded: { ...s.loaded, [id]: status } },
+    )
+  }
+  emitter.on('load', ({ id }) => setLoadStatus(id, 'loading'))
+  emitter.on('loaded', ({ id }) => setLoadStatus(id, 'loaded'))
+  emitter.on('loadError', ({ id }) => setLoadStatus(id, 'error'))
 
   // ── plugin registry (spec §13) ─────────────────────────────────────────────
   const pluginInstances: PluginInstance[] = []
@@ -95,11 +107,11 @@ export function createViewer(options: ViewerOptions): ViewerApi {
   // Returns whether the FSM actually transitioned, so lifecycle emits can be gated on a real
   // state change (a no-op OPEN/CLOSE must not re-fire open/close events — review I-C1).
   const dispatch = (event: Parameters<typeof reduceFsm>[1]): boolean => {
-    const s = store.get()
-    const prev = { phase: s.phase, interaction: s.interaction }
-    const next = reduceFsm(prev, event)
-    if (next === prev) return false
-    store.set((st) => ({ ...st, phase: next.phase, interaction: next.interaction }))
+    const next = reduceFsm(fsm, event)
+    if (next === fsm) return false
+    const phaseChanged = next.phase !== fsm.phase
+    fsm = next
+    if (phaseChanged) store.set((st) => ({ ...st, phase: next.phase }))
     return true
   }
 
@@ -118,7 +130,11 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     // Group change resets committed zoom unless keepZoomOnNav (spec §6/§8.1, review I-C2) —
     // otherwise you land pre-zoomed/pan-clamped on a differently-sized image. Combined with the
     // cursor write so subscribers see one coherent update.
-    store.set((s) => ({ ...s, cursor: target, zoom: keepZoomOnNav ? s.zoom : { ...IDENTITY_ZOOM } }))
+    store.set((s) => ({
+      ...s,
+      cursor: target,
+      zoom: keepZoomOnNav ? s.zoom : { ...IDENTITY_ZOOM },
+    }))
     emitter.emit('slide', basePayload())
     emitter.emit('afterSlide', basePayload())
   }

@@ -157,10 +157,9 @@ export type LoadStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
 export interface ViewerState {
   phase: Phase
-  interaction: Interaction
   cursor: Cursor
   /** last *committed* transform — live pan/zoom is applied imperatively (decision P0-E). */
   zoom: ZoomState
+  /** per-item load status, keyed by item id; driven by the load/loaded/loadError events. */
   loaded: Record<string, LoadStatus>
-  fullscreen: boolean
 }

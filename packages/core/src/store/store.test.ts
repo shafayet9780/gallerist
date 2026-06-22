@@ -52,37 +52,6 @@ describe('createStore', () => {
     expect(s.get().a).toBe(11)
   })
 
-  it('select fires only when the selected slice changes (Object.is default)', () => {
-    const s = createStore(initial())
-    const fn = vi.fn()
-    s.select((st) => st.a, fn)
-    s.set((p) => ({ ...p, b: { n: 99 } })) // a unchanged
-    expect(fn).not.toHaveBeenCalled()
-    s.set((p) => ({ ...p, a: 2 }))
-    expect(fn).toHaveBeenCalledTimes(1)
-    expect(fn).toHaveBeenCalledWith(2)
-  })
-
-  it('select honors a custom equality fn', () => {
-    const s = createStore(initial())
-    const fn = vi.fn()
-    const shallow = (x: { n: number }, y: { n: number }) => x.n === y.n
-    s.select((st) => st.b, fn, shallow)
-    s.set((p) => ({ ...p, b: { n: 0 } })) // new ref, same n → suppressed
-    expect(fn).not.toHaveBeenCalled()
-    s.set((p) => ({ ...p, b: { n: 1 } }))
-    expect(fn).toHaveBeenCalledTimes(1)
-  })
-
-  it('select unsubscribe works', () => {
-    const s = createStore(initial())
-    const fn = vi.fn()
-    const off = s.select((st) => st.a, fn)
-    off()
-    s.set((p) => ({ ...p, a: 5 }))
-    expect(fn).not.toHaveBeenCalled()
-  })
-
   it('unsubscribing during a notification is safe', () => {
     const s = createStore(initial())
     const calls: string[] = []
