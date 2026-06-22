@@ -9,6 +9,7 @@ import {
   type Phase,
   type ViewerApi,
   type ZoomState,
+  clampPan,
   clampScale,
   focalZoom,
 } from '@visora/core'
@@ -97,6 +98,21 @@ function el(tag: string, className?: string, attrs?: Record<string, string>): HT
 
 function applyTransform(content: HTMLElement, zoom: ZoomState): void {
   content.style.transform = `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`
+}
+
+// Body scroll-lock is shared across all open overlay viewers: the original overflow is
+// captured when the first overlay opens and restored only when the last one is removed. A
+// per-instance capture would let a viewer opened over another record the already-locked
+// 'hidden' as the value to restore, permanently locking page scroll (S-R2). Presence is read
+// from the DOM (the overlay roots themselves) so it self-corrects and never leaks a count.
+let savedBodyOverflow = ''
+const anyOverlayMounted = () => !!document.querySelector('.visora[data-visora-mode="overlay"]')
+function lockBodyScroll(): void {
+  if (!anyOverlayMounted()) savedBodyOverflow = document.body.style.overflow // first of the stack
+  document.body.style.overflow = 'hidden'
+}
+function unlockBodyScroll(): void {
+  if (!anyOverlayMounted()) document.body.style.overflow = savedBodyOverflow // last one removed
 }
 
 export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandle {
@@ -363,6 +379,21 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.itemId = it.id
         rec.activated = false
         rec.content.appendChild(rec.overlayHost) // keep overlays above the media
+        // Content-anchored overlays map image-space points through the media's natural size.
+        // Before the image decodes naturalSize() is null and paint falls back to the stage rect
+        // (a wrong, full-stage contain rect). Repaint once the media is ready so overlays
+        // re-anchor to the real image box (I-R1).
+        const mountedId = it.id
+        const slideKey = k
+        rec.media?.ready
+          ?.then(() => {
+            const r = mounted.get(slideKey)
+            if (!r || r.itemId !== mountedId) return // navigated away / item swapped out
+            if (groupIndex(slideKey) !== viewer.getState().cursor.g) return // no longer current
+            r.overlayItemId = undefined // force a repaint at the now-known natural size
+            if (attached) renderWindow()
+          })
+          .catch(() => {}) // load failures are surfaced via the load events, not repainted
       }
       // activate/deactivate media on slide enter/leave (spec §12 — play/pause for video)
       if (isCurrent && !rec.activated) {
@@ -489,7 +520,6 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   // ── attach / detach ──────────────────────────────────────────────────────────
   let attached = false
-  let prevOverflow = ''
   let restoreFocus: HTMLElement | null = null
 
   // Auto-hide chrome on idle (UX-C); inert under reduced motion. Rail collapse is independent.
@@ -501,8 +531,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     attached = true
     if (overlay) {
       restoreFocus = document.activeElement as HTMLElement | null
-      prevOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
+      lockBodyScroll()
       document.body.appendChild(root)
       root.focus()
     }
@@ -512,8 +541,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (!attached) return
     attached = false
     if (overlay) {
-      document.body.style.overflow = prevOverflow
-      root.remove()
+      root.remove() // remove this overlay first so the presence check below is accurate
+      unlockBodyScroll()
       restoreFocus?.focus?.()
     }
   }
@@ -588,13 +617,22 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         setRailCollapsed(!railCollapsed, true)
         break
       case 'Home':
-        viewer.goTo(0)
+        if (linear) {
+          ensureFlat()
+          const t = flatSeq[0]
+          if (t) viewer.goTo(t.g, t.i)
+        } else viewer.goTo(0)
         break
       case 'End':
-        viewer.goTo(viewer.getCollection().groups.length - 1)
+        if (linear) {
+          ensureFlat()
+          const t = flatSeq[flatSeq.length - 1]
+          if (t) viewer.goTo(t.g, t.i)
+        } else viewer.goTo(viewer.getCollection().groups.length - 1)
         break
       default:
-        if (/^[1-9]$/.test(e.key)) {
+        // Within-group digit jumps are meaningless in linear mode (the pills retire), so skip them.
+        if (!linear && /^[1-9]$/.test(e.key)) {
           viewer.goTo(viewer.getState().cursor.g, Number(e.key) - 1)
         } else if (pluginKeymap[e.key]) {
           pluginKeymap[e.key]?.(e)
@@ -644,6 +682,34 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     },
   })
 
+  // ── re-measure on resize (spec §10.5) ──────────────────────────────────────────
+  // A single ResizeObserver on the stage, debounced to one frame. On resize / device rotation
+  // it repaints the current slide's content overlays (their px box is derived from the stage
+  // rect) and re-clamps the committed zoom against the new fit, so image-space overlays don't
+  // drift and a zoomed image can't be stranded panned past the new edge (C2).
+  let resizeFrame = 0
+  const onStageResize = () => {
+    if (resizeFrame) return
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0
+      if (!attached) return
+      const cur = currentRec()
+      if (cur) cur.overlayItemId = undefined // re-anchor overlays against the new stage rect
+      const r = stage.getBoundingClientRect()
+      const size = { w: r.width, h: r.height }
+      const z = viewer.getState().zoom
+      const clamped = size.w > 0 && size.h > 0 ? clampPan(z, size, size) : z
+      if (clamped.x !== z.x || clamped.y !== z.y) {
+        viewer.zoomTo(clamped.scale, { x: clamped.x, y: clamped.y }) // commit → sync → repaint
+      } else {
+        renderWindow() // repaint overlays at the new rect
+      }
+    })
+  }
+  const resizeObserver =
+    typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onStageResize) : null
+  resizeObserver?.observe(stage)
+
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(viewer.getPlugins())
@@ -670,6 +736,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       unsubscribe()
       offPlugins()
       detachGestures()
+      resizeObserver?.disconnect()
+      if (resizeFrame) cancelAnimationFrame(resizeFrame)
       idle?.destroy()
       document.removeEventListener('fullscreenchange', onFsChange)
       root.removeEventListener('keydown', onKey)

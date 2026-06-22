@@ -504,3 +504,79 @@ describe('mount — vertical rail (left/right) axis remap', () => {
     expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
   })
 })
+
+describe('mount — stacked overlays scroll-lock (S-R2)', () => {
+  it('keeps the page locked until the last overlay closes, then restores the original', () => {
+    document.body.style.overflow = 'scroll' // a pre-existing value that must come back
+    const a = createViewer({ collection: collection() })
+    mount(a)
+    a.open()
+    const b = createViewer({ collection: collection() })
+    mount(b)
+    b.open()
+    expect(document.body.style.overflow).toBe('hidden')
+    a.close()
+    expect(document.body.style.overflow).toBe('hidden') // b still open → stays locked
+    b.close()
+    expect(document.body.style.overflow).toBe('scroll') // last one closed → original restored
+  })
+})
+
+describe('mount — linear Home/End (S-R3)', () => {
+  it('End jumps to the true last flat item, not the last group head', () => {
+    const v = createViewer({ collection: collection() }) // last flat item is g2/i1 (c1)
+    mount(v, { linear: true })
+    v.open()
+    const root = document.querySelector('.visora') as HTMLElement
+    root.dispatchEvent(key({ key: 'End' }))
+    expect(v.getState().cursor).toEqual({ g: 2, i: 1 })
+    root.dispatchEvent(key({ key: 'Home' }))
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+  })
+})
+
+describe('mount — resize re-clamp (C2)', () => {
+  it('re-clamps committed zoom when the stage shrinks', () => {
+    let roCb: () => void = () => {}
+    class FakeRO {
+      constructor(cb: () => void) {
+        roCb = cb
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeRO)
+    vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
+      cb()
+      return 1
+    })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    try {
+      const v = createViewer({ collection: collection() })
+      const h = mount(v)
+      v.open()
+      const stage = document.querySelector('.visora-stage') as HTMLElement
+      let w = 1000
+      vi.spyOn(stage, 'getBoundingClientRect').mockImplementation(
+        () =>
+          ({
+            width: w,
+            height: 800,
+            left: 0,
+            top: 0,
+            right: w,
+            bottom: 800,
+            x: 0,
+            y: 0,
+          }) as DOMRect,
+      )
+      v.zoomTo(2, { x: -900, y: 0 }) // core does not clamp; pan is far out of bounds
+      w = 300 // stage shrinks
+      roCb() // ResizeObserver fires
+      expect(v.getState().zoom.x).toBeGreaterThan(-900) // re-clamped inward to the new bounds
+      h.destroy()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
