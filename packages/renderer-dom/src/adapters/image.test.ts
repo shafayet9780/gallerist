@@ -84,11 +84,27 @@ describe('imageAdapter', () => {
     expect(m.element.hasAttribute('data-visora-loaded')).toBe(true)
   })
 
-  it('flags the image with data-visora-error on a failed load (I-UX3)', async () => {
-    const m = imageAdapter().mount(img(), slot(), ctx())
+  it('shows a centered error card with the alt caption on a failed load (I-UX3)', async () => {
+    const s = slot()
+    const m = imageAdapter().mount(img({ alt: 'Broken chart' }), s, ctx())
     m.element.dispatchEvent(new Event('error'))
     await expect(m.ready).rejects.toThrow()
     expect(m.element.hasAttribute('data-visora-error')).toBe(true)
+    const card = s.querySelector('.visora-media-error')
+    expect(card).not.toBeNull()
+    expect(card?.getAttribute('role')).toBe('img')
+    expect(card?.querySelector('.visora-media-error-label')?.textContent).toBe('Broken chart')
+    m.destroy()
+    expect(s.querySelector('.visora-media-error')).toBeNull() // card removed on teardown
+  })
+
+  it('renders the error card without a label when the item has no alt (I-UX3)', async () => {
+    const s = slot()
+    const m = imageAdapter().mount(img(), s, ctx())
+    m.element.dispatchEvent(new Event('error'))
+    await expect(m.ready).rejects.toThrow()
+    expect(s.querySelector('.visora-media-error')).not.toBeNull()
+    expect(s.querySelector('.visora-media-error-label')).toBeNull()
   })
 
   it('rejects ready when the signal is already aborted', async () => {

@@ -9,6 +9,10 @@ const COLOR_RE = /^(#|rgb|hsl|[a-z]+$)/i
 // fires an attacker-controlled request). Quotes/backslash/newlines are rejected for the url path.
 const CSS_URL_UNSAFE = /["\\\n\r]/
 
+// Static broken-image glyph (lucide "image-off"); safe to inject as markup (no user data).
+const BROKEN_ICON =
+  '<svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.4 10.4a2 2 0 1 1-2.8-2.8"/><path d="M21 15.5V5a2 2 0 0 0-2-2H8.5"/><path d="M3.6 3.6A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14a2 2 0 0 0 1.4-.6"/><path d="m5 21 7-7"/><path d="m2 2 20 20"/></svg>'
+
 function applyPlaceholder(el: HTMLElement, placeholder: string): void {
   if (placeholder.startsWith('data:') || placeholder.includes('/')) {
     if (CSS_URL_UNSAFE.test(placeholder)) return // reject breakout attempts — paint nothing
@@ -34,6 +38,31 @@ export function imageAdapter(): MediaAdapter {
 
       // A loader may resolve to a custom element instead of an <img>; track the live node.
       let element: HTMLElement = img
+
+      // On load failure, show a centered error card (icon + the item's alt as a caption) instead
+      // of the browser's default top-left broken-image glyph, which overlapped the chrome (I-UX3).
+      let errorEl: HTMLElement | null = null
+      const showError = () => {
+        if (errorEl) return
+        img.setAttribute('data-visora-error', '') // keeps the img hidden + excludes it from shimmer
+        const card = document.createElement('div')
+        card.className = 'visora-media-error'
+        card.setAttribute('role', 'img')
+        if (item.alt) card.setAttribute('aria-label', item.alt)
+        const icon = document.createElement('div')
+        icon.className = 'visora-media-error-icon'
+        icon.setAttribute('aria-hidden', 'true')
+        icon.innerHTML = BROKEN_ICON // static markup only
+        card.appendChild(icon)
+        if (item.alt) {
+          const label = document.createElement('span')
+          label.className = 'visora-media-error-label'
+          label.textContent = item.alt // host-supplied → textContent, never innerHTML
+          card.appendChild(label)
+        }
+        slot.appendChild(card)
+        errorEl = card
+      }
 
       const ready = new Promise<void>((resolve, reject) => {
         const abortErr = () => new DOMException('Image load aborted', 'AbortError')
@@ -62,7 +91,7 @@ export function imageAdapter(): MediaAdapter {
         }
         const onError = () => {
           cleanup()
-          img.setAttribute('data-visora-error', '') // reveal a visible broken state (I-UX3)
+          showError()
           reject(new Error(`image load error: ${item.id}`))
         }
         img.addEventListener('load', onLoad)
@@ -95,7 +124,7 @@ export function imageAdapter(): MediaAdapter {
             })
             .catch((err) => {
               cleanup()
-              img.setAttribute('data-visora-error', '') // reveal a visible broken state (I-UX3)
+              showError()
               reject(err instanceof Error ? err : new Error(String(err)))
             })
         }
@@ -117,6 +146,7 @@ export function imageAdapter(): MediaAdapter {
         destroy() {
           img.removeAttribute('src')
           element.remove()
+          errorEl?.remove() // the error card is a slot sibling, not `element`
         },
       }
     },

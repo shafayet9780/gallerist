@@ -30,6 +30,24 @@ test('opens and shows the first image with a counter', async ({ page }) => {
   await expect(page.locator('.visora-slide[data-visora-current] img')).toBeVisible()
 })
 
+test('a failed image shows a centered error card with its alt (I-UX3)', async ({ page }) => {
+  await page.evaluate(() =>
+    (window as unknown as { viewer: { setCollection(c: unknown): void } }).viewer.setCollection({
+      groups: [
+        {
+          id: 'g',
+          items: [
+            { id: 'x', type: 'image', source: '/does-not-exist-404.jpg', alt: 'Burndown chart' },
+          ],
+        },
+      ],
+    }),
+  )
+  const card = page.locator('.visora-media-error')
+  await expect(card).toBeVisible()
+  await expect(card.locator('.visora-media-error-label')).toHaveText('Burndown chart')
+})
+
 test('keyboard ArrowRight navigates groups; Escape closes', async ({ page }) => {
   await page.locator('.visora').focus()
   await page.keyboard.press('ArrowRight')

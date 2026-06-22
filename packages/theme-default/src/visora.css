@@ -131,12 +131,30 @@
 .visora-media-image[data-visora-loaded] {
   opacity: 1;
 }
-/* A failed load must not be an invisible blank stage: reveal the image so its alt text / broken
-   glyph shows, on a faint surface so it reads as a failed-media area (I-UX3). */
-.visora-media-image[data-visora-error] {
-  opacity: 1;
-  background-color: rgba(127, 127, 127, 0.08);
-  object-fit: scale-down;
+/* A failed load shows a centered error card (icon + the item's alt as a caption) instead of a
+   blank stage or the browser's default top-left broken-image glyph (I-UX3). The broken <img>
+   itself stays hidden (opacity:0); the adapter injects .visora-media-error as a sibling. */
+.visora-media-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--visora-fg-muted);
+  background: rgba(127, 127, 127, 0.06);
+}
+.visora-media-error-icon {
+  opacity: 0.75;
+  line-height: 0;
+}
+.visora-media-error-label {
+  font: 14px / 1.4 system-ui, -apple-system, sans-serif;
+  max-width: 40ch;
+  color: var(--visora-fg);
 }
 /* Loading shimmer for slow media — shown only while an image is still pending (no loaded/error
    marker yet), delayed so fast loads never flash it. Degrades to nothing where :has is absent. */
