@@ -49,7 +49,9 @@ export function prevGroup(cursor: Cursor, ctx: NavCtx): Cursor {
 export function nextItem(cursor: Cursor, ctx: NavCtx): Cursor {
   const count = ctx.counts[cursor.g] ?? 0
   if (count <= 0) return { g: cursor.g, i: 0 }
-  let i = cursor.i + 1
+  // Defensively clamp an out-of-range incoming index so we always step from a valid item and
+  // never return a still-invalid cursor (review S-C3).
+  let i = Math.min(Math.max(0, cursor.i), count - 1) + 1
   if (i >= count) i = ctx.loop ? 0 : count - 1
   return { g: cursor.g, i }
 }
@@ -57,7 +59,7 @@ export function nextItem(cursor: Cursor, ctx: NavCtx): Cursor {
 export function prevItem(cursor: Cursor, ctx: NavCtx): Cursor {
   const count = ctx.counts[cursor.g] ?? 0
   if (count <= 0) return { g: cursor.g, i: 0 }
-  let i = cursor.i - 1
+  let i = Math.min(Math.max(0, cursor.i), count - 1) - 1
   if (i < 0) i = ctx.loop ? count - 1 : 0
   return { g: cursor.g, i }
 }

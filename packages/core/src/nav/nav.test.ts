@@ -67,6 +67,11 @@ describe('secondary (item) axis', () => {
   it('prevItem wraps to the last item when looping', () => {
     expect(prevItem(at(1, 0), ctx({ loop: true }))).toEqual({ g: 1, i: 2 })
   })
+  it('clamps an out-of-range incoming item index (S-C3)', () => {
+    // g1 has 3 items; i=5 is out of range and must be clamped before stepping
+    expect(nextItem(at(1, 5), ctx({ loop: false }))).toEqual({ g: 1, i: 2 })
+    expect(prevItem(at(1, 5), ctx({ loop: false }))).toEqual({ g: 1, i: 1 })
+  })
   it('is a no-op in a single-item group (even when looping)', () => {
     expect(nextItem(at(0, 0), ctx({ loop: true }))).toEqual({ g: 0, i: 0 })
     expect(prevItem(at(0, 0), ctx({ loop: true }))).toEqual({ g: 0, i: 0 })

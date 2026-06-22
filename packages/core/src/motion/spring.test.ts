@@ -9,6 +9,15 @@ describe('sampleSpring', () => {
     expect(values.at(-1)).toBe(1)
   })
 
+  it('handles degenerate sample counts without NaN (S-C1)', () => {
+    expect(sampleSpring(SPRINGS.smooth, 0).values).toEqual([])
+    expect(sampleSpring(SPRINGS.smooth, 1).values).toEqual([1]) // single keyframe → settled value
+    const two = sampleSpring(SPRINGS.smooth, 2).values
+    expect(two[0]).toBe(0)
+    expect(two.at(-1)).toBe(1)
+    expect(two.some(Number.isNaN)).toBe(false)
+  })
+
   it('produces a clamped, positive duration', () => {
     const { duration } = sampleSpring(SPRINGS.smooth)
     expect(duration).toBeGreaterThan(100)

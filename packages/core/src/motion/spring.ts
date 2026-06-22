@@ -53,9 +53,13 @@ export function sampleSpring(params: SpringParams, count = 60): SpringSample {
     return 1 - (a * Math.exp(r1 * t) + b * Math.exp(r2 * t))
   }
 
+  if (count <= 0) return { values: [], duration }
+  // Guard the divisor: count===1 would divide by zero → NaN sample times. A single keyframe
+  // collapses to the settled value [1]; count>=2 samples evenly start..end (review S-C1).
+  const denom = count > 1 ? count - 1 : 1
   const values: number[] = []
   for (let i = 0; i < count; i++) {
-    values.push(at((settle * i) / (count - 1)))
+    values.push(at((settle * i) / denom))
   }
   values[0] = 0
   values[count - 1] = 1
