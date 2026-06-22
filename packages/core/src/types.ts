@@ -151,8 +151,6 @@ export interface ZoomState {
 
 export type Phase = 'closed' | 'opening' | 'open' | 'closing'
 
-export type Interaction = 'idle' | 'navigating' | 'zooming' | 'panning' | 'dragging'
-
 export type LoadStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
 export interface ViewerState {

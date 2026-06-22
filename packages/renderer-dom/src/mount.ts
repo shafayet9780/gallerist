@@ -134,6 +134,25 @@ function unlockBodyScroll(): void {
   if (!anyOverlayMounted()) document.body.style.overflow = savedBodyOverflow // last one removed
 }
 
+// Background inerting is shared across stacked overlays via the same DOM-presence model as the
+// scroll-lock: every element we mark is tracked module-wide, and inert is only released when the
+// last overlay is gone — so closing an overlay out of LIFO order can't un-inert the page while
+// another modal is still open (review #6, C5).
+const inertedByVisora = new Set<HTMLElement>()
+function inertBackground(root: HTMLElement): void {
+  for (const child of [...document.body.children]) {
+    if (child !== root && child instanceof HTMLElement && !child.hasAttribute('inert')) {
+      child.setAttribute('inert', '')
+      inertedByVisora.add(child)
+    }
+  }
+}
+function releaseBackgroundInert(): void {
+  if (anyOverlayMounted()) return // another overlay still needs the page inert
+  for (const el of inertedByVisora) el.removeAttribute('inert')
+  inertedByVisora.clear()
+}
+
 export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandle {
   const overlay = !opts.container
   const container = opts.container ?? null
@@ -151,7 +170,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     rail === 'left' || rail === 'right' ? 'vertical' : 'horizontal'
   const vertical = orientation === 'vertical'
   const linear = opts.linear ?? false
-  const loop = opts.loop ?? false
+  // Default to the viewer's resolved loop so linear traversal and the slide window agree; an
+  // explicit mount({ loop }) still overrides for the rare case they should differ (review #2).
+  const loop = opts.loop ?? viewer.loop
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -426,11 +447,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         // overlays re-anchor to the real image box once the natural size is known (I-R1).
         const mountedId = it.id
         const slideKey = k
-        const loadBase = { viewer, cursor: viewer.cursor, group, item: it }
-        viewer.emit('load', { ...loadBase, id: mountedId })
+        // group/item are stable for this slide; the cursor is read fresh at emit time because
+        // loaded/loadError fire later from the ready promise, when the cursor may have moved (review #5).
+        const loadBase = { viewer, group, item: it }
+        viewer.emit('load', { ...loadBase, cursor: viewer.cursor, id: mountedId })
         rec.media?.ready
           ?.then(() => {
-            viewer.emit('loaded', { ...loadBase, id: mountedId })
+            viewer.emit('loaded', { ...loadBase, cursor: viewer.cursor, id: mountedId })
             const r = mounted.get(slideKey)
             if (!r || r.itemId !== mountedId) return // navigated away / item swapped out
             if (groupIndex(slideKey) !== viewer.getState().cursor.g) return // no longer current
@@ -438,7 +461,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
             if (attached) renderWindow()
           })
           .catch((error) => {
-            viewer.emit('loadError', { ...loadBase, id: mountedId, error })
+            viewer.emit('loadError', { ...loadBase, cursor: viewer.cursor, id: mountedId, error })
           })
       }
       // activate/deactivate media on slide enter/leave (spec §12 — play/pause for video)
@@ -582,7 +605,6 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // ── attach / detach ──────────────────────────────────────────────────────────
   let attached = false
   let restoreFocus: HTMLElement | null = null
-  let inerted: HTMLElement[] = [] // body children we marked inert while the dialog is open (C5)
 
   // Auto-hide chrome on idle (UX-C); inert under reduced motion. Rail collapse is independent.
   // Created before attach() so the (TDZ-safe) poke on show works in both overlay and inline modes.
@@ -597,13 +619,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       document.body.appendChild(root)
       // Inert every other top-level element so the dialog is truly modal — focus and the SR
       // virtual cursor can't reach the obscured page behind it (C5). aria-modal alone doesn't
-      // enforce this. Only touch elements we actually changed, so we restore cleanly.
-      for (const child of [...document.body.children]) {
-        if (child !== root && child instanceof HTMLElement && !child.hasAttribute('inert')) {
-          child.setAttribute('inert', '')
-          inerted.push(child)
-        }
-      }
+      // enforce this.
+      inertBackground(root)
       root.focus()
     }
     idle?.poke() // start the idle countdown from when the viewer is shown
@@ -612,10 +629,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (!attached) return
     attached = false
     if (overlay) {
-      root.remove() // remove this overlay first so the presence check below is accurate
+      root.remove() // remove this overlay first so the presence checks below are accurate
       unlockBodyScroll()
-      for (const child of inerted) child.removeAttribute('inert')
-      inerted = []
+      releaseBackgroundInert()
       // Prefer an explicit returnFocus target (survives a trigger that unmounted), else restore
       // focus to whatever was focused on open (S-UX4).
       const target =

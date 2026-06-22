@@ -123,7 +123,35 @@ export function attachGestures(opts: GestureOptions): () => void {
     } catch {}
   }
 
+  // Wheel/trackpad zoom: snapshot geometry once per burst (no forced layout per tick), accumulate
+  // the target locally and apply it imperatively via the RAF schedule, then commit to the store
+  // ONCE when the burst settles — instead of a full store commit + render + subscriber fan-out on
+  // every tick (the one continuous interaction that was routed through the store) (I-PERF1).
+  const WHEEL_COMMIT_MS = 90
+  let wheelGeom: Geometry | null = null
+  let wheelZoom: { scale: number; x: number; y: number } | null = null
+  let wheelTimer: ReturnType<typeof setTimeout> | undefined
+
+  const commitWheel = () => {
+    wheelTimer = undefined
+    wheelGeom = null
+    if (wheelZoom) {
+      viewer.zoomTo(wheelZoom.scale, { x: wheelZoom.x, y: wheelZoom.y })
+      wheelZoom = null
+    }
+  }
+  // Force any settle-pending wheel zoom into the store NOW. Called before a competing interaction
+  // (pointer down, double-click) snapshots its zoom base, and on teardown, so the wheel result is
+  // never clobbered by a stale base nor silently dropped (review #1/#4).
+  const flushWheel = () => {
+    if (wheelTimer) {
+      clearTimeout(wheelTimer)
+      commitWheel()
+    }
+  }
+
   const onDown = (e: PointerEvent) => {
+    flushWheel() // commit a pending wheel zoom before snapshotting startZoom from the store
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
     capture(e.pointerId)
     startZoom = { ...viewer.getState().zoom }
@@ -250,24 +278,6 @@ export function attachGestures(opts: GestureOptions): () => void {
     }
   }
 
-  // Wheel/trackpad zoom: snapshot geometry once per burst (no forced layout per tick), accumulate
-  // the target locally and apply it imperatively via the RAF schedule, then commit to the store
-  // ONCE when the burst settles — instead of a full store commit + render + subscriber fan-out on
-  // every tick (the one continuous interaction that was routed through the store) (I-PERF1).
-  const WHEEL_COMMIT_MS = 90
-  let wheelGeom: Geometry | null = null
-  let wheelZoom: { scale: number; x: number; y: number } | null = null
-  let wheelTimer: ReturnType<typeof setTimeout> | undefined
-
-  const commitWheel = () => {
-    wheelTimer = undefined
-    wheelGeom = null
-    if (wheelZoom) {
-      viewer.zoomTo(wheelZoom.scale, { x: wheelZoom.x, y: wheelZoom.y })
-      wheelZoom = null
-    }
-  }
-
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
     if (!wheelGeom) wheelGeom = getGeometry()
@@ -290,6 +300,7 @@ export function attachGestures(opts: GestureOptions): () => void {
   }
 
   const onDblClick = (e: MouseEvent) => {
+    flushWheel() // commit a pending wheel zoom before reading the base for the toggle
     const z = viewer.getState().zoom
     const target = toggleZoom(z.scale, fit(), maxScale)
     const next = focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), target)
@@ -311,7 +322,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     stage.removeEventListener('wheel', onWheel)
     stage.removeEventListener('dblclick', onDblClick)
     if (frame) caf(frame)
-    if (wheelTimer) clearTimeout(wheelTimer)
+    flushWheel() // commit a settle-pending wheel zoom rather than dropping it on teardown
   }
 }
 

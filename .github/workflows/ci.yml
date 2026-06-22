@@ -28,7 +28,7 @@ jobs:
         run: |
           for d in packages/core packages/renderer-dom packages/react packages/plugin-*; do
             echo "::group::attw $d"
-            pnpm dlx @arethetypeswrong/cli@latest --pack "$d" --profile node16
+            pnpm dlx @arethetypeswrong/cli@0.17 --pack "$d" --profile node16
             echo "::endgroup::"
           done
       - run: pnpm exec playwright install --with-deps chromium

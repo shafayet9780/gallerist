@@ -234,6 +234,7 @@ export function createViewer(options: ViewerOptions): ViewerApi {
         ...st,
         cursor,
         zoom: sameItem ? st.zoom : { ...IDENTITY_ZOOM },
+        loaded: {}, // drop stale per-item load status so it can't grow across collection swaps (review #3)
       }))
       emitter.emit('collectionChange', { viewer: api })
     },

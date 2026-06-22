@@ -101,6 +101,23 @@ describe('wheel zoom', () => {
       vi.useRealTimers()
     }
   })
+
+  it('flushes a pending wheel zoom when a pointer gesture starts, with no late re-commit (#1)', () => {
+    vi.useFakeTimers()
+    try {
+      const v = setup()
+      stage.dispatchEvent(wheel(-100))
+      expect(v.getState().zoom.scale).toBe(1) // pending on the debounce, not committed yet
+      stage.dispatchEvent(pe('pointerdown', 500, 400)) // onDown must flush the wheel first
+      const flushed = v.getState().zoom.scale
+      expect(flushed).toBeGreaterThan(1) // committed by the flush, so the gesture base is current
+      stage.dispatchEvent(pe('pointerup', 500, 400))
+      vi.advanceTimersByTime(120) // the cleared wheel timer must not re-commit and clobber
+      expect(v.getState().zoom.scale).toBe(flushed)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('double-click', () => {
