@@ -668,6 +668,16 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         ArrowDown: nav.nextItem,
         ArrowUp: nav.prevItem,
       }
+  const isRtl = (): boolean => {
+    const dir = root.closest('[dir]')?.getAttribute('dir')
+    if (dir) return dir === 'rtl'
+    try {
+      return getComputedStyle(root).direction === 'rtl'
+    } catch {
+      return false
+    }
+  }
+
   const onKey = (e: KeyboardEvent) => {
     // Don't hijack typing inside an embedded control (overlay input/textarea/etc); Escape still
     // closes from anywhere (I-UX2).
@@ -695,9 +705,14 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       case 'ArrowRight':
       case 'ArrowLeft':
       case 'ArrowUp':
-      case 'ArrowDown':
-        arrowNav[e.key]?.()
+      case 'ArrowDown': {
+        // In an RTL document the horizontal arrows mirror (ArrowLeft advances), matching the
+        // logical-property chrome layout (S-UX3). Vertical (Up/Down) is unaffected.
+        const flip = isRtl() && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')
+        const k = flip ? (e.key === 'ArrowRight' ? 'ArrowLeft' : 'ArrowRight') : e.key
+        arrowNav[k]?.()
         break
+      }
       case 'Escape':
         viewer.close()
         break

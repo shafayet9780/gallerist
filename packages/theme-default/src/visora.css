@@ -199,10 +199,15 @@
 }
 .visora-region-footer {
   position: absolute;
-  left: 0;
-  right: 0;
+  inset-inline: 0;
+  /* sits above a horizontal bottom rail. With a vertical (left/right) rail or a collapsed/hidden
+     rail there is no bottom strip to clear, so the band drops to the stage edge (S-UX1). */
   bottom: var(--visora-thumb-h, 0);
   z-index: 6;
+}
+.visora[data-visora-orientation="vertical"] .visora-region-footer,
+.visora[data-visora-rail="collapsed"] .visora-region-footer {
+  bottom: 0;
 }
 .visora-region-stage {
   position: absolute;
@@ -412,7 +417,9 @@
   bottom: calc(100% + 10px);
   z-index: 7;
   max-height: 60vh;
-  overflow-y: auto;
+  /* clamp so a vertical-rail flyout can't spill off-screen over the stage (I-UX4) */
+  max-width: min(280px, 60vw);
+  overflow: auto;
   padding: 6px;
   border-radius: var(--visora-radius);
   background: var(--visora-chrome-bg);
@@ -543,12 +550,13 @@
 }
 .visora-prev {
   top: 50%;
-  left: 12px;
+  /* logical inset so prev/next mirror automatically in an RTL document (S-UX3) */
+  inset-inline-start: 12px;
   transform: translateY(-50%);
 }
 .visora-next {
   top: 50%;
-  right: 12px;
+  inset-inline-end: 12px;
   transform: translateY(-50%);
 }
 .visora-item-prev {

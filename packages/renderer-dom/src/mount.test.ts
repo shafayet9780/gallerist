@@ -620,4 +620,16 @@ describe('mount — modal accessibility (WS-3)', () => {
     v.open({ g: 1 }) // b0
     expect(document.querySelector('.visora-live')?.textContent).toContain('b0')
   })
+
+  it('flips the horizontal arrow keys in an RTL document (S-UX3)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.visora') as HTMLElement
+    root.setAttribute('dir', 'rtl')
+    root.dispatchEvent(key({ key: 'ArrowLeft' })) // RTL: left advances
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    root.dispatchEvent(key({ key: 'ArrowRight' })) // RTL: right retreats
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+  })
 })
