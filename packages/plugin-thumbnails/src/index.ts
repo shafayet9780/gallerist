@@ -560,6 +560,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (groupDisplay === 'flat') {
         if (colChanged) buildFlatModel(col)
         const cursorFi = flatPos.get(`${cur.g}:${cur.i}`) ?? 0
+        // The rail is an ordered display slice, not an absolutely-positioned preload window:
+        // looping here would wrap-reorder the visible thumbs (windowIndices is wrap-first), so it
+        // stays linear. The slide window (mount.ts) is what threads viewer.loop for wrap preload.
         const windowIdx = windowIndices(cursorFi, flat.length, overscan, overscan, false)
         const windowKey = `${windowIdx[0] ?? -1}-${windowIdx[windowIdx.length - 1] ?? -1}-${flat.length}`
         if (colChanged || windowKey !== lastWindowKey) {

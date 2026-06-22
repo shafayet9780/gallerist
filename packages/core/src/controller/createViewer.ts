@@ -256,6 +256,9 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     get zoom() {
       return store.get().zoom
     },
+    get loop() {
+      return loop
+    },
   }
 
   // wire `on` option handlers

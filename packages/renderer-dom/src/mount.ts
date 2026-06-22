@@ -324,7 +324,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (groupCount === 0) return
     const cur = state.cursor
 
-    const idxs = windowIndices(cur.g, groupCount, preload.ahead, preload.behind, false)
+    const idxs = windowIndices(cur.g, groupCount, preload.ahead, preload.behind, viewer.loop)
     const wantKeys = idxs.map((g) => col.groups[g]?.id ?? '')
     const { enter, exit } = reconcileKeys([...mounted.keys()], wantKeys)
 

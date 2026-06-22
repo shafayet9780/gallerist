@@ -59,4 +59,7 @@ export interface ViewerApi {
   // navigation/zoom accessors used by overlays & adapters:
   readonly cursor: Cursor
   readonly zoom: ZoomState
+  /** Resolved loop setting (mirrors the `loop` option, default true) — read by the
+   *  renderer and rail/grid plugins so every virtualization window agrees on wrap. */
+  readonly loop: boolean
 }

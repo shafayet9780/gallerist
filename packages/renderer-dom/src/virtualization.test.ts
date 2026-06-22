@@ -23,6 +23,16 @@ describe('virtualization (spec §20: bounded DOM at scale)', () => {
     expect(document.querySelectorAll('.visora-slide').length).toBeLessThan(10)
   })
 
+  it('preloads the wrap-around neighbor at the last group when loop is on (C4)', () => {
+    const v = createViewer({ collection: bigCollection(10), loop: true })
+    mount(v)
+    v.open()
+    for (let i = 0; i < 9; i++) v.next() // navigate to the last group (g9)
+    expect(v.getState().cursor.g).toBe(9)
+    // next() wraps g9 → g0, so the slide window must include g0 (else a blank frame on wrap)
+    expect(document.querySelector('[data-group="g0"]')).not.toBeNull()
+  })
+
   it('stays bounded across deep navigation (node pool recycles, no growth)', () => {
     const v = createViewer({ collection: bigCollection(10_000), loop: true })
     mount(v)
