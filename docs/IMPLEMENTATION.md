@@ -252,3 +252,13 @@ items are deferred with rationale (we launch at 0.x, so none is frozen):
   split to a deep `@visora/core/internal` entry before 1.0 so the frozen root stays minimal.
 - **Gesture discoverability (review S-UX2).** There is no first-run hint for swipe / pinch /
   swipe-to-dismiss. Planned as an opt-in coachmark; for now, document the gestures in your UI.
+- **Broken-image affordance polish (review I-UX3).** A failed image is now visible (the `alt`
+  text + the browser's broken-image glyph on a faint surface, instead of a blank stage) and emits
+  `loadError`. The alt currently renders at the browser-default position (top-left); a centred
+  icon-plus-caption error card would need the renderer to inject a dedicated error element and is a
+  follow-up. Verified visually via a real 404 source.
+- **Cross-browser e2e.** The Playwright suite runs on chromium + webkit. Five synthetic-input/
+  headless-focus assertions (mouse-drag gestures, Tab-cycle, focus-restore) are chromium-only — the
+  logic is browser-agnostic and Playwright/WebKit's synthetic input drops drag pointer events and
+  Tab focus. Everything WebKit uniquely covers (CSS rendering, the prefixed Fullscreen path, axe,
+  overlays/resize re-anchor, plugins) runs on both.

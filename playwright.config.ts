@@ -10,7 +10,12 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // WebKit covers Safari-specific paths (e.g. the prefixed Fullscreen API, S-PL1) that Chromium
+    // can't exercise. iPhone element-fullscreen has no equivalent and stays a documented limitation.
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ],
   webServer: {
     command: 'pnpm exec vite --config e2e/app/vite.config.ts',
     url: 'http://localhost:5173',

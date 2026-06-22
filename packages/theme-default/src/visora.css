@@ -888,6 +888,8 @@
   /* the position counter is primary info — use full-contrast fg so it clears WCAG AA over the
      translucent chrome (the muted grey landed ~3.5:1) (S-UX5). */
   color: var(--visora-fg);
+  /* keep "N / M" reading left-to-right even in an RTL document (bidi would flip it to "M / N"). */
+  direction: ltr;
   padding: 6px 10px;
   border-radius: var(--visora-radius);
   background: var(--visora-chrome-bg);

@@ -45,7 +45,15 @@ test('next/prev chrome buttons drive the group axis', async ({ page }) => {
   await expect(page.locator('.visora-counter')).toHaveText(/1 \/ 3/)
 })
 
+// Playwright/WebKit's synthetic mouse coalesces/drops pointermove+up during a capture-based drag
+// (verified: 2 of 12 moves, 0 ups delivered), so these drag-driven gesture assertions can't run
+// there. The gesture engine is browser-agnostic and is fully exercised on chromium; real Safari
+// uses real pointer input, which capture handles normally.
 test('horizontal swipe navigates to the next group (arbitration: navigate)', async ({ page }) => {
+  test.skip(
+    test.info().project.name === 'webkit',
+    'WebKit synthetic mouse drops drag pointer events',
+  )
   const box = await page.locator('.visora-stage').boundingBox()
   if (!box) throw new Error('no stage box')
   const cy = box.y + box.height / 2
@@ -54,6 +62,10 @@ test('horizontal swipe navigates to the next group (arbitration: navigate)', asy
 })
 
 test('drag downward dismisses the viewer (arbitration: close)', async ({ page }) => {
+  test.skip(
+    test.info().project.name === 'webkit',
+    'WebKit synthetic mouse drops drag pointer events',
+  )
   const box = await page.locator('.visora-stage').boundingBox()
   if (!box) throw new Error('no stage box')
   const cx = box.x + box.width / 2
