@@ -42,6 +42,8 @@ interface YTPlayer {
 interface YTPlayerConfig {
   videoId: string
   host?: string
+  /** playerVars.origin lets the IFrame API validate the origin of postMessage commands (S-PL3). */
+  playerVars?: { origin?: string }
   events: { onReady?: () => void; onStateChange?: (e: { data?: number }) => void }
 }
 interface YTNamespace {
@@ -95,24 +97,31 @@ function loadYouTubeAPI(): Promise<YTNamespace> {
 export function youtubeAdapter(viewer: ViewerApi, opts: YouTubeOptions = {}): MediaAdapter {
   return {
     type: 'video',
+    // Decline URLs we can't extract an id from (playlists, channel/home pages) so the renderer's
+    // error path takes over instead of building an empty, never-ready player (S-PL2).
     match: (item) => {
       const u = srcOf(item.source)
-      return !!u && isYouTube(u)
+      return !!u && isYouTube(u) && parseYouTubeId(u) !== ''
     },
     mount(item: Item, slot: HTMLElement, ctx: AdapterCtx) {
       const host = document.createElement('div')
       host.className = 'visora-media visora-media-youtube'
       slot.appendChild(host)
       let player: YTPlayer | null = null
+      const videoId = parseYouTubeId(srcOf(item.source) ?? '')
 
       const ready = new Promise<void>((resolve, reject) => {
         if (ctx.signal.aborted) return reject(new DOMException('aborted', 'AbortError'))
+        // Don't hang on an empty videoId — the IFrame API never fires onReady for it (S-PL2).
+        if (!videoId) return reject(new Error(`unparseable YouTube URL: ${item.id}`))
         loadYouTubeAPI()
           .then((YT) => {
             if (ctx.signal.aborted) return
             player = new YT.Player(host, {
-              videoId: parseYouTubeId(srcOf(item.source) ?? ''),
+              videoId,
               host: opts.nocookie ? 'https://www.youtube-nocookie.com' : undefined,
+              playerVars:
+                typeof window !== 'undefined' ? { origin: window.location.origin } : undefined,
               events: {
                 onReady: () => resolve(),
                 onStateChange: (e) => {

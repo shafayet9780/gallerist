@@ -9,13 +9,22 @@ const ctx = () => ({ signal: new AbortController().signal, priority: 'high' as c
 
 // minimal fake IFrame API
 let lastPlayer: FakePlayer | null = null
+let lastConfig: { videoId?: string; playerVars?: { origin?: string } } | null = null
 class FakePlayer {
   play = 0
   pause = 0
   destroyed = false
   events: { onReady?: () => void; onStateChange?: (e: { data: number }) => void }
-  constructor(_el: unknown, cfg: { events: FakePlayer['events'] }) {
+  constructor(
+    _el: unknown,
+    cfg: {
+      videoId?: string
+      playerVars?: { origin?: string }
+      events: FakePlayer['events']
+    },
+  ) {
     this.events = cfg.events
+    lastConfig = cfg
     lastPlayer = this
     cfg.events.onReady?.()
   }
@@ -32,6 +41,7 @@ class FakePlayer {
 
 beforeEach(() => {
   lastPlayer = null
+  lastConfig = null
   ;(window as unknown as { YT: unknown }).YT = { Player: FakePlayer, PlayerState: { ENDED: 0 } }
 })
 afterEach(() => {
@@ -67,6 +77,25 @@ describe('youtubeAdapter', () => {
     const a = youtubeAdapter({} as ViewerApi)
     expect(a.match?.(ytItem('https://youtu.be/dQw4w9WgXcQ'))).toBe(true)
     expect(a.match?.(ytItem('https://x/clip.mp4'))).toBe(false)
+  })
+
+  it('declines an unparseable YouTube URL and rejects rather than hanging (S-PL2)', async () => {
+    const a = youtubeAdapter({} as ViewerApi)
+    const playlist = ytItem('https://www.youtube.com/playlist?list=PLxyz')
+    expect(a.match?.(playlist)).toBe(false) // no id → decline the match
+    const m = a.mount(playlist, document.createElement('div'), ctx())
+    await expect(m.ready).rejects.toThrow() // mounting anyway rejects instead of hanging
+  })
+
+  it('passes playerVars.origin for postMessage validation (S-PL3)', async () => {
+    const m = youtubeAdapter({} as ViewerApi).mount(
+      ytItem('https://youtu.be/dQw4w9WgXcQ'),
+      document.createElement('div'),
+      ctx(),
+    )
+    await m.ready
+    expect(lastConfig?.videoId).toBe('dQw4w9WgXcQ')
+    expect(lastConfig?.playerVars?.origin).toBe(window.location.origin)
   })
 
   it('creates a player; ready resolves; activate/deactivate drive it', async () => {

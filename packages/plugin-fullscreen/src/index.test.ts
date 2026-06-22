@@ -68,6 +68,36 @@ describe('plugin-fullscreen', () => {
     expect(req).toHaveBeenCalled()
   })
 
+  it('fullscreens the bound viewer root, not the first .visora, across viewers (I-PL4)', () => {
+    const a = createViewer({ collection: collection(), plugins: [fullscreen()] })
+    mount(a)
+    a.open()
+    const b = createViewer({ collection: collection(), plugins: [fullscreen()] })
+    mount(b)
+    b.open()
+    const roots = document.querySelectorAll('.visora')
+    const reqA = vi.fn(() => Promise.resolve())
+    const reqB = vi.fn(() => Promise.resolve())
+    ;(roots[0] as HTMLElement).requestFullscreen = reqA as never
+    ;(roots[1] as HTMLElement).requestFullscreen = reqB as never
+    const btns = document.querySelectorAll('.visora-fullscreen-btn')
+    ;(btns[1] as HTMLButtonElement).click() // B's button → must fullscreen B, not A
+    expect(reqB).toHaveBeenCalled()
+    expect(reqA).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the webkit-prefixed request on Safari (S-PL1)', () => {
+    openViewer()
+    const root = document.querySelector('.visora') as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>
+    }
+    root.requestFullscreen = undefined as never
+    const req = vi.fn(() => Promise.resolve())
+    root.webkitRequestFullscreen = req
+    ;(document.querySelector('.visora-fullscreen-btn') as HTMLButtonElement).click()
+    expect(req).toHaveBeenCalled()
+  })
+
   it('emits fullscreenChange on the document fullscreenchange event', () => {
     const v = openViewer()
     const onChange = vi.fn()

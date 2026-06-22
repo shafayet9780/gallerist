@@ -12,11 +12,24 @@ export interface HashOptions {
 export function parseHash(hash: string): { g?: string; i?: string } {
   const out: { g?: string; i?: string } = {}
   const raw = hash.replace(/^#/, '')
+  // The hash is untrusted (any user can edit the address bar): tolerate a malformed percent
+  // escape instead of throwing URIError (I-PL1).
+  const dec = (s: string) => {
+    try {
+      return decodeURIComponent(s)
+    } catch {
+      return s
+    }
+  }
   for (const part of raw.split('&')) {
-    const [k, v] = part.split('=')
+    // Split on the FIRST '=' only so ids may legitimately contain '=' (e.g. base64 padding) (I-PL2).
+    const eq = part.indexOf('=')
+    if (eq < 0) continue
+    const k = part.slice(0, eq)
+    const v = part.slice(eq + 1)
     if (!v) continue
-    if (k === 'g') out.g = decodeURIComponent(v)
-    else if (k === 'i') out.i = decodeURIComponent(v)
+    if (k === 'g') out.g = dec(v)
+    else if (k === 'i') out.i = dec(v)
   }
   return out
 }
@@ -51,7 +64,14 @@ export function hash(opts: HashOptions = {}): Plugin {
       if (!group) return
       const item = group.items[cur.i]
       lastWritten = formatHash(group.id, item?.id)
-      window.location.hash = lastWritten
+      // Replace, don't push: assigning location.hash stacks a new history entry on every nav,
+      // trapping the Back button (press Back N times to leave). replaceState keeps the URL
+      // shareable without polluting history (I-PL3). Falls back where history is restricted.
+      try {
+        window.history.replaceState(window.history.state, '', `#${lastWritten}`)
+      } catch {
+        window.location.hash = lastWritten
+      }
     }
 
     const onHashChange = () => {

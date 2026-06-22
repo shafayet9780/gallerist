@@ -102,7 +102,9 @@ export async function downloadItems(items: Item[], opts: ZipOptions = {}): Promi
   const blob = await downloadZip(entries).blob()
   const objectUrl = URL.createObjectURL(blob)
   anchorDownload(objectUrl, opts.zipName ?? 'visora.zip')
-  URL.revokeObjectURL(objectUrl)
+  // Defer the revoke: revoking the blob URL synchronously can cancel the still-starting download
+  // in some browsers (notably older Firefox). One tick lets the download begin first (I-PL5).
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
 }
 
 export const downloadGroup = (group: Group, opts?: ZipOptions): Promise<void> =>

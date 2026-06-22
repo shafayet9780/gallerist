@@ -25,6 +25,14 @@ describe('parse/format', () => {
     expect(parseHash('#g=a%20b')).toEqual({ g: 'a b' })
     expect(formatHash('a b')).toBe('g=a%20b')
   })
+  it('tolerates a malformed percent-escape without throwing (I-PL1)', () => {
+    expect(() => parseHash('#g=%')).not.toThrow()
+    expect(parseHash('#g=%')).toEqual({ g: '%' })
+    expect(() => parseHash('#g=%E0%A4%A')).not.toThrow()
+  })
+  it('preserves ids containing "=" by splitting on the first only (I-PL2)', () => {
+    expect(parseHash('#g=a=b&i=c')).toEqual({ g: 'a=b', i: 'c' })
+  })
 })
 
 describe('plugin-hash', () => {
@@ -71,6 +79,16 @@ describe('plugin-hash', () => {
     v.next() // g1
     window.dispatchEvent(new Event('hashchange')) // browser echo: hash unchanged from our write
     expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+  })
+
+  it('replaces history rather than pushing on intra-gallery nav (I-PL3)', () => {
+    const v = createViewer({ collection: collection(), plugins: [hash()] })
+    v.open()
+    const before = window.history.length
+    v.next()
+    v.nextItem()
+    expect(window.history.length).toBe(before) // no new Back-trapping entries
+    expect(window.location.hash).toContain('g=g1')
   })
 
   it('ignores a malformed hash without throwing', () => {
