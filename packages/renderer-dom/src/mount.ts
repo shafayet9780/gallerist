@@ -67,6 +67,11 @@ export interface MountOptions {
    * `linear` traversal, to wrap the flattened sequence at the global first/last item. Default false.
    */
   loop?: boolean
+  /** Accessible name for the overlay dialog (default 'Media viewer'); sets aria-label. */
+  label?: string
+  /** Element (or getter) to return focus to when the overlay closes. Falls back to whatever
+   *  had focus when it opened — useful when the trigger lives in a tree that may have unmounted. */
+  returnFocus?: HTMLElement | (() => HTMLElement | null)
 }
 
 export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
@@ -94,6 +99,20 @@ function el(tag: string, className?: string, attrs?: Record<string, string>): HT
   if (className) node.className = className
   if (attrs) for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v)
   return node
+}
+
+const FOCUSABLE_SELECTOR =
+  'a[href],area[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),iframe,[tabindex],[contenteditable="true"]'
+/** Tabbable descendants of `root`, in DOM order (used by the dialog focus trap). */
+function focusableWithin(root: HTMLElement): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter(
+    (node) => node.tabIndex !== -1 && !node.hasAttribute('disabled'),
+  )
+}
+/** True when the key event originates from a control where typing must not be hijacked. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  const node = target as HTMLElement | null
+  return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName ?? ''))
 }
 
 function applyTransform(content: HTMLElement, zoom: ZoomState): void {
@@ -210,6 +229,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   if (overlay) {
     root.setAttribute('role', 'dialog')
     root.setAttribute('aria-modal', 'true')
+    root.setAttribute('aria-label', opts.label ?? 'Media viewer') // dialog accessible name (I-UX1)
     root.tabIndex = -1
   } else {
     root.setAttribute('role', 'group')
@@ -518,26 +538,31 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     chromeI = cur.i
     const G = col.groups.length
     const itemCount = col.groups[cur.g]?.items.length ?? 0
+    // Announce the item's own description alongside the position so SR users hear what they
+    // navigated to, not just the index (S-UX4).
+    const alt = col.groups[cur.g]?.items[cur.i]?.alt
+    const desc = alt ? ` — ${alt}` : ''
     if (linear) {
       // flat linear: one running position across all items; the within-group pills retire.
       const pos = flatPosition(cur.g, cur.i) + 1 // flatPosition() also rebuilds flatSeq if needed
       const total = flatSeq.length
       if (counter) counter.textContent = `${pos} / ${total}`
       if (position) position.hidden = true
-      live.textContent = `Item ${pos} of ${total}`
+      live.textContent = `Item ${pos} of ${total}${desc}`
     } else {
       if (counter) counter.textContent = `${cur.g + 1} / ${G}`
       updatePosition(cur.g, cur.i, itemCount)
       live.textContent =
         itemCount > 1
-          ? `Group ${cur.g + 1} of ${G}, screen ${cur.i + 1} of ${itemCount}`
-          : `Group ${cur.g + 1} of ${G}`
+          ? `Group ${cur.g + 1} of ${G}, screen ${cur.i + 1} of ${itemCount}${desc}`
+          : `Group ${cur.g + 1} of ${G}${desc}`
     }
   }
 
   // ── attach / detach ──────────────────────────────────────────────────────────
   let attached = false
   let restoreFocus: HTMLElement | null = null
+  let inerted: HTMLElement[] = [] // body children we marked inert while the dialog is open (C5)
 
   // Auto-hide chrome on idle (UX-C); inert under reduced motion. Rail collapse is independent.
   // Created before attach() so the (TDZ-safe) poke on show works in both overlay and inline modes.
@@ -550,6 +575,15 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       restoreFocus = document.activeElement as HTMLElement | null
       lockBodyScroll()
       document.body.appendChild(root)
+      // Inert every other top-level element so the dialog is truly modal — focus and the SR
+      // virtual cursor can't reach the obscured page behind it (C5). aria-modal alone doesn't
+      // enforce this. Only touch elements we actually changed, so we restore cleanly.
+      for (const child of [...document.body.children]) {
+        if (child !== root && child instanceof HTMLElement && !child.hasAttribute('inert')) {
+          child.setAttribute('inert', '')
+          inerted.push(child)
+        }
+      }
       root.focus()
     }
     idle?.poke() // start the idle countdown from when the viewer is shown
@@ -560,7 +594,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (overlay) {
       root.remove() // remove this overlay first so the presence check below is accurate
       unlockBodyScroll()
-      restoreFocus?.focus?.()
+      for (const child of inerted) child.removeAttribute('inert')
+      inerted = []
+      // Prefer an explicit returnFocus target (survives a trigger that unmounted), else restore
+      // focus to whatever was focused on open (S-UX4).
+      const target =
+        typeof opts.returnFocus === 'function' ? opts.returnFocus() : (opts.returnFocus ?? null)
+      ;(target ?? restoreFocus)?.focus?.()
     }
   }
 
@@ -609,6 +649,28 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         ArrowUp: nav.prevItem,
       }
   const onKey = (e: KeyboardEvent) => {
+    // Don't hijack typing inside an embedded control (overlay input/textarea/etc); Escape still
+    // closes from anywhere (I-UX2).
+    if (isEditableTarget(e.target) && e.key !== 'Escape') return
+    // Focus trap: cycle Tab within the dialog so focus can't escape to the inert page (C5).
+    if (e.key === 'Tab' && overlay) {
+      const tabbables = focusableWithin(root)
+      const first = tabbables[0]
+      const last = tabbables[tabbables.length - 1]
+      if (!first || !last) {
+        e.preventDefault()
+        return
+      }
+      const active = document.activeElement
+      if (e.shiftKey && (active === first || active === root)) {
+        last.focus()
+        e.preventDefault()
+      } else if (!e.shiftKey && active === last) {
+        first.focus()
+        e.preventDefault()
+      }
+      return
+    }
     switch (e.key) {
       case 'ArrowRight':
       case 'ArrowLeft':
@@ -648,6 +710,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         } else viewer.goTo(viewer.getCollection().groups.length - 1)
         break
       default:
+        // Modified chords (Ctrl/Cmd/Alt) belong to the browser/OS, not our single-letter map.
+        if (e.ctrlKey || e.metaKey || e.altKey) return
         // Within-group digit jumps are meaningless in linear mode (the pills retire), so skip them.
         if (!linear && /^[1-9]$/.test(e.key)) {
           viewer.goTo(viewer.getState().cursor.g, Number(e.key) - 1)

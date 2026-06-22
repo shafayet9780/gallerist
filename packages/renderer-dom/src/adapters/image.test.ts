@@ -84,6 +84,13 @@ describe('imageAdapter', () => {
     expect(m.element.hasAttribute('data-visora-loaded')).toBe(true)
   })
 
+  it('flags the image with data-visora-error on a failed load (I-UX3)', async () => {
+    const m = imageAdapter().mount(img(), slot(), ctx())
+    m.element.dispatchEvent(new Event('error'))
+    await expect(m.ready).rejects.toThrow()
+    expect(m.element.hasAttribute('data-visora-error')).toBe(true)
+  })
+
   it('rejects ready when the signal is already aborted', async () => {
     const c = new AbortController()
     c.abort()

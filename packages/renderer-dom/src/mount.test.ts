@@ -580,3 +580,44 @@ describe('mount — resize re-clamp (C2)', () => {
     }
   })
 })
+
+describe('mount — modal accessibility (WS-3)', () => {
+  it('gives the overlay dialog an accessible name (I-UX1)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect(document.querySelector('.visora')?.getAttribute('aria-label')).toBe('Media viewer')
+  })
+
+  it('inerts the rest of the page while open and restores on close (C5)', () => {
+    const sibling = document.createElement('div')
+    document.body.appendChild(sibling)
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect(sibling.hasAttribute('inert')).toBe(true)
+    v.close()
+    expect(sibling.hasAttribute('inert')).toBe(false)
+  })
+
+  it('does not hijack shortcut keys while typing in an overlay control (I-UX2)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.visora') as HTMLElement
+    const input = document.createElement('input')
+    root.appendChild(input)
+    input.focus()
+    input.dispatchEvent(key({ key: 't' })) // would toggle the rail if not guarded
+    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    input.dispatchEvent(key({ key: 'Escape' })) // Escape still closes from a field
+    expect(v.getState().phase).toBe('closed')
+  })
+
+  it('announces the current item description in the live region (S-UX4)', () => {
+    const v = createViewer({ collection: collection() }) // items carry alt = id
+    mount(v)
+    v.open({ g: 1 }) // b0
+    expect(document.querySelector('.visora-live')?.textContent).toContain('b0')
+  })
+})

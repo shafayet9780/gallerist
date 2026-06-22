@@ -62,6 +62,7 @@ export function imageAdapter(): MediaAdapter {
         }
         const onError = () => {
           cleanup()
+          img.setAttribute('data-visora-error', '') // reveal a visible broken state (I-UX3)
           reject(new Error(`image load error: ${item.id}`))
         }
         img.addEventListener('load', onLoad)
@@ -94,6 +95,7 @@ export function imageAdapter(): MediaAdapter {
             })
             .catch((err) => {
               cleanup()
+              img.setAttribute('data-visora-error', '') // reveal a visible broken state (I-UX3)
               reject(err instanceof Error ? err : new Error(String(err)))
             })
         }
