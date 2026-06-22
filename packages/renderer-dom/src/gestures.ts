@@ -104,8 +104,24 @@ export function attachGestures(opts: GestureOptions): () => void {
     })
   }
 
+  // Pointer capture keeps move/up/cancel flowing to the stage even when the pointer
+  // leaves the stage bounds (panning a zoomed image past the edge, a fast swipe). Without
+  // it an off-stage pointerup never reaches onUp, stranding the gesture and poisoning the
+  // next one. Guard the calls: synthetic test events and inactive pointer ids throw (C3).
+  const capture = (id: number) => {
+    try {
+      stage.setPointerCapture?.(id)
+    } catch {}
+  }
+  const release = (id: number) => {
+    try {
+      stage.releasePointerCapture?.(id)
+    } catch {}
+  }
+
   const onDown = (e: PointerEvent) => {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    capture(e.pointerId)
     startZoom = { ...viewer.getState().zoom }
     live = { ...startZoom }
     gestureGeom = getGeometry() // snapshot once; reused for the gesture (no per-move layout)
@@ -167,9 +183,22 @@ export function attachGestures(opts: GestureOptions): () => void {
   const onUp = (e: PointerEvent) => {
     if (!pointers.has(e.pointerId)) return
     pointers.delete(e.pointerId)
+    release(e.pointerId)
     if (frame) {
       caf(frame)
       frame = 0
+    }
+
+    // Pinch → single-finger handoff: when the first of two fingers lifts, commit the pinch
+    // zoom now and re-seat the gesture onto the remaining finger so it continues as a fresh
+    // pan/swipe. Otherwise the lingering finger is dead until the second finger lifts (I-R2).
+    if (intent === 'zoom' && pointers.size === 1) {
+      viewer.zoomTo(live.scale, { x: live.x, y: live.y })
+      const [remaining] = [...pointers.values()]
+      startZoom = { ...live }
+      start = remaining ? { x: remaining.x, y: remaining.y } : null
+      intent = 'none'
+      return
     }
 
     // Use the up event's own coordinates: coalesced input may have fired no pointermove,

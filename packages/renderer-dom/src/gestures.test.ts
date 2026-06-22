@@ -135,3 +135,28 @@ describe('pointer gestures → arbitration', () => {
     expect(nextItem).toHaveBeenCalled()
   })
 })
+
+describe('multi-touch pinch → pan handoff (I-R2)', () => {
+  it('commits the pinch zoom when the first finger lifts and lets the second finger pan', () => {
+    const v = setup()
+    v.zoomTo(0.5, { x: 0, y: 0 }) // start at fit
+    const next = vi.spyOn(v, 'next')
+    // two fingers down (200px apart) → pinch intent
+    stage.dispatchEvent(pe('pointerdown', 400, 400, 1))
+    stage.dispatchEvent(pe('pointerdown', 600, 400, 2))
+    // spread to 400px apart → factor 2 → scale 1.0 (from fit 0.5)
+    stage.dispatchEvent(pe('pointermove', 300, 400, 1))
+    stage.dispatchEvent(pe('pointermove', 700, 400, 2))
+    // lift finger 1 → pinch must commit now, not stay frozen until finger 2 lifts
+    stage.dispatchEvent(pe('pointerup', 300, 400, 1))
+    const scaleAfterPinch = v.getState().zoom.scale
+    const xAfterPinch = v.getState().zoom.x
+    expect(scaleAfterPinch).toBeGreaterThan(0.5)
+    // the lingering finger must now pan (not be dead, not navigate)
+    stage.dispatchEvent(pe('pointermove', 650, 400, 2)) // dx -50 from its 700 start
+    stage.dispatchEvent(pe('pointerup', 650, 400, 2))
+    expect(next).not.toHaveBeenCalled()
+    expect(v.getState().zoom.scale).toBeCloseTo(scaleAfterPinch, 5) // pan preserves scale
+    expect(v.getState().zoom.x).toBeLessThan(xAfterPinch) // panned left
+  })
+})
