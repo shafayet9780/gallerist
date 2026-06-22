@@ -161,7 +161,7 @@ One internal representation, two ergonomic front doors. Flat users never see the
 The cursor is `{ g: number; i: number }` (group index, item index).
 
 - **Primary axis** (`next()/prev()`): moves `g`. Wraps if `loop`.
-- **Secondary axis** (`nextItem()/prevItem()`): moves `i` within the current group. A group with one item makes the secondary axis a no-op (and the renderer hides its affordances).
+- **Secondary axis** (`nextItem()/prevItem()`): moves `i` within the current group. **Wraps within the group if `loop`** (the same flag governs both axes — see D15). A group with one item makes the secondary axis a no-op (and the renderer hides its affordances).
 - **Cross-axis policy** when entering a new group — `itemMemory` (locked: default `reset`; Apploye ships `preserve`):
   - `'reset'` → `i = 0` (default; most galleries).
   - `'preserve'` → keep `i` if the new group has that index (great for monitoring: stay on monitor 2 across moments).
@@ -645,6 +645,7 @@ All forks are locked. Recorded here for provenance.
 | D12 | Monorepo tooling | **pnpm + Changesets** | Simplest for an OSS lib. |
 | D13 | Production direction | **Dogfood-first** | Apploye is the first consumer of the MVP; stress-tests the grouped model on a hard workload. |
 | D14 | Open-core boundary | **All generic features MIT; only Apploye domain logic proprietary** | Generosity in the core drives adoption; the moat is the domain layer, not withheld features. |
+| D15 | `loop` axis scope | **Both axes wrap on `loop`** (single flag) | Phase-1 review: `nextItem/prevItem` wrap within the group when `loop` is set, mirroring the primary axis, rather than introducing a separate per-axis flag. Simpler surface; the variant axis cycles like the group axis. |
 
 Note on D7: pure MIT + DCO means the open core cannot be *unilaterally* re-licensed commercially later. Accepted deliberately — that lever isn't needed, because value capture lives in the Apploye layer, which MIT already permits to stay closed.
 
