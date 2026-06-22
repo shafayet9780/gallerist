@@ -1,5 +1,5 @@
 import type { ViewerApi, ViewerState } from '@visora/core'
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
 export interface UseVisora {
   state: Readonly<ViewerState>
@@ -22,18 +22,24 @@ export function useVisora(viewer: ViewerApi): UseVisora {
   const getSnapshot = useCallback(() => viewer.getState(), [viewer])
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
-  return {
-    state,
-    viewer,
-    open: (at) => viewer.open(at),
-    close: () => viewer.close(),
-    next: () => viewer.next(),
-    prev: () => viewer.prev(),
-    nextItem: () => viewer.nextItem(),
-    prevItem: () => viewer.prevItem(),
-    goTo: (g, i) => viewer.goTo(g, i),
-    goToId: (g, i) => viewer.goToId(g, i),
-    zoomTo: (s, f) => viewer.zoomTo(s, f),
-    resetZoom: () => viewer.resetZoom(),
-  }
+  // Stabilize the action closures so they keep a constant identity across re-renders (this hook
+  // re-renders on every store commit). Otherwise each commit handed consumers fresh function
+  // references, defeating React.memo / dependency-array memoization downstream (S-PERF4).
+  const actions = useMemo(
+    () => ({
+      open: (at?: Parameters<ViewerApi['open']>[0]) => viewer.open(at),
+      close: () => viewer.close(),
+      next: () => viewer.next(),
+      prev: () => viewer.prev(),
+      nextItem: () => viewer.nextItem(),
+      prevItem: () => viewer.prevItem(),
+      goTo: (g: number, i?: number) => viewer.goTo(g, i),
+      goToId: (g: string, i?: string) => viewer.goToId(g, i),
+      zoomTo: (s: number, f?: Parameters<ViewerApi['zoomTo']>[1]) => viewer.zoomTo(s, f),
+      resetZoom: () => viewer.resetZoom(),
+    }),
+    [viewer],
+  )
+
+  return { state, viewer, ...actions }
 }

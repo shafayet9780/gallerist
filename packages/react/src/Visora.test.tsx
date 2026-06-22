@@ -2,7 +2,7 @@
 
 import { act, cleanup, render, screen } from '@testing-library/react'
 import type { Collection, ViewerApi } from '@visora/core'
-import { StrictMode, createRef } from 'react'
+import { StrictMode, createRef, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Visora } from './Visora'
 import { useViewerContext } from './context'
@@ -154,5 +154,37 @@ describe('portal bridge', () => {
     expect(document.querySelector('.visora-viewport-layer')?.textContent ?? '').not.toContain(
       'Badge',
     )
+  })
+
+  it('disposes plugins when the component unmounts (I-X2)', () => {
+    const destroy = vi.fn()
+    const plugin = () => ({ name: 'leaky', init() {}, destroy })
+    const { unmount } = render(<Visora collection={collection} open plugins={[plugin]} />)
+    expect(document.querySelector('.visora')).not.toBeNull()
+    unmount()
+    expect(destroy).toHaveBeenCalled()
+  })
+
+  it('fires onClose exactly once on a controlled close (I-X1)', () => {
+    const onClose = vi.fn()
+    function Controlled() {
+      const [open, setOpen] = useState(true)
+      return (
+        <Visora
+          collection={collection}
+          open={open}
+          onClose={() => {
+            onClose()
+            setOpen(false)
+          }}
+        />
+      )
+    }
+    render(<Controlled />)
+    act(() => {
+      const root = document.querySelector('.visora') as HTMLElement
+      root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

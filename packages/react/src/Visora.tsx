@@ -56,9 +56,25 @@ const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref
   } = props
   const rootRef = useRef<HTMLElement | null>(null)
   // Create the viewer once (core is DOM-free → SSR-safe); options are read at construction. Lazy
-  // useState (not useMemo, which React may discard) guarantees a single stable instance.
-  const [viewer] = useState(() => createViewer(options))
+  // useState (not useMemo, which React may discard) guarantees a single stable instance. Plugins
+  // are deliberately NOT registered at construction — they're managed in an effect below so their
+  // teardown runs on unmount (I-X2).
+  const [viewer] = useState(() => {
+    const { plugins: _plugins, ...rest } = options
+    return createViewer(rest)
+  })
   useImperativeHandle(ref, () => viewer, [viewer])
+
+  // Register the construction-time plugins via use() and dispose them on unmount, so their
+  // init()-created store subscriptions / observers / DOM don't leak on every remount (the viewer
+  // itself is intentionally never destroyed — see the mount effect). Plugins are mount-time config.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: register once for the viewer's life
+  useEffect(() => {
+    const disposers = (options.plugins ?? []).map((plugin) => viewer.use(plugin))
+    return () => {
+      for (const dispose of disposers) dispose()
+    }
+  }, [viewer])
 
   // Mount the renderer once per viewer (client-side); container/controls are mount-time only. Only
   // the renderer (the DOM holder) is torn down here. The viewer is NOT destroyed on cleanup: under
@@ -125,6 +141,13 @@ function Overlay(props: VisoraOverlayProps): ReactNode {
   const autoId = useId()
   const id = props.id ?? autoId
 
+  // Depend on the VALUE of the object/array props, not their identity. The common usage passes
+  // inline literals (`anchor={{ kind: 'viewport', … }}`) that are a fresh reference every render;
+  // keying on identity disposed+re-registered the overlay plugin on every parent render, forcing a
+  // full overlay repaint. Serializing makes re-registration happen only on a real change (I-X3).
+  const anchorKey = JSON.stringify(props.anchor)
+  const visibleAtKey = JSON.stringify(props.visibleAt ?? null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: anchor/visibleAt tracked by value key
   useEffect(() => {
     const node = document.createElement('div')
     setHost(node)
@@ -142,7 +165,7 @@ function Overlay(props: VisoraOverlayProps): ReactNode {
       dispose()
       setHost(null)
     }
-  }, [viewer, id, props.anchor, props.layer, props.interactive, props.visibleAt, props.className])
+  }, [viewer, id, anchorKey, visibleAtKey, props.layer, props.interactive, props.className])
 
   return host ? createPortal(props.children, host) : null
 }
