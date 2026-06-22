@@ -13,5 +13,6 @@ export default defineConfig({
   tsconfig: 'tsconfig.build.json',
   esbuildOptions(options) {
     options.jsx = 'automatic'
+    options.sourcesContent = false
   },
 })

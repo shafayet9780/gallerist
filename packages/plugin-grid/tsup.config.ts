@@ -10,4 +10,7 @@ export default defineConfig({
   target: 'es2022',
   external: ['@visora/core'],
   tsconfig: 'tsconfig.build.json',
+  esbuildOptions(options) {
+    options.sourcesContent = false
+  },
 })

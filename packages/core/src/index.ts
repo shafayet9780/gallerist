@@ -1,6 +1,8 @@
 // @visora/core — headless engine entry point.
 // Phase 0 build order (see plans/phase-0.md): M1 model/store/FSM/nav, M2 zoom/arbitration math.
-export const VERSION = '0.0.0'
+declare const __VISORA_VERSION__: string
+/** Package version, injected from package.json at build time (tsup `define`). */
+export const VERSION = __VISORA_VERSION__
 
 export type * from './types'
 export type { EventHandlers, ViewerApi, ViewerOptions } from './api'

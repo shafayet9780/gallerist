@@ -1,27 +1,63 @@
 {
   "name": "@visora/core",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "Headless, framework-agnostic media viewer engine — nested galleries, image-space overlays, virtualization.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "files": ["dist"],
+  "files": ["dist", "LICENSE", "README.md"],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../../scripts/copy-license.mjs"
   },
   "devDependencies": {
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shafayet9780/visora.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/shafayet9780/visora#readme",
+  "bugs": {
+    "url": "https://github.com/shafayet9780/visora/issues"
+  },
+  "author": "Shafayet Ahmmed",
+  "keywords": [
+    "lightbox",
+    "gallery",
+    "image-viewer",
+    "media-viewer",
+    "photo-gallery",
+    "carousel",
+    "zoom",
+    "pan",
+    "overlays",
+    "headless",
+    "framework-agnostic",
+    "virtualized",
+    "nested-gallery",
+    "state-machine",
+    "signals"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

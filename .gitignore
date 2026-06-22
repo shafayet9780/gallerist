@@ -6,3 +6,6 @@ coverage/
 test-results/
 playwright-report/
 .turbo/
+
+# LICENSE is copied into each package at pack time (scripts/copy-license.mjs)
+packages/*/LICENSE

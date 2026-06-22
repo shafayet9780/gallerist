@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'tsup'
+
+const { version } = JSON.parse(readFileSync('package.json', 'utf8'))
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -11,4 +14,8 @@ export default defineConfig({
   target: 'es2022',
   external: ['@visora/core'],
   tsconfig: 'tsconfig.build.json',
+  define: { __VISORA_VERSION__: JSON.stringify(version) },
+  esbuildOptions(options) {
+    options.sourcesContent = false
+  },
 })

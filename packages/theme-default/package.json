@@ -1,16 +1,47 @@
 {
   "name": "@visora/theme-default",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "Default Visora theme — pure CSS, no JS dependency. Driven by --visora-* custom properties.",
   "license": "MIT",
   "sideEffects": ["*.css"],
-  "files": ["src"],
+  "files": ["src", "LICENSE", "README.md"],
   "exports": {
     "./visora.css": "./src/visora.css",
     "./package.json": "./package.json"
   },
   "scripts": {
     "build": "node -e \"process.stdout.write('theme-default: CSS only, no build step\\n')\"",
-    "typecheck": "node -e \"process.exit(0)\""
+    "typecheck": "node -e \"process.exit(0)\"",
+    "prepack": "node ../../scripts/copy-license.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shafayet9780/visora.git",
+    "directory": "packages/theme-default"
+  },
+  "homepage": "https://github.com/shafayet9780/visora#readme",
+  "bugs": {
+    "url": "https://github.com/shafayet9780/visora/issues"
+  },
+  "author": "Shafayet Ahmmed",
+  "keywords": [
+    "lightbox",
+    "gallery",
+    "image-viewer",
+    "media-viewer",
+    "photo-gallery",
+    "carousel",
+    "zoom",
+    "pan",
+    "overlays",
+    "headless",
+    "framework-agnostic",
+    "virtualized",
+    "nested-gallery",
+    "css",
+    "theme"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
