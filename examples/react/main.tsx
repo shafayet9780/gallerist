@@ -28,15 +28,23 @@ type AutoHide = 'auto' | 'on' | 'off'
 type LinearOpt = 'auto' | 'on' | 'off'
 type Opt<T> = T | 'auto'
 
-const shot = (seed: string, alt: string, caption?: string): Item => ({
-  id: seed,
-  type: 'image',
-  source: `https://picsum.photos/seed/${seed}/1600/1000`,
-  thumb: `https://picsum.photos/seed/${seed}/360/225`,
-  alt,
-  caption,
-  naturalSize: { w: 1600, h: 1000 },
-})
+// Local tech photos (served from examples/react/public/photos) so the playground works fully
+// offline — no dependency on an external image service. Cycled across items at module load.
+const PHOTOS = ['tech-01', 'tech-02', 'tech-03', 'tech-04', 'tech-05', 'tech-06']
+let photoN = 0
+
+const shot = (seed: string, alt: string, caption?: string): Item => {
+  const photo = PHOTOS[photoN++ % PHOTOS.length]
+  return {
+    id: seed,
+    type: 'image',
+    source: `/photos/${photo}.jpg`,
+    thumb: `/photos/${photo}-thumb.jpg`,
+    alt,
+    caption,
+    naturalSize: { w: 1600, h: 1000 },
+  }
+}
 
 const bucket = (
   id: string,
@@ -86,7 +94,7 @@ const mediaGroup: Collection['groups'][number] = {
       id: 'mp4',
       type: 'video',
       source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-      thumb: 'https://picsum.photos/seed/bunny/360/225',
+      thumb: '/photos/tech-06-thumb.jpg',
       alt: 'MP4 clip',
       caption: 'MP4 file',
     },
