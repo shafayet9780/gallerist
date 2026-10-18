@@ -468,6 +468,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
             if (attached) renderWindow()
           })
           .catch((error) => {
+            // A load we cancelled (slide torn down, item swapped out) is not a failure — adapters
+            // reject `ready` on abort, and reporting it would mark the item 'error'.
+            if (abort.signal.aborted) return
             viewer.emit('loadError', { ...loadBase, cursor: viewer.cursor, id: mountedId, error })
           })
       }

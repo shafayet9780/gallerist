@@ -358,6 +358,58 @@ describe('mount — late mediaAdapters via use()', () => {
   })
 })
 
+describe('mount — load lifecycle', () => {
+  // An adapter whose load never settles on its own: it rejects only when aborted, or on fail().
+  const pendingAdapter = (failures: Map<string, (e: unknown) => void>) => ({
+    type: 'image',
+    mount: (it: Item, slot: HTMLElement, ctx: { signal: AbortSignal }) => {
+      const img = document.createElement('img')
+      slot.appendChild(img)
+      const ready = new Promise<void>((_resolve, reject) => {
+        ctx.signal.addEventListener('abort', () =>
+          reject(new DOMException('Image load aborted', 'AbortError')),
+        )
+        failures.set(it.id, reject)
+      })
+      return {
+        element: img,
+        ready,
+        supportsZoom: true,
+        naturalSize: () => null,
+        destroy: () => img.remove(),
+      }
+    },
+  })
+  const flush = () => new Promise((r) => setTimeout(r, 0))
+
+  it('a load cancelled by navigation is not reported as loadError', async () => {
+    const loadError = vi.fn()
+    const v = createViewer({ collection: collection(), on: { loadError } })
+    mount(v, { adapters: [pendingAdapter(new Map())] })
+    v.open({ g: 1 })
+    v.nextItem() // swaps b0 → b1: b0's in-flight load is aborted
+    v.next() // g1 → g2 and further: tears slides down mid-load
+    v.next()
+    await flush()
+    expect(loadError).not.toHaveBeenCalled()
+    expect(Object.values(v.getState().loaded)).not.toContain('error')
+  })
+
+  it('a genuine load failure still emits loadError and marks the item error', async () => {
+    const loadError = vi.fn()
+    const failures = new Map<string, (e: unknown) => void>()
+    const v = createViewer({ collection: collection(), on: { loadError } })
+    mount(v, { adapters: [pendingAdapter(failures)] })
+    v.open()
+    const boom = new Error('404')
+    failures.get('a0')?.(boom)
+    await flush()
+    expect(loadError).toHaveBeenCalledTimes(1)
+    expect(loadError.mock.calls[0]?.[0]).toMatchObject({ id: 'a0', error: boom })
+    expect(v.getState().loaded.a0).toBe('error')
+  })
+})
+
 describe('mount — destroy', () => {
   it('removes the root and stops reacting', () => {
     const v = createViewer({ collection: collection() })
