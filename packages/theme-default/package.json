@@ -3,14 +3,8 @@
   "version": "0.2.0",
   "description": "Default Gallerist theme — pure CSS, no JS dependency. Driven by --gallerist-* custom properties.",
   "license": "MIT",
-  "sideEffects": [
-    "*.css"
-  ],
-  "files": [
-    "src",
-    "LICENSE",
-    "README.md"
-  ],
+  "sideEffects": ["*.css"],
+  "files": ["src", "LICENSE", "README.md"],
   "exports": {
     "./gallerist.css": "./src/gallerist.css",
     "./base.css": "./src/base.css",

@@ -58,6 +58,8 @@
   `color-scheme: dark` (dark native scrollbars). New base tokens let any skin do the same:
   `--gallerist-bar-bg`, `--gallerist-bar-border`, `--gallerist-rail-border`, `--gallerist-tool-fg`,
   `--gallerist-pressed-shadow`. Gallery is unchanged.
+- **theme (M18)**: plugin-grid's styles move from `base.css` to `grid.css` (like `pins.css`);
+  `gallerist.css` includes both, so only a skin built on `base.css` alone needs to import them.
 - **examples/monitoring (M18)**: Console + `reviewer` with timeline times, numbered monitors, the
   zoom navigator and comment pins (press C to add one).
 - **theme (M16)**: `theme-default` splits into `base.css` (structure: layout areas, reserved space,

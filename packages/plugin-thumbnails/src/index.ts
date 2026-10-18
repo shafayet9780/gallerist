@@ -321,7 +321,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         const label = document.createElement('span')
         label.className = 'gallerist-thumb-time'
         label.setAttribute('aria-hidden', 'true') // folded into the card's name below
-        label.textContent = time ?? ''
+        const text = document.createElement('span')
+        text.className = 'gallerist-thumb-time-text'
+        text.textContent = time ?? ''
+        label.appendChild(text)
         wrap.prepend(label)
         if (time) btn.setAttribute('aria-label', `Group ${gIndex + 1}, ${time}`)
       }

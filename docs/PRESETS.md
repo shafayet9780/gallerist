@@ -33,9 +33,9 @@ const { thumbnails: t } = resolvePreset('reviewer')
 createViewer({ collection, plugins: [thumbnails(t)] })
 ```
 
-`resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails }`.
-Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide` options always win over
-the preset.
+`resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails,
+navigator? }`. Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide`/`navigator`
+options always win over the preset.
 
 ## Rail placement (`data-gallerist-rail-pos`)
 
@@ -107,7 +107,8 @@ exception: the stage fills the viewer and the bar, caption and rail float over i
 - **Zoom navigator** (`navigator: true`, on in `reviewer`): while zoomed in, a minimap of the image
   in the stage's bottom corner (top corner on narrow screens) with a box for the visible part;
   click or drag it to move around. It is a pointer aid, hidden from assistive tech; the keys zoom
-  and pan as before.
+  and pan as before. It belongs to the built-in controls (none with `controls: false`) and fades
+  with them on idle; it isn't shown for media that can't zoom (video).
 - **Phones:** under 600px wide the chrome compacts, the `aside` column and the items toggle are
   dropped and the bar's tools scroll sideways if they don't fit. On a touch screen every target is
   at least 44px, the ↑ · position · ↓ navigator stays visible (group arrows give way to swipes but

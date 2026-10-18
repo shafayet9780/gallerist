@@ -441,6 +441,53 @@ describe('mount — zoom navigator (M18)', () => {
     expect(nav()?.hidden).toBe(true)
   })
 
+  it('keeps no minimap for media that cannot zoom, and ignores secondary buttons', () => {
+    const v = createViewer({ collection: sized() })
+    mount(v, {
+      navigator: true,
+      adapters: [
+        {
+          type: 'image',
+          mount: (_it, slot) => {
+            const node = document.createElement('video')
+            node.className = 'gallerist-media'
+            slot.appendChild(node)
+            return {
+              element: node,
+              ready: Promise.resolve(),
+              naturalSize: () => ({ w: 1000, h: 800 }),
+              supportsZoom: false,
+              destroy: () => node.remove(),
+            }
+          },
+        },
+      ],
+    })
+    v.open()
+    measure(1000, 800)
+    getInternals(v).setZoom({ scale: 2, x: -500, y: -400 })
+    expect(nav()?.hidden).toBe(true)
+  })
+
+  it('a right-button press on the minimap does not pan', () => {
+    const v = createViewer({ collection: sized() })
+    mount(v, { navigator: true })
+    v.open()
+    measure(1000, 800)
+    getInternals(v).setZoom({ scale: 2, x: -500, y: -400 })
+    const n = nav() as HTMLElement
+    vi.spyOn(n, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 80,
+    } as DOMRect)
+    n.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, button: 2, clientX: 25, clientY: 20 }),
+    )
+    expect(v.getState().zoom).toEqual({ scale: 2, x: -500, y: -400 })
+  })
+
   it('pointing at the minimap centres the view there', () => {
     const v = createViewer({ collection: sized() })
     mount(v, { navigator: true })

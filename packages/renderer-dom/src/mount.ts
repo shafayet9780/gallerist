@@ -95,7 +95,7 @@ export interface MountOptions {
   /**
    * Zoom navigator: while zoomed in, a minimap of the image in the stage's bottom corner with a box
    * for the visible part; click or drag it to move around. Default off (the `reviewer` preset turns
-   * it on).
+   * it on). Part of the built-in controls, so `controls: false` has none.
    */
   navigator?: boolean
   /** Accessible name for the overlay dialog (default 'Media viewer'); sets aria-label. */
@@ -773,23 +773,20 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const natural = rec?.media?.naturalSize?.()
     const { g, i } = viewer.getState().cursor
     const it = viewer.getCollection().groups[g]?.items[i]
-    const src = it ? (sourceUrl(it.thumb) ?? sourceUrl(it.source)) : null
+    // the image itself (already loaded): a thumb may be cropped to another shape
+    const src = it ? (sourceUrl(it.source) ?? sourceUrl(it.thumb)) : null
     const size = stageSize()
-    if (!(z.scale > 1.001) || !natural || !src || !(size.w > 0)) {
+    const zoomable = rec?.media?.supportsZoom !== false // a video keeps no minimap
+    if (!(z.scale > 1.001) || !zoomable || !natural || !src || !(size.w > 0)) {
       navigatorEl.hidden = true
       return
     }
     const box = mediaBox(size)
     const url = `url(${JSON.stringify(src)})`
     if (navigatorEl.style.backgroundImage !== url) navigatorEl.style.backgroundImage = url
-    // fit the image's shape inside the skin's navigator size
-    const max =
-      Number.parseFloat(
-        getComputedStyle(navigatorEl).getPropertyValue('--gallerist-navigator-size'),
-      ) || 160
-    const k = max / Math.max(natural.w, natural.h)
-    navigatorEl.style.width = `${natural.w * k}px`
-    navigatorEl.style.height = `${natural.h * k}px`
+    // the image's shape; the theme sizes its longer side from --gallerist-navigator-size
+    navigatorEl.style.aspectRatio = `${natural.w} / ${natural.h}`
+    navigatorEl.dataset.shape = natural.h > natural.w ? 'portrait' : 'landscape'
     const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
     const x0 = clamp01((-z.x / z.scale - box.x) / box.w)
     const y0 = clamp01((-z.y / z.scale - box.y) / box.h)
@@ -820,6 +817,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     })
   }
   function onNavigatorDown(e: PointerEvent) {
+    if (e.button !== 0) return // primary button (or touch / pen contact) only
     const nav = e.currentTarget as HTMLElement
     e.preventDefault()
     e.stopPropagation()
@@ -830,10 +828,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       nav.removeEventListener('pointermove', move)
       nav.removeEventListener('pointerup', up)
       nav.removeEventListener('pointercancel', up)
+      nav.removeEventListener('lostpointercapture', up)
     }
     nav.addEventListener('pointermove', move)
     nav.addEventListener('pointerup', up)
     nav.addEventListener('pointercancel', up)
+    // hidden mid-drag (zoom reset): capture is lost and no pointerup arrives here
+    nav.addEventListener('lostpointercapture', up)
   }
 
   // ── attach / detach ──────────────────────────────────────────────────────────

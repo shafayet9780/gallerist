@@ -24,7 +24,7 @@ export interface ResolvedPreset {
     numberItems?: boolean
   }
   /** turn on the zoom navigator by default (overridable). */
-  navigator: boolean
+  navigator?: boolean
 }
 
 const PRESETS: Record<PresetName, ResolvedPreset> = {

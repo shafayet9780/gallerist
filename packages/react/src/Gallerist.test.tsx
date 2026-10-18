@@ -49,6 +49,11 @@ describe('<Gallerist>', () => {
     expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
   })
 
+  it('passes navigator to the renderer, overriding the preset', () => {
+    render(<Gallerist collection={collection} open preset="reviewer" navigator={false} />)
+    expect(document.querySelector('.gallerist-navigator')).toBeNull()
+  })
+
   it('closes when open flips to false and fires onClose', () => {
     const onClose = vi.fn()
     const { rerender } = render(<Gallerist collection={collection} open onClose={onClose} />)

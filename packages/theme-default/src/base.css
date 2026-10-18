@@ -50,6 +50,7 @@
     --gallerist-tool-fg: var(--gallerist-fg);
     --gallerist-pressed-shadow: none;
     --gallerist-navigator-size: 160px; /* the zoom navigator's longest side */
+    --gallerist-navigator-radius: min(var(--gallerist-radius), 8px);
     --gallerist-rail-track-gap: var(--gallerist-rail-bg); /* the ring that cuts the track at a tick */
 
     /* hover: unchanged unless a skin sets one */
@@ -512,10 +513,35 @@
   align-items: center;
   gap: 6px;
   height: 14px;
+  /* a label never widens its card's column: long ones end in an ellipsis */
+  max-width: calc(var(--gallerist-thumb-h) * 1.4);
   font: 500 11px var(--gallerist-mono);
   font-variant-numeric: tabular-nums;
   color: var(--gallerist-fg-muted);
   white-space: nowrap;
+}
+.gallerist-thumb-time-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* a side rail runs top to bottom: no horizontal track between the cards */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-time::after {
+  display: none;
+}
+/* a timeline label sits above the card, so the touch expand caret moves down onto the card */
+.gallerist-thumbs[data-timeline] .gallerist-thumb-expand {
+  top: calc(14px + 6px + 4px);
+}
+/* a side rail's band edge faces the stage, not the bar */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs {
+  border-block-start: 0 none;
+}
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumbs {
+  border-right: var(--gallerist-rail-border);
+}
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-thumbs {
+  border-left: var(--gallerist-rail-border);
 }
 .gallerist-thumb-time::before {
   content: "";
@@ -1000,15 +1026,21 @@
   z-index: 4;
   inset-inline-start: 12px;
   inset-block-end: 12px;
-  width: var(--gallerist-navigator-size); /* the renderer fits the image's shape inside this */
+  /* the longer side is the token; the renderer sets the image's aspect ratio */
+  width: var(--gallerist-navigator-size);
+  height: auto;
   overflow: hidden;
   border: var(--gallerist-control-border);
-  border-radius: var(--gallerist-control-radius);
+  border-radius: var(--gallerist-navigator-radius); /* a minimap keeps its corners */
   background: var(--gallerist-surface) center / 100% 100% no-repeat;
   box-shadow: var(--gallerist-shadow);
   cursor: crosshair;
   touch-action: none;
   pointer-events: auto;
+}
+.gallerist-navigator[data-shape="portrait"] {
+  width: auto;
+  height: var(--gallerist-navigator-size);
 }
 .gallerist-navigator[hidden] {
   display: none;
@@ -1189,12 +1221,14 @@
 .gallerist-bar,
 .gallerist-controls > button,
 .gallerist-itemnav,
+.gallerist-navigator,
 .gallerist-caption {
   transition: opacity var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
 }
 .gallerist[data-gallerist-idle] .gallerist-bar,
 .gallerist[data-gallerist-idle] .gallerist-controls > button,
 .gallerist[data-gallerist-idle] .gallerist-itemnav,
+.gallerist[data-gallerist-idle] .gallerist-navigator,
 .gallerist[data-gallerist-idle] .gallerist-caption {
   opacity: 0;
   pointer-events: none;
