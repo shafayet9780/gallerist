@@ -10,6 +10,8 @@ export default defineConfig({
       '@gallerist/core/internal': r('../../packages/core/src/internal.ts'),
       '@gallerist/core': r('../../packages/core/src/index.ts'),
       '@gallerist/renderer-dom': r('../../packages/renderer-dom/src/index.ts'),
+      '@gallerist/plugin-pins': r('../../packages/plugin-pins/src/index.ts'),
+      '@gallerist/plugin-thumbnails': r('../../packages/plugin-thumbnails/src/index.ts'),
       '@gallerist/theme-default': r('../../packages/theme-default/src'),
     },
   },

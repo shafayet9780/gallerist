@@ -42,6 +42,16 @@
     --gallerist-pin-resolved-fg: #f0f1f3;
     --gallerist-pin-card-bg: var(--gallerist-panel); /* near-opaque: it sits on the image */
 
+    /* bands and tools: a skin may give the bar and rail a solid band, tint the tools, and mark a
+       pressed toggle with a shadow (an underline) as well as its fill */
+    --gallerist-bar-bg: transparent;
+    --gallerist-bar-border: 0 none;
+    --gallerist-rail-border: 0 none;
+    --gallerist-tool-fg: var(--gallerist-fg);
+    --gallerist-pressed-shadow: none;
+    --gallerist-navigator-size: 160px; /* the zoom navigator's longest side */
+    --gallerist-rail-track-gap: var(--gallerist-rail-bg); /* the ring that cuts the track at a tick */
+
     /* hover: unchanged unless a skin sets one */
     --gallerist-arrow-hover-bg: var(--gallerist-arrow-bg);
     --gallerist-itemnav-button-hover-bg: var(--gallerist-itemnav-button-bg);
@@ -333,48 +343,6 @@
   z-index: 0;
 }
 
-/* ── grid (plugin-grid) ────────────────────────────────────────────────────── */
-.gallerist-grid {
-  position: absolute;
-  inset: 0;
-  overflow-y: auto;
-  padding: 16px;
-  background: var(--gallerist-panel);
-  backdrop-filter: blur(8px);
-}
-.gallerist-grid-header {
-  position: sticky;
-  top: 0;
-  padding: 12px 4px 8px;
-  font: 500 14px var(--gallerist-font);
-  color: var(--gallerist-fg);
-  background: var(--gallerist-panel);
-}
-.gallerist-grid-cells {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.gallerist-grid-cell {
-  aspect-ratio: 3 / 2;
-  padding: 0;
-  border: 2px solid transparent;
-  border-radius: var(--gallerist-thumb-radius);
-  overflow: hidden;
-  cursor: pointer;
-  background: var(--gallerist-cell-bg);
-}
-.gallerist-grid-cell[data-active] {
-  border-color: var(--gallerist-selection);
-}
-.gallerist-grid-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
 /* ── thumbnails rail (plugin-thumbnails) ───────────────────────────────────── */
 /* the region wrapper: holds the scrollable rail plus the floating item/peek panels as siblings, so
    the panels escape the rail's overflow-clip yet still ride along when the region is re-mounted. */
@@ -395,6 +363,7 @@
   padding: 8px 12px;
   overflow-x: auto;
   background: var(--gallerist-rail-bg);
+  border-block-start: var(--gallerist-rail-border);
   backdrop-filter: var(--gallerist-blur);
 }
 /* cards stack image + (optional) caption band; height grows for the caption */
@@ -528,6 +497,74 @@
   box-shadow: var(--gallerist-item-ring);
 }
 
+/* timeline (thumbnails `timeline`): a label with a tick above each card, the ticks joined into one
+   track line; the current group's tick and label take the accent */
+.gallerist-thumbs[data-timeline] {
+  align-items: flex-start;
+}
+.gallerist-thumbs[data-timeline] .gallerist-thumb-wrap {
+  flex-direction: column;
+  gap: 6px;
+}
+.gallerist-thumb-time {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 14px;
+  font: 500 11px var(--gallerist-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--gallerist-fg-muted);
+  white-space: nowrap;
+}
+.gallerist-thumb-time::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gallerist-fg-muted);
+  box-shadow: 0 0 0 3px var(--gallerist-rail-track-gap);
+}
+/* the track: each label's line runs through its gap to the next card */
+.gallerist-thumb-time::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-inline: 0 -8px;
+  top: 50%;
+  height: 1px;
+  background: var(--gallerist-hairline);
+}
+.gallerist-thumb-wrap {
+  isolation: isolate; /* keeps the track line behind its own label */
+}
+.gallerist-thumb-wrap[data-active] .gallerist-thumb-time {
+  color: var(--gallerist-accent);
+}
+.gallerist-thumb-wrap[data-active] .gallerist-thumb-time::before {
+  background: var(--gallerist-accent);
+}
+/* numbered items (thumbnails `numberItems`) */
+.gallerist-thumb-num {
+  position: absolute;
+  top: 3px;
+  inset-inline-start: 3px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: 2px;
+  background: var(--gallerist-badge-bg);
+  color: var(--gallerist-fg);
+  font: 600 9px / 14px var(--gallerist-mono);
+  text-align: center;
+}
+.gallerist-thumb-item[data-active] .gallerist-thumb-num {
+  background: var(--gallerist-selection);
+  color: var(--gallerist-selection-fg);
+}
+
 /* ── peek flyout (stacked, UX-A): preview a non-active group's items on hover/focus without
    navigating in. Mirrors the vertical item column; `left` is set inline to anchor it to the
    hovered card. ──────────────────────────────────────────────────────────────────────────── */
@@ -648,6 +685,7 @@
 .gallerist-bar button {
   border: var(--gallerist-tool-border);
   background: var(--gallerist-tool-bg);
+  color: var(--gallerist-tool-fg);
 }
 .gallerist-bar button:hover:not([aria-pressed="true"]) {
   background: var(--gallerist-tool-hover-bg);
@@ -678,6 +716,7 @@
   background: var(--gallerist-pressed-bg);
   border-color: var(--gallerist-pressed-bg);
   color: var(--gallerist-pressed-fg);
+  box-shadow: var(--gallerist-pressed-shadow);
 }
 .gallerist-bar button:focus-visible,
 .gallerist-controls > button:focus-visible,
@@ -697,6 +736,8 @@
   grid-area: bar;
   position: relative;
   z-index: 3;
+  background: var(--gallerist-bar-bg);
+  border-block-end: var(--gallerist-bar-border);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -950,6 +991,34 @@
 .gallerist-pill:focus-visible {
   outline: 2px solid var(--gallerist-focus);
   outline-offset: 1px;
+}
+
+/* zoom navigator: a minimap of the zoomed image in the bottom inline-start corner; the view box is
+   the visible part, everything outside it dimmed */
+.gallerist-navigator {
+  position: absolute;
+  z-index: 4;
+  inset-inline-start: 12px;
+  inset-block-end: 12px;
+  width: var(--gallerist-navigator-size); /* the renderer fits the image's shape inside this */
+  overflow: hidden;
+  border: var(--gallerist-control-border);
+  border-radius: var(--gallerist-control-radius);
+  background: var(--gallerist-surface) center / 100% 100% no-repeat;
+  box-shadow: var(--gallerist-shadow);
+  cursor: crosshair;
+  touch-action: none;
+  pointer-events: auto;
+}
+.gallerist-navigator[hidden] {
+  display: none;
+}
+.gallerist-navigator-view {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--gallerist-accent);
+  box-shadow: 0 0 0 999px rgb(0 0 0 / 0.45);
+  pointer-events: none;
 }
 
 /* linear flat traversal: the item axis retires (the renderer also hides the navigator) */
@@ -1238,6 +1307,7 @@
       --gallerist-thumb-h: 56px;
       --gallerist-toolbar-h: 52px;
       --gallerist-rail-w: 64px; /* a side rail leaves the stage most of a narrow screen */
+      --gallerist-navigator-size: 96px;
     }
   }
   @media (pointer: coarse) {
@@ -1250,6 +1320,10 @@
   .gallerist-region-aside,
   .gallerist .gallerist-bar .gallerist-items-toggle {
     display: none;
+  }
+  /* the bottom edge belongs to the item position chip: the navigator goes to the top corner */
+  .gallerist-navigator {
+    inset-block: 12px auto;
   }
   .gallerist-bar {
     gap: 4px;

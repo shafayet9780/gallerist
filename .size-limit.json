@@ -8,7 +8,10 @@
   },
   {
     "name": "@gallerist/core + renderer-dom (gz)",
-    "path": ["packages/core/dist/index.js", "packages/renderer-dom/dist/index.js"],
+    "path": [
+      "packages/core/dist/index.js",
+      "packages/renderer-dom/dist/index.js"
+    ],
     "import": {
       "packages/core/dist/index.js": "{ createViewer }",
       "packages/renderer-dom/dist/index.js": "{ mount }"
@@ -35,7 +38,12 @@
     "name": "@gallerist/react (gz)",
     "path": "packages/react/dist/index.js",
     "import": "{ Gallerist, useGallerist }",
-    "ignore": ["react", "react-dom", "@gallerist/core", "@gallerist/renderer-dom"],
+    "ignore": [
+      "react",
+      "react-dom",
+      "@gallerist/core",
+      "@gallerist/renderer-dom"
+    ],
     "limit": "3 kB",
     "gzip": true
   },
@@ -43,8 +51,28 @@
     "name": "@gallerist/plugin-pins (gz)",
     "path": "packages/plugin-pins/dist/index.js",
     "import": "{ pins }",
-    "ignore": ["@gallerist/core"],
+    "ignore": [
+      "@gallerist/core"
+    ],
     "limit": "4 kB",
+    "gzip": true
+  },
+  {
+    "name": "theme base.css (gz)",
+    "path": "packages/theme-default/src/base.css",
+    "limit": "10 kB",
+    "gzip": true
+  },
+  {
+    "name": "theme gallery.css skin (gz)",
+    "path": "packages/theme-default/src/gallery.css",
+    "limit": "6 kB",
+    "gzip": true
+  },
+  {
+    "name": "theme console.css skin (gz)",
+    "path": "packages/theme-default/src/console.css",
+    "limit": "6 kB",
     "gzip": true
   }
 ]

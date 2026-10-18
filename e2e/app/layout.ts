@@ -12,6 +12,7 @@ import {
   type PresetName,
   type RailPlacement,
   mount,
+  resolvePreset,
 } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
@@ -46,6 +47,10 @@ const collection: Collection = {
   groups: sizes.map((n, g) => ({
     id: `g${g}`,
     caption: captionMode === '1' ? `Group ${g + 1} title` : undefined,
+    // the reviewer timeline's labels: 09:12, 09:19, … every 7 minutes
+    meta: {
+      time: `${String(9 + Math.floor((12 + g * 7) / 60)).padStart(2, '0')}:${String((12 + g * 7) % 60).padStart(2, '0')}`,
+    },
     items: Array.from({ length: n }, (_, i) =>
       img(
         `g${g}i${i}`,
@@ -65,7 +70,10 @@ const viewer = createViewer({
     p.get('plugins') === '0'
       ? []
       : [
-          thumbnails({ groupDisplay: p.get('display') === 'flat' ? 'flat' : 'stacked' }),
+          thumbnails({
+            ...(p.get('preset') ? resolvePreset(p.get('preset') as string).thumbnails : {}),
+            groupDisplay: p.get('display') === 'flat' ? 'flat' : 'stacked',
+          }),
           grid(),
           fullscreen(),
           download(),

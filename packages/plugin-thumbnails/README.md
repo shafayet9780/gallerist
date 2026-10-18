@@ -64,6 +64,8 @@ thumbnails({
 | `itemAxis`     | `'vertical' \| 'horizontal'` | `'vertical'`| `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. Ignored in `flat`. |
 | `groupDisplay` | `'stacked' \| 'flat'`        | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, bracketed per group. |
 | `expandActive` | `boolean`                    | `true`      | `stacked` only. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |
+| `timeline`     | `boolean \| (group, index) => string` | off | `stacked` only. A label with a tick above each card, joined into a track, the current one in the accent. `true` reads `group.meta.time`. The label joins the card's accessible name. |
+| `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 
 Presets configure these for you — see [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md). The rail's **position**
 (bottom/top/hidden) is a renderer option (`rail`), not a thumbnails option.

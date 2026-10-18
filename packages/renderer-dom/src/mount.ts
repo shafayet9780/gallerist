@@ -7,6 +7,7 @@ import type {
   Group,
   Item,
   MediaAdapter,
+  MediaSource,
   OverlaySpec,
   Phase,
   ViewerApi,
@@ -91,6 +92,12 @@ export interface MountOptions {
   accent?: Accent
   /** `dark` (default), `light`, or `auto` to follow the system (`data-gallerist-scheme`). */
   scheme?: ColorScheme
+  /**
+   * Zoom navigator: while zoomed in, a minimap of the image in the stage's bottom corner with a box
+   * for the visible part; click or drag it to move around. Default off (the `reviewer` preset turns
+   * it on).
+   */
+  navigator?: boolean
   /** Accessible name for the overlay dialog (default 'Media viewer'); sets aria-label. */
   label?: string
   /** Element (or getter) to return focus to when the overlay closes. Falls back to whatever
@@ -118,6 +125,10 @@ interface SlideRec {
   overlayItem?: Item
   activated?: boolean
 }
+
+/** A plain URL for a media source (loader and tiled sources have none). */
+const sourceUrl = (source: MediaSource | undefined): string | null =>
+  typeof source === 'string' ? source : source && 'src' in source ? source.src : null
 
 function el(tag: string, className?: string, attrs?: Record<string, string>): HTMLElement {
   const node = document.createElement(tag)
@@ -212,6 +223,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const preset = opts.preset ? resolvePreset(opts.preset) : null
   const arrows: ArrowLayout = opts.arrows ?? preset?.arrows ?? 'pill-right'
   const autoHide = opts.autoHide ?? preset?.autoHide ?? true
+  const showNavigator = opts.navigator ?? preset?.navigator ?? false
   const rail: RailPlacement = opts.rail ?? preset?.rail ?? 'bottom'
   const railHidden = rail === 'hidden'
   const railPos = rail === 'hidden' ? 'bottom' : rail // bottom | left | right
@@ -385,6 +397,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   let itemNav: HTMLElement | undefined
   let controlsBox: HTMLElement | undefined
   let reset: HTMLElement | undefined
+  let navigatorEl: HTMLElement | undefined
+  let navigatorView: HTMLElement | undefined
   // segmented pills are rebuilt only when the active group / its size changes (UX-H)
   let posG = -1
   let posM = -1
@@ -429,6 +443,15 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     itemNav.append(prevItem, position, nextItem)
     controlsBox = el('div', 'gallerist-controls')
     controlsBox.append(prev, next, itemNav)
+    if (showNavigator) {
+      // a pointer aid only (keyboard users zoom and pan with the keys), so hidden from AT
+      navigatorEl = el('div', 'gallerist-navigator', { 'aria-hidden': 'true' })
+      navigatorEl.hidden = true
+      navigatorView = el('div', 'gallerist-navigator-view')
+      navigatorEl.appendChild(navigatorView)
+      navigatorEl.addEventListener('pointerdown', onNavigatorDown)
+      controlsBox.appendChild(navigatorEl)
+    }
     main.appendChild(controlsBox)
   } else {
     bar.appendChild(regionHosts.toolbar) // plugin tools keep their place without built-in chrome
@@ -737,6 +760,80 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // zoom reset only while zoomed in (fit == 1 in the contained model)
   const updateZoomChrome = () => {
     if (reset) setHiddenKeepingFocus(reset, !(viewer.getState().zoom.scale > 1.001))
+    updateNavigator()
+  }
+
+  // ── zoom navigator ────────────────────────────────────────────────────────────
+  // The minimap is the image at the navigator's size; the view box is the stage's visible part,
+  // mapped from content space through the painted media box (the same box the zoom bounds use).
+  function updateNavigator() {
+    if (!navigatorEl || !navigatorView) return
+    const z = viewer.getState().zoom
+    const rec = currentRec()
+    const natural = rec?.media?.naturalSize?.()
+    const { g, i } = viewer.getState().cursor
+    const it = viewer.getCollection().groups[g]?.items[i]
+    const src = it ? (sourceUrl(it.thumb) ?? sourceUrl(it.source)) : null
+    const size = stageSize()
+    if (!(z.scale > 1.001) || !natural || !src || !(size.w > 0)) {
+      navigatorEl.hidden = true
+      return
+    }
+    const box = mediaBox(size)
+    const url = `url(${JSON.stringify(src)})`
+    if (navigatorEl.style.backgroundImage !== url) navigatorEl.style.backgroundImage = url
+    // fit the image's shape inside the skin's navigator size
+    const max =
+      Number.parseFloat(
+        getComputedStyle(navigatorEl).getPropertyValue('--gallerist-navigator-size'),
+      ) || 160
+    const k = max / Math.max(natural.w, natural.h)
+    navigatorEl.style.width = `${natural.w * k}px`
+    navigatorEl.style.height = `${natural.h * k}px`
+    const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
+    const x0 = clamp01((-z.x / z.scale - box.x) / box.w)
+    const y0 = clamp01((-z.y / z.scale - box.y) / box.h)
+    const x1 = clamp01(((size.w - z.x) / z.scale - box.x) / box.w)
+    const y1 = clamp01(((size.h - z.y) / z.scale - box.y) / box.h)
+    Object.assign(navigatorView.style, {
+      left: `${x0 * 100}%`,
+      top: `${y0 * 100}%`,
+      width: `${(x1 - x0) * 100}%`,
+      height: `${(y1 - y0) * 100}%`,
+    })
+    navigatorEl.hidden = false
+  }
+  // centre the visible part on the pointed spot of the minimap
+  const panNavigatorTo = (e: PointerEvent) => {
+    if (!navigatorEl) return
+    const r = navigatorEl.getBoundingClientRect()
+    const size = stageSize()
+    if (!(r.width > 0) || !(size.w > 0)) return
+    const box = mediaBox(size)
+    const z = viewer.getState().zoom
+    const cx = box.x + ((e.clientX - r.left) / r.width) * box.w
+    const cy = box.y + ((e.clientY - r.top) / r.height) * box.h
+    internals.setZoom({
+      scale: z.scale,
+      x: size.w / 2 - cx * z.scale,
+      y: size.h / 2 - cy * z.scale,
+    })
+  }
+  function onNavigatorDown(e: PointerEvent) {
+    const nav = e.currentTarget as HTMLElement
+    e.preventDefault()
+    e.stopPropagation()
+    nav.setPointerCapture?.(e.pointerId)
+    panNavigatorTo(e)
+    const move = (ev: PointerEvent) => panNavigatorTo(ev)
+    const up = () => {
+      nav.removeEventListener('pointermove', move)
+      nav.removeEventListener('pointerup', up)
+      nav.removeEventListener('pointercancel', up)
+    }
+    nav.addEventListener('pointermove', move)
+    nav.addEventListener('pointerup', up)
+    nav.addEventListener('pointercancel', up)
   }
 
   // ── attach / detach ──────────────────────────────────────────────────────────
@@ -1027,6 +1124,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       internals.setZoom(clamped) // commit → sync → repaint
     } else {
       renderWindow() // repaint overlays at the new rect
+      updateNavigator()
     }
   }
 

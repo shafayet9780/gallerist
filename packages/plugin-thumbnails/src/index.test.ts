@@ -612,3 +612,61 @@ describe('plugin-thumbnails — active item panel (expandActive)', () => {
     expect(document.querySelector('.gallerist-items-toggle')).toBeNull()
   })
 })
+
+describe('thumbnails — timeline and numbered items (M18)', () => {
+  const timed = (): Collection => ({
+    groups: [
+      { id: 'g0', meta: { time: '09:00' }, items: [item('a0')] },
+      { id: 'g1', meta: { time: '09:10' }, items: [item('b0'), item('b1')] },
+      { id: 'g2', items: [item('c0')] }, // no time: an empty label keeps the row aligned
+    ],
+  })
+  const openWith = (opts: Parameters<typeof thumbnails>[0], col = timed()) => {
+    const v = createViewer({ collection: col, plugins: [thumbnails(opts)] })
+    mount(v)
+    v.open()
+    return v
+  }
+
+  it('timeline: true labels each card from group.meta.time, inside the card name', () => {
+    openWith({ timeline: true })
+    const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+    expect(rail.hasAttribute('data-timeline')).toBe(true)
+    const labels = [...document.querySelectorAll('.gallerist-thumb-time')].map((l) => l.textContent)
+    expect(labels).toEqual(['09:00', '09:10', ''])
+    const card = document.querySelector('.gallerist-thumb[data-group="g1"]') as HTMLElement
+    expect(card.getAttribute('aria-label')).toBe('Group 2, 09:10')
+    expect(document.querySelector('.gallerist-thumb-time')?.getAttribute('aria-hidden')).toBe(
+      'true',
+    )
+  })
+
+  it('a timeline function supplies the labels; the current group’s wrapper is marked', () => {
+    const v = openWith({ timeline: (_g, i) => `T${i}` })
+    expect(document.querySelector('.gallerist-thumb-time')?.textContent).toBe('T0')
+    const active = () =>
+      [...document.querySelectorAll('.gallerist-thumb-wrap[data-active]')].map(
+        (w) => (w as HTMLElement).dataset.group,
+      )
+    expect(active()).toEqual(['g0'])
+    v.next()
+    expect(active()).toEqual(['g1'])
+  })
+
+  it('no timeline row without the option, or in flat mode', () => {
+    openWith({})
+    expect(document.querySelector('.gallerist-thumb-time')).toBeNull()
+    document.body.innerHTML = ''
+    openWith({ timeline: true, groupDisplay: 'flat' })
+    expect(document.querySelector('.gallerist-thumb-time')).toBeNull()
+  })
+
+  it('numberItems puts a 1-based number on each item thumb', () => {
+    const v = openWith({ numberItems: true })
+    v.next() // the two-item group
+    const nums = [...document.querySelectorAll('.gallerist-thumb-items .gallerist-thumb-num')].map(
+      (n) => n.textContent,
+    )
+    expect(nums).toEqual(['1', '2'])
+  })
+})

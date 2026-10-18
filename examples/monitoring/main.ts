@@ -5,7 +5,9 @@ import {
   type OverlaySpec,
   createViewer,
 } from '@gallerist/core'
-import { mount } from '@gallerist/renderer-dom'
+import { type Pin, pins } from '@gallerist/plugin-pins'
+import { thumbnails } from '@gallerist/plugin-thumbnails'
+import { mount, resolvePreset } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
 
@@ -16,6 +18,9 @@ const svg = (color: string, label: string) =>
 
 // activity ramp (spec §27.6): red <30, amber 30–69, green ≥70
 const activityColor = (pct: number) => (pct < 30 ? '#c0392b' : pct < 70 ? '#f39c12' : '#27ae60')
+
+// one capture every 10 minutes from 09:00 (the reviewer timeline labels each moment with it)
+const time = (moment: number) => `09:${String(moment * 10).padStart(2, '0')}`
 
 const screen = (moment: number, monitor: number, activity: number): Item => {
   const overlays: OverlaySpec[] = [
@@ -29,17 +34,31 @@ const screen = (moment: number, monitor: number, activity: number): Item => {
         return el
       },
     },
-    {
-      id: `pin-${moment}-${monitor}`,
-      anchor: { kind: 'point', x: 0.5, y: 0.5 },
-      render: () => {
-        const el = document.createElement('div')
-        el.textContent = '⌖'
-        el.style.cssText = 'font-size:28px;color:#fff;text-shadow:0 1px 4px #000'
-        return el
-      },
-    },
   ]
+  // review comments pinned to the screenshot (plugin-pins reads item.meta.pins)
+  const comments: Pin[] =
+    monitor === 0
+      ? [
+          {
+            id: `c-${moment}-1`,
+            x: 0.72,
+            y: 0.64,
+            label: 'R. Okafor',
+            meta: `${time(moment)}`,
+            body: 'Idle for most of this window. Was a meeting scheduled?',
+            replies: [{ author: 'M. Lindqvist', meta: 'later', body: 'Yes: sprint planning.' }],
+          },
+          {
+            id: `c-${moment}-2`,
+            x: 0.24,
+            y: 0.3,
+            label: 'J. Tanaka',
+            meta: `${time(moment)}`,
+            body: 'Private browsing window, blurred as expected.',
+            resolved: moment % 2 === 0,
+          },
+        ]
+      : []
   return {
     id: `m${moment}-mon${monitor}`,
     type: 'image',
@@ -49,7 +68,7 @@ const screen = (moment: number, monitor: number, activity: number): Item => {
     ),
     naturalSize: { w: 2560, h: 1440 },
     alt: `Moment ${moment}, monitor ${monitor + 1}`,
-    meta: { activity },
+    meta: { activity, pins: comments },
     overlays,
   }
 }
@@ -59,6 +78,8 @@ const groups: Group[] = Array.from({ length: 6 }, (_, m) => {
   const monitors = 1 + (m % 3)
   return {
     id: `moment-${m}`,
+    caption: `${monitors} monitor${monitors > 1 ? 's' : ''}`,
+    meta: { time: time(m) },
     items: Array.from({ length: monitors }, (_, mon) =>
       screen(m, mon, ((m * 17 + mon * 23) % 100) + 1),
     ),
@@ -68,9 +89,25 @@ const groups: Group[] = Array.from({ length: 6 }, (_, m) => {
 const collection: Collection = { groups }
 
 // itemMemory:'preserve' → keep the same monitor index when moving across moments.
-const viewer = createViewer({ collection, loop: true, itemMemory: 'preserve' })
-// a review tool: the Console skin (graphite, a signal accent, monospaced counters)
-mount(viewer, { skin: 'console' })
+// A review tool: the Console skin with the reviewer preset (timeline rail, numbered monitors, zoom
+// navigator) and comment pins; press C (or the toolbar button) and click to add a comment.
+const commentPins = pins({
+  presentation: 'comment',
+  onPlace: (at, { item }) => {
+    const list = (item.meta as { pins: Pin[] }).pins
+    const id = `new-${list.length + 1}`
+    list.push({ id, ...at, label: 'You', meta: 'now', body: 'New comment' })
+    commentPins.refresh()
+    commentPins.open(id)
+  },
+})
+const viewer = createViewer({
+  collection,
+  loop: true,
+  itemMemory: 'preserve',
+  plugins: [thumbnails(resolvePreset('reviewer').thumbnails), commentPins],
+})
+mount(viewer, { skin: 'console', preset: 'reviewer' })
 
 const rail = document.getElementById('moments')
 groups.forEach((group, g) => {

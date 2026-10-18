@@ -1,0 +1,46 @@
+/*
+ * @gallerist/theme-default — grid.css: styles for @gallerist/plugin-grid, drawn from the skin's
+ * tokens. Included by gallerist.css.
+ */
+
+/* ── grid (plugin-grid) ────────────────────────────────────────────────────── */
+.gallerist-grid {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--gallerist-panel);
+  backdrop-filter: blur(8px);
+}
+.gallerist-grid-header {
+  position: sticky;
+  top: 0;
+  padding: 12px 4px 8px;
+  font: 500 14px var(--gallerist-font);
+  color: var(--gallerist-fg);
+  background: var(--gallerist-panel);
+}
+.gallerist-grid-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.gallerist-grid-cell {
+  aspect-ratio: 3 / 2;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--gallerist-thumb-radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--gallerist-cell-bg);
+}
+.gallerist-grid-cell[data-active] {
+  border-color: var(--gallerist-selection);
+}
+.gallerist-grid-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
