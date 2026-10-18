@@ -66,10 +66,12 @@ export interface GalleristProps extends ViewerOptions {
   linear?: boolean
   /** UI text overrides (button labels, announcements) for translation; read once at mount. */
   strings?: Partial<Strings>
-  /** item position indicator: `pills` (default), `dots` or `counter`; read once at mount. */
+  /** item position indicator: `pills` (default), `dots`, `counter` or `placard`; read once at mount. */
   itemIndicator?: ItemIndicator
   /** zoom navigator while zoomed in (overrides the preset default); read once at mount. */
   navigator?: boolean
+  /** framed media: the work hangs with room around it (overrides the preset); read once at mount. */
+  frame?: boolean
   children?: ReactNode
 }
 
@@ -159,6 +161,7 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     strings,
     itemIndicator,
     navigator,
+    frame,
     children,
     ...options
   } = props
@@ -234,6 +237,7 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
       strings,
       itemIndicator,
       navigator,
+      frame,
       skin,
       accent,
       scheme,

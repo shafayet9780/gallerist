@@ -64,5 +64,11 @@
     "path": "packages/theme-default/src/console.css",
     "limit": "6 kB",
     "gzip": true
+  },
+  {
+    "name": "theme editorial.css skin (gz)",
+    "path": "packages/theme-default/src/editorial.css",
+    "limit": "6 kB",
+    "gzip": true
   }
 ]

@@ -27,7 +27,7 @@ import { DEFAULT_STRINGS, type Strings } from './strings'
 import { zoomTransform } from './transform'
 import { reconcileKeys, windowIndices } from './windowing'
 
-export type ItemIndicator = 'pills' | 'dots' | 'counter'
+export type ItemIndicator = 'pills' | 'dots' | 'counter' | 'placard'
 
 export interface MountOptions {
   /** null/undefined → overlay (portal to body); element → inline. */
@@ -79,8 +79,10 @@ export interface MountOptions {
   /**
    * How the position within a multi-item group is shown, surfaced as the indicator's `data-mode`.
    * `pills` (default): numbered pills up to 8 items, then `n / N`. `dots`: plain dots with the
-   * `n / N` count, up to 12 items, then the count alone. `counter`: always `n / N`. On a touch
-   * screen the theme shows the count only (swipes navigate).
+   * `n / N` count, up to 12 items, then the count alone. `counter`: always `n / N`. `placard`: the
+   * whole item navigator (↑ · ticks · `n / N` · ↓) moves into the caption, which becomes a label
+   * beside the work in the `editorial` preset. On a touch screen the theme shows the count only
+   * (swipes navigate).
    */
   itemIndicator?: ItemIndicator
   /**
@@ -98,6 +100,13 @@ export interface MountOptions {
    * it on). Part of the built-in controls, so `controls: false` has none.
    */
   navigator?: boolean
+  /**
+   * Framed media: the image hangs inside the stage with room around it (the skin's
+   * `--gallerist-frame-inset`), and the media element is sized to the image itself so a skin can
+   * give it a mat and a shadow. Zoom bounds, overlays and pins follow the framed box. Default off
+   * (the `editorial` preset turns it on).
+   */
+  frame?: boolean
   /** Accessible name for the overlay dialog (default 'Media viewer'); sets aria-label. */
   label?: string
   /** Element (or getter) to return focus to when the overlay closes. Falls back to whatever
@@ -224,6 +233,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const arrows: ArrowLayout = opts.arrows ?? preset?.arrows ?? 'pill-right'
   const autoHide = opts.autoHide ?? preset?.autoHide ?? true
   const showNavigator = opts.navigator ?? preset?.navigator ?? false
+  const frame = opts.frame ?? preset?.frame ?? false
   const rail: RailPlacement = opts.rail ?? preset?.rail ?? 'bottom'
   const railHidden = rail === 'hidden'
   const railPos = rail === 'hidden' ? 'bottom' : rail // bottom | left | right
@@ -237,7 +247,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // explicit mount({ loop }) still overrides for the rare case they should differ (review #2).
   const loop = opts.loop ?? viewer.loop
   const ui: Strings = { ...DEFAULT_STRINGS, ...opts.strings }
-  const itemIndicator: ItemIndicator = opts.itemIndicator ?? 'pills'
+  const itemIndicator: ItemIndicator = opts.itemIndicator ?? preset?.itemIndicator ?? 'pills'
+  const placard = itemIndicator === 'placard'
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -321,6 +332,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   root.setAttribute('data-gallerist-orientation', orientation)
   root.setAttribute('data-gallerist-rail', railHidden ? 'collapsed' : 'expanded')
   if (linear) root.setAttribute('data-gallerist-linear', 'true')
+  if (frame) root.setAttribute('data-gallerist-frame', '')
+  if (placard) root.setAttribute('data-gallerist-indicator', 'placard')
   applyAppearance(root, { skin: opts.skin, accent: opts.accent, scheme: opts.scheme })
   if (preset) for (const [k, val] of Object.entries(preset.rootAttrs)) root.setAttribute(k, val)
   if (overlay) {
@@ -354,6 +367,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     footer: el('div', 'gallerist-region gallerist-region-footer'),
   }
   const caption = el('div', 'gallerist-caption')
+  const captionText = el('span', 'gallerist-caption-text')
+  caption.appendChild(captionText)
   caption.hidden = true
   root.append(
     regionHosts.backdrop,
@@ -442,7 +457,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     itemNav.hidden = true // shown only for groups with more than one item (and not in linear mode)
     itemNav.append(prevItem, position, nextItem)
     controlsBox = el('div', 'gallerist-controls')
-    controlsBox.append(prev, next, itemNav)
+    controlsBox.append(prev, next)
+    // a placard carries the item navigator in the caption, under the label
+    if (placard) caption.appendChild(itemNav)
+    else controlsBox.appendChild(itemNav)
     if (showNavigator) {
       // a pointer aid only (keyboard users zoom and pan with the keys), so hidden from AT
       navigatorEl = el('div', 'gallerist-navigator', { 'aria-hidden': 'true' })
@@ -559,6 +577,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.itemId = it.id
         rec.activated = false
         rec.content.appendChild(rec.overlayHost) // keep overlays above the media
+        frameSlide(rec)
         // Surface the media load lifecycle (spec §18: load/loaded/loadError, which also drive
         // state.loaded). On `loaded`, repaint content overlays: before decode naturalSize() is
         // null and paint falls back to the stage rect (a wrong full-stage contain rect), so the
@@ -574,6 +593,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
             internals.emit('loaded', { ...loadBase, cursor: viewer.cursor, id: mountedId })
             const r = mounted.get(slideKey)
             if (!r || r.itemId !== mountedId) return // navigated away / item swapped out
+            frameSlide(r) // the frame fits the now-known natural size
             if (groupIndex(slideKey) !== viewer.getState().cursor.g) return // no longer current
             r.overlayItem = undefined // force a repaint at the now-known natural size
             // a zoom committed before the size was known was bounded by the whole layer
@@ -627,6 +647,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
                 zoom: state.zoom,
                 stage: stageSize,
                 natural: rec.media?.naturalSize?.() ?? stageSize,
+                box: paintedBox(stageSize, rec.media?.naturalSize?.()),
               },
             )
             rec.overlayItem = it
@@ -665,7 +686,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const mode =
       itemIndicator === 'pills' && itemCount <= PILL_MAX
         ? 'pills'
-        : itemIndicator === 'dots' && itemCount <= DOT_MAX
+        : (itemIndicator === 'dots' || placard) && itemCount <= DOT_MAX
           ? 'dots'
           : 'counter'
     if (g !== posG || itemCount !== posM || position.dataset.mode !== mode) {
@@ -720,7 +741,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       const anyCaption = col.groups.some((grp) =>
         grp.items.some((it) => typeof it.caption === 'string'),
       )
-      caption.hidden = !(controls && anyCaption)
+      // a placard is always up: it holds the item navigator as well as the caption
+      caption.hidden = !(controls && (anyCaption || placard))
     }
     chromeCol = col
     chromeG = cur.g
@@ -738,7 +760,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
     // Text captions go in the caption bar (the theme clamps them); an OverlaySpec caption isn't
     // rendered by the DOM renderer yet (planned with the captions plugin).
-    caption.textContent = typeof item?.caption === 'string' ? item.caption : ''
+    captionText.textContent = typeof item?.caption === 'string' ? item.caption : ''
     // Announce the item's own description alongside the position so SR users hear what they
     // navigated to, not just the index (S-UX4).
     const desc = item?.alt ? ` — ${item.alt}` : ''
@@ -859,6 +881,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       root.focus()
     }
     setDir()
+    readFrameInset()
     idle?.poke() // start the idle countdown from when the viewer is shown
   }
   const detach = () => {
@@ -1095,11 +1118,39 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     return { w: r.width, h: r.height }
   }
   // The current media's painted box in content space; the whole layer until its size is known.
+  // The painted media box in content space at fit: the media's contain rect, inside the frame
+  // inset when framed; the whole (inset) layer until the natural size is known. Zoom bounds, the
+  // navigator, overlays and the framed media element all use this one box.
+  let frameInset = 0
+  const readFrameInset = () => {
+    frameInset = frame
+      ? Number.parseFloat(getComputedStyle(root).getPropertyValue('--gallerist-frame-inset')) || 0
+      : 0
+  }
+  function paintedBox(
+    size: { w: number; h: number },
+    natural: { w: number; h: number } | null | undefined,
+  ) {
+    const inset = Math.max(0, Math.min(frameInset, size.w / 4, size.h / 4))
+    const inner = { w: size.w - 2 * inset, h: size.h - 2 * inset }
+    if (!(natural && natural.w > 0 && natural.h > 0)) return { x: inset, y: inset, ...inner }
+    const r = containRect(inner, natural)
+    return { x: r.x + inset, y: r.y + inset, w: r.w, h: r.h }
+  }
   function mediaBox(size: { w: number; h: number }) {
-    const natural = currentRec()?.media?.naturalSize?.()
-    return natural && natural.w > 0 && natural.h > 0
-      ? containRect(size, natural)
-      : { x: 0, y: 0, w: size.w, h: size.h }
+    return paintedBox(size, currentRec()?.media?.naturalSize?.())
+  }
+  // Framed: size the slide's media element to its painted box (the theme reads these variables).
+  function frameSlide(rec: SlideRec) {
+    if (!frame) return
+    const size = stageSize()
+    if (!(size.w > 0 && size.h > 0)) return
+    const box = paintedBox(size, rec.media?.naturalSize?.())
+    const s = rec.content.style
+    s.setProperty('--gallerist-box-x', `${box.x}px`)
+    s.setProperty('--gallerist-box-y', `${box.y}px`)
+    s.setProperty('--gallerist-box-w', `${box.w}px`)
+    s.setProperty('--gallerist-box-h', `${box.h}px`)
   }
   const constrainZoom = (z: ZoomState): ZoomState => {
     const scaled = { scale: clampScale(z.scale, 1, MAX_ZOOM), x: z.x, y: z.y }
@@ -1140,6 +1191,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     resizeFrame = requestAnimationFrame(() => {
       resizeFrame = 0
       if (!attached) return
+      readFrameInset() // the inset can change with the viewport (the mobile layer)
+      for (const rec of mounted.values()) frameSlide(rec)
       const cur = currentRec()
       if (cur) cur.overlayItem = undefined // re-anchor overlays against the new stage rect
       reclampZoom()

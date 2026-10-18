@@ -34,7 +34,7 @@ describe('<Gallerist>', () => {
     expect(root.getAttribute('data-gallerist-arrows')).toBe('corner-br') // reviewer default
     expect(root.getAttribute('data-gallerist-skin')).toBe('console')
     expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
-    expect(root.getAttribute('data-gallerist-scheme')).toBe('dark')
+    expect(root.hasAttribute('data-gallerist-scheme')).toBe(false) // the skin's own default
   })
 
   it('updates skin, accent and scheme in place when the props change', () => {
@@ -52,6 +52,13 @@ describe('<Gallerist>', () => {
   it('passes navigator to the renderer, overriding the preset', () => {
     render(<Gallerist collection={collection} open preset="reviewer" navigator={false} />)
     expect(document.querySelector('.gallerist-navigator')).toBeNull()
+  })
+
+  it('passes frame to the renderer, overriding the preset', () => {
+    render(<Gallerist collection={collection} open preset="editorial" frame={false} />)
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.hasAttribute('data-gallerist-frame')).toBe(false)
+    expect(root.getAttribute('data-gallerist-indicator')).toBe('placard')
   })
 
   it('closes when open flips to false and fires onClose', () => {

@@ -507,6 +507,109 @@ describe('mount — zoom navigator (M18)', () => {
   })
 })
 
+describe('mount — editorial: frame and placard (M19)', () => {
+  const measure = (w: number, h: number) => {
+    const stage = document.querySelector('.gallerist-stage') as HTMLElement
+    vi.spyOn(stage, 'getBoundingClientRect').mockImplementation(
+      () => ({ width: w, height: h, left: 0, top: 0, right: w, bottom: h, x: 0, y: 0 }) as DOMRect,
+    )
+  }
+  const sized = (): Collection => ({
+    groups: [
+      {
+        id: 'g',
+        items: [
+          { ...item('a'), naturalSize: { w: 1000, h: 500 }, caption: 'Above the Inversion' },
+          { ...item('b'), naturalSize: { w: 1000, h: 500 } },
+        ],
+      },
+    ],
+  })
+  const current = () =>
+    document.querySelector('.gallerist-content[data-gallerist-current]') as HTMLElement
+
+  it('the editorial preset frames media and puts the item navigator in a placard', () => {
+    const v = createViewer({ collection: sized() })
+    mount(v, { preset: 'editorial' })
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.hasAttribute('data-gallerist-frame')).toBe(true)
+    expect(root.getAttribute('data-gallerist-indicator')).toBe('placard')
+    const caption = document.querySelector('.gallerist-caption') as HTMLElement
+    expect(caption.hidden).toBe(false)
+    expect(caption.querySelector('.gallerist-caption-text')?.textContent).toBe(
+      'Above the Inversion',
+    )
+    expect(caption.querySelector('.gallerist-itemnav')).not.toBeNull()
+    expect(document.querySelector('.gallerist-controls .gallerist-itemnav')).toBeNull()
+    v.nextItem()
+    expect(caption.querySelector('.gallerist-caption-text')?.textContent).toBe('')
+    expect(caption.querySelector('.gallerist-itemnav')).not.toBeNull() // still there
+  })
+
+  it('a framed slide carries its painted box, inset by the skin, and zoom bounds use it', () => {
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0)
+      return 1
+    })
+    try {
+      const v = createViewer({ collection: sized() })
+      mount(v, { frame: true })
+      v.open()
+      const root = document.querySelector('.gallerist') as HTMLElement
+      root.style.setProperty('--gallerist-frame-inset', '50px')
+      measure(1000, 800)
+      v.refresh() // re-measure: reads the inset, frames every slide
+      // inner 900×700; a 2:1 image fits 900×450, centred: x 50, y 50 + 125
+      const s = current().style
+      expect([
+        s.getPropertyValue('--gallerist-box-x'),
+        s.getPropertyValue('--gallerist-box-y'),
+        s.getPropertyValue('--gallerist-box-w'),
+        s.getPropertyValue('--gallerist-box-h'),
+      ]).toEqual(['50px', '175px', '900px', '450px'])
+      // at 2× the box is 1800 wide: its left edge may not come inside the stage
+      getInternals(v).setZoom({ scale: 2, x: 0, y: 0 })
+      expect(v.getState().zoom.x).toBe(-100) // the box's left edge (50 × 2) at the stage's
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('a content overlay maps through the framed box', () => {
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0)
+      return 1
+    })
+    try {
+      const col = sized()
+      const first = col.groups[0]?.items[0]
+      if (first)
+        first.overlays = [
+          { id: 'tl', anchor: { kind: 'point', x: 0, y: 0 }, render: () => 'x', interactive: true },
+        ]
+      const v = createViewer({ collection: col })
+      mount(v, { frame: true })
+      v.open()
+      const root = document.querySelector('.gallerist') as HTMLElement
+      root.style.setProperty('--gallerist-frame-inset', '50px')
+      measure(1000, 800)
+      v.refresh()
+      const host = document.querySelector('[data-overlay="tl"]') as HTMLElement
+      expect([host.style.left, host.style.top]).toEqual(['50px', '175px'])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('without a scheme option the root leaves the scheme to the skin', () => {
+    const v = createViewer({ collection: sized() })
+    mount(v, { skin: 'editorial' })
+    v.open()
+    expect(document.querySelector('.gallerist')?.hasAttribute('data-gallerist-scheme')).toBe(false)
+  })
+})
+
 describe('mount — motion axis', () => {
   const current = () => document.querySelector('.gallerist-slide[data-gallerist-current]')
   it('tags the current slide with the axis of motion (group vs item)', () => {
@@ -928,7 +1031,7 @@ describe('mount — review fixes (M15)', () => {
     v.open()
     const root = document.querySelector('.gallerist') as HTMLElement
     expect(root.getAttribute('data-gallerist-skin')).toBe('gallery')
-    expect(root.getAttribute('data-gallerist-scheme')).toBe('dark')
+    expect(root.hasAttribute('data-gallerist-scheme')).toBe(false) // the skin's own default
     expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
   })
 
@@ -950,7 +1053,7 @@ describe('mount — review fixes (M15)', () => {
     expect(root.getAttribute('data-gallerist-scheme')).toBe('light')
     expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
     applyAppearance(root, { scheme: undefined, accent: undefined })
-    expect(root.getAttribute('data-gallerist-scheme')).toBe('dark')
+    expect(root.hasAttribute('data-gallerist-scheme')).toBe(false)
     expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
     expect(root.getAttribute('data-gallerist-skin')).toBe('console')
   })

@@ -11,7 +11,7 @@
 - [x] **M16** Skin system: base/skin split, `skin`/`accent`/`scheme`, Gallery default, `console` extracted with zero visual diff. Verified as a zero computed-style diff (26 configurations × 3 viewports) against M15. Console keeps `color-scheme: normal` to stay identical; M18 can move it to `dark`. Review: 10 findings fixed (token overrides via cascade layers, load order, partial `applyAppearance`, hover/focus states, axe per skin)
 - [x] **M17** Contained-rect zoom bounds + `plugin-pins` (`comment`, `tag`, `feature`), hotspot demo (`examples/hotspots`). Review: 10 findings fixed (Escape on WebKit and after `open()`, focus on hide and repaint, placing vs pan, card room, resolved contrast), plus a thumbnails side-column bug found while building M18
 - [x] **M18** Console: skin polish, `reviewer` preset upgrade (timeline rail, numbered items), zoom navigator, comment pins in the monitoring example. Review: 11 findings fixed (lint on the JSON files, React `navigator` prop, idle fade, CSS-sized minimap, video items, timeline in side rails and long labels, grid.css documented)
-- [ ] **M19** Editorial: wall skin + Night scheme, framed media, placard caption with item controls, `editorial` preset
+- [x] **M19** Editorial: wall skin + Night scheme, framed media, placard caption with item controls, `editorial` preset. The renderer's scheme default moved to the skins (Editorial defaults to the light wall)
 - [ ] **M20** Tour: thumbnails `groupDisplay: 'index'`, grid `layout: 'sections'` + `startOpen`, `arrowLabels`, `tour` preset
 - [ ] **M21** Parity: `"use client"`, DOM-markup init, UMD build, strings audit
 - [ ] Release 0.3: positioning, docs site with skin × preset playground, migration notes, publish

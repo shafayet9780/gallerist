@@ -16,6 +16,7 @@ import {
 } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
+import '@gallerist/theme-default/editorial.css'
 
 const svg = (color: string, label: string) =>
   `data:image/svg+xml,${encodeURIComponent(

@@ -28,6 +28,15 @@ describe('resolvePreset', () => {
     expect(resolvePreset('filmstrip').navigator).toBe(false)
   })
 
+  it('editorial: framed media, a placard, numbered items inline in a bottom rail', () => {
+    const p = resolvePreset('editorial')
+    expect(p.rootAttrs['data-gallerist-preset']).toBe('editorial')
+    expect(p.frame).toBe(true)
+    expect(p.itemIndicator).toBe('placard')
+    expect(p.rail).toBe('bottom')
+    expect(p.thumbnails).toMatchObject({ itemAxis: 'horizontal', numberItems: true })
+  })
+
   it('contact: right (vertical) rail', () => {
     const p = resolvePreset('contact')
     expect(p.rail).toBe('right')

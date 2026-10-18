@@ -36,11 +36,16 @@ const CONFIGS: Record<string, string> = {
   'indicator-dots': 'indicator=dots',
   'indicator-counter': 'indicator=counter&arrows=corner-br',
   'scheme-light': 'scheme=light&captions=1&indicator=dots',
+  'scheme-dark': 'scheme=dark&captions=1', // Editorial's Night; the others' default
+  'preset-editorial': 'preset=editorial&captions=1',
+  'editorial-long-caption': 'preset=editorial&captions=long&g=1',
+  'editorial-zoomed': 'preset=editorial&captions=1&zoom=2',
+  'placard-filmstrip': 'indicator=placard&captions=1', // a placard in the bottom caption band
   'scheme-auto-light': 'scheme=auto&accent=mint&captions=1', // run with the system in light mode
 }
 
 // every configuration runs in every skin: skins set tokens (sizes included), so each needs the sweep
-const SKINS = ['gallery', 'console'] as const
+const SKINS = ['gallery', 'console', 'editorial'] as const
 
 const VIEWPORTS = {
   desktop: { viewport: { width: 1280, height: 800 } },
@@ -61,7 +66,7 @@ const ATOMS = [
   '.gallerist-item-prev',
   '.gallerist-item-next',
   '.gallerist-position',
-  '.gallerist-caption',
+  '.gallerist-caption-text', // the caption's text (a placard caption also holds the item navigator)
   '.gallerist-rail-toggle',
   '.gallerist-thumbs',
   '.gallerist-thumb-items',
@@ -316,10 +321,13 @@ test.describe('layout lint', () => {
             for (const g of glyphButtons)
               problems.push(`toolbar button without the shared icon: ${g}`)
             // 7. no toggle for something that can't show: the item-stack toggle needs a visible aside
+            // (a horizontal item row lives in the rail instead)
             const deadToggle = await page.evaluate(() => {
               const btn = document.querySelector<HTMLElement>('.gallerist-items-toggle')
               const aside = document.querySelector<HTMLElement>('.gallerist-region-aside')
               if (!btn || !aside || !btn.checkVisibility()) return false
+              if (document.querySelector('.gallerist-thumb-items[data-axis="horizontal"]'))
+                return false
               return getComputedStyle(aside).display === 'none'
             })
             if (deadToggle) problems.push('items toggle visible but the aside column cannot show')

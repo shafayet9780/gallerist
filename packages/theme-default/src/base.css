@@ -9,7 +9,7 @@
 /* Token declarations sit in cascade layers so a page's own --gallerist-* overrides always win,
    whatever the skin, scheme or accent, and so the skins apply in a fixed order whatever order the
    files load in. Component rules stay unlayered, so a page's element resets can't strip them. */
-@layer gallerist.base, gallerist.gallery, gallerist.console, gallerist.compact;
+@layer gallerist.base, gallerist.gallery, gallerist.console, gallerist.editorial, gallerist.compact;
 
 @layer gallerist.base {
   .gallerist {
@@ -51,6 +51,23 @@
     --gallerist-pressed-shadow: none;
     --gallerist-navigator-size: 160px; /* the zoom navigator's longest side */
     --gallerist-navigator-radius: min(var(--gallerist-radius), 8px);
+
+    /* type: the bar title and the caption may take another face (Editorial's serif) */
+    --gallerist-title-font: var(--gallerist-font);
+    --gallerist-caption-font: var(--gallerist-font);
+    --gallerist-caption-style: normal;
+
+    /* framed media (`frame`): room around the work, a mat behind it, a shadow under it */
+    --gallerist-frame-inset: 0px;
+    --gallerist-frame-inset-compact: 0px;
+    --gallerist-frame-mat: transparent;
+    --gallerist-frame-shadow: none;
+    /* the placard column (itemIndicator: 'placard' in the editorial preset) */
+    --gallerist-placard-w: 300px;
+
+    /* motion: the keyframes a slide enters with, per axis (a skin may crossfade instead) */
+    --gallerist-enter-group: gallerist-enter-group;
+    --gallerist-enter-item: gallerist-enter-item;
     --gallerist-rail-track-gap: var(--gallerist-rail-bg); /* the ring that cuts the track at a tick */
 
     /* hover: unchanged unless a skin sets one */
@@ -117,6 +134,19 @@
     "rail main aside"
     "rail caption aside"
     "rail footer aside";
+}
+/* editorial: the caption is a placard in a column beside the work (bottom rail or hidden only) */
+.gallerist[data-gallerist-preset="editorial"] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "bar bar"
+    "main caption"
+    "footer footer"
+    "rail rail";
+}
+.gallerist[data-gallerist-preset="editorial"] .gallerist-region-aside {
+  display: none;
 }
 /* modes (data-attribute, not a class — avoids colliding with .gallerist-overlay elements) */
 .gallerist[data-gallerist-mode="overlay"] {
@@ -207,6 +237,20 @@
   margin: auto;
   max-width: 100%;
   max-height: 100%;
+}
+/* framed (`frame`): the media element is the painted image box the renderer measured, so the mat
+   and shadow hug the work itself */
+.gallerist[data-gallerist-frame] .gallerist-media {
+  inset: auto;
+  left: var(--gallerist-box-x, 0);
+  top: var(--gallerist-box-y, 0);
+  width: var(--gallerist-box-w, 100%);
+  height: var(--gallerist-box-h, 100%);
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  background-color: var(--gallerist-frame-mat);
+  box-shadow: var(--gallerist-frame-shadow);
 }
 .gallerist-media-image {
   width: 100%;
@@ -790,6 +834,7 @@
 .gallerist-title {
   flex: 1 1 auto;
   min-width: 0;
+  font-family: var(--gallerist-title-font);
   font-size: var(--gallerist-title-size);
   font-weight: var(--gallerist-title-weight);
   white-space: nowrap;
@@ -821,6 +866,10 @@
 }
 .gallerist-caption[hidden] {
   display: none;
+}
+.gallerist-caption-text {
+  font-family: var(--gallerist-caption-font);
+  font-style: var(--gallerist-caption-style);
 }
 
 /* ── arrows and the item navigator, over the stage (inside main) ────────────────── */
@@ -1051,6 +1100,96 @@
   border: 1.5px solid var(--gallerist-accent);
   box-shadow: 0 0 0 999px rgb(0 0 0 / 0.45);
   pointer-events: none;
+}
+
+/* placard (itemIndicator: 'placard'): the caption is a label (title, rule, item navigator); the
+   navigator sits in it instead of over the stage, and the dots become ticks */
+.gallerist[data-gallerist-indicator="placard"] .gallerist-caption {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  height: auto;
+  min-height: 0;
+  padding: 16px 28px 16px 12px;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  line-clamp: none;
+}
+.gallerist[data-gallerist-preset="editorial"][data-gallerist-indicator="placard"]
+  .gallerist-caption {
+  width: var(--gallerist-placard-w);
+}
+.gallerist[data-gallerist-indicator="placard"] .gallerist-caption-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+  line-height: 1.2;
+}
+.gallerist[data-gallerist-indicator="placard"] .gallerist-caption-text:empty {
+  display: none;
+}
+.gallerist[data-gallerist-indicator="placard"][data-gallerist-arrows]
+  .gallerist-caption
+  .gallerist-itemnav:not([hidden]) {
+  position: static;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  inset: auto;
+  transform: none;
+  padding: 16px 0 0;
+  border: 0;
+  border-block-start: 1px solid var(--gallerist-hairline);
+  border-radius: 0;
+  background: transparent;
+}
+.gallerist[data-gallerist-indicator="placard"][data-gallerist-arrows]
+  .gallerist-caption
+  .gallerist-itemnav
+  > * {
+  position: static;
+  transform: none;
+}
+.gallerist[data-gallerist-indicator="placard"] .gallerist-caption .gallerist-position {
+  order: -1; /* ticks and the count first, the ↑ ↓ buttons after */
+  flex: 1 1 auto;
+  /* a column of ticks with the count beside it */
+  display: grid;
+  grid-auto-flow: row;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 0;
+  padding: 0;
+  background: transparent;
+  font: 600 15px var(--gallerist-font);
+  color: var(--gallerist-fg);
+}
+.gallerist[data-gallerist-indicator="placard"] .gallerist-caption .gallerist-position-text {
+  grid-column: 2;
+  grid-row: 1 / span 12;
+  padding: 0;
+}
+.gallerist[data-gallerist-indicator="placard"] .gallerist-caption .gallerist-dot {
+  width: 28px;
+  height: 8px;
+  place-items: center start;
+}
+.gallerist[data-gallerist-indicator="placard"] .gallerist-caption .gallerist-dot::before {
+  width: 18px;
+  height: 2px;
+  border-radius: 0;
+}
+.gallerist[data-gallerist-indicator="placard"]
+  .gallerist-caption
+  .gallerist-dot[data-active]::before {
+  width: 28px;
+  height: 2px;
+  background: var(--gallerist-accent);
 }
 
 /* linear flat traversal: the item axis retires (the renderer also hides the navigator) */
@@ -1287,10 +1426,10 @@
 
 /* time axis = horizontal slide; screen axis = depth pop — never the same motion */
 .gallerist-slide[data-gallerist-enter="group"] {
-  animation: gallerist-enter-group var(--gallerist-dur-snappy) var(--gallerist-ease-out);
+  animation: var(--gallerist-enter-group) var(--gallerist-dur-snappy) var(--gallerist-ease-out);
 }
 .gallerist-slide[data-gallerist-enter="item"] {
-  animation: gallerist-enter-item var(--gallerist-dur-snappy) var(--gallerist-ease-pop);
+  animation: var(--gallerist-enter-item) var(--gallerist-dur-snappy) var(--gallerist-ease-pop);
 }
 /* open/close: the renderer settles the viewer to open/closed when these end (data-gallerist-phase) */
 .gallerist[data-gallerist-mode="overlay"][data-gallerist-phase="opening"] {
@@ -1342,6 +1481,7 @@
       --gallerist-toolbar-h: 52px;
       --gallerist-rail-w: 64px; /* a side rail leaves the stage most of a narrow screen */
       --gallerist-navigator-size: 96px;
+      --gallerist-frame-inset: var(--gallerist-frame-inset-compact); /* a skin's phone inset */
     }
   }
   @media (pointer: coarse) {
@@ -1354,6 +1494,23 @@
   .gallerist-region-aside,
   .gallerist .gallerist-bar .gallerist-items-toggle {
     display: none;
+  }
+  /* editorial: the placard drops under the work */
+  .gallerist[data-gallerist-preset="editorial"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-areas:
+      "bar"
+      "main"
+      "caption"
+      "footer"
+      "rail";
+  }
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-indicator="placard"]
+    .gallerist-caption {
+    width: auto;
+    padding: 10px 16px;
+    gap: 10px;
   }
   /* the bottom edge belongs to the item position chip: the navigator goes to the top corner */
   .gallerist-navigator {

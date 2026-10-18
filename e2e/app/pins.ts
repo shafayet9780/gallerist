@@ -1,10 +1,11 @@
 // Pins fixture (e2e/tests/pins.spec.ts): one landscape item with three pins and one portrait item
-// (for the contained zoom bounds). Query: skin, scheme, presentation.
+// (for the contained zoom bounds). Query: skin, scheme, preset, presentation.
 import { type Collection, createViewer } from '@gallerist/core'
 import { type Pin, type PinPresentation, pins } from '@gallerist/plugin-pins'
-import { type ColorScheme, mount } from '@gallerist/renderer-dom'
+import { type ColorScheme, type PresetName, mount } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
+import '@gallerist/theme-default/editorial.css'
 
 const p = new URLSearchParams(location.search)
 const svg = (w: number, h: number, color: string) =>
@@ -68,6 +69,7 @@ const plugin = pins({
 const viewer = createViewer({ collection, plugins: [plugin] })
 mount(viewer, {
   skin: p.get('skin') ?? undefined,
+  preset: (p.get('preset') ?? undefined) as PresetName | undefined,
   scheme: (p.get('scheme') ?? undefined) as ColorScheme | undefined,
   autoHide: false,
 })

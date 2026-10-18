@@ -11,7 +11,7 @@
 /* Token declarations sit in cascade layers so a page's own --gallerist-* overrides always win,
    whatever the skin, scheme or accent, and so the skins apply in a fixed order whatever order the
    files load in. Component rules stay unlayered, so a page's element resets can't strip them. */
-@layer gallerist.base, gallerist.gallery, gallerist.console, gallerist.compact;
+@layer gallerist.base, gallerist.gallery, gallerist.console, gallerist.editorial, gallerist.compact;
 
 @layer gallerist.console {
   .gallerist[data-gallerist-skin="console"] {

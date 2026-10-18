@@ -73,6 +73,9 @@ const LOOKS = [
   'skin=console',
   'skin=console&scheme=light',
   'skin=console&accent=vermilion',
+  'skin=editorial&preset=editorial',
+  'skin=editorial&preset=editorial&scheme=dark',
+  'skin=editorial&accent=cobalt',
 ]
 for (const look of LOOKS) {
   test(`no axe violations in ${look}`, async ({ page, browserName }) => {

@@ -41,25 +41,27 @@ const zoomState = (page: Page) =>
 test.describe('pins', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'pins run once (chromium)')
 
-  test('a pin sits on its image point and keeps its size and point under zoom', async ({
-    page,
-  }) => {
-    await ready(page)
-    const check = async () => {
-      const box = await imageBox(page)
-      const dot = await dotOf(page, 'a')
-      expect(Math.abs(dot.cx - (box.x + 0.25 * box.w))).toBeLessThan(1.5)
-      expect(Math.abs(dot.cy - (box.y + 0.25 * box.h))).toBeLessThan(1.5)
-      return dot.w
-    }
-    const before = await check()
-    await page.keyboard.press('+')
-    await page.keyboard.press('+')
-    await expect.poll(async () => (await zoomState(page)).scale).toBeGreaterThan(1.5)
-    await page.waitForTimeout(400) // let the zoom transition settle
-    const after = await check()
-    expect(Math.abs(after - before)).toBeLessThan(1) // counter-scaled: same screen size
-  })
+  for (const look of ['', 'preset=editorial&skin=editorial']) {
+    test(`a pin sits on its image point and keeps its size and point under zoom ${look}`, async ({
+      page,
+    }) => {
+      await ready(page, look)
+      const check = async () => {
+        const box = await imageBox(page)
+        const dot = await dotOf(page, 'a')
+        expect(Math.abs(dot.cx - (box.x + 0.25 * box.w))).toBeLessThan(1.5)
+        expect(Math.abs(dot.cy - (box.y + 0.25 * box.h))).toBeLessThan(1.5)
+        return dot.w
+      }
+      const before = await check()
+      await page.keyboard.press('+')
+      await page.keyboard.press('+')
+      await expect.poll(async () => (await zoomState(page)).scale).toBeGreaterThan(1.5)
+      await page.waitForTimeout(400) // let the zoom transition settle
+      const after = await check()
+      expect(Math.abs(after - before)).toBeLessThan(1) // counter-scaled: same screen size
+    })
+  }
 
   test('a card opens beside its pin, Escape closes it and keeps the viewer open', async ({
     page,
@@ -108,25 +110,33 @@ test.describe('pins', () => {
     await expect(page.locator('.gallerist-pin').first()).toBeVisible()
   })
 
-  test('placing a comment reports the clicked image point and shows the new pin', async ({
-    page,
-  }) => {
-    await ready(page, 'presentation=comment&skin=console')
-    await page.locator('.gallerist-pin-add').click()
-    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-placing', '')
-    const box = await imageBox(page)
-    await page.mouse.click(box.x + box.w * 0.6, box.y + box.h * 0.4)
-    const placed = await page.evaluate(
-      () => (window as unknown as { placed: Array<{ x: number; y: number }> }).placed,
-    )
-    expect(placed).toHaveLength(1)
-    expect(placed[0]?.x).toBeCloseTo(0.6, 2)
-    expect(placed[0]?.y).toBeCloseTo(0.4, 2)
-    await expect(page.locator('[data-pin="n1"]')).toBeVisible()
-    await expect(page.locator('[data-pin="n1"] .gallerist-pin-dot')).toHaveText('4')
-  })
+  for (const look of ['skin=console', 'skin=editorial&preset=editorial']) {
+    test(`placing a comment reports the clicked image point and shows the new pin (${look})`, async ({
+      page,
+    }) => {
+      await ready(page, `presentation=comment&${look}`)
+      await page.locator('.gallerist-pin-add').click()
+      await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-placing', '')
+      const box = await imageBox(page)
+      await page.mouse.click(box.x + box.w * 0.6, box.y + box.h * 0.4)
+      const placed = await page.evaluate(
+        () => (window as unknown as { placed: Array<{ x: number; y: number }> }).placed,
+      )
+      expect(placed).toHaveLength(1)
+      expect(placed[0]?.x).toBeCloseTo(0.6, 2)
+      expect(placed[0]?.y).toBeCloseTo(0.4, 2)
+      await expect(page.locator('[data-pin="n1"]')).toBeVisible()
+      await expect(page.locator('[data-pin="n1"] .gallerist-pin-dot')).toHaveText('4')
+    })
+  }
 
-  for (const look of ['skin=gallery', 'skin=gallery&scheme=light', 'skin=console']) {
+  for (const look of [
+    'skin=gallery',
+    'skin=gallery&scheme=light',
+    'skin=console',
+    'skin=editorial',
+    'skin=editorial&scheme=dark',
+  ]) {
     test(`an open card has no axe violations (${look})`, async ({ page }) => {
       await ready(page, `${look}&presentation=comment`)
       await page.locator('[data-pin="c"] .gallerist-pin-marker').click()

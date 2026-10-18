@@ -28,8 +28,14 @@ export function containRect(container: Size, natural: Size): ContainRect {
   return { x: (container.w - w) / 2, y: (container.h - h) / 2, w, h }
 }
 
-export function contentAnchorBox(anchor: ContentAnchor, stage: Size, natural: Size): OverlayBox {
-  const rect = containRect(stage, natural)
+/** `rect` is the painted media box when the renderer knows it (framed media); otherwise the media
+ *  is assumed contained in the whole stage. */
+export function contentAnchorBox(
+  anchor: ContentAnchor,
+  stage: Size,
+  natural: Size,
+  rect: ContainRect = containRect(stage, natural),
+): OverlayBox {
   const s = rect.w / natural.w
   const space = anchor.space ?? 'normalized'
 

@@ -3,9 +3,9 @@
 // name. Pure resolver (no DOM): the renderer applies `rootAttrs` + `arrows`/`autoHide`, and a host
 // (or the React adapter) spreads `thumbnails` into the thumbnails() plugin.
 
-import type { ArrowLayout, RailPlacement } from './mount'
+import type { ArrowLayout, ItemIndicator, RailPlacement } from './mount'
 
-export type PresetName = 'filmstrip' | 'immersive' | 'reviewer' | 'contact'
+export type PresetName = 'filmstrip' | 'immersive' | 'reviewer' | 'contact' | 'editorial'
 
 export interface ResolvedPreset {
   /** data-* attributes the renderer sets on the root (drives the theme). */
@@ -25,6 +25,10 @@ export interface ResolvedPreset {
   }
   /** turn on the zoom navigator by default (overridable). */
   navigator?: boolean
+  /** frame the media (overridable). */
+  frame?: boolean
+  /** default item indicator (overridable). */
+  itemIndicator?: ItemIndicator
 }
 
 const PRESETS: Record<PresetName, ResolvedPreset> = {
@@ -55,6 +59,17 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     rail: 'bottom',
     thumbnails: { itemAxis: 'vertical', timeline: true, numberItems: true },
     navigator: true,
+  },
+  // a gallery wall: the work framed with room around it, a placard beside it (caption + item
+  // navigator), numbered items inline in a bottom rail. Pairs with `skin: 'editorial'`.
+  editorial: {
+    rootAttrs: { 'data-gallerist-preset': 'editorial' },
+    arrows: 'pill-right',
+    autoHide: false,
+    rail: 'bottom',
+    thumbnails: { itemAxis: 'horizontal', numberItems: true },
+    frame: true,
+    itemIndicator: 'placard',
   },
   // browse-heavy: a vertical rail down the right edge (pairs well with the grid plugin).
   contact: {
