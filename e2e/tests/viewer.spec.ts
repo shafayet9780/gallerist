@@ -143,6 +143,20 @@ test('close fades out before unmounting; phases settle on the real animation', a
   expect(phases).toEqual(['closing', 'closed'])
 })
 
+test('with reduced motion, open and close do not animate', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const root = page.locator('.gallerist')
+  await expect(root).toHaveAttribute('data-gallerist-phase', 'open')
+  await page.evaluate(() => (window as unknown as { viewer: { close(): void } }).viewer.close())
+  await expect(root).toHaveCount(0)
+  await page.click('#open')
+  const name = await root.evaluate((el) => {
+    el.setAttribute('data-gallerist-phase', 'closing') // force the exit rule to apply
+    return getComputedStyle(el).animationName
+  })
+  expect(name).toBe('none')
+})
+
 test('wheel zooms in past fit (arbitration: zoom)', async ({ page }) => {
   const box = await page.locator('.gallerist-stage').boundingBox()
   if (!box) throw new Error('no stage box')

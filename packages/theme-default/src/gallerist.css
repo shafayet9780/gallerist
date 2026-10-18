@@ -1010,8 +1010,9 @@
   .gallerist[data-gallerist-preset="immersive"] .gallerist-region-toolbar {
     transition-duration: 0ms;
   }
+  /* the phase selector must match the phase rules' specificity (0,3,0) so this later rule wins */
   .gallerist-slide[data-gallerist-enter],
-  .gallerist[data-gallerist-phase] {
+  .gallerist[data-gallerist-mode][data-gallerist-phase] {
     animation: none;
   }
 }
