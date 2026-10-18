@@ -105,9 +105,9 @@
     --gallerist-frame-inset-compact: 16px;
     --gallerist-placard-w: 300px;
 
-    /* motion: works fade in on the wall rather than slide */
+    /* motion: works fade in on the wall rather than slide; items settle in */
     --gallerist-enter-group: gallerist-fade;
-    --gallerist-enter-item: gallerist-fade;
+    --gallerist-enter-item: gallerist-fade-settle; /* the item axis settles in: never the group's motion */
     --gallerist-dur-snappy: 420ms;
 
     /* the red marks what's current and progress; selection and pressed use ink */

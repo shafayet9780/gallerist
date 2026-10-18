@@ -64,6 +64,7 @@
     --gallerist-frame-shadow: none;
     /* the placard column (itemIndicator: 'placard' in the editorial preset) */
     --gallerist-placard-w: 300px;
+    --gallerist-placard-band-h: 60px; /* a placard under the stage: one row, fixed */
 
     /* motion: the keyframes a slide enters with, per axis (a skin may crossfade instead) */
     --gallerist-enter-group: gallerist-enter-group;
@@ -135,18 +136,16 @@
     "rail caption aside"
     "rail footer aside";
 }
-/* editorial: the caption is a placard in a column beside the work (bottom rail or hidden only) */
-.gallerist[data-gallerist-preset="editorial"] {
-  grid-template-columns: minmax(0, 1fr) auto;
+/* editorial with a bottom (or hidden) rail: the placard is a column beside the work, then the item
+   stack column if any. Side rails keep their own template, with the placard as the caption band. */
+.gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"] {
+  grid-template-columns: minmax(0, 1fr) auto auto;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
-    "bar bar"
-    "main caption"
-    "footer footer"
-    "rail rail";
-}
-.gallerist[data-gallerist-preset="editorial"] .gallerist-region-aside {
-  display: none;
+    "bar bar bar"
+    "main caption aside"
+    "footer footer footer"
+    "rail rail rail";
 }
 /* modes (data-attribute, not a class — avoids colliding with .gallerist-overlay elements) */
 .gallerist[data-gallerist-mode="overlay"] {
@@ -237,6 +236,14 @@
   margin: auto;
   max-width: 100%;
   max-height: 100%;
+}
+/* framed: a failed load's error card fills the frame, not the margins around it */
+.gallerist[data-gallerist-frame] .gallerist-media-error {
+  inset: auto;
+  left: var(--gallerist-box-x, 0);
+  top: var(--gallerist-box-y, 0);
+  width: var(--gallerist-box-w, 100%);
+  height: var(--gallerist-box-h, 100%);
 }
 /* framed (`frame`): the media element is the painted image box the renderer measured, so the mat
    and shadow hug the work itself */
@@ -497,6 +504,17 @@
   padding-left: 8px;
   margin-left: 8px;
   border-left: 1px solid var(--gallerist-hairline);
+}
+/* in a side rail the row would widen the rail and crush the stage: it runs down the rail instead */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-items[data-axis="horizontal"] {
+  flex-direction: column;
+  align-items: stretch;
+  max-height: 50%;
+  overflow-y: auto;
+  padding: 8px 0 0;
+  margin: 8px 0 0;
+  border-left: 0;
+  border-top: 1px solid var(--gallerist-hairline);
 }
 /* vertical (default): a stack in the aside column beside the stage, scrolling when it is long */
 .gallerist-thumb-items[data-axis="vertical"] {
@@ -1102,48 +1120,41 @@
   pointer-events: none;
 }
 
-/* placard (itemIndicator: 'placard'): the caption is a label (title, rule, item navigator); the
-   navigator sits in it instead of over the stage, and the dots become ticks */
+/* placard (itemIndicator: 'placard'): the caption is a label, the caption text then the item
+   navigator with a tick per item. Under the stage it is one band of fixed height, so the stage keeps
+   its size as captions and groups change; beside the work (editorial, wide screens) a column. */
 .gallerist[data-gallerist-indicator="placard"] .gallerist-caption {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 18px;
-  height: auto;
-  min-height: 0;
-  padding: 16px 28px 16px 12px;
-  overflow: visible;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  height: var(--gallerist-placard-band-h);
+  padding: 0 16px;
+  overflow: hidden;
   -webkit-line-clamp: unset;
   line-clamp: none;
 }
-.gallerist[data-gallerist-preset="editorial"][data-gallerist-indicator="placard"]
-  .gallerist-caption {
-  width: var(--gallerist-placard-w);
-}
 .gallerist[data-gallerist-indicator="placard"] .gallerist-caption-text {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   line-height: 1.2;
-}
-.gallerist[data-gallerist-indicator="placard"] .gallerist-caption-text:empty {
-  display: none;
 }
 .gallerist[data-gallerist-indicator="placard"][data-gallerist-arrows]
   .gallerist-caption
   .gallerist-itemnav:not([hidden]) {
   position: static;
   display: flex;
+  flex: none;
   flex-direction: row;
   align-items: center;
   gap: 8px;
   inset: auto;
   transform: none;
-  padding: 16px 0 0;
+  padding: 0;
   border: 0;
-  border-block-start: 1px solid var(--gallerist-hairline);
   border-radius: 0;
   background: transparent;
 }
@@ -1156,40 +1167,91 @@
 }
 .gallerist[data-gallerist-indicator="placard"] .gallerist-caption .gallerist-position {
   order: -1; /* ticks and the count first, the ↑ ↓ buttons after */
-  flex: 1 1 auto;
-  /* a column of ticks with the count beside it */
-  display: grid;
-  grid-auto-flow: row;
-  grid-template-columns: auto 1fr;
+  display: flex;
+  flex-direction: row;
   align-items: center;
-  column-gap: 14px;
-  row-gap: 0;
+  gap: 0;
   padding: 0;
   background: transparent;
   font: 600 15px var(--gallerist-font);
   color: var(--gallerist-fg);
 }
 .gallerist[data-gallerist-indicator="placard"] .gallerist-caption .gallerist-position-text {
-  grid-column: 2;
-  grid-row: 1 / span 12;
-  padding: 0;
+  order: 1;
+  padding: 0 0 0 10px;
 }
+/* a tick: a short rule in a 24px target */
 .gallerist[data-gallerist-indicator="placard"] .gallerist-caption .gallerist-dot {
-  width: 28px;
-  height: 8px;
-  place-items: center start;
+  width: 24px;
+  height: 24px;
+  place-items: center;
 }
 .gallerist[data-gallerist-indicator="placard"] .gallerist-caption .gallerist-dot::before {
-  width: 18px;
+  width: 16px;
   height: 2px;
   border-radius: 0;
+  opacity: 0.6;
 }
 .gallerist[data-gallerist-indicator="placard"]
   .gallerist-caption
   .gallerist-dot[data-active]::before {
-  width: 28px;
+  width: 22px;
   height: 2px;
+  opacity: 1;
   background: var(--gallerist-accent);
+}
+/* beside the work: a column (its height can't move the stage there); ticks run down, the count
+   beside them */
+@media (min-width: 601px) {
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"][data-gallerist-indicator="placard"]
+    .gallerist-caption {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 18px;
+    width: var(--gallerist-placard-w);
+    height: auto;
+    padding: 16px 28px 16px 12px;
+  }
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"][data-gallerist-indicator="placard"]
+    .gallerist-caption-text {
+    flex: none;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    white-space: normal;
+  }
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"][data-gallerist-indicator="placard"]
+    .gallerist-caption-text:empty {
+    display: none;
+  }
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"][data-gallerist-indicator="placard"][data-gallerist-arrows]
+    .gallerist-caption
+    .gallerist-itemnav:not([hidden]) {
+    padding-block-start: 16px;
+    border-block-start: 1px solid var(--gallerist-hairline);
+  }
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"][data-gallerist-indicator="placard"]
+    .gallerist-caption
+    .gallerist-position {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 14px;
+  }
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"][data-gallerist-indicator="placard"]
+    .gallerist-caption
+    .gallerist-position-text {
+    grid-column: 2;
+    grid-row: 1 / span 12;
+    padding: 0;
+  }
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"][data-gallerist-indicator="placard"]
+    .gallerist-caption
+    .gallerist-dot {
+    place-items: center start;
+  }
 }
 
 /* linear flat traversal: the item axis retires (the renderer also hides the navigator) */
@@ -1415,6 +1477,18 @@
     opacity: 1;
   }
 }
+/* a fade that settles from slightly larger: the item axis of a skin that fades (never the same
+   motion as its group axis, spec §27.5) */
+@keyframes gallerist-fade-settle {
+  from {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 @keyframes gallerist-fade-out {
   from {
     opacity: 1;
@@ -1495,8 +1569,8 @@
   .gallerist .gallerist-bar .gallerist-items-toggle {
     display: none;
   }
-  /* editorial: the placard drops under the work */
-  .gallerist[data-gallerist-preset="editorial"] {
+  /* editorial: the placard drops under the work, as the caption band */
+  .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto auto auto;
     grid-template-areas:
@@ -1505,12 +1579,6 @@
       "caption"
       "footer"
       "rail";
-  }
-  .gallerist[data-gallerist-preset="editorial"][data-gallerist-indicator="placard"]
-    .gallerist-caption {
-    width: auto;
-    padding: 10px 16px;
-    gap: 10px;
   }
   /* the bottom edge belongs to the item position chip: the navigator goes to the top corner */
   .gallerist-navigator {

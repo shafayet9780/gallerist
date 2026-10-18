@@ -18,7 +18,7 @@ distinct layout.
 | `reviewer`  | `bottom` | `corner-br` | no        | Time-series review: a timeline rail (a time over each group from `group.meta.time`), numbered items, the zoom navigator. Pairs with `skin: 'console'`. |
 | `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
 | `contact`   | `right`  | `pill-right`| no        | Browse-heavy; vertical rail on the right (pairs with `plugin-grid`). |
-| `editorial` | `bottom` | `pill-right`| no        | A gallery wall: the work framed with room around it (`frame`), a placard beside it holding the caption and the item navigator (`itemIndicator: 'placard'`), numbered items inline in the rail. Pairs with `skin: 'editorial'`; supports bottom and hidden rails. |
+| `editorial` | `bottom` | `pill-right`| no        | A gallery wall: the work framed with room around it (`frame`), a placard beside it holding the caption and the item navigator (`itemIndicator: 'placard'`), numbered items inline in the rail. Pairs with `skin: 'editorial'`. With a side rail the placard becomes the caption band under the stage. |
 
 ```tsx
 // React
@@ -110,8 +110,10 @@ exception: the stage fills the viewer and the bar, caption and rail float over i
   the skin's mat (`--gallerist-frame-mat`) and shadow (`--gallerist-frame-shadow`) hug it. Zoom
   bounds, overlays and pins follow the framed box.
 - **Placard** (`itemIndicator: 'placard'`, on in `editorial`): the item navigator moves from over
-  the stage into the caption, under the item's caption, with ticks for the items. The editorial
-  preset sets the caption beside the work; elsewhere it stays the caption band under the stage.
+  the stage into the caption, with a tick per item. Under the stage the placard is one band of
+  fixed height (the caption on one line), so the stage keeps its size; the editorial preset sets it
+  as a column beside the work on wide screens. It stays up even with no caption and a one-item group,
+  so the layout never shifts.
 - **Zoom navigator** (`navigator: true`, on in `reviewer`): while zoomed in, a minimap of the image
   in the stage's bottom corner (top corner on narrow screens) with a box for the visible part;
   click or drag it to move around. It is a pointer aid, hidden from assistive tech; the keys zoom

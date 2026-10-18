@@ -54,7 +54,7 @@ export interface GalleristProps extends ViewerOptions {
   skin?: Skin
   /** the skin's accent by name, e.g. `mint` (Gallery) or `cyan` (Console) (reactive). */
   accent?: Accent
-  /** colour scheme: `dark` (default), `light` or `auto` (reactive). */
+  /** colour scheme: `dark`, `light` or `auto`; unset, the skin's own default (reactive). */
   scheme?: ColorScheme
   /** within-group arrow placement (overrides the preset default) — UX-D. */
   arrows?: ArrowLayout

@@ -74,6 +74,7 @@ const viewer = createViewer({
           thumbnails({
             ...(p.get('preset') ? resolvePreset(p.get('preset') as string).thumbnails : {}),
             groupDisplay: p.get('display') === 'flat' ? 'flat' : 'stacked',
+            ...(p.get('items') ? { itemAxis: p.get('items') as 'vertical' | 'horizontal' } : {}),
           }),
           grid(),
           fullscreen(),

@@ -92,7 +92,8 @@ export interface MountOptions {
   skin?: Skin
   /** The skin's accent by name (`data-gallerist-accent`); unset uses the skin's default. */
   accent?: Accent
-  /** `dark` (default), `light`, or `auto` to follow the system (`data-gallerist-scheme`). */
+  /** `dark`, `light`, or `auto` to follow the system (`data-gallerist-scheme`); unset, the skin's
+   *  own default (Gallery and Console dark, Editorial light). */
   scheme?: ColorScheme
   /**
    * Zoom navigator: while zoomed in, a minimap of the image in the stage's bottom corner with a box

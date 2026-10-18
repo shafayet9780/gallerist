@@ -41,6 +41,9 @@ const CONFIGS: Record<string, string> = {
   'editorial-long-caption': 'preset=editorial&captions=long&g=1',
   'editorial-zoomed': 'preset=editorial&captions=1&zoom=2',
   'placard-filmstrip': 'indicator=placard&captions=1', // a placard in the bottom caption band
+  'editorial-rail-left': 'preset=editorial&rail=left&captions=1',
+  'editorial-rail-right-rtl': 'preset=editorial&rail=right&dir=rtl&captions=1',
+  'editorial-vertical-items': 'preset=editorial&captions=1&items=vertical',
   'scheme-auto-light': 'scheme=auto&accent=mint&captions=1', // run with the system in light mode
 }
 
@@ -425,6 +428,35 @@ test.describe('layout behaviour', () => {
     await expect.poll(async () => Math.abs((await imageEdgeGaps())[1] ?? 99)).toBeLessThan(1.5)
     await page.keyboard.press('0')
     await expect(navigator).toBeHidden()
+  })
+
+  for (const [look, size] of [
+    ['indicator=placard&captions=mixed', { width: 1280, height: 800 }],
+    ['preset=editorial&skin=editorial&captions=mixed', { width: 560, height: 800 }],
+    ['preset=editorial&skin=editorial&captions=mixed', { width: 1280, height: 800 }],
+  ] as const) {
+    test(`a placard keeps the stage's size across groups (${look}, ${size.width}px)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(size)
+      const heights: number[] = []
+      for (const g of [0, 1, 5]) {
+        await page.goto(`/layout.html?${look}&g=${g}`)
+        await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+        const box = await page.locator('.gallerist-stage').boundingBox()
+        heights.push(Math.round(box?.height ?? 0))
+      }
+      expect(new Set(heights).size, heights.join(' / ')).toBe(1)
+    })
+  }
+
+  test('editorial with a side rail keeps a stage', async ({ page }) => {
+    for (const rail of ['left', 'right']) {
+      await page.goto(`/layout.html?preset=editorial&skin=editorial&rail=${rail}&captions=1`)
+      await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+      const box = await page.locator('.gallerist-stage').boundingBox()
+      expect(box?.height ?? 0, rail).toBeGreaterThan(300)
+    }
   })
 
   test('RTL: the group arrows point the reading direction', async ({ page }) => {

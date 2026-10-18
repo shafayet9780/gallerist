@@ -38,7 +38,8 @@
 - **theme (M19)**: the **Editorial** skin (`editorial.css`, `skin: 'editorial'`). A warm gallery
   wall, with a Night scheme, ink type, serif titles and captions, outlined round arrows, and
   `vermilion` / `cobalt` accents. Works fade in rather than slide: the slide animations are now
-  tokens (`--gallerist-enter-group`, `--gallerist-enter-item`).
+  tokens (`--gallerist-enter-group`, `--gallerist-enter-item`); items settle in (a fade with a
+  slight scale) so the two axes never share a motion.
 - **renderer-dom (M19)**: `frame` option. The work hangs inside the stage with room around it, and
   the media element is sized to the image, so a skin's mat and shadow hug it. Zoom bounds,
   overlays, pins and the navigator follow the framed box. `itemIndicator: 'placard'` moves the item
