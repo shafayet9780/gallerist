@@ -152,7 +152,7 @@ One internal representation, two ergonomic front doors. Flat users never see the
 
 ### 4.4 Identity & stability
 
-`id` on group and item is mandatory and must be stable across renders. It powers: DOM keying/recycling, deep-link hashes (`#g=<groupId>&i=<itemId>`), overlay persistence, and the diffing used when the collection updates live (e.g. Apploye streaming in new screenshots). The engine supports **live collection updates** — `viewer.setCollection(next)` diffs by id, preserving cursor and zoom where possible.
+`id` on group and item is mandatory, must be stable across renders, and must be unique: group ids among groups, item ids across the whole collection (a group and an item may share one, as flat items do). `normalize` throws on a duplicate. It powers: DOM keying/recycling, deep-link hashes (`#g=<groupId>&i=<itemId>`), overlay persistence, and the diffing used when the collection updates live (e.g. Apploye streaming in new screenshots). The engine supports **live collection updates** — `viewer.setCollection(next)` diffs by id, preserving cursor and zoom where possible.
 
 ---
 

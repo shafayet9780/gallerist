@@ -143,6 +143,18 @@ describe('createViewer — zoom (committed)', () => {
     expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
   })
 
+  it('ignores a non-finite or non-positive scale and a non-finite focal (no poisoned state)', () => {
+    const zoom = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { zoom } })
+    v.open()
+    v.zoomTo(2, { x: 10, y: 20 })
+    zoom.mockClear()
+    for (const bad of [Number.NaN, 0, -5, Number.POSITIVE_INFINITY]) v.zoomTo(bad)
+    v.zoomTo(2, { x: Number.NaN, y: 0 })
+    expect(v.getState().zoom).toEqual({ scale: 2, x: 10, y: 20 })
+    expect(zoom).not.toHaveBeenCalled()
+  })
+
   it('resets committed zoom on group navigation by default (I-C2)', () => {
     const v = createViewer({ collection: grouped() })
     v.open()

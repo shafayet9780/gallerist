@@ -3,8 +3,8 @@ import type { Collection, CollectionInput, Group } from '../types'
 /**
  * Normalize the three public front doors (spec §4.2) into one internal Collection.
  * Flat `items` become singleton groups (group.id = item.id); `groups`/`collection`
- * pass through. Validates that every group and item carries a stable string id and
- * that no group is empty (spec §4.4). Input is never mutated.
+ * pass through. Validates that every group and item carries a stable, unique string id
+ * and that no group is empty (spec §4.4). Input is never mutated.
  */
 export function normalize<GM = unknown, IM = unknown>(
   input: CollectionInput<GM, IM>,
@@ -35,11 +35,20 @@ export function normalize<GM = unknown, IM = unknown>(
   return collection
 }
 
+// Ids must be unique: slides are keyed by group id and `state.loaded` by item id, so a duplicate
+// silently orphans slide nodes and shows the wrong media. Groups and items are separate
+// namespaces — flat sugar's singleton groups (group.id === item.id) are fine.
 function validate(collection: Collection): void {
+  const groupIds = new Set<string>()
+  const itemIds = new Set<string>()
   collection.groups.forEach((group, gi) => {
     if (!group || typeof group.id !== 'string' || group.id === '') {
       throw new Error(`normalize: group at index ${gi} is missing a stable string id`)
     }
+    if (groupIds.has(group.id)) {
+      throw new Error(`normalize: duplicate group id "${group.id}" (index ${gi})`)
+    }
+    groupIds.add(group.id)
     if (!Array.isArray(group.items) || group.items.length === 0) {
       throw new Error(`normalize: group "${group.id}" (index ${gi}) has no items`)
     }
@@ -49,6 +58,12 @@ function validate(collection: Collection): void {
           `normalize: item at group "${group.id}", index ${ii} is missing a stable string id`,
         )
       }
+      if (itemIds.has(it.id)) {
+        throw new Error(
+          `normalize: duplicate item id "${it.id}" (group "${group.id}", index ${ii}); item ids must be unique across the collection`,
+        )
+      }
+      itemIds.add(it.id)
     })
   })
 }

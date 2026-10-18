@@ -80,4 +80,44 @@ describe('normalize', () => {
     expect(c.groups[0]?.caption).toBe('Morning session')
     expect(c.groups[0]?.items[0]?.caption).toBe('First screen')
   })
+  describe('id uniqueness (duplicates orphan slides and alias load status)', () => {
+    it('rejects duplicate group ids', () => {
+      expect(() =>
+        normalize({
+          groups: [
+            { id: 'g', items: [item('a')] },
+            { id: 'g', items: [item('b')] },
+          ],
+        }),
+      ).toThrow(/duplicate group id "g"/)
+    })
+
+    it('rejects duplicate flat item ids (they become duplicate group ids)', () => {
+      expect(() => normalize({ items: [item('a'), item('a')] })).toThrow(/duplicate group id "a"/)
+    })
+
+    it('rejects an item id repeated within a group', () => {
+      expect(() => normalize({ groups: [{ id: 'g', items: [item('a'), item('a')] }] })).toThrow(
+        /duplicate item id "a"/,
+      )
+    })
+
+    it('rejects an item id repeated across groups', () => {
+      expect(() =>
+        normalize({
+          groups: [
+            { id: 'g1', items: [item('a')] },
+            { id: 'g2', items: [item('a')] },
+          ],
+        }),
+      ).toThrow(/duplicate item id "a" \(group "g2"/)
+    })
+
+    it('allows a group and an item to share an id (separate namespaces, flat sugar)', () => {
+      expect(() =>
+        normalize({ groups: [{ id: 'x', items: [item('x'), item('y')] }] }),
+      ).not.toThrow()
+      expect(() => normalize({ items: [item('a'), item('b')] })).not.toThrow()
+    })
+  })
 })

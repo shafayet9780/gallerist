@@ -206,6 +206,10 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     },
     zoomTo(scale, focal) {
       if (destroyed) return
+      // A NaN/negative/infinite transform would poison the committed state and every later
+      // focal computation built on it — ignore invalid input instead.
+      if (!(Number.isFinite(scale) && scale > 0)) return
+      if (focal && !(Number.isFinite(focal.x) && Number.isFinite(focal.y))) return
       const cur = store.get().zoom
       commitZoom({ scale, x: focal?.x ?? cur.x, y: focal?.y ?? cur.y })
     },
