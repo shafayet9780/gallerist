@@ -259,6 +259,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   }
 
   // ── DOM scaffold ───────────────────────────────────────────────────────────
+  // The root is a grid of areas (theme base.css): bar / main / aside / caption / footer / rail. Every
+  // piece of chrome lives in its own area, so persistent chrome takes space instead of covering the
+  // stage and nothing can collide; only the arrows and the item navigator sit over the stage, inside
+  // `main`. Presets and rail positions change the grid template, never the DOM.
   const root = el('div', 'gallerist')
   root.setAttribute('data-gallerist-mode', overlay ? 'overlay' : 'inline')
   root.setAttribute('data-gallerist-arrows', arrows)
@@ -278,30 +282,42 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   }
 
   if (overlay) root.appendChild(el('div', 'gallerist-backdrop'))
+  const bar = el('div', 'gallerist-bar')
+  const main = el('div', 'gallerist-main')
   const stage = el('div', 'gallerist-stage')
   const track = el('div', 'gallerist-track')
   const viewportLayer = el('div', 'gallerist-viewport-layer')
   const stageRegion = el('div', 'gallerist-region gallerist-region-stage')
   stage.append(track, viewportLayer, stageRegion)
-  root.appendChild(stage)
+  main.appendChild(stage)
 
   // Named region hosts for plugins (spec §13).
   const regionHosts: RegionHosts = {
     backdrop: el('div', 'gallerist-region gallerist-region-backdrop'),
     stage: stageRegion,
     toolbar: el('div', 'gallerist-region gallerist-region-toolbar'),
+    aside: el('div', 'gallerist-region gallerist-region-aside'),
     thumbnails: el('div', 'gallerist-region gallerist-region-thumbnails'),
     footer: el('div', 'gallerist-region gallerist-region-footer'),
   }
-  root.prepend(regionHosts.backdrop)
-  root.append(regionHosts.toolbar, regionHosts.thumbnails, regionHosts.footer)
+  const caption = el('div', 'gallerist-caption')
+  caption.hidden = true
+  root.append(
+    regionHosts.backdrop,
+    bar,
+    main,
+    regionHosts.aside,
+    caption,
+    regionHosts.footer,
+    regionHosts.thumbnails,
+  )
 
   const live = el('div', 'gallerist-live', { 'aria-live': 'polite', role: 'status' })
   root.appendChild(live)
 
   // Rail collapse (UX-C): a pull-handle attached to the rail's edge + `t` key + fullscreen →
   // data-gallerist-rail. The handle lives inside the thumbnails region so it reads as part of the
-  // gallery and slides with it; it's (re)attached in mountRegions since the host is replaceChildren'd.
+  // gallery; it's (re)placed in mountRegions.
   let railCollapsed = railHidden
   let preFsCollapsed: boolean | null = null
   const railHandle = el('div', 'gallerist-rail-handle')
@@ -323,17 +339,30 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   railToggle.addEventListener('click', () => setRailCollapsed(!railCollapsed, true))
 
   let counter: HTMLElement | undefined
+  let title: HTMLElement | undefined
   let position: HTMLElement | undefined
+  let itemNav: HTMLElement | undefined
+  let reset: HTMLElement | undefined
   // segmented pills are rebuilt only when the active group / its size changes (UX-H)
   let posG = -1
   let posM = -1
   if (controls) {
-    const chrome = el('div', 'gallerist-chrome')
+    // top bar: counter → title → plugin tools → zoom reset → close (one row, never overlapping)
+    counter = el('div', 'gallerist-counter')
+    title = el('div', 'gallerist-title')
+    title.hidden = true
+    reset = el('button', 'gallerist-zoom-reset', { type: 'button', 'aria-label': 'Reset zoom' })
+    reset.innerHTML = ICONS.zoomReset
+    reset.hidden = true // only while zoomed in
+    reset.addEventListener('click', () => viewer.resetZoom())
     const close = el('button', 'gallerist-close', { type: 'button', 'aria-label': 'Close' })
     close.innerHTML = ICONS.close
     close.addEventListener('click', () => viewer.close())
-    // Icons follow the orientation: horizontal → group ←/→, item ↑/↓; vertical → group ↑/↓, item ←/→.
-    // (Positions are the CSS counterpart in `[data-gallerist-orientation="vertical"]`; keep the two in sync.)
+    bar.append(counter, title, regionHosts.toolbar, reset, close)
+
+    // over the stage: group arrows and the item navigator (↑ · position · ↓) as one cluster, so
+    // each arrow layout places it as a unit. Icons follow the orientation: horizontal → group ←/→,
+    // item ↑/↓; vertical (side rail) → group ↑/↓, item ←/→.
     const prev = el('button', 'gallerist-prev', { type: 'button', 'aria-label': 'Previous' })
     prev.innerHTML = vertical ? ICONS.itemPrev : ICONS.prev
     prev.addEventListener('click', () => nav.prev())
@@ -352,17 +381,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     })
     nextItem.innerHTML = vertical ? ICONS.next : ICONS.itemNext
     nextItem.addEventListener('click', () => nav.nextItem())
-    const reset = el('button', 'gallerist-zoom-reset', {
-      type: 'button',
-      'aria-label': 'Reset zoom',
-    })
-    reset.innerHTML = ICONS.zoomReset
-    reset.addEventListener('click', () => viewer.resetZoom())
-    counter = el('div', 'gallerist-counter')
     position = el('div', 'gallerist-position')
-    position.hidden = true
-    chrome.append(close, prev, next, prevItem, nextItem, reset, counter, position)
-    root.appendChild(chrome)
+    itemNav = el('div', 'gallerist-itemnav')
+    itemNav.hidden = true // shown only for groups with more than one item (and not in linear mode)
+    itemNav.append(prevItem, position, nextItem)
+    main.append(prev, next, itemNav)
+  } else {
+    bar.appendChild(regionHosts.toolbar) // plugin tools keep their place without built-in chrome
   }
 
   // ── slide window ─────────────────────────────────────────────────────────────
@@ -561,46 +586,34 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
 
-  // within-group position: segmented pills for small groups, a mono counter for large ones (UX-H)
+  // Within-group position (UX-H): always an "n / N" text, plus segmented pills for small groups
+  // (≤ PILL_MAX) that jump straight to an item. The theme decides which to show per device (pills
+  // on a fine pointer; the text, and swipes, on touch).
   const PILL_MAX = 8
   const updatePosition = (g: number, i: number, itemCount: number) => {
     if (!position) return
-    if (itemCount <= 1) {
-      if (posM !== 0) {
-        position.replaceChildren()
-        position.removeAttribute('data-mode')
-        posG = -1
-        posM = 0
-      }
-      position.hidden = true
-      return
-    }
-    position.hidden = false
-    if (itemCount > PILL_MAX) {
-      position.dataset.mode = 'counter'
-      position.textContent = `${i + 1} / ${itemCount}`
-      posG = g
-      posM = itemCount
-      return
-    }
-    if (g !== posG || itemCount !== posM || position.dataset.mode !== 'pills') {
-      position.dataset.mode = 'pills'
+    const mode = itemCount > PILL_MAX ? 'counter' : 'pills'
+    if (g !== posG || itemCount !== posM || position.dataset.mode !== mode) {
+      position.dataset.mode = mode
       position.replaceChildren()
-      const label = el('span', 'gallerist-position-label')
-      label.textContent = 'screen'
-      position.appendChild(label)
-      for (let k = 0; k < itemCount; k++) {
-        const pill = el('button', 'gallerist-pill', {
-          type: 'button',
-          'aria-label': `Screen ${k + 1}`,
-        })
-        pill.textContent = String(k + 1)
-        pill.addEventListener('click', () => viewer.goTo(g, k))
-        position.appendChild(pill)
+      const text = el('span', 'gallerist-position-text')
+      position.appendChild(text)
+      if (mode === 'pills') {
+        for (let k = 0; k < itemCount; k++) {
+          const pill = el('button', 'gallerist-pill', {
+            type: 'button',
+            'aria-label': `Item ${k + 1}`,
+          })
+          pill.textContent = String(k + 1)
+          pill.addEventListener('click', () => viewer.goTo(g, k))
+          position.appendChild(pill)
+        }
       }
       posG = g
       posM = itemCount
     }
+    const text = position.querySelector('.gallerist-position-text')
+    if (text) text.textContent = `${i + 1} / ${itemCount}`
     for (const [k, pill] of position.querySelectorAll('.gallerist-pill').entries()) {
       if (k === i) pill.setAttribute('data-active', '')
       else pill.removeAttribute('data-active')
@@ -619,26 +632,41 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     chromeG = cur.g
     chromeI = cur.i
     const G = col.groups.length
-    const itemCount = col.groups[cur.g]?.items.length ?? 0
+    const group = col.groups[cur.g]
+    const item = group?.items[cur.i]
+    const itemCount = group?.items.length ?? 0
+    // the item axis exists only for multi-item groups, and retires in linear mode
+    const multi = !linear && itemCount > 1
+    root.setAttribute('data-gallerist-items', multi ? 'multi' : 'single')
+    if (itemNav) itemNav.hidden = !multi
+    if (title) {
+      title.textContent = group?.caption ?? ''
+      title.hidden = !group?.caption
+    }
+    // plain-text captions go in the caption bar; a rich (OverlaySpec) caption renders as an overlay
+    caption.textContent = controls && typeof item?.caption === 'string' ? item.caption : ''
+    caption.hidden = !caption.textContent
     // Announce the item's own description alongside the position so SR users hear what they
     // navigated to, not just the index (S-UX4).
-    const alt = col.groups[cur.g]?.items[cur.i]?.alt
-    const desc = alt ? ` — ${alt}` : ''
+    const desc = item?.alt ? ` — ${item.alt}` : ''
     if (linear) {
-      // flat linear: one running position across all items; the within-group pills retire.
+      // flat linear: one running position across all items
       const pos = flatPosition(cur.g, cur.i) + 1 // flatPosition() also rebuilds flatSeq if needed
       const total = flatSeq.length
       if (counter) counter.textContent = `${pos} / ${total}`
-      if (position) position.hidden = true
       live.textContent = `Item ${pos} of ${total}${desc}`
     } else {
       if (counter) counter.textContent = `${cur.g + 1} / ${G}`
-      updatePosition(cur.g, cur.i, itemCount)
-      live.textContent =
-        itemCount > 1
-          ? `Group ${cur.g + 1} of ${G}, screen ${cur.i + 1} of ${itemCount}${desc}`
-          : `Group ${cur.g + 1} of ${G}${desc}`
+      if (multi) updatePosition(cur.g, cur.i, itemCount)
+      live.textContent = multi
+        ? `Group ${cur.g + 1} of ${G}, item ${cur.i + 1} of ${itemCount}${desc}`
+        : `Group ${cur.g + 1} of ${G}${desc}`
     }
+  }
+
+  // zoom reset only while zoomed in (fit == 1 in the contained model)
+  const updateZoomChrome = () => {
+    if (reset) reset.hidden = !(viewer.getState().zoom.scale > 1.001)
   }
 
   // ── attach / detach ──────────────────────────────────────────────────────────
@@ -698,6 +726,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (attached) {
       renderWindow()
       updateChrome()
+      updateZoomChrome()
     }
   }
 

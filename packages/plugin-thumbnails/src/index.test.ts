@@ -459,14 +459,48 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
 })
 
 describe('plugin-thumbnails — active item panel (expandActive)', () => {
-  it('default: active multi-item group auto-shows its item panel (un-clipped, in the region wrapper)', () => {
+  it('default: active multi-item group auto-shows its vertical item stack in the aside column', () => {
     const v = open()
     v.next() // g1 (3 items)
     const panel = document.querySelector('.gallerist-thumb-items')
     expect(panel?.querySelectorAll('.gallerist-thumb-item').length).toBe(3)
-    // a sibling of the rail inside the region wrapper, NOT inside the clipping `.gallerist-thumbs` rail
-    expect(panel?.closest('.gallerist-thumbs')).toBeNull()
+    // beside the stage (takes space), not floating over it from the rail
+    expect(panel?.closest('.gallerist-region-aside')).not.toBeNull()
+    expect(panel?.closest('.gallerist-region-thumbnails')).toBeNull()
+  })
+
+  it('the vertical stack stays up on a one-item group, so the stage width does not jump', () => {
+    const v = open() // g0: one item; other groups have several
+    const panel = document.querySelector('.gallerist-thumb-items')
+    expect(panel?.querySelectorAll('.gallerist-thumb-item').length).toBe(1)
+    v.next()
+    expect(document.querySelector('.gallerist-thumb-items')).toBe(panel) // same node, refilled
+  })
+
+  it('no stack when no group has more than one item', () => {
+    const v = createViewer({
+      items: [
+        { id: 'a', type: 'image', source: 'a.jpg' },
+        { id: 'b', type: 'image', source: 'b.jpg' },
+      ],
+      plugins: [thumbnails()],
+    })
+    mount(v)
+    v.open()
+    expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
+  })
+
+  it('a horizontal item row stays inline in the rail region', () => {
+    const v = createViewer({
+      collection: collection(),
+      plugins: [thumbnails({ itemAxis: 'horizontal' })],
+    })
+    mount(v)
+    v.open()
+    v.next()
+    const panel = document.querySelector('.gallerist-thumb-items')
     expect(panel?.closest('.gallerist-thumbs-region')).not.toBeNull()
+    expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
   })
 
   it('keeps the item panel through a late viewer.use() (region remount replaceChildren)', () => {

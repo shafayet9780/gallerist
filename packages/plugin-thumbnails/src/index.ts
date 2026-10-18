@@ -135,6 +135,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let regionEl: HTMLElement | null = null
     let root: HTMLElement | null = null
     let itemRow: HTMLElement | null = null
+    // A vertical item stack goes in the renderer's `aside` column (beside the stage, taking space
+    // rather than covering it); a horizontal row stays inline in the rail region.
+    let asideEl: HTMLElement | null = null
     let toolbarBtn: HTMLButtonElement | null = null
     let panelOpen = expandActive // whether the active group's item panel is shown (toggle: button / `e`)
     let unsub: (() => void) | null = null
@@ -332,14 +335,20 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // the active item column lives on the region host (see rebuildItemColumn), not the rail.
     }
 
-    // Build/show the active group's item panel when `panelOpen`. Mounted on the region host (not
-    // `.gallerist-thumbs`, whose overflow + backdrop-filter would clip it) so it's visible + clickable
-    // in every rail position; CSS flips its open direction per `data-gallerist-rail-pos`.
+    // Build/show the active group's item panel when `panelOpen`. A vertical stack is mounted in the
+    // `aside` column; a horizontal row in the rail region (not inside `.gallerist-thumbs`, whose
+    // overflow would clip it). While any group has several items the stack stays up even for a
+    // one-item group, so the stage doesn't change width on every navigation.
+    let collectionHasMulti = false
     const rebuildItemColumn = (activeGroup: Group | undefined, gIndex: number) => {
       if (!root) return
       itemBtns.clear()
-      const mountEl = regionEl ?? root
-      if (panelOpen && activeGroup && activeGroup.items.length > 1) {
+      const mountEl = (itemAxis === 'vertical' ? asideEl : null) ?? regionEl ?? root
+      const show =
+        panelOpen &&
+        !!activeGroup &&
+        (activeGroup.items.length > 1 || (itemAxis === 'vertical' && collectionHasMulti))
+      if (show && activeGroup) {
         if (!itemRow) {
           itemRow = document.createElement('div')
           itemRow.className = 'gallerist-thumb-items'
@@ -555,7 +564,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (col === lastCol && cur.g === lastG && cur.i === lastI) return // skip zoom/pan/etc.
 
       const colChanged = col !== lastCol
-      if (colChanged) resetAll()
+      if (colChanged) {
+        resetAll()
+        collectionHasMulti = col.groups.some((g) => g.items.length > 1)
+      }
 
       if (groupDisplay === 'flat') {
         if (colChanged) buildFlatModel(col)
@@ -596,6 +608,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const regions: PluginInstance['regions'] = {
       thumbnails: () => regionEl ?? document.createElement('div'),
     }
+    if (groupDisplay === 'stacked' && itemAxis === 'vertical') {
+      regions.aside = () => asideEl ?? document.createElement('div')
+    }
     const keymap: PluginInstance['keymap'] = {}
     // the item panel + its toggle only exist in stacked mode (flat lays every item out already).
     if (groupDisplay === 'stacked') {
@@ -618,6 +633,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         if (groupDisplay === 'flat') {
           root.dataset.display = 'flat'
         } else {
+          if (itemAxis === 'vertical') {
+            asideEl = document.createElement('div')
+            asideEl.className = 'gallerist-thumbs-aside'
+          }
           toolbarBtn = document.createElement('button')
           toolbarBtn.type = 'button'
           toolbarBtn.className = 'gallerist-items-toggle'
@@ -641,6 +660,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         groupWraps.clear()
         itemRow?.remove()
         itemRow = null
+        asideEl = null
         toolbarBtn?.removeEventListener('click', toggleActivePanel)
         toolbarBtn = null
         liveCardId = null

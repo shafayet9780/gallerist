@@ -14,6 +14,22 @@
   content stays fixed, defaulting to the stage centre. It used to be treated as the pan offset. Set
   a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
 
+### Changed
+- **renderer-dom + theme (M15)**: the viewer is laid out as a grid of areas: top bar (counter →
+  group title → plugin tools → zoom reset → close), stage, an `aside` column, caption bar, footer and
+  rail. Persistent chrome now takes space instead of covering the image, and no two pieces of chrome
+  can overlap in any preset, arrow layout, rail position or direction. A Playwright layout lint
+  checks 16 configurations on desktop and phone for overlaps, off-screen chrome, a covered stage
+  and touch targets under 44px.
+- **renderer-dom**: ↑ · position · ↓ form one item navigator, hidden for one-item groups and in
+  linear mode; zoom reset shows only while zoomed; group and item captions are shown (bar title and
+  caption bar); the `dpad` layout is now a keyboard-arrow cluster.
+- **plugin-thumbnails**: the vertical item stack moves into the new `aside` region beside the stage
+  (it used to float over the stage), and stays up for one-item groups so the stage keeps its width.
+- **theme**: a mobile layer (compact chrome under 600px, 44px touch targets, safe areas, swipes
+  instead of on-image arrows on touch) and RTL arrow glyphs that point the reading direction.
+- **renderer-dom**: generic wording: announcements and pill labels say "item", not "screen".
+
 ### Fixed
 - **core**: a throwing event handler no longer stops later handlers (it is reported via
   `reportError`); a destructured `preventDefault()` works; `zoomTo` ignores NaN/negative input.
