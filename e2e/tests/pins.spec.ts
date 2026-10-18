@@ -139,6 +139,44 @@ test.describe('pins', () => {
   }
 })
 
+// on every engine: WebKit doesn't focus a clicked button, so Escape arrives at the viewer root
+test('Escape closes an open card, not the viewer, wherever focus is', async ({ page }) => {
+  await ready(page)
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  await expect(page.locator('[data-pin="a"] .gallerist-pin-card')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('[data-pin="a"] .gallerist-pin-card')).toBeHidden()
+  await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+})
+
+test('on a small screen a card opens toward the room and stays inside the stage', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'runs once (chromium)')
+  await page.setViewportSize({ width: 375, height: 667 })
+  await ready(page, 'presentation=comment')
+  for (const id of ['a', 'b', 'c']) {
+    await page.locator(`[data-pin="${id}"] .gallerist-pin-marker`).click()
+    const card = await page.locator(`[data-pin="${id}"] .gallerist-pin-card`).boundingBox()
+    const stage = await page.locator('.gallerist-stage').boundingBox()
+    if (!card || !stage) throw new Error('missing box')
+    expect(card.x, id).toBeGreaterThanOrEqual(stage.x - 1)
+    expect(card.x + card.width, id).toBeLessThanOrEqual(stage.x + stage.width + 1)
+  }
+})
+
+test('a double click inside an open card does not zoom the image', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'runs once (chromium)')
+  await ready(page)
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  await page.locator('[data-pin="a"] .gallerist-pin-body').dblclick()
+  expect((await zoomState(page)).scale).toBe(1)
+})
+
 test('a zoomed portrait pans only to its own edges, never into the letterbox (M17)', async ({
   page,
   browserName,

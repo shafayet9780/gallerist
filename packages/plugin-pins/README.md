@@ -56,7 +56,9 @@ mount(viewer)
 | `strings` | English | every label, for translation |
 
 The returned plugin also has `refresh()` (re-read pins you changed in place), `setVisible(bool)` and
-`open(id | null)`. Escape closes an open card (or cancels placing) without closing the viewer.
+`open(id | null)`. Escape closes an open card (or cancels placing) without closing the viewer,
+wherever focus is. A card opens toward the side of the stage with more room. While placing, a pan
+or a click beside the image keeps the mode armed; a click outside the stage cancels it.
 
 ```ts
 const commentPins = pins({

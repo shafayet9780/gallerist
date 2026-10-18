@@ -13,7 +13,7 @@ import {
   viewportAnchorStyle,
 } from './position'
 
-const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]'
+const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 export interface OverlayPaintCtx {
   group: Group
@@ -54,6 +54,12 @@ export function paintOverlays(
   specs: OverlaySpec[],
   ctx: OverlayPaintCtx,
 ): OverlayEntry[] {
+  // a repaint must not drop keyboard focus to <body>: remember which overlay had it
+  const active = document.activeElement
+  const focusedId =
+    active && (viewportHost.contains(active) || contentHost.contains(active))
+      ? active.closest<HTMLElement>('[data-overlay]')?.dataset.overlay
+      : undefined
   viewportHost.replaceChildren()
   contentHost.replaceChildren()
   const entries: OverlayEntry[] = []
@@ -72,6 +78,7 @@ export function paintOverlays(
     if (!visible) host.style.display = 'none'
 
     if (spec.interactive) {
+      host.dataset.interactive = '' // the stage's double-click zoom leaves it alone
       host.addEventListener('click', () =>
         getInternals(ctx.viewer).emit('overlayClick', {
           viewer: ctx.viewer,
@@ -112,6 +119,12 @@ export function paintOverlays(
       contentHost.appendChild(host)
     }
     entries.push({ el: host, spec, counterScaled })
+  }
+  if (focusedId) {
+    const host = entries.find((e) => e.spec.id === focusedId)?.el
+    const target =
+      host?.querySelector<HTMLElement>(FOCUSABLE) ?? (host?.tabIndex === 0 ? host : null)
+    target?.focus({ preventScroll: true })
   }
   return entries
 }

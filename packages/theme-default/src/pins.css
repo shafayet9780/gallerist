@@ -40,7 +40,7 @@
 }
 .gallerist-pin[data-resolved] .gallerist-pin-dot {
   background: var(--gallerist-pin-resolved-bg);
-  color: var(--gallerist-fg);
+  color: var(--gallerist-pin-resolved-fg);
 }
 /* tag: a frosted ring with a white centre (it sits on photos, so it doesn't follow the scheme) */
 .gallerist-pin[data-presentation="tag"] .gallerist-pin-dot {
@@ -73,6 +73,7 @@
 .gallerist-pin-card {
   position: absolute;
   z-index: 1;
+  box-sizing: border-box; /* the renderer's max-width is the room beside the pin, padding included */
   width: max-content;
   max-width: min(280px, 70vw);
   padding: 12px 36px 12px 14px;
@@ -121,6 +122,7 @@
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--gallerist-pin-resolved-bg);
+  color: var(--gallerist-pin-resolved-fg);
   font-size: 11px;
   font-weight: 600;
 }

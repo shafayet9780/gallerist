@@ -222,6 +222,52 @@ describe('plugin-pins', () => {
     expect(document.querySelector('.gallerist-pin')?.hasAttribute('data-resolved')).toBe(true)
   })
 
+  describe('review fixes', () => {
+    it('Escape closes a card opened by open(id) while focus is on the viewer, not the viewer', () => {
+      const { v, plugin } = open()
+      const root = document.querySelector('.gallerist') as HTMLElement
+      root.focus()
+      plugin.open('p1')
+      expect(cards()[0]?.hidden).toBe(false)
+      root.dispatchEvent(key('Escape'))
+      expect(cards()[0]?.hidden).toBe(true)
+      expect(v.getState().phase).not.toMatch(/clos/)
+      root.dispatchEvent(key('Escape')) // with no card open, Escape is the viewer's again
+      expect(v.getState().phase).toMatch(/clos/)
+    })
+
+    it('hiding pins while one has focus hands focus to the toggle', async () => {
+      open()
+      await flush()
+      markers()[0]?.focus()
+      ;(document.querySelector('.gallerist') as HTMLElement).dispatchEvent(key('P'))
+      expect(document.activeElement?.classList.contains('gallerist-pins-toggle')).toBe(true)
+    })
+
+    it('a repaint keeps keyboard focus on the same pin', async () => {
+      const { v } = open()
+      markers()[1]?.focus()
+      v.refresh()
+      await new Promise((r) => requestAnimationFrame(r))
+      expect(document.activeElement).toBe(markers()[1])
+    })
+
+    it('reports the close when the open pin disappears from the data', () => {
+      const onOpenChange = vi.fn()
+      const { v } = open({ onOpenChange })
+      markers()[0]?.click()
+      v.setCollection({ groups: [{ id: 'g0', items: [item('a', [pin('q', 0.1, 0.1)])] }] })
+      expect(onOpenChange).toHaveBeenLastCalledWith(null, expect.anything())
+    })
+
+    it('marks interactive overlay hosts so a double-click in a card does not zoom', () => {
+      open()
+      expect(
+        document.querySelector('.gallerist-pin-overlay')?.hasAttribute('data-interactive'),
+      ).toBe(true)
+    })
+  })
+
   describe('placing a comment', () => {
     const arm = async (onPlace: PinsOptions['onPlace']) => {
       const r = open({ presentation: 'comment', onPlace })
@@ -253,6 +299,25 @@ describe('plugin-pins', () => {
         expect.objectContaining({ item: expect.objectContaining({ id: 'a' }) }),
       )
       expect(root.hasAttribute('data-gallerist-placing')).toBe(false)
+    })
+
+    it('a drag (a pan) and a click beside the image keep placing armed', async () => {
+      const onPlace = vi.fn()
+      const { media } = await arm(onPlace)
+      const root = document.querySelector('.gallerist') as HTMLElement
+      const add = document.querySelector('.gallerist-pin-add') as HTMLElement
+      expect(add.getAttribute('aria-pressed')).toBe('true')
+      media.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, clientX: 300, clientY: 300 }),
+      )
+      clickAt(media, 420, 300) // released 120px away: a pan
+      expect(root.hasAttribute('data-gallerist-placing')).toBe(true)
+      clickAt(document.querySelector('.gallerist-stage') as Element, 50, 50) // beside the image
+      expect(root.hasAttribute('data-gallerist-placing')).toBe(true)
+      expect(onPlace).not.toHaveBeenCalled()
+      clickAt(media, 350, 450)
+      expect(onPlace).toHaveBeenCalledTimes(1)
+      expect(add.getAttribute('aria-pressed')).toBe('false')
     })
 
     it('Escape cancels placing without closing the viewer', async () => {

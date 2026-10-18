@@ -38,7 +38,8 @@
     --gallerist-pin-bg: var(--gallerist-accent);
     --gallerist-pin-fg: var(--gallerist-accent-fg);
     --gallerist-pin-ring: rgb(0 0 0 / 0.35);
-    --gallerist-pin-resolved-bg: rgb(127 127 127 / 0.55);
+    --gallerist-pin-resolved-bg: #5a6069; /* opaque: pins sit on photos of any brightness */
+    --gallerist-pin-resolved-fg: #f0f1f3;
     --gallerist-pin-card-bg: var(--gallerist-panel); /* near-opaque: it sits on the image */
 
     /* hover: unchanged unless a skin sets one */

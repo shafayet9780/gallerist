@@ -90,6 +90,11 @@
   occlusion, stage size and item-axis reachability.
 
 ### Fixed
+- **plugin-thumbnails**: the item stack went into the rail instead of the side column when an
+  overlay viewer opened after mount (on a click, as pages do). The column is used whenever the
+  renderer has mounted it, not only once it is in the document.
+- **renderer-dom (M17)**: a repaint of the overlays keeps keyboard focus on the same overlay
+  instead of dropping it to `<body>`; a double click inside an interactive overlay doesn't zoom.
 - **core + renderer-dom (M17)**: zoom and pan are bounded by the painted image, not the stage. A
   zoomed portrait in a landscape stage (or a panorama in a tall one) stays centred until it is wider
   than the stage, and can no longer be dragged into the empty letterbox beside it. The bound updates

@@ -62,8 +62,8 @@ export interface PinsStrings {
 }
 
 export const DEFAULT_PINS_STRINGS: PinsStrings = {
-  toggle: 'Show pins',
-  add: 'Add a comment',
+  toggle: 'Show pins (P)',
+  add: 'Add a comment (C)',
   placing: 'Click the image to place the comment. Esc cancels.',
   pin: (n, label) => (label ? `${n}. ${label}` : `Pin ${n}`),
   close: 'Close',
@@ -124,6 +124,7 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   let bound: ViewerApi | null = null
   let root: HTMLElement | null = null
   let toggleBtn: HTMLButtonElement | null = null
+  let addBtn: HTMLButtonElement | null = null
   let rendered: Rendered[] = []
   let openId: string | null = null
   let placing = false
@@ -134,6 +135,33 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     rendered = rendered.filter((r) => r.el.isConnected)
     return rendered
   }
+  // the viewer root: captured from the toolbar, or from any painted pin (no toolbar)
+  const viewerRoot = (): HTMLElement | null => {
+    if (!root) root = live()[0]?.el.closest<HTMLElement>('.gallerist') ?? null
+    return root
+  }
+
+  // Open the card toward the side of the stage with more room, sized to fit it there. Decided when
+  // it opens (from where the pin is on screen), so zoom and pan are accounted for.
+  const placeCard = (r: Rendered) => {
+    const stage = viewerRoot()?.querySelector('.gallerist-stage')?.getBoundingClientRect()
+    const m = r.marker.getBoundingClientRect()
+    if (!stage || !(stage.width > 0)) return
+    const left = m.left - stage.left
+    const right = stage.right - m.right
+    r.el.dataset.side = left > right ? 'left' : 'right'
+    r.el.dataset.v = m.top - stage.top > stage.bottom - m.bottom ? 'up' : 'down'
+    r.card.style.maxWidth = `${Math.max(120, Math.min(280, Math.max(left, right) - 12))}px`
+  }
+
+  // While a card is open, Escape closes it (not the viewer), wherever focus is in the viewer: some
+  // browsers don't focus a clicked button, and `open(id)` leaves focus where it was.
+  const onOpenKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || !openId) return
+    e.stopPropagation()
+    setOpen(null, true)
+  }
+  let keyRoot: HTMLElement | null = null
 
   // `openId` is the pin asked for; `shown` the one whose card is on screen. They differ while a pin
   // asked for by `open(id)` hasn't been painted yet (it opens when it is).
@@ -151,14 +179,22 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       if (host) host.style.zIndex = isOpen ? '30' : '20'
       if (isOpen) opened = r
     }
+    if (opened) placeCard(opened)
     if (focusMarker && shown && shown !== opened && shown.marker.isConnected) shown.marker.focus()
     if (opened?.pin.id !== shown?.pin.id) {
       const ctx = (opened ?? shown)?.ctx
       if (ctx) opts.onOpenChange?.(opened ? opened.pin : null, ctx)
     }
     shown = opened
-    if (openId) document.addEventListener('pointerdown', onOutside, true)
-    else document.removeEventListener('pointerdown', onOutside, true)
+    keyRoot?.removeEventListener('keydown', onOpenKey, true)
+    keyRoot = null
+    if (openId) {
+      document.addEventListener('pointerdown', onOutside, true)
+      keyRoot = viewerRoot()
+      keyRoot?.addEventListener('keydown', onOpenKey, true)
+    } else {
+      document.removeEventListener('pointerdown', onOutside, true)
+    }
   }
 
   const onOutside = (e: Event) => {
@@ -169,7 +205,15 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
 
   const setVisible = (v: boolean) => {
     visible = v
-    if (!v) setOpen(null)
+    if (!v) {
+      setOpen(null)
+      // hiding the focused pin would drop focus to <body>: hand it to the toggle (or the viewer)
+      const active = document.activeElement
+      if (active && live().some((r) => r.el.contains(active))) {
+        const to = toggleBtn?.isConnected ? toggleBtn : viewerRoot()
+        to?.focus({ preventScroll: true })
+      }
+    }
     for (const r of live()) r.el.hidden = !v
     toggleBtn?.setAttribute('aria-pressed', String(v))
   }
@@ -177,15 +221,24 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   // ── placing a comment: a one-shot click on the image ───────────────────────────
   const stopPlacing = () => {
     placing = false
+    addBtn?.setAttribute('aria-pressed', 'false')
     root?.removeAttribute('data-gallerist-placing')
     root?.removeEventListener('click', onPlaceClick, true)
     root?.removeEventListener('keydown', onPlaceKey, true)
+    root?.removeEventListener('pointerdown', onPlaceDown, true)
+  }
+  // a click that ends a drag (a pan) neither places nor cancels
+  let downAt: { x: number; y: number } | null = null
+  const onPlaceDown = (e: PointerEvent) => {
+    downAt = { x: e.clientX, y: e.clientY }
   }
   const startPlacing = () => {
     if (!root || !opts.onPlace) return
     placing = true
     setOpen(null)
+    addBtn?.setAttribute('aria-pressed', 'true')
     root.setAttribute('data-gallerist-placing', '')
+    root.addEventListener('pointerdown', onPlaceDown, true)
     root.addEventListener('click', onPlaceClick, true)
     root.addEventListener('keydown', onPlaceKey, true)
     announce(t.placing)
@@ -197,8 +250,12 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   }
   const onPlaceClick = (e: MouseEvent) => {
     const target = e.target as Element | null
+    const dragged = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 5
+    downAt = null
+    if (dragged) return
     if (!target?.closest('.gallerist-content[data-gallerist-current]')) {
-      if (!target?.closest('.gallerist-pin-add')) stopPlacing() // a click elsewhere cancels
+      // a click outside the stage cancels; inside it (beside the image) placing stays armed
+      if (!target?.closest('.gallerist-stage, .gallerist-pin-add')) stopPlacing()
       return
     }
     const at = pointOnImage(e)
@@ -284,11 +341,6 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     card.appendChild(close)
 
     marker.addEventListener('click', () => setOpen(openId === pin.id ? null : pin.id))
-    el.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || openId !== pin.id) return
-      e.stopPropagation() // close the card, not the viewer
-      setOpen(null, true)
-    })
     // a click inside a card must not reach the stage (no swipe, no close-on-backdrop)
     card.addEventListener('pointerdown', (e) => e.stopPropagation())
     el.append(marker, card)
@@ -377,7 +429,7 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = 'gallerist-pins-toggle'
-      btn.setAttribute('aria-label', `${t.toggle} (P)`)
+      btn.setAttribute('aria-label', t.toggle)
       btn.setAttribute('aria-pressed', String(visible))
       btn.innerHTML = ICONS.pin
       btn.addEventListener('click', () => setVisible(!visible))
@@ -388,8 +440,10 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       const add = document.createElement('button')
       add.type = 'button'
       add.className = 'gallerist-pin-add'
-      add.setAttribute('aria-label', `${t.add} (C)`)
+      add.setAttribute('aria-label', t.add)
+      add.setAttribute('aria-pressed', 'false')
       add.innerHTML = ICONS.comment
+      addBtn = add
       add.addEventListener('click', () => (placing ? stopPlacing() : startPlacing()))
       wrap.appendChild(add)
     }
@@ -408,7 +462,7 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     const overlays = ({ group, item }: { group: Group; item: Item }): OverlaySpec[] => {
       const list = read(item, group) ?? []
       const ctx: PinContext = { viewer, group, item }
-      if (openId && !list.some((p) => p.id === openId)) openId = null
+      if (openId && !list.some((p) => p.id === openId)) setOpen(null) // its pin is gone
       return list.map((pin, k) => ({
         id: `pin:${pin.id}`,
         anchor: { kind: 'point', x: pin.x, y: pin.y, space: pin.space ?? 'normalized' },
@@ -444,7 +498,13 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       overlays,
       keymap: {
         p: () => setVisible(!visible),
-        ...(opts.onPlace ? { c: () => (placing ? stopPlacing() : startPlacing()) } : {}),
+        P: () => setVisible(!visible),
+        ...(opts.onPlace
+          ? {
+              c: () => (placing ? stopPlacing() : startPlacing()),
+              C: () => (placing ? stopPlacing() : startPlacing()),
+            }
+          : {}),
       },
       regions:
         opts.toggle !== false || opts.onPlace
