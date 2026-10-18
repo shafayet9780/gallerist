@@ -32,6 +32,9 @@
   and rebuild every region host. Hosts are now only touched when their nodes change.
 - **core + renderer-dom**: `viewer.refresh()` re-measures (re-anchors overlays, re-clamps zoom).
   It was a no-op that no renderer could hook.
+- **core**: `open({ g, i })` on a viewer that is already open now navigates like `goTo` (slide/item
+  events, cancelable). It used to move the cursor silently. Reopening starts at fit instead of
+  the previous session's zoom.
 - **renderer-dom**: cancelled media loads are no longer reported as `loadError`.
 - **core + renderer-dom**: zooming back out (keyboard, double-tap, pinch, `zoomTo`) no longer
   leaves the image off-centre or panned past its edge. The renderer lends the core its stage

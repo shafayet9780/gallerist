@@ -174,11 +174,13 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     emitter.emit('zoomEnd', { ...basePayload(), zoom: z })
   }
 
+  // viewer.refresh() → the renderer re-measures (registered via internals.onRefresh)
+  const refreshListeners = new Set<() => void>()
+
   // ── lifecycle transitions (spec §6) ──────────────────────────────────────
   // opening → open and closing → closed settle when the renderer's driver calls done(). Each
   // transition gets a generation so a done() from one that was superseded (close during opening,
   // reopen during closing) is ignored.
-  const refreshListeners = new Set<() => void>()
   let lifecycleDriver: LifecycleDriver | null = null
   let generation = 0
   let pendingSettle: (() => void) | null = null
@@ -207,9 +209,16 @@ export function createViewer(options: ViewerOptions): ViewerApi {
   api = {
     open(at) {
       if (destroyed) return
-      if (at) setCursor(nav.goTo(at.g ?? store.get().cursor.g, at.i, navCtx()))
-      // Only emit when OPEN actually transitions — a second open() on an already-open viewer
-      // must not re-fire open/opened (review I-C1).
+      const s = store.get()
+      const target = at ? nav.goTo(at.g ?? s.cursor.g, at.i, navCtx()) : s.cursor
+      if (s.phase === 'open' || s.phase === 'opening') {
+        // Already showing: open({ g, i }) is a navigation like goTo (events, cancelable), and a
+        // second open() must not re-fire open/opened (review I-C1).
+        if (at) navTo(target)
+        return
+      }
+      // A fresh open starts at fit; a zoom left over from the last session would open pre-zoomed.
+      store.set((st) => ({ ...st, cursor: target, zoom: { ...IDENTITY_ZOOM } }))
       if (!dispatch({ t: 'OPEN' })) return
       emitter.emit('open', basePayload())
       runTransition('opening', () => {

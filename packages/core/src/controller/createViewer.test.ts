@@ -501,3 +501,46 @@ describe('createViewer — refresh', () => {
     expect(fn).not.toHaveBeenCalled()
   })
 })
+
+describe('createViewer — open(at)', () => {
+  it('on an open viewer, open({ g }) navigates with slide events (and the group move resets zoom)', () => {
+    const slide = vi.fn()
+    const opened = vi.fn()
+    const v = createViewer({ collection: grouped(), on: { slide, opened } })
+    v.open()
+    v.zoomTo(2)
+    v.open({ g: 2 })
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+    expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+    expect(slide).toHaveBeenCalledTimes(1)
+    expect(opened).toHaveBeenCalledTimes(1) // not re-fired
+  })
+
+  it('on an open viewer, open({ g, i }) within the group is an item move, and cancelable', () => {
+    const item = vi.fn()
+    const v = createViewer({ collection: grouped(), startAt: { g: 1 }, on: { item } })
+    v.open()
+    v.open({ g: 1, i: 2 })
+    expect(item).toHaveBeenCalledTimes(1)
+    v.on('beforeSlide', () => false)
+    v.open({ g: 0 })
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+  })
+
+  it('reopening starts at fit instead of the last session zoom', () => {
+    const v = createViewer({ collection: grouped() })
+    v.open()
+    v.zoomTo(2, { x: 10, y: 10 })
+    v.close()
+    v.open()
+    expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+  })
+
+  it('opening a closed viewer at a position does not emit navigation events', () => {
+    const slide = vi.fn()
+    const v = createViewer({ collection: grouped(), on: { slide } })
+    v.open({ g: 2, i: 1 })
+    expect(v.getState().cursor).toEqual({ g: 2, i: 1 })
+    expect(slide).not.toHaveBeenCalled()
+  })
+})
