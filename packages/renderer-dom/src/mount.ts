@@ -6,6 +6,7 @@
 import type { MediaAdapter, OverlaySpec, Phase, ViewerApi, ZoomState } from '@gallerist/core'
 import { clampPan, clampScale, getInternals } from '@gallerist/core/internal'
 import { imageAdapter } from './adapters/image'
+import { type Accent, type ColorScheme, type Skin, applyAppearance } from './appearance'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
 import { type IdleController, createIdleController } from './idle'
@@ -72,6 +73,15 @@ export interface MountOptions {
    * screen the theme shows the count only (swipes navigate).
    */
   itemIndicator?: ItemIndicator
+  /**
+   * Visual skin (`data-gallerist-skin`, default `gallery`). Other skins need their stylesheet loaded
+   * after gallerist.css, e.g. `@gallerist/theme-default/console.css` for `console`.
+   */
+  skin?: Skin
+  /** The skin's accent by name (`data-gallerist-accent`); unset uses the skin's default. */
+  accent?: Accent
+  /** `dark` (default), `light`, or `auto` to follow the system (`data-gallerist-scheme`). */
+  scheme?: ColorScheme
   /** Accessible name for the overlay dialog (default 'Media viewer'); sets aria-label. */
   label?: string
   /** Element (or getter) to return focus to when the overlay closes. Falls back to whatever
@@ -284,6 +294,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   root.setAttribute('data-gallerist-orientation', orientation)
   root.setAttribute('data-gallerist-rail', railHidden ? 'collapsed' : 'expanded')
   if (linear) root.setAttribute('data-gallerist-linear', 'true')
+  applyAppearance(root, opts)
   if (preset) for (const [k, val] of Object.entries(preset.rootAttrs)) root.setAttribute(k, val)
   if (overlay) {
     root.setAttribute('role', 'dialog')

@@ -8,12 +8,14 @@ import { video } from '@gallerist/plugin-video'
 import { videoYouTube } from '@gallerist/plugin-video-youtube'
 import {
   type ArrowLayout,
+  type ColorScheme,
   Gallerist,
   type PresetName,
   type RailPlacement,
   resolvePreset,
 } from '@gallerist/react'
 import '@gallerist/theme-default/gallerist.css'
+import '@gallerist/theme-default/console.css'
 import { StrictMode, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -21,7 +23,7 @@ import { createRoot } from 'react-dom/client'
 // screens captured then (the ↑/↓ axis). Each control maps to a real option on <Gallerist>, the core
 // viewer, or the thumbnails plugin — flip them and re-open to feel the difference.
 
-type Theme = 'amber' | 'cyan' | 'vermilion'
+type SkinName = 'gallery' | 'console'
 type GroupDisplay = 'stacked' | 'flat'
 type ItemAxis = 'vertical' | 'horizontal'
 type AutoHide = 'auto' | 'on' | 'off'
@@ -102,7 +104,13 @@ const mediaGroup: Collection['groups'][number] = {
 }
 
 const PRESETS: PresetName[] = ['reviewer', 'filmstrip', 'immersive', 'contact']
-const THEMES: Theme[] = ['amber', 'cyan', 'vermilion']
+const SKINS: SkinName[] = ['gallery', 'console']
+// accents are named per skin; the first one is the skin's default
+const ACCENTS: Record<SkinName, string[]> = {
+  gallery: ['periwinkle', 'mint', 'amber', 'vermilion'],
+  console: ['amber', 'cyan', 'vermilion'],
+}
+const SCHEMES: ColorScheme[] = ['dark', 'light', 'auto']
 const ARROWS: ArrowLayout[] = ['pill-right', 'corner-br', 'dpad', 'split']
 const RAILS: RailPlacement[] = ['bottom', 'left', 'right', 'hidden']
 const MEMORIES: ItemMemory[] = ['reset', 'preserve', 'clamp']
@@ -119,9 +127,11 @@ const BLURB: Record<PresetName, string> = {
 function App() {
   const [open, setOpen] = useState(() => /(?:^|[#&])g=/.test(window.location.hash))
 
-  // preset + accent
+  // preset + appearance
   const [preset, setPreset] = useState<PresetName>('reviewer')
-  const [theme, setTheme] = useState<Theme>('amber')
+  const [skin, setSkin] = useState<SkinName>('gallery')
+  const [accent, setAccent] = useState('periwinkle')
+  const [scheme, setScheme] = useState<ColorScheme>('dark')
 
   // layout overrides (win over the preset; 'auto' = keep the preset default)
   const [arrows, setArrows] = useState<Opt<ArrowLayout>>('auto')
@@ -176,7 +186,7 @@ function App() {
   }, [groupDisplay, itemAxis, overscan, expandActive, pGrid, pFullscreen, pDownload, pHash, pMedia])
 
   // <Gallerist> reads collection / core options / plugins / layout at construction + mount time, so a
-  // change to any of them needs a fresh instance. theme + open stay reactive (no remount).
+  // change to any of them needs a fresh instance. skin, accent, scheme + open stay reactive (no remount).
   const mountKey = [
     preset,
     arrows,
@@ -260,11 +270,38 @@ function App() {
             </select>
           </label>
           <label className="field">
-            Accent (theme)
-            <select value={theme} onChange={(e) => setTheme(e.target.value as Theme)}>
-              {THEMES.map((th) => (
-                <option key={th} value={th}>
-                  {th}
+            Skin
+            <select
+              value={skin}
+              onChange={(e) => {
+                const next = e.target.value as SkinName
+                setSkin(next)
+                setAccent(ACCENTS[next][0] as string)
+              }}
+            >
+              {SKINS.map((sk) => (
+                <option key={sk} value={sk}>
+                  {sk}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            Accent
+            <select value={accent} onChange={(e) => setAccent(e.target.value)}>
+              {ACCENTS[skin].map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            Scheme
+            <select value={scheme} onChange={(e) => setScheme(e.target.value as ColorScheme)}>
+              {SCHEMES.map((sc) => (
+                <option key={sc} value={sc}>
+                  {sc}
                 </option>
               ))}
             </select>
@@ -484,7 +521,9 @@ function App() {
         <pre>
           {usageSnippet({
             preset,
-            theme,
+            skin,
+            accent,
+            scheme,
             arrows,
             rail,
             autoHide,
@@ -518,7 +557,9 @@ function App() {
         onClose={() => setOpen(false)}
         controls={controls}
         preset={preset}
-        theme={theme}
+        skin={skin}
+        accent={accent}
+        scheme={scheme}
         arrows={arrows === 'auto' ? undefined : arrows}
         rail={rail === 'auto' ? undefined : rail}
         autoHide={autoHide === 'auto' ? undefined : autoHide === 'on'}
@@ -530,7 +571,9 @@ function App() {
         </Gallerist.Region>
         {showOverlay && (
           <Gallerist.Overlay anchor={{ kind: 'viewport', at: 'bottom', offset: [0, -84] }}>
-            <span className="vchip">overlay · {theme}</span>
+            <span className="vchip">
+              overlay · {skin} · {accent}
+            </span>
           </Gallerist.Overlay>
         )}
       </Gallerist>
@@ -541,7 +584,9 @@ function App() {
 // Build a copy-pasteable JSX snippet mirroring the live config — the example doubles as docs.
 function usageSnippet(c: {
   preset: PresetName
-  theme: Theme
+  skin: SkinName
+  accent: string
+  scheme: ColorScheme
   arrows: Opt<ArrowLayout>
   rail: Opt<RailPlacement>
   autoHide: AutoHide
@@ -583,7 +628,9 @@ function usageSnippet(c: {
     c.itemMemory !== 'reset' ? `itemMemory="${c.itemMemory}"` : null,
     c.keepZoomOnNav ? 'keepZoomOnNav' : null,
     `preset="${c.preset}"`,
-    `theme="${c.theme}"`,
+    c.skin !== 'gallery' ? `skin="${c.skin}"` : null,
+    c.accent !== ACCENTS[c.skin][0] ? `accent="${c.accent}"` : null,
+    c.scheme !== 'dark' ? `scheme="${c.scheme}"` : null,
     c.arrows !== 'auto' ? `arrows="${c.arrows}"` : null,
     c.rail !== 'auto' ? `rail="${c.rail}"` : null,
     c.autoHide !== 'auto' ? `autoHide={${c.autoHide === 'on'}}` : null,

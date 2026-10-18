@@ -7,6 +7,7 @@ import {
 } from '@gallerist/core'
 import { mount } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
+import '@gallerist/theme-default/console.css'
 
 const svg = (color: string, label: string) =>
   `data:image/svg+xml,${encodeURIComponent(
@@ -68,7 +69,8 @@ const collection: Collection = { groups }
 
 // itemMemory:'preserve' → keep the same monitor index when moving across moments.
 const viewer = createViewer({ collection, loop: true, itemMemory: 'preserve' })
-mount(viewer)
+// a review tool: the Console skin (graphite, a signal accent, monospaced counters)
+mount(viewer, { skin: 'console' })
 
 const rail = document.getElementById('moments')
 groups.forEach((group, g) => {

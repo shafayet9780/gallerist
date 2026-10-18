@@ -25,21 +25,28 @@ describe('<Gallerist>', () => {
     expect(document.querySelector('.gallerist-counter')?.textContent).toContain('1 / 2')
   })
 
-  it('applies preset, theme, and arrow layout to the root', () => {
-    render(<Gallerist collection={collection} open preset="reviewer" theme="cyan" />)
+  it('applies preset, appearance, and arrow layout to the root', () => {
+    render(
+      <Gallerist collection={collection} open preset="reviewer" skin="console" accent="cyan" />,
+    )
     const root = document.querySelector('.gallerist') as HTMLElement
     expect(root.getAttribute('data-gallerist-preset')).toBe('reviewer')
     expect(root.getAttribute('data-gallerist-arrows')).toBe('corner-br') // reviewer default
-    expect(root.getAttribute('data-gallerist-theme')).toBe('cyan')
+    expect(root.getAttribute('data-gallerist-skin')).toBe('console')
+    expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('dark')
   })
 
-  it('updates the theme attribute when the theme prop changes', () => {
-    const { rerender } = render(<Gallerist collection={collection} open theme="cyan" />)
-    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-theme')).toBe('cyan')
-    rerender(<Gallerist collection={collection} open theme="vermilion" />)
-    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-theme')).toBe(
-      'vermilion',
-    )
+  it('updates skin, accent and scheme in place when the props change', () => {
+    const { rerender } = render(<Gallerist collection={collection} open accent="mint" />)
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-skin')).toBe('gallery')
+    expect(root.getAttribute('data-gallerist-accent')).toBe('mint')
+    rerender(<Gallerist collection={collection} open skin="console" scheme="light" />)
+    expect(document.querySelector('.gallerist')).toBe(root) // no remount
+    expect(root.getAttribute('data-gallerist-skin')).toBe('console')
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('light')
+    expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
   })
 
   it('closes when open flips to false and fires onClose', () => {
@@ -121,7 +128,7 @@ describe('<Gallerist> reactive props', () => {
     )
     rerender(
       <StrictMode>
-        <Gallerist collection={collection} on={{ collectionChange }} open theme="cyan" />
+        <Gallerist collection={collection} on={{ collectionChange }} open accent="mint" />
       </StrictMode>,
     )
     expect(collectionChange).not.toHaveBeenCalled()
@@ -131,16 +138,16 @@ describe('<Gallerist> reactive props', () => {
     const ref = createRef<ViewerApi>()
     const collectionChange = vi.fn()
     const photos = ['a', 'b', 'c']
-    const view = (theme: 'cyan' | 'amber') => (
+    const view = (accent: 'mint' | 'amber') => (
       <Gallerist
         ref={ref}
         items={photos.map((id) => ({ id, type: 'image' as const, source: { src: `${id}.jpg` } }))}
         on={{ collectionChange }}
-        theme={theme}
+        accent={accent}
         open
       />
     )
-    const { rerender } = render(view('cyan'))
+    const { rerender } = render(view('mint'))
     act(() => {
       getInternals(ref.current as ViewerApi).emit('loaded', {
         viewer: ref.current as ViewerApi,

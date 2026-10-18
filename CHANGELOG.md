@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Breaking
+- **theme + renderer-dom + react (M16)**: the default look is now the **Gallery** skin: quiet
+  near-black surfaces, round controls, sans numerals, and a periwinkle tint for focus only.
+  The previous graphite + amber look is the **Console** skin. It is unchanged, verified as a zero
+  computed-style diff across the layout lint's configurations. To keep it, load it and opt in:
+  `import '@gallerist/theme-default/console.css'` after `gallerist.css`, then
+  `mount(viewer, { skin: 'console' })` or `<Gallerist skin="console">`.
+- **renderer-dom + react**: appearance is three options, `skin` (`gallery` | `console`), `accent`
+  (named per skin) and `scheme` (`dark` | `light` | `auto`), reflected as `data-gallerist-skin`,
+  `data-gallerist-accent` and `data-gallerist-scheme`. React's `theme` prop is replaced by `accent`,
+  and the `data-gallerist-theme` attribute is gone. All three props are reactive in React, and
+  `applyAppearance(root, …)` changes them on a mounted vanilla viewer.
 - **core**: renderer/plugin plumbing moved off the public `ViewerApi` to
   `@gallerist/core/internal`: `viewer.emit`, `getPlugins` and `onPluginsChanged` are now
   `getInternals(viewer).emit(…)` etc. The engine building blocks (normalize, store, FSM, nav,
@@ -15,6 +26,14 @@
   a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
 
 ### Changed
+- **theme (M16)**: `theme-default` splits into `base.css` (structure: layout areas, reserved space,
+  the mobile layer, RTL, reduced motion, every component rule) and skins that only set tokens.
+  `gallerist.css` stays the zero-config entry (base + Gallery). New tokens let a skin give bar
+  tools, arrows and the item navigator their own treatment, and restyle selection rings, idle thumbs,
+  dots, the counter, title and caption. Light schemes: Gallery's warm paper and Console's Paper.
+  Accents: Gallery `periwinkle` / `mint` / `amber` / `vermilion`, Console `amber` / `cyan` /
+  `vermilion`, each with a value per scheme. The layout lint now runs every configuration in both
+  skins.
 - **renderer-dom + theme (M15)**: the viewer is laid out as a grid of areas: top bar (counter →
   group title → plugin tools → zoom reset → close), stage, an `aside` column, caption bar, footer and
   rail. Persistent chrome now takes space instead of covering the image, and no two pieces of chrome

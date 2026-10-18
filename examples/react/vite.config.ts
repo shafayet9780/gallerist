@@ -19,7 +19,7 @@ export default defineConfig({
       '@gallerist/plugin-hash': r('../../packages/plugin-hash/src/index.ts'),
       '@gallerist/plugin-video': r('../../packages/plugin-video/src/index.ts'),
       '@gallerist/plugin-video-youtube': r('../../packages/plugin-video-youtube/src/index.ts'),
-      '@gallerist/theme-default/gallerist.css': r('../../packages/theme-default/src/gallerist.css'),
+      '@gallerist/theme-default': r('../../packages/theme-default/src'),
     },
   },
 })

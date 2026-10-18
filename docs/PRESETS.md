@@ -21,7 +21,7 @@ distinct layout.
 
 ```tsx
 // React
-<Gallerist preset="reviewer" theme="amber" collection={c}
+<Gallerist preset="reviewer" skin="console" collection={c}
         plugins={[thumbnails({ ...resolvePreset('reviewer').thumbnails }), grid(), fullscreen()]} />
 ```
 
@@ -113,21 +113,37 @@ exception: the stage fills the viewer and the bar, caption and rail float over i
 - **Right-to-left:** the renderer sets `data-gallerist-dir="ltr|rtl"` from the computed direction;
   the theme mirrors arrow glyphs and keeps `rail: 'left' | 'right'` on the physical side.
 
-## Theming (`data-gallerist-theme`)
+## Skins, accents and schemes
 
-The default theme is a "pro-review console": warm graphite surfaces, one signal accent, monospace
-tabular numerals. Ship-in accent variants:
+The look is three independent options, separate from the layout preset: any skin works with any
+preset. The renderer reflects them as `data-gallerist-skin`, `data-gallerist-accent` and
+`data-gallerist-scheme` on the root, and the theme does the rest.
 
-| `data-gallerist-theme` | Accent |
-|---------------------|--------|
-| (unset) / `amber`   | signal amber `#ffb000` |
-| `cyan`              | scope cyan `#22d3ee` |
-| `vermilion`         | record vermilion `#ff5a36` |
+| `skin` | Stylesheet | Look | Accents (first is the default) |
+|--------|-----------|------|---------|
+| `gallery` (default) | `gallerist.css` | Quiet near-black or warm paper, round controls, sans numerals. The tint marks focus and progress only; selection and pressed toggles use the foreground. | `periwinkle`, `mint`, `amber`, `vermilion` |
+| `console` | `gallerist.css` + `console.css` | Pro review: warm graphite (or Paper), one signal accent that fills the current thumb and pressed toggles, monospaced counters. | `amber`, `cyan`, `vermilion` |
 
-```tsx
-<Gallerist theme="cyan" … />          // React (reactive)
-root.setAttribute('data-gallerist-theme', 'vermilion') // vanilla
+`scheme` is `dark` (default), `light`, or `auto` (follows `prefers-color-scheme`). Each accent has a
+dark and a light value, so every accent works in both schemes.
+
+```ts
+import '@gallerist/theme-default/gallerist.css'
+import '@gallerist/theme-default/console.css' // only for skin: 'console'
+
+mount(viewer, { skin: 'console', accent: 'cyan', scheme: 'auto' })
 ```
 
-Everything is plain CSS custom properties (`--gallerist-*`). Override `--gallerist-accent`,
-`--gallerist-backdrop`, `--gallerist-thumb-h`, etc. to restyle without forking the theme.
+```tsx
+<Gallerist skin="console" accent="cyan" scheme="auto" … /> // React: all three are reactive
+```
+
+Without its stylesheet a skin falls back to Gallery, and an accent the skin doesn't name falls back
+to the skin's default. Gallery uses Instrument Sans when the page has loaded it and the system sans
+otherwise; the theme never downloads fonts.
+
+Everything is plain CSS custom properties (`--gallerist-*`). Override `--gallerist-accent-dark`,
+`--gallerist-backdrop`, `--gallerist-thumb-h`, etc. to restyle without forking the theme. A custom
+skin is a rule that sets tokens, e.g. `.gallerist[data-gallerist-skin="mine"] { … }`, loaded after
+`gallerist.css`; `base.css` documents every token it reads. Skins set tokens only; they never
+position chrome, so the layout guarantees hold in every skin.

@@ -801,6 +801,26 @@ describe('mount — review fixes (M15)', () => {
     expect((document.querySelector('.gallerist-bar') as HTMLElement).hidden).toBe(false)
   })
 
+  it('reflects skin, accent and scheme as root attributes (M16)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-skin')).toBe('gallery')
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('dark')
+    expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
+  })
+
+  it('takes a skin, accent and scheme from the options', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { skin: 'console', accent: 'cyan', scheme: 'auto' })
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-skin')).toBe('console')
+    expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('auto')
+  })
+
   it('marks the reading direction for the theme', () => {
     document.documentElement.dir = 'rtl'
     try {

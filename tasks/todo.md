@@ -8,7 +8,7 @@
 
 ## Release 0.3
 - [x] **M15** Chrome architecture: top bar region, reserved space, item indicator variants, hidden axes, mobile layer, `strings`, caption bar, SVG plugin icons. The verification gate is a geometry lint (`e2e/tests/layout.spec.ts`) instead of screenshot baselines, which differ between macOS and Linux CI. An independent review followed: 25 findings, 22 fixed, 3 accepted as intended (idle tool fade, rail collapse not animated, caption overlay specs not rendered yet)
-- [ ] **M16** Skin system: base/skin split, `skin`/`accent`/`scheme`, Gallery default, `console` extracted with zero visual diff
+- [x] **M16** Skin system: base/skin split, `skin`/`accent`/`scheme`, Gallery default, `console` extracted with zero visual diff. Verified as a zero computed-style diff (26 configurations × 3 viewports) against M15. Console keeps `color-scheme: normal` to stay identical; M18 can move it to `dark`
 - [ ] **M17** Contained-rect zoom bounds + `plugin-pins` (`comment`, `tag`, `feature`)
 - [ ] **M18** Console: skin polish, `reviewer` preset upgrade, zoom navigator, comment pins in the monitoring example
 - [ ] **M19** Editorial: wall skin + Night scheme, framed media, placard caption with item controls, `editorial` preset
