@@ -1,13 +1,19 @@
 name: Release
 
+# Manual-only until the first release: publishing is deliberately deferred, and an
+# automatic trigger would publish on the first push to main once NPM_TOKEN exists.
+# Run it from Actions → Release → "Run workflow". To restore auto-release, add back:
+#   push:
+#     branches: [main]
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   release:
+    # workflow_dispatch can target any branch; only ever release from main.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the version PR / git tags
