@@ -27,6 +27,9 @@
   the open fade (280ms) or close fade (180ms) ends, and the overlay stays mounted through its exit
   instead of vanishing. Renderers drive this via `getInternals(viewer).setLifecycleDriver`. The
   phase is exposed as `data-gallerist-phase`. No animation under reduced motion.
+- **renderer-dom**: plugin region renderers run once per plugin instance, as PLUGIN-AUTHORING
+  promises. Every plugin change (each React `<Gallerist.Overlay>` mount) used to re-run all of them
+  and rebuild every region host. Hosts are now only touched when their nodes change.
 - **renderer-dom**: cancelled media loads are no longer reported as `loadError`.
 - **core + renderer-dom**: zooming back out (keyboard, double-tap, pinch, `zoomTo`) no longer
   leaves the image off-centre or panned past its edge. The renderer lends the core its stage

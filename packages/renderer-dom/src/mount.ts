@@ -11,7 +11,7 @@ import { ICONS } from './icons'
 import { type IdleController, createIdleController } from './idle'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
 import { type PresetName, resolvePreset } from './presets'
-import { type RegionHosts, aggregateKeymap, mountPluginRegions } from './regions'
+import { type RegionHosts, aggregateKeymap, createRegionMounter } from './regions'
 import { reconcileKeys, windowIndices } from './windowing'
 
 export interface MountOptions {
@@ -916,11 +916,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   resizeObserver?.observe(stage)
 
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
+  const mountPluginRegions = createRegionMounter(regionHosts, { viewer })
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(internals.getPlugins())
-    mountPluginRegions(regionHosts, internals.getPlugins(), { viewer })
-    // attach the pull-handle into the rail region (only when a rail is mounted); mountPluginRegions
-    // replaceChildren'd the host, so prepend it fresh each time.
+    mountPluginRegions(internals.getPlugins())
+    // attach the pull-handle into the rail region (only when a rail is mounted); the mounter
+    // replaces a host's children when its plugin nodes change, so (re)prepend it each time.
     if (regionHosts.thumbnails.childElementCount > 0) {
       regionHosts.thumbnails.prepend(railHandle)
     }
