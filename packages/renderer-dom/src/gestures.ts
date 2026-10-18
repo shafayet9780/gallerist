@@ -275,8 +275,9 @@ export function attachGestures(opts: GestureOptions): () => void {
         else viewer.zoomTo(startZoom.scale, { x: startZoom.x, y: startZoom.y })
         break
       case 'secondary':
-        if (dy < 0) nav.nextItem()
-        else nav.prevItem()
+        // Arbitration only yields 'secondary' for an upward drag (downward is dismiss), and like
+        // the group axis it needs a real commit distance — not just the 10px intent threshold.
+        if (-dy >= commitNav) nav.nextItem()
         break
     }
 
@@ -285,6 +286,28 @@ export function attachGestures(opts: GestureOptions): () => void {
       intent = 'none'
       gestureGeom = null
     }
+  }
+
+  // pointercancel means the browser took the pointer away (a system gesture, palm rejection, a
+  // scroll takeover): abandon the whole gesture rather than treating it as a release, which could
+  // navigate or dismiss from a drag the user never finished. Snap back to the committed transform.
+  const onCancel = (e: PointerEvent) => {
+    if (!pointers.has(e.pointerId)) return
+    for (const id of pointers.keys()) release(id)
+    pointers.clear()
+    if (frame) {
+      caf(frame)
+      frame = 0
+    }
+    dismissEl.style.removeProperty('--gallerist-dismiss')
+    const content = getContent()
+    if (content) {
+      const z = viewer.getState().zoom
+      content.style.transform = `translate(${z.x}px, ${z.y}px) scale(${z.scale})`
+    }
+    start = null
+    intent = 'none'
+    gestureGeom = null
   }
 
   const onWheel = (e: WheelEvent) => {
@@ -316,18 +339,24 @@ export function attachGestures(opts: GestureOptions): () => void {
     viewer.zoomTo(next.scale, { x: next.x, y: next.y })
   }
 
+  // A mouse drag over an <img> starts the browser's native drag-and-drop, which fires
+  // pointercancel and steals the gesture. The stage is a gesture surface, never a drag source.
+  const onDragStart = (e: Event) => e.preventDefault()
+
+  stage.addEventListener('dragstart', onDragStart)
   stage.addEventListener('pointerdown', onDown)
   stage.addEventListener('pointermove', onMove)
   stage.addEventListener('pointerup', onUp)
-  stage.addEventListener('pointercancel', onUp)
+  stage.addEventListener('pointercancel', onCancel)
   stage.addEventListener('wheel', onWheel, { passive: false })
   stage.addEventListener('dblclick', onDblClick)
 
   return () => {
+    stage.removeEventListener('dragstart', onDragStart)
     stage.removeEventListener('pointerdown', onDown)
     stage.removeEventListener('pointermove', onMove)
     stage.removeEventListener('pointerup', onUp)
-    stage.removeEventListener('pointercancel', onUp)
+    stage.removeEventListener('pointercancel', onCancel)
     stage.removeEventListener('wheel', onWheel)
     stage.removeEventListener('dblclick', onDblClick)
     if (frame) caf(frame)

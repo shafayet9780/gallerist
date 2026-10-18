@@ -167,9 +167,88 @@ describe('pointer gestures → arbitration', () => {
     v.zoomTo(0.5, { x: 0, y: 0 })
     const nextItem = vi.spyOn(v, 'nextItem')
     stage.dispatchEvent(pe('pointerdown', 500, 400))
-    stage.dispatchEvent(pe('pointermove', 505, 360)) // dy -40 vertical-up
-    stage.dispatchEvent(pe('pointerup', 505, 360))
+    stage.dispatchEvent(pe('pointermove', 505, 300)) // dy -100 vertical-up, past commitNav
+    stage.dispatchEvent(pe('pointerup', 505, 300))
     expect(nextItem).toHaveBeenCalled()
+  })
+
+  it('a short upward flick (past the intent threshold, short of commitNav) does not change item', () => {
+    const v = setup({ startAt: { g: 1 } })
+    v.zoomTo(0.5, { x: 0, y: 0 })
+    const nextItem = vi.spyOn(v, 'nextItem')
+    stage.dispatchEvent(pe('pointerdown', 500, 400))
+    stage.dispatchEvent(pe('pointermove', 502, 380)) // dy -20: secondary intent, not committed
+    stage.dispatchEvent(pe('pointerup', 502, 380))
+    expect(nextItem).not.toHaveBeenCalled()
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+  })
+})
+
+describe('pointercancel abandons the gesture', () => {
+  it('prevents native drag-and-drop on the stage (it would fire pointercancel mid-swipe)', () => {
+    setup()
+    const img = document.createElement('img')
+    stage.appendChild(img)
+    const e = new Event('dragstart', { bubbles: true, cancelable: true })
+    img.dispatchEvent(e)
+    expect(e.defaultPrevented).toBe(true)
+  })
+
+  it('stops preventing native drag once detached', () => {
+    setup()
+    detach()
+    const e = new Event('dragstart', { bubbles: true, cancelable: true })
+    stage.dispatchEvent(e)
+    expect(e.defaultPrevented).toBe(false)
+  })
+
+  it('does not navigate when a swipe is cancelled past the commit distance', () => {
+    const v = setup()
+    v.zoomTo(0.5, { x: 0, y: 0 })
+    const next = vi.spyOn(v, 'next')
+    stage.dispatchEvent(pe('pointerdown', 500, 400))
+    stage.dispatchEvent(pe('pointermove', 380, 402)) // dx -120: would navigate on release
+    stage.dispatchEvent(pe('pointercancel', 380, 402))
+    expect(next).not.toHaveBeenCalled()
+    expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+  })
+
+  it('does not close on a cancelled drag-to-dismiss, and clears the dismiss progress', () => {
+    const v = setup()
+    v.open()
+    v.zoomTo(0.5, { x: 0, y: 0 })
+    const close = vi.spyOn(v, 'close')
+    stage.dispatchEvent(pe('pointerdown', 500, 200))
+    stage.dispatchEvent(pe('pointermove', 502, 400)) // dy +200: past closeDismiss
+    expect(stage.style.getPropertyValue('--gallerist-dismiss')).not.toBe('')
+    stage.dispatchEvent(pe('pointercancel', 502, 400))
+    expect(close).not.toHaveBeenCalled()
+    expect(stage.style.getPropertyValue('--gallerist-dismiss')).toBe('')
+  })
+
+  it('snaps a cancelled pan back to the committed transform without committing', () => {
+    const v = setup() // scale 1 > fit 0.5 → drags pan
+    const zoomTo = vi.spyOn(v, 'zoomTo')
+    stage.dispatchEvent(pe('pointerdown', 500, 400))
+    stage.dispatchEvent(pe('pointermove', 400, 400)) // live pan dx -100
+    expect(content.style.transform).toContain('-100px')
+    stage.dispatchEvent(pe('pointercancel', 400, 400))
+    expect(zoomTo).not.toHaveBeenCalled()
+    expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+    expect(content.style.transform).toBe('translate(0px, 0px) scale(1)')
+  })
+
+  it('leaves the gesture state clean so the next gesture works', () => {
+    const v = setup()
+    v.zoomTo(0.5, { x: 0, y: 0 })
+    const next = vi.spyOn(v, 'next')
+    stage.dispatchEvent(pe('pointerdown', 500, 400))
+    stage.dispatchEvent(pe('pointermove', 380, 402))
+    stage.dispatchEvent(pe('pointercancel', 380, 402))
+    stage.dispatchEvent(pe('pointerdown', 500, 400))
+    stage.dispatchEvent(pe('pointermove', 380, 402))
+    stage.dispatchEvent(pe('pointerup', 380, 402))
+    expect(next).toHaveBeenCalledTimes(1)
   })
 })
 
