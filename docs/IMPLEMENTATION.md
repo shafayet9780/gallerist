@@ -183,6 +183,7 @@ viewer.destroy()
 const handle = mount(viewer, {
   container? = null,   // null = overlay/portal; element = inline
   controls? = true, adapters? = [imageAdapter()], preload? = {ahead:2,behind:1}, overlays?,
+  strings?,            // label/announcement overrides for translation (DEFAULT_STRINGS)
 })
 handle.destroy()
 ```

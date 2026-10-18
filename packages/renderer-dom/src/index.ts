@@ -14,4 +14,5 @@ export {
   type RendererHandle,
 } from './mount'
 export { type PresetName, type ResolvedPreset, resolvePreset } from './presets'
+export { DEFAULT_STRINGS, type Strings } from './strings'
 export { type KeyReconcile, reconcileKeys, windowIndices } from './windowing'

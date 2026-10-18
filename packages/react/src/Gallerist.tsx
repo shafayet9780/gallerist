@@ -14,6 +14,7 @@ import {
   type ArrowLayout,
   type PresetName,
   type RailPlacement,
+  type Strings,
   mount,
 } from '@gallerist/renderer-dom'
 import {
@@ -54,6 +55,8 @@ export interface GalleristProps extends ViewerOptions {
   autoHide?: boolean
   /** linear flat traversal: ←/→ walks the flattened item sequence; pairs with a flat thumbnail rail. */
   linear?: boolean
+  /** UI text overrides (button labels, announcements) for translation; read once at mount. */
+  strings?: Partial<Strings>
   children?: ReactNode
 }
 
@@ -138,6 +141,7 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     rail,
     autoHide,
     linear,
+    strings,
     children,
     ...options
   } = props
@@ -210,6 +214,7 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
       rail,
       autoHide,
       linear,
+      strings,
       loop: options.loop,
     })
     rootRef.current = handle.root

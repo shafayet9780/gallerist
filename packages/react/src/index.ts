@@ -4,6 +4,8 @@ export {
   type PresetName,
   type RailPlacement,
   type ResolvedPreset,
+  type Strings,
+  DEFAULT_STRINGS,
   resolvePreset,
 } from '@gallerist/renderer-dom'
 export { useViewerContext, GalleristContext } from './context'

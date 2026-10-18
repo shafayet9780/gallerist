@@ -29,6 +29,9 @@
 - **theme**: a mobile layer (compact chrome under 600px, 44px touch targets, safe areas, swipes
   instead of on-image arrows on touch) and RTL arrow glyphs that point the reading direction.
 - **renderer-dom**: generic wording: announcements and pill labels say "item", not "screen".
+- **renderer-dom + react**: `strings` option (`mount(viewer, { strings })`, `<Gallerist strings>`)
+  for every label and announcement the renderer produces, with English defaults
+  (`DEFAULT_STRINGS`); positions are functions so a language can order words and numbers.
 - **plugins + renderer-dom**: one icon family. The shared SVG set moves to `@gallerist/core/internal`
   (`ICONS`) and the toolbar buttons of thumbnails, grid, fullscreen and download use it instead of
   Unicode glyphs. Zoom reset gets its own icon (it used to look like fullscreen). The fullscreen

@@ -12,6 +12,7 @@ import { type IdleController, createIdleController } from './idle'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
 import { type PresetName, resolvePreset } from './presets'
 import { type RegionHosts, aggregateKeymap, createRegionMounter } from './regions'
+import { DEFAULT_STRINGS, type Strings } from './strings'
 import { zoomTransform } from './transform'
 import { reconcileKeys, windowIndices } from './windowing'
 
@@ -60,6 +61,8 @@ export interface MountOptions {
    * `linear` traversal, to wrap the flattened sequence at the global first/last item. Default false.
    */
   loop?: boolean
+  /** UI text overrides (button labels, announcements) for translation; merged over English. */
+  strings?: Partial<Strings>
   /** Accessible name for the overlay dialog (default 'Media viewer'); sets aria-label. */
   label?: string
   /** Element (or getter) to return focus to when the overlay closes. Falls back to whatever
@@ -192,6 +195,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // Default to the viewer's resolved loop so linear traversal and the slide window agree; an
   // explicit mount({ loop }) still overrides for the rare case they should differ (review #2).
   const loop = opts.loop ?? viewer.loop
+  const t: Strings = { ...DEFAULT_STRINGS, ...opts.strings }
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -323,7 +327,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const railHandle = el('div', 'gallerist-rail-handle')
   const railToggle = el('button', 'gallerist-rail-toggle', {
     type: 'button',
-    'aria-label': railHidden ? 'Show thumbnails' : 'Hide thumbnails',
+    'aria-label': railHidden ? t.showThumbnails : t.hideThumbnails,
     'aria-pressed': String(railHidden),
   })
   railToggle.innerHTML = ICONS.collapse
@@ -332,7 +336,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     railCollapsed = v
     root.setAttribute('data-gallerist-rail', v ? 'collapsed' : 'expanded')
     railToggle.setAttribute('aria-pressed', String(v))
-    railToggle.setAttribute('aria-label', v ? 'Show thumbnails' : 'Hide thumbnails')
+    railToggle.setAttribute('aria-label', v ? t.showThumbnails : t.hideThumbnails)
     // a manual toggle while fullscreen wins over the on-exit restore
     if (manual) preFsCollapsed = null
   }
@@ -351,11 +355,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     counter = el('div', 'gallerist-counter')
     title = el('div', 'gallerist-title')
     title.hidden = true
-    reset = el('button', 'gallerist-zoom-reset', { type: 'button', 'aria-label': 'Reset zoom' })
+    reset = el('button', 'gallerist-zoom-reset', { type: 'button', 'aria-label': t.resetZoom })
     reset.innerHTML = ICONS.zoomReset
     reset.hidden = true // only while zoomed in
     reset.addEventListener('click', () => viewer.resetZoom())
-    const close = el('button', 'gallerist-close', { type: 'button', 'aria-label': 'Close' })
+    const close = el('button', 'gallerist-close', { type: 'button', 'aria-label': t.close })
     close.innerHTML = ICONS.close
     close.addEventListener('click', () => viewer.close())
     bar.append(counter, title, regionHosts.toolbar, reset, close)
@@ -363,21 +367,21 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // over the stage: group arrows and the item navigator (↑ · position · ↓) as one cluster, so
     // each arrow layout places it as a unit. Icons follow the orientation: horizontal → group ←/→,
     // item ↑/↓; vertical (side rail) → group ↑/↓, item ←/→.
-    const prev = el('button', 'gallerist-prev', { type: 'button', 'aria-label': 'Previous' })
+    const prev = el('button', 'gallerist-prev', { type: 'button', 'aria-label': t.previous })
     prev.innerHTML = vertical ? ICONS.itemPrev : ICONS.prev
     prev.addEventListener('click', () => nav.prev())
-    const next = el('button', 'gallerist-next', { type: 'button', 'aria-label': 'Next' })
+    const next = el('button', 'gallerist-next', { type: 'button', 'aria-label': t.next })
     next.innerHTML = vertical ? ICONS.itemNext : ICONS.next
     next.addEventListener('click', () => nav.next())
     const prevItem = el('button', 'gallerist-item-prev', {
       type: 'button',
-      'aria-label': 'Previous item',
+      'aria-label': t.previousItem,
     })
     prevItem.innerHTML = vertical ? ICONS.prev : ICONS.itemPrev
     prevItem.addEventListener('click', () => nav.prevItem())
     const nextItem = el('button', 'gallerist-item-next', {
       type: 'button',
-      'aria-label': 'Next item',
+      'aria-label': t.nextItem,
     })
     nextItem.innerHTML = vertical ? ICONS.next : ICONS.itemNext
     nextItem.addEventListener('click', () => nav.nextItem())
@@ -602,7 +606,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         for (let k = 0; k < itemCount; k++) {
           const pill = el('button', 'gallerist-pill', {
             type: 'button',
-            'aria-label': `Item ${k + 1}`,
+            'aria-label': t.item(k + 1),
           })
           pill.textContent = String(k + 1)
           pill.addEventListener('click', () => viewer.goTo(g, k))
@@ -654,13 +658,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       const pos = flatPosition(cur.g, cur.i) + 1 // flatPosition() also rebuilds flatSeq if needed
       const total = flatSeq.length
       if (counter) counter.textContent = `${pos} / ${total}`
-      live.textContent = `Item ${pos} of ${total}${desc}`
+      live.textContent = `${t.itemOf(pos, total)}${desc}`
     } else {
       if (counter) counter.textContent = `${cur.g + 1} / ${G}`
       if (multi) updatePosition(cur.g, cur.i, itemCount)
       live.textContent = multi
-        ? `Group ${cur.g + 1} of ${G}, item ${cur.i + 1} of ${itemCount}${desc}`
-        : `Group ${cur.g + 1} of ${G}${desc}`
+        ? `${t.groupOf(cur.g + 1, G)}, ${t.itemOf(cur.i + 1, itemCount)}${desc}`
+        : `${t.groupOf(cur.g + 1, G)}${desc}`
     }
   }
 

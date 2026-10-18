@@ -683,6 +683,40 @@ describe('mount — chrome structure (M15)', () => {
   })
 })
 
+describe('mount — strings (translation)', () => {
+  it('uses English defaults with generic wording', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open({ g: 1 })
+    expect(document.querySelector('.gallerist-close')?.getAttribute('aria-label')).toBe('Close')
+    expect(document.querySelector('.gallerist-pill')?.getAttribute('aria-label')).toBe('Item 1')
+    expect(document.querySelector('.gallerist-live')?.textContent).toBe(
+      'Group 2 of 3, Item 1 of 3 — b0',
+    )
+  })
+
+  it('applies partial overrides, including position templates', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, {
+      strings: {
+        close: 'Schließen',
+        next: 'Weiter',
+        item: (n) => `Bild ${n}`,
+        groupOf: (n, total) => `Gruppe ${n} von ${total}`,
+        itemOf: (n, total) => `Bild ${n} von ${total}`,
+      },
+    })
+    v.open({ g: 1 })
+    expect(document.querySelector('.gallerist-close')?.getAttribute('aria-label')).toBe('Schließen')
+    expect(document.querySelector('.gallerist-next')?.getAttribute('aria-label')).toBe('Weiter')
+    expect(document.querySelector('.gallerist-prev')?.getAttribute('aria-label')).toBe('Previous') // not overridden
+    expect(document.querySelector('.gallerist-pill')?.getAttribute('aria-label')).toBe('Bild 1')
+    expect(document.querySelector('.gallerist-live')?.textContent).toBe(
+      'Gruppe 2 von 3, Bild 1 von 3 — b0',
+    )
+  })
+})
+
 describe('mount — destroy', () => {
   it('removes the root and stops reacting', () => {
     const v = createViewer({ collection: collection() })
