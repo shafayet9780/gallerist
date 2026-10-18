@@ -19,6 +19,15 @@ export interface ZoomBounds {
   constrain(zoom: ZoomState): ZoomState
 }
 
+/**
+ * Lets a renderer stretch open/close over a real transition: `opened` / `closed` fire when it calls
+ * `done()`. Without a driver (or a missing hook) the phase settles synchronously.
+ */
+export interface LifecycleDriver {
+  opening?(done: () => void): void
+  closing?(done: () => void): void
+}
+
 export interface ViewerInternals {
   /** Emit a viewer event: the renderer surfaces load/overlay events, plugins their own. */
   emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): boolean
@@ -30,6 +39,8 @@ export interface ViewerInternals {
   setZoom(zoom: ZoomState): void
   /** Lend the core the stage geometry; returns a disposer. Without bounds, zoom is unclamped. */
   setZoomBounds(bounds: ZoomBounds): () => void
+  /** Drive open/close transitions; returns a disposer that also settles one in flight. */
+  setLifecycleDriver(driver: LifecycleDriver): () => void
 }
 
 export function attachInternals(viewer: ViewerApi, internals: ViewerInternals): void {

@@ -118,6 +118,31 @@ test('zooming back out after a pan returns to a centred fit (zoom bounds)', asyn
   await expect.poll(zoom).toEqual({ scale: 1, x: 0, y: 0 })
 })
 
+test('close fades out before unmounting; phases settle on the real animation', async ({ page }) => {
+  const phase = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { viewer: { getState(): { phase: string } } }).viewer.getState()
+          .phase,
+    )
+  await expect.poll(phase).toBe('open') // the opening fade has settled
+  await page.evaluate(() => {
+    const w = window as unknown as {
+      viewer: { subscribe(fn: (s: { phase: string }) => void): void; close(): void }
+      __phases: string[]
+    }
+    w.__phases = []
+    w.viewer.subscribe((s) => {
+      if (w.__phases.at(-1) !== s.phase) w.__phases.push(s.phase)
+    })
+    w.viewer.close()
+  })
+  await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'closing')
+  await expect(page.locator('.gallerist')).toHaveCount(0)
+  const phases = await page.evaluate(() => (window as unknown as { __phases: string[] }).__phases)
+  expect(phases).toEqual(['closing', 'closed'])
+})
+
 test('wheel zooms in past fit (arbitration: zoom)', async ({ page }) => {
   const box = await page.locator('.gallerist-stage').boundingBox()
   if (!box) throw new Error('no stage box')

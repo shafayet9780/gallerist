@@ -1,7 +1,6 @@
 // The vanilla controller (spec §8): composes normalize + store + FSM + nav + events
-// into the ViewerApi. Headless — no DOM. Lifecycle transitions settle synchronously here;
-// the DOM renderer (M3) will drive opening/closing over real CSS transitions and own the
-// async nav coalescing (spec §6) once transitions become time-based.
+// into the ViewerApi. Headless — no DOM. Lifecycle transitions settle synchronously unless a
+// renderer installs a LifecycleDriver, which settles opening/closing when its CSS transition ends.
 
 import type { EventHandlers, ViewerApi, ViewerOptions } from '../api'
 import {
@@ -18,7 +17,7 @@ import type { Plugin, PluginInstance } from '../plugins/types'
 import { createStore } from '../store/store'
 import type { Collection, Cursor, LoadStatus, ViewerState, ZoomState } from '../types'
 import { focalZoom } from '../zoom/zoom'
-import { type ZoomBounds, attachInternals } from './internals'
+import { type LifecycleDriver, type ZoomBounds, attachInternals } from './internals'
 
 const IDENTITY_ZOOM: ZoomState = { scale: 1, x: 0, y: 0 }
 
@@ -175,6 +174,34 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     emitter.emit('zoomEnd', { ...basePayload(), zoom: z })
   }
 
+  // ── lifecycle transitions (spec §6) ──────────────────────────────────────
+  // opening → open and closing → closed settle when the renderer's driver calls done(). Each
+  // transition gets a generation so a done() from one that was superseded (close during opening,
+  // reopen during closing) is ignored.
+  let lifecycleDriver: LifecycleDriver | null = null
+  let generation = 0
+  let pendingSettle: (() => void) | null = null
+  const runTransition = (hook: 'opening' | 'closing', settle: () => void): void => {
+    const gen = ++generation
+    const done = () => {
+      if (gen !== generation || destroyed) return
+      pendingSettle = null
+      settle()
+    }
+    pendingSettle = done
+    const run = lifecycleDriver?.[hook]
+    if (!run) {
+      done()
+      return
+    }
+    try {
+      run.call(lifecycleDriver, done)
+    } catch (error) {
+      done() // never strand the viewer mid-transition on a renderer bug
+      throw error
+    }
+  }
+
   // ── public api ───────────────────────────────────────────────────────────
   api = {
     open(at) {
@@ -184,8 +211,9 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       // must not re-fire open/opened (review I-C1).
       if (!dispatch({ t: 'OPEN' })) return
       emitter.emit('open', basePayload())
-      dispatch({ t: 'OPENED' }) // sync settle (renderer overrides in M3)
-      emitter.emit('opened', basePayload())
+      runTransition('opening', () => {
+        if (dispatch({ t: 'OPENED' })) emitter.emit('opened', basePayload())
+      })
     },
     close() {
       if (destroyed) return
@@ -194,8 +222,9 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       // open+onClose double-fire, I-X1).
       if (!dispatch({ t: 'CLOSE' })) return
       emitter.emit('close', basePayload())
-      dispatch({ t: 'CLOSED' })
-      emitter.emit('closed', basePayload())
+      runTransition('closing', () => {
+        if (dispatch({ t: 'CLOSED' })) emitter.emit('closed', basePayload())
+      })
     },
     next() {
       groupNav(nav.nextGroup(store.get().cursor, navCtx()))
@@ -319,6 +348,16 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       return () => {
         // a later renderer (e.g. a StrictMode remount) may have replaced us — don't clear theirs
         if (zoomBounds === bounds) zoomBounds = null
+      }
+    },
+    setLifecycleDriver(driver) {
+      lifecycleDriver = driver
+      return () => {
+        if (lifecycleDriver !== driver) return
+        lifecycleDriver = null
+        // The renderer is going away: its transition will never report back, so settle it now
+        // rather than leaving the viewer stuck in opening/closing (and `closed` never firing).
+        pendingSettle?.()
       }
     },
   })

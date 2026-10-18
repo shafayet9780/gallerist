@@ -475,6 +475,91 @@ describe('mount — overlays option', () => {
   })
 })
 
+describe('mount — open/close transitions (lifecycle driver)', () => {
+  afterEach(() => vi.restoreAllMocks()) // the getComputedStyle mock must not leak into later tests
+  // happy-dom loads no theme CSS: pretend the root runs a 180ms phase animation.
+  const animated = () =>
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(
+      (el: Element) =>
+        ({
+          animationName: (el as HTMLElement).classList.contains('gallerist')
+            ? 'gallerist-fade-out'
+            : 'none',
+          animationDuration: '0.18s',
+          animationDelay: '0s',
+        }) as CSSStyleDeclaration,
+    )
+  const root = () => document.querySelector('.gallerist') as HTMLElement | null
+  const animationEnd = (target: Element) =>
+    target.dispatchEvent(new Event('animationend', { bubbles: true }))
+
+  it('reflects the phase on the root; with no animation it settles at once', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect(v.getState().phase).toBe('open')
+    expect(root()?.getAttribute('data-gallerist-phase')).toBe('open')
+  })
+
+  it('stays mounted through the exit animation, then detaches and fires closed', () => {
+    const closed = vi.fn()
+    const v = createViewer({ collection: collection(), on: { closed } })
+    mount(v)
+    animated()
+    v.open()
+    const el = root() as HTMLElement
+    animationEnd(el) // opening done
+    expect(v.getState().phase).toBe('open')
+    v.close()
+    expect(v.getState().phase).toBe('closing')
+    expect(el.getAttribute('data-gallerist-phase')).toBe('closing')
+    expect(root()).not.toBeNull()
+    expect(closed).not.toHaveBeenCalled()
+    animationEnd(el)
+    expect(root()).toBeNull()
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores animationend bubbling up from a descendant', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    animated()
+    v.open()
+    animationEnd(document.querySelector('.gallerist-slide') as HTMLElement)
+    expect(v.getState().phase).toBe('opening')
+  })
+
+  it('settles on a timer if animationend never fires', () => {
+    vi.useFakeTimers()
+    try {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      animated()
+      v.open()
+      vi.advanceTimersByTime(229) // 180ms + 50ms grace
+      expect(v.getState().phase).toBe('opening')
+      vi.advanceTimersByTime(2)
+      expect(v.getState().phase).toBe('open')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('destroying the renderer mid-close still settles to closed', () => {
+    const closed = vi.fn()
+    const v = createViewer({ collection: collection(), on: { closed } })
+    const h = mount(v)
+    animated()
+    v.open()
+    animationEnd(root() as HTMLElement)
+    v.close()
+    h.destroy()
+    expect(v.getState().phase).toBe('closed')
+    expect(closed).toHaveBeenCalledTimes(1)
+    expect(root()).toBeNull()
+  })
+})
+
 describe('mount — destroy', () => {
   it('removes the root and stops reacting', () => {
     const v = createViewer({ collection: collection() })

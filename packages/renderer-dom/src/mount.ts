@@ -107,6 +107,18 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName ?? ''))
 }
 
+/** Longest animation (duration + delay) in ms from a computed style's comma lists. */
+function animationMs(style: CSSStyleDeclaration): number {
+  const ms = (v: string) => {
+    const n = Number.parseFloat(v)
+    if (!Number.isFinite(n)) return 0
+    return v.trim().endsWith('ms') ? n : n * 1000
+  }
+  const durations = style.animationDuration.split(',')
+  const delays = style.animationDelay.split(',')
+  return Math.max(0, ...durations.map((d, i) => ms(d) + ms(delays[i % delays.length] ?? '0s')))
+}
+
 /** Max committed zoom (fit == 1 in the contained model); shared by gestures, keys and bounds. */
 const MAX_ZOOM = 4
 
@@ -660,6 +672,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   const sync = () => {
     const phase: Phase = viewer.getState().phase
+    // The theme keys the open/close animation off the phase (see the lifecycle driver below).
+    if (root.getAttribute('data-gallerist-phase') !== phase)
+      root.setAttribute('data-gallerist-phase', phase)
     if (overlay) {
       if (phase !== 'closed') attach()
       else detach()
@@ -821,6 +836,38 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     },
   })
 
+  // ── open/close transitions (spec §6, §27) ───────────────────────────────────────
+  // The theme animates the root per data-gallerist-phase (fade in while opening, out while
+  // closing) and the viewer settles to open/closed when that animation ends, so the overlay stays
+  // mounted, focus-trapped and scroll-locked through its exit. No animation (reduced motion, inline
+  // mode, a theme without one) settles at once. A timer backs up animationend, which never fires if
+  // the animation is cancelled or the root is display:none.
+  let cancelPhaseWait: (() => void) | null = null
+  const awaitPhaseAnimation = (done: () => void) => {
+    cancelPhaseWait?.()
+    const style = getComputedStyle(root)
+    if (!style.animationName || style.animationName === 'none') return done()
+    const onEnd = (e: Event) => {
+      if (e.target === root) finish() // slide/thumbnail animations bubble up too
+    }
+    const stop = () => {
+      root.removeEventListener('animationend', onEnd)
+      clearTimeout(timer)
+      cancelPhaseWait = null
+    }
+    const finish = () => {
+      stop()
+      done()
+    }
+    root.addEventListener('animationend', onEnd) // events dispatch async: never before `timer` exists
+    const timer = setTimeout(finish, animationMs(style) + 50)
+    cancelPhaseWait = stop
+  }
+  const offLifecycle = internals.setLifecycleDriver({
+    opening: awaitPhaseAnimation,
+    closing: awaitPhaseAnimation,
+  })
+
   // ── zoom bounds (spec §11.1) ───────────────────────────────────────────────────
   // Lend the core the stage geometry so every committed zoom (API, keyboard, gesture end, resize)
   // is clamped in one place. Contained model: the media is object-fit inside a stage-sized content
@@ -894,6 +941,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       unsubscribe()
       offPlugins()
       offZoomBounds()
+      cancelPhaseWait?.()
+      offLifecycle() // settles a transition in flight, so `closed` still fires
       detachGestures()
       resizeObserver?.disconnect()
       if (resizeFrame) cancelAnimationFrame(resizeFrame)

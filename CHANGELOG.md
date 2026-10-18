@@ -23,6 +23,10 @@
   so data that arrived later (an API call) never showed. A new reference is applied with
   `setCollection`, keeping the cursor on the same item.
 - **react**: `on` handlers always call the latest props instead of the first render's closures.
+- **core + renderer-dom + theme**: open/close are real transitions. `opened` / `closed` fire when
+  the open fade (280ms) or close fade (180ms) ends, and the overlay stays mounted through its exit
+  instead of vanishing. Renderers drive this via `getInternals(viewer).setLifecycleDriver`. The
+  phase is exposed as `data-gallerist-phase`. No animation under reduced motion.
 - **renderer-dom**: cancelled media loads are no longer reported as `loadError`.
 - **core + renderer-dom**: zooming back out (keyboard, double-tap, pinch, `zoomTo`) no longer
   leaves the image off-centre or panned past its edge. The renderer lends the core its stage

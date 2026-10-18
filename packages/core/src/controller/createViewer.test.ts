@@ -349,3 +349,133 @@ describe('createViewer — internals boundary (spec §8.4)', () => {
     expect(() => getInternals({} as never)).toThrow(/not a viewer created by createViewer/)
   })
 })
+
+describe('createViewer — lifecycle driver (async open/close)', () => {
+  // A driver that parks each transition's done() so the test settles it explicitly.
+  const parked = () => {
+    const pending: { opening: (() => void)[]; closing: (() => void)[] } = {
+      opening: [],
+      closing: [],
+    }
+    return {
+      pending,
+      driver: {
+        opening: (done: () => void) => void pending.opening.push(done),
+        closing: (done: () => void) => void pending.closing.push(done),
+      },
+    }
+  }
+
+  it('opened/closed fire only when the driver reports the transition done', () => {
+    const opened = vi.fn()
+    const closed = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { opened, closed } })
+    const { pending, driver } = parked()
+    getInternals(v).setLifecycleDriver(driver)
+    v.open()
+    expect(v.getState().phase).toBe('opening')
+    expect(opened).not.toHaveBeenCalled()
+    pending.opening[0]?.()
+    expect(v.getState().phase).toBe('open')
+    expect(opened).toHaveBeenCalledTimes(1)
+    v.close()
+    expect(v.getState().phase).toBe('closing')
+    pending.closing[0]?.()
+    expect(v.getState().phase).toBe('closed')
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it('a done() from a superseded transition is ignored (close during opening)', () => {
+    const opened = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { opened } })
+    const { pending, driver } = parked()
+    getInternals(v).setLifecycleDriver(driver)
+    v.open()
+    v.close() // interrupts the opening
+    pending.opening[0]?.() // the stale opening finishes late
+    expect(v.getState().phase).toBe('closing')
+    expect(opened).not.toHaveBeenCalled()
+    pending.closing[0]?.()
+    expect(v.getState().phase).toBe('closed')
+  })
+
+  it('reopening during closing ignores the stale close and settles the new open', () => {
+    const closed = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { closed } })
+    const { pending, driver } = parked()
+    getInternals(v).setLifecycleDriver(driver)
+    v.open()
+    pending.opening[0]?.()
+    v.close()
+    v.open() // reopen mid-close
+    pending.closing[0]?.() // stale
+    expect(v.getState().phase).toBe('opening')
+    expect(closed).not.toHaveBeenCalled()
+    pending.opening[1]?.()
+    expect(v.getState().phase).toBe('open')
+  })
+
+  it('calling done() twice settles once', () => {
+    const opened = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { opened } })
+    const { pending, driver } = parked()
+    getInternals(v).setLifecycleDriver(driver)
+    v.open()
+    pending.opening[0]?.()
+    pending.opening[0]?.()
+    expect(opened).toHaveBeenCalledTimes(1)
+  })
+
+  it('removing the driver mid-transition settles it (closed still fires)', () => {
+    const closed = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { closed } })
+    const { pending, driver } = parked()
+    const off = getInternals(v).setLifecycleDriver(driver)
+    v.open()
+    pending.opening[0]?.()
+    v.close()
+    off() // e.g. the renderer unmounts during the close animation
+    expect(v.getState().phase).toBe('closed')
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it("a replaced driver's disposer neither clears nor settles the new driver's transition", () => {
+    const v = createViewer({ items: [item('a')] })
+    const internals = getInternals(v)
+    const offFirst = internals.setLifecycleDriver(parked().driver)
+    const second = parked()
+    internals.setLifecycleDriver(second.driver)
+    v.open()
+    offFirst()
+    expect(v.getState().phase).toBe('opening')
+    second.pending.opening[0]?.()
+    expect(v.getState().phase).toBe('open')
+  })
+
+  it('a throwing driver hook settles the transition and surfaces the error', () => {
+    const v = createViewer({ items: [item('a')] })
+    getInternals(v).setLifecycleDriver({
+      opening: () => {
+        throw new Error('renderer bug')
+      },
+    })
+    expect(() => v.open()).toThrow('renderer bug')
+    expect(v.getState().phase).toBe('open')
+  })
+
+  it('a missing hook settles synchronously', () => {
+    const v = createViewer({ items: [item('a')] })
+    getInternals(v).setLifecycleDriver({ closing: (done) => done() })
+    v.open()
+    expect(v.getState().phase).toBe('open')
+  })
+
+  it('a done() after destroy is ignored', () => {
+    const v = createViewer({ items: [item('a')] })
+    const { pending, driver } = parked()
+    getInternals(v).setLifecycleDriver(driver)
+    v.open()
+    v.destroy()
+    expect(() => pending.opening[0]?.()).not.toThrow()
+  })
+})

@@ -307,6 +307,7 @@ const { emit, getPlugins, onPluginsChanged } = getInternals(viewer)
 - `emit(event, payload)`: surface an event (the renderer emits load/overlay events, plugins their own). Off the public API so app code can't forge, say, a `loaded` event.
 - `getPlugins()` / `onPluginsChanged(fn)`: the plugin registry the renderer mounts regions, adapters and overlays from.
 - `setZoom(transform)`: commit a full `{scale, x, y}` (gesture end, resize re-clamp).
+- `setLifecycleDriver({ opening?(done), closing?(done) })`: stretch open/close over a real transition. `opened` / `closed` fire when the renderer calls `done()`; a `done()` from a superseded transition is ignored, and removing the driver settles one in flight. The DOM renderer settles when the theme's phase animation on the root (`data-gallerist-phase`) ends.
 - `setZoomBounds({ center, constrain })`: the renderer lends the core its stage geometry. Every committed zoom, from `zoomTo`, `resetZoom` or `setZoom`, passes through `constrain` (scale into [fit, max], pan so the content covers the stage, centred at fit), and `zoomTo` without a focal point pivots on `center()`.
 - The engine building blocks: normalize, store, FSM, nav, windowing, springs, gesture arbitration and zoom math.
 

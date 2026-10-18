@@ -2,7 +2,12 @@
 // internal half (getInternals) plus the pure model/nav/zoom/motion building blocks. Not covered
 // by semver before 1.0; app code should only need the root entry (spec §8.4).
 
-export { getInternals, type ViewerInternals, type ZoomBounds } from './controller/internals'
+export {
+  getInternals,
+  type LifecycleDriver,
+  type ViewerInternals,
+  type ZoomBounds,
+} from './controller/internals'
 export { normalize } from './model/normalize'
 export { createStore, type Store } from './store/store'
 export {
