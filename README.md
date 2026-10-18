@@ -1,10 +1,10 @@
-# Visora
+# Gallerist
 
 A **headless, framework-agnostic media viewer** for grouped / nested galleries, with image-space
 overlays and virtualized rendering at scale. MIT licensed; zero runtime dependencies in the core.
 
 Every other lightbox models a gallery as a flat 1-D strip. The real web is galleries-of-galleries
-— product variants × angles, posts × images, moments × monitors, documents × pages. Visora makes
+— product variants × angles, posts × images, moments × monitors, documents × pages. Gallerist makes
 **nesting a first-class primitive**, lets you anchor interactive content to points *on the image*,
 and holds 60fps across thousands of items.
 
@@ -17,14 +17,14 @@ and holds 60fps across thousands of items.
 
 ```bash
 pnpm install
-pnpm --filter @visora/example-monitoring dev   # grouped reviewer demo (nested, overlays)
-pnpm --filter @visora/example-vanilla dev      # flat gallery demo
+pnpm --filter @gallerist/example-monitoring dev   # grouped reviewer demo (nested, overlays)
+pnpm --filter @gallerist/example-vanilla dev      # flat gallery demo
 ```
 
 ```ts
-import { createViewer } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
-import '@visora/theme-default/visora.css'
+import { createViewer } from '@gallerist/core'
+import { mount } from '@gallerist/renderer-dom'
+import '@gallerist/theme-default/gallerist.css'
 
 // flat gallery — items[] is normalized to singleton groups internally
 const viewer = createViewer({ items: [{ id: 'a', type: 'image', source: 'a.jpg' }] })
@@ -32,7 +32,7 @@ mount(viewer)            // overlay/lightbox mode; pass { container } for inline
 viewer.open()
 ```
 
-Grouped (two-axis) — the reason Visora exists:
+Grouped (two-axis) — the reason Gallerist exists:
 
 ```ts
 const viewer = createViewer({
@@ -62,11 +62,11 @@ mount(viewer)
 
 | Package | What it does |
 |---|---|
-| `@visora/core` | Headless engine: data model, signal store, FSM, two-axis nav, zoom/gesture math, events, spring sampler, `createViewer`. **No DOM, zero deps.** |
-| `@visora/renderer-dom` | Default DOM renderer: windowed slides, image adapter, live gestures, image-space overlays, dialog a11y, chrome. The only ring that writes DOM. |
-| `@visora/theme-default` | Pure-CSS skin driven by `--visora-*` tokens; distinct axis motion; reduced-motion safe. |
-| `@visora/react` | React adapter: `useVisora()` hook, `<Visora>` component, `<Visora.Overlay>`/`<Visora.Region>` JSX portals. |
-| `@visora/plugin-*` | Tree-shakeable plugins: `fullscreen`, `hash`, `download`, `thumbnails` (grouped), `grid`, `video`, `video-youtube`. |
+| `@gallerist/core` | Headless engine: data model, signal store, FSM, two-axis nav, zoom/gesture math, events, spring sampler, `createViewer`. **No DOM, zero deps.** |
+| `@gallerist/renderer-dom` | Default DOM renderer: windowed slides, image adapter, live gestures, image-space overlays, dialog a11y, chrome. The only ring that writes DOM. |
+| `@gallerist/theme-default` | Pure-CSS skin driven by `--gallerist-*` tokens; distinct axis motion; reduced-motion safe. |
+| `@gallerist/react` | React adapter: `useGallerist()` hook, `<Gallerist>` component, `<Gallerist.Overlay>`/`<Gallerist.Region>` JSX portals. |
+| `@gallerist/plugin-*` | Tree-shakeable plugins: `fullscreen`, `hash`, `download`, `thumbnails` (grouped), `grid`, `video`, `video-youtube`. |
 
 ## Architecture
 
@@ -74,7 +74,7 @@ The **headless core** owns state and logic and touches no DOM. The **renderer** 
 that writes to the DOM, and it is replaceable — that's what lets anyone build a fully custom UI on
 the same engine. Design rationale, the coordinate model, the data flow, and known gotchas are in
 [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md). The full spec (with the 14 locked decisions) is
-in [`docs/VISORA_SPEC.md`](docs/VISORA_SPEC.md).
+in [`docs/GALLERIST_SPEC.md`](docs/GALLERIST_SPEC.md).
 
 ```
 theme-default (CSS) ─┐

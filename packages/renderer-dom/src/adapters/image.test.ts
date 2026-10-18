@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import type { AdapterCtx, Item } from '@visora/core'
+import type { AdapterCtx, Item } from '@gallerist/core'
 import { describe, expect, it } from 'vitest'
 import { imageAdapter } from './image'
 
@@ -81,7 +81,7 @@ describe('imageAdapter', () => {
     const m = imageAdapter().mount(img(), slot(), ctx())
     m.element.dispatchEvent(new Event('load'))
     await expect(m.ready).resolves.toBeUndefined()
-    expect(m.element.hasAttribute('data-visora-loaded')).toBe(true)
+    expect(m.element.hasAttribute('data-gallerist-loaded')).toBe(true)
   })
 
   it('shows a centered error card with the alt caption on a failed load (I-UX3)', async () => {
@@ -89,13 +89,13 @@ describe('imageAdapter', () => {
     const m = imageAdapter().mount(img({ alt: 'Broken chart' }), s, ctx())
     m.element.dispatchEvent(new Event('error'))
     await expect(m.ready).rejects.toThrow()
-    expect(m.element.hasAttribute('data-visora-error')).toBe(true)
-    const card = s.querySelector('.visora-media-error')
+    expect(m.element.hasAttribute('data-gallerist-error')).toBe(true)
+    const card = s.querySelector('.gallerist-media-error')
     expect(card).not.toBeNull()
     expect(card?.getAttribute('role')).toBe('img')
-    expect(card?.querySelector('.visora-media-error-label')?.textContent).toBe('Broken chart')
+    expect(card?.querySelector('.gallerist-media-error-label')?.textContent).toBe('Broken chart')
     m.destroy()
-    expect(s.querySelector('.visora-media-error')).toBeNull() // card removed on teardown
+    expect(s.querySelector('.gallerist-media-error')).toBeNull() // card removed on teardown
   })
 
   it('renders the error card without a label when the item has no alt (I-UX3)', async () => {
@@ -103,8 +103,8 @@ describe('imageAdapter', () => {
     const m = imageAdapter().mount(img(), s, ctx())
     m.element.dispatchEvent(new Event('error'))
     await expect(m.ready).rejects.toThrow()
-    expect(s.querySelector('.visora-media-error')).not.toBeNull()
-    expect(s.querySelector('.visora-media-error-label')).toBeNull()
+    expect(s.querySelector('.gallerist-media-error')).not.toBeNull()
+    expect(s.querySelector('.gallerist-media-error-label')).toBeNull()
   })
 
   it('rejects ready when the signal is already aborted', async () => {
@@ -149,7 +149,7 @@ describe('imageAdapter', () => {
     const m = imageAdapter().mount(img({ source: { loader: async () => custom } }), s, ctx())
     await expect(m.ready).resolves.toBeUndefined()
     expect(s.contains(custom)).toBe(true)
-    expect(custom.hasAttribute('data-visora-loaded')).toBe(true)
+    expect(custom.hasAttribute('data-gallerist-loaded')).toBe(true)
     expect(m.element).toBe(custom)
   })
 })

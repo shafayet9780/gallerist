@@ -1,7 +1,7 @@
 // Image media adapter (spec §12, decision P0-J). Lives in the renderer because it touches DOM.
 // Responsive srcset, decode-before-reveal, LQIP placeholder, naturalSize hint, abortable load.
 
-import type { AdapterCtx, Item, MediaAdapter, MountedMedia } from '@visora/core'
+import type { AdapterCtx, Item, MediaAdapter, MountedMedia } from '@gallerist/core'
 
 const COLOR_RE = /^(#|rgb|hsl|[a-z]+$)/i
 
@@ -31,7 +31,7 @@ export function imageAdapter(): MediaAdapter {
       const img = document.createElement('img')
       img.setAttribute('decoding', 'async')
       img.setAttribute('fetchpriority', ctx.priority ?? 'auto')
-      img.className = 'visora-media visora-media-image'
+      img.className = 'gallerist-media gallerist-media-image'
       if (item.alt !== undefined) img.alt = item.alt
       if (item.placeholder) applyPlaceholder(img, item.placeholder)
       slot.appendChild(img)
@@ -44,19 +44,19 @@ export function imageAdapter(): MediaAdapter {
       let errorEl: HTMLElement | null = null
       const showError = () => {
         if (errorEl) return
-        img.setAttribute('data-visora-error', '') // keeps the img hidden + excludes it from shimmer
+        img.setAttribute('data-gallerist-error', '') // keeps the img hidden + excludes it from shimmer
         const card = document.createElement('div')
-        card.className = 'visora-media-error'
+        card.className = 'gallerist-media-error'
         card.setAttribute('role', 'img')
         if (item.alt) card.setAttribute('aria-label', item.alt)
         const icon = document.createElement('div')
-        icon.className = 'visora-media-error-icon'
+        icon.className = 'gallerist-media-error-icon'
         icon.setAttribute('aria-hidden', 'true')
         icon.innerHTML = BROKEN_ICON // static markup only
         card.appendChild(icon)
         if (item.alt) {
           const label = document.createElement('span')
-          label.className = 'visora-media-error-label'
+          label.className = 'gallerist-media-error-label'
           label.textContent = item.alt // host-supplied → textContent, never innerHTML
           card.appendChild(label)
         }
@@ -86,7 +86,7 @@ export function imageAdapter(): MediaAdapter {
             // decode can reject on detached/aborted nodes — fall through and reveal anyway.
           }
           cleanup()
-          img.setAttribute('data-visora-loaded', '')
+          img.setAttribute('data-gallerist-loaded', '')
           resolve()
         }
         const onError = () => {
@@ -117,7 +117,7 @@ export function imageAdapter(): MediaAdapter {
                 cleanup()
                 img.remove()
                 slot.appendChild(res)
-                res.setAttribute('data-visora-loaded', '')
+                res.setAttribute('data-gallerist-loaded', '')
                 element = res
                 resolve()
               }

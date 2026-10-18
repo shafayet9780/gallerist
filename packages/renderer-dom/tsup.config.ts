@@ -12,9 +12,9 @@ export default defineConfig({
   sourcemap: true,
   minify: false,
   target: 'es2022',
-  external: ['@visora/core'],
+  external: ['@gallerist/core'],
   tsconfig: 'tsconfig.build.json',
-  define: { __VISORA_VERSION__: JSON.stringify(version) },
+  define: { __GALLERIST_VERSION__: JSON.stringify(version) },
   esbuildOptions(options) {
     options.sourcesContent = false
   },

@@ -12,7 +12,7 @@ import {
   clampPan,
   clampScale,
   focalZoom,
-} from '@visora/core'
+} from '@gallerist/core'
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
@@ -31,26 +31,26 @@ export interface MountOptions {
   /** global overlays applied to every slide (spec §8.1, §9). */
   overlays?: OverlaySpec[]
   /**
-   * Placement of the within-group ↑/↓ arrows, surfaced as `data-visora-arrows` for the theme
+   * Placement of the within-group ↑/↓ arrows, surfaced as `data-gallerist-arrows` for the theme
    * (UX-D). `pill-right` (default): ←/→ on the side edges, ↑/↓ as a stacked pill at right-center.
    * `corner-br`: ↑/↓ paired bottom-right. `dpad`: all four clustered as a d-pad. `split`: legacy
    * ↑/↓ top/bottom-center.
    */
   arrows?: ArrowLayout
   /**
-   * Auto-hide the chrome after a period of inactivity (UX-C), flagged as `data-visora-idle` for
+   * Auto-hide the chrome after a period of inactivity (UX-C), flagged as `data-gallerist-idle` for
    * the theme. Default true; inert under prefers-reduced-motion. The thumbnail rail collapses
-   * separately (the `t` key / toggle button / fullscreen), tracked as `data-visora-rail`.
+   * separately (the `t` key / toggle button / fullscreen), tracked as `data-gallerist-rail`.
    */
   autoHide?: boolean
   /**
-   * Named layout preset (UX-E) — sets `data-visora-preset` and supplies defaults for `arrows` and
+   * Named layout preset (UX-E) — sets `data-gallerist-preset` and supplies defaults for `arrows` and
    * `autoHide` (both still overridable by explicit options above). The preset's preferred
    * thumbnails() options are exposed via `resolvePreset(name).thumbnails` for the host to apply.
    */
   preset?: PresetName
   /**
-   * Thumbnail rail placement (UX-E), surfaced as `data-visora-rail-pos`. `bottom` (default) keeps
+   * Thumbnail rail placement (UX-E), surfaced as `data-gallerist-rail-pos`. `bottom` (default) keeps
    * the rail horizontal (group axis = ←/→); `left` / `right` run it vertically and remap the
    * keys/arrows (group axis = ↑/↓, items = ←/→ — touch swipes stay conventional); `hidden` starts
    * collapsed (reveal with the toggle / `t` / hover). Overridable; presets supply a default.
@@ -59,7 +59,7 @@ export interface MountOptions {
   /**
    * Linear traversal (pairs with `thumbnails({ groupDisplay: 'flat' })`). When true, ←/→ walks the
    * flattened item sequence across groups (1a, 1b, 2a, 2b, 2c, 3a…), ↑/↓ retire, the counter shows
-   * `item N / total`, and the within-group pills hide — surfaced as `data-visora-linear`.
+   * `item N / total`, and the within-group pills hide — surfaced as `data-gallerist-linear`.
    */
   linear?: boolean
   /**
@@ -125,7 +125,8 @@ function applyTransform(content: HTMLElement, zoom: ZoomState): void {
 // 'hidden' as the value to restore, permanently locking page scroll (S-R2). Presence is read
 // from the DOM (the overlay roots themselves) so it self-corrects and never leaks a count.
 let savedBodyOverflow = ''
-const anyOverlayMounted = () => !!document.querySelector('.visora[data-visora-mode="overlay"]')
+const anyOverlayMounted = () =>
+  !!document.querySelector('.gallerist[data-gallerist-mode="overlay"]')
 function lockBodyScroll(): void {
   if (!anyOverlayMounted()) savedBodyOverflow = document.body.style.overflow // first of the stack
   document.body.style.overflow = 'hidden'
@@ -138,19 +139,19 @@ function unlockBodyScroll(): void {
 // scroll-lock: every element we mark is tracked module-wide, and inert is only released when the
 // last overlay is gone — so closing an overlay out of LIFO order can't un-inert the page while
 // another modal is still open (review #6, C5).
-const inertedByVisora = new Set<HTMLElement>()
+const inertedByGallerist = new Set<HTMLElement>()
 function inertBackground(root: HTMLElement): void {
   for (const child of [...document.body.children]) {
     if (child !== root && child instanceof HTMLElement && !child.hasAttribute('inert')) {
       child.setAttribute('inert', '')
-      inertedByVisora.add(child)
+      inertedByGallerist.add(child)
     }
   }
 }
 function releaseBackgroundInert(): void {
   if (anyOverlayMounted()) return // another overlay still needs the page inert
-  for (const el of inertedByVisora) el.removeAttribute('inert')
-  inertedByVisora.clear()
+  for (const el of inertedByGallerist) el.removeAttribute('inert')
+  inertedByGallerist.clear()
 }
 
 export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandle {
@@ -239,13 +240,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   }
 
   // ── DOM scaffold ───────────────────────────────────────────────────────────
-  const root = el('div', 'visora')
-  root.setAttribute('data-visora-mode', overlay ? 'overlay' : 'inline')
-  root.setAttribute('data-visora-arrows', arrows)
-  root.setAttribute('data-visora-rail-pos', railPos)
-  root.setAttribute('data-visora-orientation', orientation)
-  root.setAttribute('data-visora-rail', railHidden ? 'collapsed' : 'expanded')
-  if (linear) root.setAttribute('data-visora-linear', 'true')
+  const root = el('div', 'gallerist')
+  root.setAttribute('data-gallerist-mode', overlay ? 'overlay' : 'inline')
+  root.setAttribute('data-gallerist-arrows', arrows)
+  root.setAttribute('data-gallerist-rail-pos', railPos)
+  root.setAttribute('data-gallerist-orientation', orientation)
+  root.setAttribute('data-gallerist-rail', railHidden ? 'collapsed' : 'expanded')
+  if (linear) root.setAttribute('data-gallerist-linear', 'true')
   if (preset) for (const [k, val] of Object.entries(preset.rootAttrs)) root.setAttribute(k, val)
   if (overlay) {
     root.setAttribute('role', 'dialog')
@@ -257,35 +258,35 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     root.setAttribute('aria-roledescription', 'carousel')
   }
 
-  if (overlay) root.appendChild(el('div', 'visora-backdrop'))
-  const stage = el('div', 'visora-stage')
-  const track = el('div', 'visora-track')
-  const viewportLayer = el('div', 'visora-viewport-layer')
-  const stageRegion = el('div', 'visora-region visora-region-stage')
+  if (overlay) root.appendChild(el('div', 'gallerist-backdrop'))
+  const stage = el('div', 'gallerist-stage')
+  const track = el('div', 'gallerist-track')
+  const viewportLayer = el('div', 'gallerist-viewport-layer')
+  const stageRegion = el('div', 'gallerist-region gallerist-region-stage')
   stage.append(track, viewportLayer, stageRegion)
   root.appendChild(stage)
 
   // Named region hosts for plugins (spec §13).
   const regionHosts: RegionHosts = {
-    backdrop: el('div', 'visora-region visora-region-backdrop'),
+    backdrop: el('div', 'gallerist-region gallerist-region-backdrop'),
     stage: stageRegion,
-    toolbar: el('div', 'visora-region visora-region-toolbar'),
-    thumbnails: el('div', 'visora-region visora-region-thumbnails'),
-    footer: el('div', 'visora-region visora-region-footer'),
+    toolbar: el('div', 'gallerist-region gallerist-region-toolbar'),
+    thumbnails: el('div', 'gallerist-region gallerist-region-thumbnails'),
+    footer: el('div', 'gallerist-region gallerist-region-footer'),
   }
   root.prepend(regionHosts.backdrop)
   root.append(regionHosts.toolbar, regionHosts.thumbnails, regionHosts.footer)
 
-  const live = el('div', 'visora-live', { 'aria-live': 'polite', role: 'status' })
+  const live = el('div', 'gallerist-live', { 'aria-live': 'polite', role: 'status' })
   root.appendChild(live)
 
   // Rail collapse (UX-C): a pull-handle attached to the rail's edge + `t` key + fullscreen →
-  // data-visora-rail. The handle lives inside the thumbnails region so it reads as part of the
+  // data-gallerist-rail. The handle lives inside the thumbnails region so it reads as part of the
   // gallery and slides with it; it's (re)attached in mountRegions since the host is replaceChildren'd.
   let railCollapsed = railHidden
   let preFsCollapsed: boolean | null = null
-  const railHandle = el('div', 'visora-rail-handle')
-  const railToggle = el('button', 'visora-rail-toggle', {
+  const railHandle = el('div', 'gallerist-rail-handle')
+  const railToggle = el('button', 'gallerist-rail-toggle', {
     type: 'button',
     'aria-label': railHidden ? 'Show thumbnails' : 'Hide thumbnails',
     'aria-pressed': String(railHidden),
@@ -294,7 +295,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   railHandle.appendChild(railToggle)
   const setRailCollapsed = (v: boolean, manual = false) => {
     railCollapsed = v
-    root.setAttribute('data-visora-rail', v ? 'collapsed' : 'expanded')
+    root.setAttribute('data-gallerist-rail', v ? 'collapsed' : 'expanded')
     railToggle.setAttribute('aria-pressed', String(v))
     railToggle.setAttribute('aria-label', v ? 'Show thumbnails' : 'Hide thumbnails')
     // a manual toggle while fullscreen wins over the on-exit restore
@@ -308,32 +309,38 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   let posG = -1
   let posM = -1
   if (controls) {
-    const chrome = el('div', 'visora-chrome')
-    const close = el('button', 'visora-close', { type: 'button', 'aria-label': 'Close' })
+    const chrome = el('div', 'gallerist-chrome')
+    const close = el('button', 'gallerist-close', { type: 'button', 'aria-label': 'Close' })
     close.innerHTML = ICONS.close
     close.addEventListener('click', () => viewer.close())
     // Icons follow the orientation: horizontal → group ←/→, item ↑/↓; vertical → group ↑/↓, item ←/→.
-    // (Positions are the CSS counterpart in `[data-visora-orientation="vertical"]`; keep the two in sync.)
-    const prev = el('button', 'visora-prev', { type: 'button', 'aria-label': 'Previous' })
+    // (Positions are the CSS counterpart in `[data-gallerist-orientation="vertical"]`; keep the two in sync.)
+    const prev = el('button', 'gallerist-prev', { type: 'button', 'aria-label': 'Previous' })
     prev.innerHTML = vertical ? ICONS.itemPrev : ICONS.prev
     prev.addEventListener('click', () => nav.prev())
-    const next = el('button', 'visora-next', { type: 'button', 'aria-label': 'Next' })
+    const next = el('button', 'gallerist-next', { type: 'button', 'aria-label': 'Next' })
     next.innerHTML = vertical ? ICONS.itemNext : ICONS.next
     next.addEventListener('click', () => nav.next())
-    const prevItem = el('button', 'visora-item-prev', {
+    const prevItem = el('button', 'gallerist-item-prev', {
       type: 'button',
       'aria-label': 'Previous item',
     })
     prevItem.innerHTML = vertical ? ICONS.prev : ICONS.itemPrev
     prevItem.addEventListener('click', () => nav.prevItem())
-    const nextItem = el('button', 'visora-item-next', { type: 'button', 'aria-label': 'Next item' })
+    const nextItem = el('button', 'gallerist-item-next', {
+      type: 'button',
+      'aria-label': 'Next item',
+    })
     nextItem.innerHTML = vertical ? ICONS.next : ICONS.itemNext
     nextItem.addEventListener('click', () => nav.nextItem())
-    const reset = el('button', 'visora-zoom-reset', { type: 'button', 'aria-label': 'Reset zoom' })
+    const reset = el('button', 'gallerist-zoom-reset', {
+      type: 'button',
+      'aria-label': 'Reset zoom',
+    })
     reset.innerHTML = ICONS.zoomReset
     reset.addEventListener('click', () => viewer.resetZoom())
-    counter = el('div', 'visora-counter')
-    position = el('div', 'visora-position')
+    counter = el('div', 'gallerist-counter')
+    position = el('div', 'gallerist-position')
     position.hidden = true
     chrome.append(close, prev, next, prevItem, nextItem, reset, counter, position)
     root.appendChild(chrome)
@@ -366,9 +373,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const tagAxis = (currentSlide: HTMLElement, cur: { g: number; i: number }) => {
     if (lastCursor && (lastCursor.g !== cur.g || lastCursor.i !== cur.i)) {
       const axis = lastCursor.g !== cur.g ? 'group' : 'item'
-      currentSlide.removeAttribute('data-visora-enter')
+      currentSlide.removeAttribute('data-gallerist-enter')
       void currentSlide.offsetWidth // reflow to restart the CSS animation
-      currentSlide.setAttribute('data-visora-enter', axis)
+      currentSlide.setAttribute('data-gallerist-enter', axis)
     }
     lastCursor = { g: cur.g, i: cur.i }
   }
@@ -412,9 +419,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       mounted.delete(k)
     }
     for (const k of enter) {
-      const slide = el('div', 'visora-slide', { 'data-group': k })
-      const content = el('div', 'visora-content')
-      const overlayHost = el('div', 'visora-overlays-content')
+      const slide = el('div', 'gallerist-slide', { 'data-group': k })
+      const content = el('div', 'gallerist-content')
+      const overlayHost = el('div', 'gallerist-overlays-content')
       content.appendChild(overlayHost)
       slide.appendChild(content)
       track.appendChild(slide)
@@ -474,8 +481,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       }
       if (isCurrent) {
         tagAxis(rec.slide, cur)
-        rec.slide.setAttribute('data-visora-current', '')
-        rec.content.setAttribute('data-visora-current', '')
+        rec.slide.setAttribute('data-gallerist-current', '')
+        rec.content.setAttribute('data-gallerist-current', '')
         applyTransform(rec.content, state.zoom)
         if (it) {
           // Repaint (re-invokes user render() + rebuilds DOM) only when the item changes.
@@ -502,8 +509,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
           }
         }
       } else {
-        rec.slide.removeAttribute('data-visora-current')
-        rec.content.removeAttribute('data-visora-current')
+        rec.slide.removeAttribute('data-gallerist-current')
+        rec.content.removeAttribute('data-gallerist-current')
         rec.overlayHost.replaceChildren()
         rec.overlayEls = undefined
         rec.overlayItemId = undefined
@@ -547,11 +554,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (g !== posG || itemCount !== posM || position.dataset.mode !== 'pills') {
       position.dataset.mode = 'pills'
       position.replaceChildren()
-      const label = el('span', 'visora-position-label')
+      const label = el('span', 'gallerist-position-label')
       label.textContent = 'screen'
       position.appendChild(label)
       for (let k = 0; k < itemCount; k++) {
-        const pill = el('button', 'visora-pill', {
+        const pill = el('button', 'gallerist-pill', {
           type: 'button',
           'aria-label': `Screen ${k + 1}`,
         })
@@ -562,7 +569,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       posG = g
       posM = itemCount
     }
-    for (const [k, pill] of position.querySelectorAll('.visora-pill').entries()) {
+    for (const [k, pill] of position.querySelectorAll('.gallerist-pill').entries()) {
       if (k === i) pill.setAttribute('data-active', '')
       else pill.removeAttribute('data-active')
     }
@@ -851,7 +858,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (regionHosts.thumbnails.childElementCount > 0) {
       regionHosts.thumbnails.prepend(railHandle)
     }
-    // plugin overlays may have changed (e.g. React <Visora.Overlay> mount/unmount) → force repaint
+    // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItemId = undefined
     if (attached) renderWindow()

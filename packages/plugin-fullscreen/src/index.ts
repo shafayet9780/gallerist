@@ -1,8 +1,8 @@
-// @visora/plugin-fullscreen — native Fullscreen API toggle (spec §14).
+// @gallerist/plugin-fullscreen — native Fullscreen API toggle (spec §14).
 // Adds a toolbar button + the `f` key, fullscreens the viewer root, and emits `fullscreenChange`.
-// Plugins may touch the DOM (the headless invariant binds @visora/core only).
+// Plugins may touch the DOM (the headless invariant binds @gallerist/core only).
 
-import type { Plugin } from '@visora/core'
+import type { Plugin } from '@gallerist/core'
 
 export interface FullscreenOptions {
   /** CSS selector for the element to fullscreen; defaults to the bound viewer's root. */
@@ -25,7 +25,11 @@ export function fullscreen(opts: FullscreenOptions = {}): Plugin {
     let boundRoot: HTMLElement | null = null
     const resolveRoot = (from?: HTMLElement | null): HTMLElement | null => {
       if (opts.target) return document.querySelector<HTMLElement>(opts.target)
-      return boundRoot ?? from?.closest<HTMLElement>('.visora') ?? document.querySelector('.visora')
+      return (
+        boundRoot ??
+        from?.closest<HTMLElement>('.gallerist') ??
+        document.querySelector('.gallerist')
+      )
     }
 
     const fsElement = (): Element | null =>
@@ -59,13 +63,13 @@ export function fullscreen(opts: FullscreenOptions = {}): Plugin {
     const button = () => {
       const btn = document.createElement('button')
       btn.type = 'button'
-      btn.className = 'visora-fullscreen-btn'
+      btn.className = 'gallerist-fullscreen-btn'
       btn.setAttribute('aria-label', 'Toggle fullscreen')
       btn.textContent = '⛶'
       btn.addEventListener('click', () => void toggle(btn))
       // Capture our root once the button is mounted (so onChange/`f` target the right viewer).
       queueMicrotask(() => {
-        boundRoot = btn.closest<HTMLElement>('.visora') ?? boundRoot
+        boundRoot = btn.closest<HTMLElement>('.gallerist') ?? boundRoot
       })
       return btn
     }

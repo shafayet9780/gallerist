@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { thumbnails } from './index'
 
@@ -55,41 +55,44 @@ afterEach(() => {
 describe('plugin-thumbnails', () => {
   it('renders one thumb per group in the thumbnails region', () => {
     open()
-    const rail = document.querySelector('.visora-region-thumbnails .visora-thumbs')
+    const rail = document.querySelector('.gallerist-region-thumbnails .gallerist-thumbs')
     expect(rail).not.toBeNull()
-    expect(rail?.querySelectorAll('.visora-thumb').length).toBe(3)
+    expect(rail?.querySelectorAll('.gallerist-thumb').length).toBe(3)
   })
 
   it('marks the active group and tracks the cursor', () => {
     const v = open()
-    expect(document.querySelector('.visora-thumb[data-active]')?.getAttribute('data-group')).toBe(
-      'g0',
-    )
+    expect(
+      document.querySelector('.gallerist-thumb[data-active]')?.getAttribute('data-group'),
+    ).toBe('g0')
     v.next()
-    expect(document.querySelector('.visora-thumb[data-active]')?.getAttribute('data-group')).toBe(
-      'g1',
-    )
+    expect(
+      document.querySelector('.gallerist-thumb[data-active]')?.getAttribute('data-group'),
+    ).toBe('g1')
   })
 
   it('clicking a group thumb navigates', () => {
     const v = open()
-    const g2 = document.querySelector('.visora-thumb[data-group="g2"]') as HTMLButtonElement
+    const g2 = document.querySelector('.gallerist-thumb[data-group="g2"]') as HTMLButtonElement
     g2.click()
     expect(v.getState().cursor.g).toBe(2)
   })
 
   it('multi-item groups get a stacked card + count badge', () => {
     open()
-    const g1 = document.querySelector('.visora-thumb[data-group="g1"]')
-    expect(g1?.classList.contains('visora-thumb-stacked')).toBe(true)
-    expect(g1?.querySelector('.visora-thumb-count')?.textContent).toBe('3')
+    const g1 = document.querySelector('.gallerist-thumb[data-group="g1"]')
+    expect(g1?.classList.contains('gallerist-thumb-stacked')).toBe(true)
+    expect(g1?.querySelector('.gallerist-thumb-count')?.textContent).toBe('3')
   })
 
   it('shows the count badge only on grouped (multi-item) cards', () => {
     open()
-    expect(document.querySelector('.visora-thumb[data-group="g0"] .visora-thumb-count')).toBeNull() // single item → no badge
     expect(
-      document.querySelector('.visora-thumb[data-group="g2"] .visora-thumb-count')?.textContent,
+      document.querySelector('.gallerist-thumb[data-group="g0"] .gallerist-thumb-count'),
+    ).toBeNull() // single item → no badge
+    expect(
+      document.querySelector('.gallerist-thumb[data-group="g2"] .gallerist-thumb-count')
+        ?.textContent,
     ).toBe('2')
   })
 
@@ -101,10 +104,11 @@ describe('plugin-thumbnails', () => {
       ],
     })
     expect(
-      document.querySelector('.visora-thumb[data-group="g0"] .visora-thumb-caption')?.textContent,
+      document.querySelector('.gallerist-thumb[data-group="g0"] .gallerist-thumb-caption')
+        ?.textContent,
     ).toBe('Morning')
     expect(
-      document.querySelector('.visora-thumb[data-group="g1"] .visora-thumb-caption'),
+      document.querySelector('.gallerist-thumb[data-group="g1"] .gallerist-thumb-caption'),
     ).toBeNull()
   })
 
@@ -112,15 +116,15 @@ describe('plugin-thumbnails', () => {
     open({
       groups: [{ id: 'g1', items: [{ ...item('b0'), caption: 'First screen' }, item('b1')] }],
     })
-    const items = document.querySelectorAll('.visora-thumb-item')
-    expect(items[0]?.querySelector('.visora-thumb-caption')?.textContent).toBe('First screen')
-    expect(items[1]?.querySelector('.visora-thumb-caption')).toBeNull()
+    const items = document.querySelectorAll('.gallerist-thumb-item')
+    expect(items[0]?.querySelector('.gallerist-thumb-caption')?.textContent).toBe('First screen')
+    expect(items[1]?.querySelector('.gallerist-thumb-caption')).toBeNull()
   })
 
   it('expands the active multi-item group into item thumbs; clicking an item navigates', () => {
     const v = open()
     v.next() // g1 (3 items) active
-    const items = document.querySelectorAll('.visora-thumb-items .visora-thumb-item')
+    const items = document.querySelectorAll('.gallerist-thumb-items .gallerist-thumb-item')
     expect(items.length).toBe(3)
     ;(items[2] as HTMLButtonElement).click()
     expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
@@ -128,7 +132,7 @@ describe('plugin-thumbnails', () => {
 
   it('does no work on a non-cursor state change (zoom)', () => {
     const v = open()
-    const rail = document.querySelector('.visora-thumbs') as HTMLElement
+    const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
     const spy = vi.spyOn(rail, 'replaceChildren')
     v.zoomTo(2) // changes zoom state, not cursor/collection → render must early-return
     expect(spy).not.toHaveBeenCalled()
@@ -136,7 +140,7 @@ describe('plugin-thumbnails', () => {
 
   it('does not tear down the rail (replaceChildren on root) for cursor moves', () => {
     const v = open()
-    const rail = document.querySelector('.visora-thumbs') as HTMLElement
+    const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
     const spy = vi.spyOn(rail, 'replaceChildren')
     v.next() // group move
     v.open({ g: 1 })
@@ -150,18 +154,18 @@ describe('plugin-thumbnails', () => {
     }
     const v = open()
     v.next() // g1 (3 items) active
-    const groupBefore = document.querySelector('.visora-thumb[data-group="g1"]')
-    const itemsBefore = [...document.querySelectorAll('.visora-thumb-item')]
+    const groupBefore = document.querySelector('.gallerist-thumb[data-group="g1"]')
+    const itemsBefore = [...document.querySelectorAll('.gallerist-thumb-item')]
     const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView')
 
     v.nextItem() // i: 0 → 1, same group — must NOT rebuild
 
-    const itemsAfter = [...document.querySelectorAll('.visora-thumb-item')]
+    const itemsAfter = [...document.querySelectorAll('.gallerist-thumb-item')]
     expect(itemsAfter[0]).toBe(itemsBefore[0]) // same nodes, no teardown
     expect(itemsAfter[1]).toBe(itemsBefore[1])
-    expect(document.querySelector('.visora-thumb[data-group="g1"]')).toBe(groupBefore)
+    expect(document.querySelector('.gallerist-thumb[data-group="g1"]')).toBe(groupBefore)
     expect(
-      document.querySelector('.visora-thumb-item[data-active]')?.getAttribute('data-item'),
+      document.querySelector('.gallerist-thumb-item[data-active]')?.getAttribute('data-item'),
     ).toBe('b1')
     expect(scrollSpy).toHaveBeenCalled()
     scrollSpy.mockRestore()
@@ -170,13 +174,13 @@ describe('plugin-thumbnails', () => {
   it('the expanded item row is its own listbox (host-mounted sibling of the rail)', () => {
     const v = open()
     v.next() // g1 active → item row appears
-    expect(document.querySelector('.visora-thumb-items')?.getAttribute('role')).toBe('listbox')
+    expect(document.querySelector('.gallerist-thumb-items')?.getAttribute('role')).toBe('listbox')
   })
 
   it('lays the item column out vertically by default (matches ↑/↓ input)', () => {
     const v = open()
     v.next() // g1 active
-    const col = document.querySelector('.visora-thumb-items')
+    const col = document.querySelector('.gallerist-thumb-items')
     expect(col?.getAttribute('aria-orientation')).toBe('vertical')
     expect(col?.getAttribute('data-axis')).toBe('vertical')
   })
@@ -189,7 +193,7 @@ describe('plugin-thumbnails', () => {
     mount(v)
     v.open()
     v.next()
-    const col = document.querySelector('.visora-thumb-items')
+    const col = document.querySelector('.gallerist-thumb-items')
     expect(col?.getAttribute('data-axis')).toBe('horizontal')
     expect(col?.getAttribute('aria-orientation')).toBe('horizontal')
   })
@@ -198,7 +202,7 @@ describe('plugin-thumbnails', () => {
     const v = open()
     v.next() // g1 active (b0,b1,b2)
     const img = document.querySelector(
-      '.visora-thumb[data-group="g1"] .visora-thumb-img',
+      '.gallerist-thumb[data-group="g1"] .gallerist-thumb-img',
     ) as HTMLImageElement
     v.nextItem() // i → 1
     expect(img.src || img.dataset.src).toContain('b1.jpg')
@@ -212,14 +216,14 @@ describe('plugin-thumbnails', () => {
     v.nextItem() // shows b1 on g1's card
     v.prev() // back to g0 → g1 card should revert to its cover (items[0] = b0)
     const img = document.querySelector(
-      '.visora-thumb[data-group="g1"] .visora-thumb-img',
+      '.gallerist-thumb[data-group="g1"] .gallerist-thumb-img',
     ) as HTMLImageElement
     expect(img.src || img.dataset.src).toContain('b0.jpg')
   })
 
   it('wires the thumb url for lazy loading', () => {
     open()
-    const img = document.querySelector('.visora-thumb .visora-thumb-img') as HTMLImageElement
+    const img = document.querySelector('.gallerist-thumb .gallerist-thumb-img') as HTMLImageElement
     expect(img.src || img.dataset.src).toContain('a0.jpg')
   })
 
@@ -231,10 +235,12 @@ describe('plugin-thumbnails', () => {
         { id: 'x1', items: [item('x1a'), item('x1b')] },
       ],
     })
-    const rail = document.querySelector('.visora-thumbs') as HTMLElement
-    expect(rail.querySelectorAll('.visora-thumb').length).toBe(2)
-    expect(rail.querySelector('.visora-thumb[data-group="g0"]')).toBeNull() // old ids gone
-    expect(rail.querySelector('.visora-thumb[data-active]')?.getAttribute('data-group')).toBe('x0')
+    const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+    expect(rail.querySelectorAll('.gallerist-thumb').length).toBe(2)
+    expect(rail.querySelector('.gallerist-thumb[data-group="g0"]')).toBeNull() // old ids gone
+    expect(rail.querySelector('.gallerist-thumb[data-active]')?.getAttribute('data-group')).toBe(
+      'x0',
+    )
   })
 
   it('keeps the rail bounded after a full traversal (no cover-cache leak)', () => {
@@ -244,7 +250,7 @@ describe('plugin-thumbnails', () => {
     const v = open(big)
     for (let i = 0; i < 400; i++) v.goTo(i) // walk the whole collection
     // windowed rail stays bounded even though every group was visited once
-    expect(document.querySelectorAll('.visora-thumb').length).toBeLessThanOrEqual(49)
+    expect(document.querySelectorAll('.gallerist-thumb').length).toBeLessThanOrEqual(49)
   })
 
   it('windows the rail: a 10k-group collection stays bounded to the window', () => {
@@ -253,61 +259,62 @@ describe('plugin-thumbnails', () => {
     }
     open(big)
     // default overscan 24 → at most 2*24+1 group thumbs live; tight bound catches a windowing regression
-    expect(document.querySelectorAll('.visora-thumb').length).toBeLessThanOrEqual(49)
+    expect(document.querySelectorAll('.gallerist-thumb').length).toBeLessThanOrEqual(49)
   })
 })
 
 describe('plugin-thumbnails — peek flyout (stacked)', () => {
   it("hovering a multi-item card opens a peek with that group's items, no cursor change", () => {
     const v = open() // cursor g0
-    const g1 = document.querySelector('.visora-thumb[data-group="g1"]') as HTMLElement
+    const g1 = document.querySelector('.gallerist-thumb[data-group="g1"]') as HTMLElement
     fire(g1, 'mouseenter')
-    const peek = document.querySelector('.visora-thumb-peek')
+    const peek = document.querySelector('.gallerist-thumb-peek')
     expect(peek?.getAttribute('role')).toBe('listbox')
-    expect(peek?.querySelectorAll('.visora-thumb-item').length).toBe(3)
+    expect(peek?.querySelectorAll('.gallerist-thumb-item').length).toBe(3)
     expect(v.getState().cursor).toEqual({ g: 0, i: 0 }) // hover never moves the cursor
   })
 
   it('clicking a peek item navigates and closes the peek', () => {
     const v = open() // cursor g0
-    fire(document.querySelector('.visora-thumb[data-group="g2"]') as HTMLElement, 'mouseenter')
-    const items = document.querySelectorAll('.visora-thumb-peek .visora-thumb-item')
+    fire(document.querySelector('.gallerist-thumb[data-group="g2"]') as HTMLElement, 'mouseenter')
+    const items = document.querySelectorAll('.gallerist-thumb-peek .gallerist-thumb-item')
     expect(items.length).toBe(2)
     ;(items[1] as HTMLButtonElement).click()
     expect(v.getState().cursor).toEqual({ g: 2, i: 1 })
-    expect(document.querySelector('.visora-thumb-peek')).toBeNull() // group now active → peek closed
+    expect(document.querySelector('.gallerist-thumb-peek')).toBeNull() // group now active → peek closed
   })
 
   it('does not open a peek for a single-item group', () => {
     open()
-    fire(document.querySelector('.visora-thumb[data-group="g0"]') as HTMLElement, 'mouseenter')
-    expect(document.querySelector('.visora-thumb-peek')).toBeNull()
+    fire(document.querySelector('.gallerist-thumb[data-group="g0"]') as HTMLElement, 'mouseenter')
+    expect(document.querySelector('.gallerist-thumb-peek')).toBeNull()
   })
 
   it('does not double-render: hovering the active group shows no peek (its column is already up)', () => {
     const v = open()
     v.next() // g1 active → its item column is shown
-    fire(document.querySelector('.visora-thumb[data-group="g1"]') as HTMLElement, 'mouseenter')
-    expect(document.querySelector('.visora-thumb-peek')).toBeNull()
+    fire(document.querySelector('.gallerist-thumb[data-group="g1"]') as HTMLElement, 'mouseenter')
+    expect(document.querySelector('.gallerist-thumb-peek')).toBeNull()
   })
 
   it('closes the peek on mouseleave (debounced)', () => {
     open()
-    const g1 = document.querySelector('.visora-thumb[data-group="g1"]') as HTMLElement
+    const g1 = document.querySelector('.gallerist-thumb[data-group="g1"]') as HTMLElement
     fire(g1, 'mouseenter')
-    expect(document.querySelector('.visora-thumb-peek')).not.toBeNull()
+    expect(document.querySelector('.gallerist-thumb-peek')).not.toBeNull()
     vi.useFakeTimers()
     fire(g1, 'mouseleave')
     vi.advanceTimersByTime(200)
     vi.useRealTimers()
-    expect(document.querySelector('.visora-thumb-peek')).toBeNull()
+    expect(document.querySelector('.gallerist-thumb-peek')).toBeNull()
   })
 
   it('opens the peek on keyboard focus (passive preview)', () => {
     open()
-    fire(document.querySelector('.visora-thumb[data-group="g1"]') as HTMLElement, 'focusin')
+    fire(document.querySelector('.gallerist-thumb[data-group="g1"]') as HTMLElement, 'focusin')
     expect(
-      document.querySelector('.visora-thumb-peek')?.querySelectorAll('.visora-thumb-item').length,
+      document.querySelector('.gallerist-thumb-peek')?.querySelectorAll('.gallerist-thumb-item')
+        .length,
     ).toBe(3)
   })
 
@@ -315,10 +322,10 @@ describe('plugin-thumbnails — peek flyout (stacked)', () => {
     stubHover(false)
     const v = open() // cursor g0
     const expand = document.querySelector(
-      '.visora-thumb[data-group="g1"] ~ .visora-thumb-expand, .visora-thumb-wrap[data-group="g1"] .visora-thumb-expand',
+      '.gallerist-thumb[data-group="g1"] ~ .gallerist-thumb-expand, .gallerist-thumb-wrap[data-group="g1"] .gallerist-thumb-expand',
     )
     expect(expand).not.toBeNull() // caret affordance present on touch
-    ;(document.querySelector('.visora-thumb[data-group="g2"]') as HTMLElement).click()
+    ;(document.querySelector('.gallerist-thumb[data-group="g2"]') as HTMLElement).click()
     expect(v.getState().cursor.g).toBe(2) // first tap still navigates
   })
 
@@ -326,11 +333,12 @@ describe('plugin-thumbnails — peek flyout (stacked)', () => {
     stubHover(false)
     open() // g0 active
     const expand = document.querySelector(
-      '.visora-thumb-wrap[data-group="g1"] .visora-thumb-expand',
+      '.gallerist-thumb-wrap[data-group="g1"] .gallerist-thumb-expand',
     ) as HTMLButtonElement
     expand.click()
     expect(
-      document.querySelector('.visora-thumb-peek')?.querySelectorAll('.visora-thumb-item').length,
+      document.querySelector('.gallerist-thumb-peek')?.querySelectorAll('.gallerist-thumb-item')
+        .length,
     ).toBe(3)
   })
 })
@@ -339,10 +347,10 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
   it('renders one card per item, wrapped one bordered container per group', () => {
     openFlat()
     const wraps = document.querySelectorAll(
-      '.visora-thumbs[data-display="flat"] .visora-thumb-group',
+      '.gallerist-thumbs[data-display="flat"] .gallerist-thumb-group',
     )
     expect(wraps.length).toBe(3) // g0, g1, g2
-    expect(document.querySelectorAll('.visora-thumb-item').length).toBe(6) // 1 + 3 + 2
+    expect(document.querySelectorAll('.gallerist-thumb-item').length).toBe(6) // 1 + 3 + 2
     expect(wraps[0]?.getAttribute('role')).toBe('group')
   })
 
@@ -354,17 +362,17 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
       ],
     })
     expect(
-      document.querySelector('.visora-thumb-group[data-group="g0"] .visora-thumb-group-cap')
+      document.querySelector('.gallerist-thumb-group[data-group="g0"] .gallerist-thumb-group-cap')
         ?.textContent,
     ).toBe('Morning')
     expect(
-      document.querySelector('.visora-thumb-group[data-group="g1"] .visora-thumb-group-cap'),
+      document.querySelector('.gallerist-thumb-group[data-group="g1"] .gallerist-thumb-group-cap'),
     ).toBeNull()
   })
 
   it('clicking an item card navigates', () => {
     const v = openFlat()
-    const c1 = document.querySelector('.visora-thumb-item[data-item="b2"]') as HTMLButtonElement
+    const c1 = document.querySelector('.gallerist-thumb-item[data-item="b2"]') as HTMLButtonElement
     c1.click()
     expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
   })
@@ -372,34 +380,34 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
   it('marks the active item and tracks the cursor', () => {
     const v = openFlat()
     expect(
-      document.querySelector('.visora-thumb-item[data-active]')?.getAttribute('data-item'),
+      document.querySelector('.gallerist-thumb-item[data-active]')?.getAttribute('data-item'),
     ).toBe('a0')
     v.next() // g1, i0
     expect(
-      document.querySelector('.visora-thumb-item[data-active]')?.getAttribute('data-item'),
+      document.querySelector('.gallerist-thumb-item[data-active]')?.getAttribute('data-item'),
     ).toBe('b0')
     v.nextItem() // g1, i1
     expect(
-      document.querySelector('.visora-thumb-item[data-active]')?.getAttribute('data-item'),
+      document.querySelector('.gallerist-thumb-item[data-active]')?.getAttribute('data-item'),
     ).toBe('b1')
   })
 
   it('reconciles cursor moves in place (no replaceChildren, stable identity)', () => {
     if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
     const v = openFlat()
-    const rail = document.querySelector('.visora-thumbs') as HTMLElement
+    const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
     const spy = vi.spyOn(rail, 'replaceChildren')
-    const before = [...document.querySelectorAll('.visora-thumb-item')]
+    const before = [...document.querySelectorAll('.gallerist-thumb-item')]
     v.next()
     v.nextItem()
-    const after = [...document.querySelectorAll('.visora-thumb-item')]
+    const after = [...document.querySelectorAll('.gallerist-thumb-item')]
     expect(after[0]).toBe(before[0]) // same nodes, never torn down
     expect(spy).not.toHaveBeenCalled()
   })
 
   it('does no work on a non-cursor change (zoom)', () => {
     const v = openFlat()
-    const rail = document.querySelector('.visora-thumbs') as HTMLElement
+    const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
     const spy = vi.spyOn(rail, 'replaceChildren')
     v.zoomTo(2)
     expect(spy).not.toHaveBeenCalled()
@@ -410,7 +418,7 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
       groups: Array.from({ length: 10_000 }, (_, i) => ({ id: `g${i}`, items: [item(`it${i}`)] })),
     }
     openFlat(big)
-    expect(document.querySelectorAll('.visora-thumb-item').length).toBeLessThanOrEqual(49)
+    expect(document.querySelectorAll('.gallerist-thumb-item').length).toBeLessThanOrEqual(49)
   })
 
   it('windows a single giant group: one 10k-item group stays bounded (pathological case)', () => {
@@ -418,8 +426,8 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
       groups: [{ id: 'g0', items: Array.from({ length: 10_000 }, (_, i) => item(`it${i}`)) }],
     }
     openFlat(big)
-    expect(document.querySelectorAll('.visora-thumb-item').length).toBeLessThanOrEqual(49)
-    const wrap = document.querySelector('.visora-thumb-group[data-group="g0"]')
+    expect(document.querySelectorAll('.gallerist-thumb-item').length).toBeLessThanOrEqual(49)
+    const wrap = document.querySelector('.gallerist-thumb-group[data-group="g0"]')
     expect(wrap).not.toBeNull()
     expect(wrap?.hasAttribute('data-partial-end')).toBe(true) // tail of the group is out of the window
   })
@@ -431,7 +439,7 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
     }
     const v = openFlat(big)
     for (let i = 0; i < 400; i++) v.goTo(i)
-    expect(document.querySelectorAll('.visora-thumb-item').length).toBeLessThanOrEqual(49)
+    expect(document.querySelectorAll('.gallerist-thumb-item').length).toBeLessThanOrEqual(49)
   })
 
   it('swaps to a disjoint collection cleanly', () => {
@@ -442,10 +450,10 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
         { id: 'x1', items: [item('x1a'), item('x1b')] },
       ],
     })
-    expect(document.querySelectorAll('.visora-thumb-item').length).toBe(3)
-    expect(document.querySelector('.visora-thumb-item[data-item="a0"]')).toBeNull() // old ids gone
+    expect(document.querySelectorAll('.gallerist-thumb-item').length).toBe(3)
+    expect(document.querySelector('.gallerist-thumb-item[data-item="a0"]')).toBeNull() // old ids gone
     expect(
-      document.querySelector('.visora-thumb-item[data-active]')?.getAttribute('data-item'),
+      document.querySelector('.gallerist-thumb-item[data-active]')?.getAttribute('data-item'),
     ).toBe('x0a')
   })
 })
@@ -454,20 +462,21 @@ describe('plugin-thumbnails — active item panel (expandActive)', () => {
   it('default: active multi-item group auto-shows its item panel (un-clipped, in the region wrapper)', () => {
     const v = open()
     v.next() // g1 (3 items)
-    const panel = document.querySelector('.visora-thumb-items')
-    expect(panel?.querySelectorAll('.visora-thumb-item').length).toBe(3)
-    // a sibling of the rail inside the region wrapper, NOT inside the clipping `.visora-thumbs` rail
-    expect(panel?.closest('.visora-thumbs')).toBeNull()
-    expect(panel?.closest('.visora-thumbs-region')).not.toBeNull()
+    const panel = document.querySelector('.gallerist-thumb-items')
+    expect(panel?.querySelectorAll('.gallerist-thumb-item').length).toBe(3)
+    // a sibling of the rail inside the region wrapper, NOT inside the clipping `.gallerist-thumbs` rail
+    expect(panel?.closest('.gallerist-thumbs')).toBeNull()
+    expect(panel?.closest('.gallerist-thumbs-region')).not.toBeNull()
   })
 
   it('keeps the item panel through a late viewer.use() (region remount replaceChildren)', () => {
     const v = open()
     v.next() // g1 active, panel shown
-    expect(document.querySelector('.visora-thumb-items')).not.toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).not.toBeNull()
     v.use(() => ({ name: 'probe' })) // triggers onPluginsChanged → renderer re-mounts all regions
     expect(
-      document.querySelector('.visora-thumb-items')?.querySelectorAll('.visora-thumb-item').length,
+      document.querySelector('.gallerist-thumb-items')?.querySelectorAll('.gallerist-thumb-item')
+        .length,
     ).toBe(3)
   })
 
@@ -476,33 +485,33 @@ describe('plugin-thumbnails — active item panel (expandActive)', () => {
     const handle = mount(v)
     v.open()
     v.next() // panel shown
-    expect(document.querySelector('.visora-thumb-items')).not.toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).not.toBeNull()
     handle.destroy()
-    expect(document.querySelector('.visora-thumb-items')).toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
   })
 
   it('toolbar items-toggle hides and shows the panel; aria-pressed tracks it', () => {
     const v = open()
     v.next()
-    const btn = document.querySelector('.visora-items-toggle') as HTMLButtonElement
+    const btn = document.querySelector('.gallerist-items-toggle') as HTMLButtonElement
     expect(btn?.getAttribute('aria-pressed')).toBe('true')
-    expect(document.querySelector('.visora-thumb-items')).not.toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).not.toBeNull()
     btn.click()
     expect(btn.getAttribute('aria-pressed')).toBe('false')
-    expect(document.querySelector('.visora-thumb-items')).toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
     btn.click()
-    expect(document.querySelector('.visora-thumb-items')).not.toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).not.toBeNull()
   })
 
   it('the `e` key toggles the panel through the renderer keymap', () => {
     const v = open()
     v.next()
-    const rootEl = document.querySelector('.visora') as HTMLElement
-    expect(document.querySelector('.visora-thumb-items')).not.toBeNull()
+    const rootEl = document.querySelector('.gallerist') as HTMLElement
+    expect(document.querySelector('.gallerist-thumb-items')).not.toBeNull()
     rootEl.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'e', bubbles: true }))
-    expect(document.querySelector('.visora-thumb-items')).toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
     rootEl.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'e', bubbles: true }))
-    expect(document.querySelector('.visora-thumb-items')).not.toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).not.toBeNull()
   })
 
   it('expandActive: false keeps the panel hidden until toggled on', () => {
@@ -513,33 +522,34 @@ describe('plugin-thumbnails — active item panel (expandActive)', () => {
     mount(v)
     v.open()
     v.next() // g1
-    expect(document.querySelector('.visora-thumb-items')).toBeNull()
-    ;(document.querySelector('.visora-items-toggle') as HTMLButtonElement).click()
-    expect(document.querySelector('.visora-thumb-items')).not.toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
+    ;(document.querySelector('.gallerist-items-toggle') as HTMLButtonElement).click()
+    expect(document.querySelector('.gallerist-thumb-items')).not.toBeNull()
   })
 
   it('peeks the active card once its panel is hidden (point 1)', () => {
     const v = open()
     v.next() // g1 active, panel shown
-    fire(document.querySelector('.visora-thumb[data-group="g1"]') as HTMLElement, 'mouseenter')
-    expect(document.querySelector('.visora-thumb-peek')).toBeNull() // panel up → no double
-    ;(document.querySelector('.visora-items-toggle') as HTMLButtonElement).click() // hide panel
-    fire(document.querySelector('.visora-thumb[data-group="g1"]') as HTMLElement, 'mouseenter')
+    fire(document.querySelector('.gallerist-thumb[data-group="g1"]') as HTMLElement, 'mouseenter')
+    expect(document.querySelector('.gallerist-thumb-peek')).toBeNull() // panel up → no double
+    ;(document.querySelector('.gallerist-items-toggle') as HTMLButtonElement).click() // hide panel
+    fire(document.querySelector('.gallerist-thumb[data-group="g1"]') as HTMLElement, 'mouseenter')
     expect(
-      document.querySelector('.visora-thumb-peek')?.querySelectorAll('.visora-thumb-item').length,
+      document.querySelector('.gallerist-thumb-peek')?.querySelectorAll('.gallerist-thumb-item')
+        .length,
     ).toBe(3)
   })
 
   it('panel-hidden state persists across group navigation', () => {
     const v = open()
     v.next() // g1, panel shown
-    ;(document.querySelector('.visora-items-toggle') as HTMLButtonElement).click() // hide
+    ;(document.querySelector('.gallerist-items-toggle') as HTMLButtonElement).click() // hide
     v.next() // g2 (2 items)
-    expect(document.querySelector('.visora-thumb-items')).toBeNull()
+    expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
   })
 
   it('flat mode contributes no items-toggle button', () => {
     openFlat()
-    expect(document.querySelector('.visora-items-toggle')).toBeNull()
+    expect(document.querySelector('.gallerist-items-toggle')).toBeNull()
   })
 })

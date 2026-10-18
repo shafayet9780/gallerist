@@ -1,13 +1,13 @@
 [
   {
-    "name": "@visora/core (gz)",
+    "name": "@gallerist/core (gz)",
     "path": "packages/core/dist/index.js",
     "import": "*",
     "limit": "12 kB",
     "gzip": true
   },
   {
-    "name": "@visora/core + renderer-dom (gz)",
+    "name": "@gallerist/core + renderer-dom (gz)",
     "path": ["packages/core/dist/index.js", "packages/renderer-dom/dist/index.js"],
     "import": {
       "packages/core/dist/index.js": "{ createViewer }",
@@ -32,10 +32,10 @@
     "gzip": true
   },
   {
-    "name": "@visora/react (gz)",
+    "name": "@gallerist/react (gz)",
     "path": "packages/react/dist/index.js",
-    "import": "{ Visora, useVisora }",
-    "ignore": ["react", "react-dom", "@visora/core", "@visora/renderer-dom"],
+    "import": "{ Gallerist, useGallerist }",
+    "ignore": ["react", "react-dom", "@gallerist/core", "@gallerist/renderer-dom"],
     "limit": "3 kB",
     "gzip": true
   }

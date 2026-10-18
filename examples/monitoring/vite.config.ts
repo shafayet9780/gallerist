@@ -7,9 +7,9 @@ export default defineConfig({
   root: r('.'),
   resolve: {
     alias: {
-      '@visora/core': r('../../packages/core/src/index.ts'),
-      '@visora/renderer-dom': r('../../packages/renderer-dom/src/index.ts'),
-      '@visora/theme-default/visora.css': r('../../packages/theme-default/src/visora.css'),
+      '@gallerist/core': r('../../packages/core/src/index.ts'),
+      '@gallerist/renderer-dom': r('../../packages/renderer-dom/src/index.ts'),
+      '@gallerist/theme-default/gallerist.css': r('../../packages/theme-default/src/gallerist.css'),
     },
   },
 })

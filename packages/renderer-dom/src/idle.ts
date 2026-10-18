@@ -1,8 +1,8 @@
-// Idle controller (M14 UX-C). Flags the root with `data-visora-idle` after a period of no pointer/
+// Idle controller (M14 UX-C). Flags the root with `data-gallerist-idle` after a period of no pointer/
 // key activity so the theme can fade the chrome + rail; any activity wakes it. Inert under
 // prefers-reduced-motion — auto-hiding UI is disorienting motion, so we never hide there.
 
-const ATTR = 'data-visora-idle'
+const ATTR = 'data-gallerist-idle'
 const ACTIVITY = ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'] as const
 // pointermove fires many times/second — re-arm the timer at most this often to avoid timer churn.
 const REARM_THROTTLE_MS = 200

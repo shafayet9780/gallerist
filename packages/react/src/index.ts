@@ -1,16 +1,16 @@
-// @visora/react — React adapter (spec §16). Thin binding over the headless store.
+// @gallerist/react — React adapter (spec §16). Thin binding over the headless store.
 export {
   type ArrowLayout,
   type PresetName,
   type RailPlacement,
   type ResolvedPreset,
   resolvePreset,
-} from '@visora/renderer-dom'
-export { useViewerContext, VisoraContext } from './context'
-export { type UseVisora, useVisora } from './useVisora'
+} from '@gallerist/renderer-dom'
+export { useViewerContext, GalleristContext } from './context'
+export { type UseGallerist, useGallerist } from './useGallerist'
 export {
-  Visora,
-  type VisoraOverlayProps,
-  type VisoraProps,
-  type VisoraRegionProps,
-} from './Visora'
+  Gallerist,
+  type GalleristOverlayProps,
+  type GalleristProps,
+  type GalleristRegionProps,
+} from './Gallerist'

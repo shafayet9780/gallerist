@@ -6,12 +6,12 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   esbuild: { jsx: 'automatic' },
   // Tests import package `src` directly (see alias below), where the build-time
-  // `__VISORA_VERSION__` define isn't applied — provide a stand-in so VERSION resolves.
-  define: { __VISORA_VERSION__: JSON.stringify('0.0.0-dev') },
+  // `__GALLERIST_VERSION__` define isn't applied — provide a stand-in so VERSION resolves.
+  define: { __GALLERIST_VERSION__: JSON.stringify('0.0.0-dev') },
   resolve: {
     alias: {
-      '@visora/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
-      '@visora/renderer-dom': fileURLToPath(
+      '@gallerist/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
+      '@gallerist/renderer-dom': fileURLToPath(
         new URL('./packages/renderer-dom/src/index.ts', import.meta.url),
       ),
     },

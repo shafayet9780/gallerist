@@ -1,4 +1,4 @@
-# Visora — Phase 1 Review Fixes (remediation plan)
+# Gallerist — Phase 1 Review Fixes (remediation plan)
 
 ## Overview
 
@@ -46,7 +46,7 @@ directory (zip-slip).
 - [ ] `safeHref(url)` allows only `http:`/`https:`/`blob:` (`data:` rejected by default); non-allowed → download skipped (no anchor click, no fetch).
 - [ ] `sanitizeName(name)` strips `/ \ \x00-\x1f`, collapses `..`, caps length, falls back to sanitized `item.id` then `'download'`; applied to both `a.download` and the zip entry `name`.
 **Verification:**
-- [ ] `pnpm test --filter @visora/plugin-download`: `safeHref('javascript:alert(1)')`→null, `data:text/html`→null, `https://…`→ok; `sanitizeName('../../x')`→no `..`/sep; `filenameOf` with backslash/CRLF cleaned.
+- [ ] `pnpm test --filter @gallerist/plugin-download`: `safeHref('javascript:alert(1)')`→null, `data:text/html`→null, `https://…`→ok; `sanitizeName('../../x')`→no `..`/sep; `filenameOf` with backslash/CRLF cleaned.
 - [ ] `pnpm lint && pnpm typecheck`
 **Dependencies:** None.
 **Files:** `packages/plugin-download/src/index.ts`, `packages/plugin-download/src/index.test.ts`.
@@ -59,7 +59,7 @@ injects a second comma-separated `url()` → attacker-controlled image request (
 **Acceptance criteria:**
 - [ ] Placeholders containing `"`, `)`, `\`, or newline are rejected (no `backgroundImage` set); valid `data:`/path/color unchanged.
 **Verification:**
-- [ ] `pnpm test --filter @visora/renderer-dom`: malicious placeholder leaves `style.backgroundImage` empty; `data:image/png…` and `#fff` still applied.
+- [ ] `pnpm test --filter @gallerist/renderer-dom`: malicious placeholder leaves `style.backgroundImage` empty; `data:image/png…` and `#fff` still applied.
 **Dependencies:** None.
 **Files:** `packages/renderer-dom/src/adapters/image.ts`, `packages/renderer-dom/src/adapters/image.test.ts`.
 **Scope:** XS.
@@ -78,7 +78,7 @@ broken player); `isYouTube` substring-matches `evil-youtube.com`.
 - [ ] `parseYouTubeId` extracts the id from `watch?v=`, `youtu.be/`, `embed/`, `shorts/`, `live/`.
 - [ ] `isYouTube` anchors to hostname (`youtube.com`/`youtu.be` and subdomains only); `evil-youtube.com`, `notyoutube.com` → false; malformed URL → false (no throw).
 **Verification:**
-- [ ] `pnpm test --filter @visora/plugin-video-youtube`: table of URL shapes incl shorts/live + the two evil hosts.
+- [ ] `pnpm test --filter @gallerist/plugin-video-youtube`: table of URL shapes incl shorts/live + the two evil hosts.
 **Dependencies:** None.
 **Files:** `packages/plugin-video-youtube/src/index.ts`, `packages/plugin-video-youtube/src/index.test.ts`.
 **Scope:** Small.
@@ -89,7 +89,7 @@ a `viewer.use(video())` after mount contributes everything except its adapter.
 **Acceptance criteria:**
 - [ ] `pickAdapter` resolves adapters computed from `viewer.getPlugins()` at call time (default image adapter + `opts.adapters` retained).
 **Verification:**
-- [ ] `pnpm test --filter @visora/renderer-dom`: mount, then `viewer.use()` a plugin with a `mediaAdapter`, navigate to a matching item → that adapter mounts.
+- [ ] `pnpm test --filter @gallerist/renderer-dom`: mount, then `viewer.use()` a plugin with a `mediaAdapter`, navigate to a matching item → that adapter mounts.
 **Dependencies:** None.
 **Files:** `packages/renderer-dom/src/mount.ts`, `packages/renderer-dom/src/mount.test.ts`.
 **Scope:** Small.
@@ -109,7 +109,7 @@ change, not just cursor/collection; item row is an invalid nested `role=listbox`
 - [ ] Item row uses `role=group` (not nested `listbox`) with `aria-label`.
 - [ ] 10k-group bound test tightened from `<200` to `<= 2*overscan+1` (deterministic window) so a windowing regression fails.
 **Verification:**
-- [ ] `pnpm test --filter @visora/plugin-thumbnails`: spy/assert no `replaceChildren` on a no-op notification; active flips on cursor change; bound test ≤49; axe-relevant role check.
+- [ ] `pnpm test --filter @gallerist/plugin-thumbnails`: spy/assert no `replaceChildren` on a no-op notification; active flips on cursor change; bound test ≤49; axe-relevant role check.
 - [ ] `pnpm e2e` thumbnail nav still green.
 **Dependencies:** None (pattern reused by Task 6).
 **Files:** `packages/plugin-thumbnails/src/index.ts`, `packages/plugin-thumbnails/src/index.test.ts`.
@@ -120,7 +120,7 @@ change, not just cursor/collection; item row is an invalid nested `role=listbox`
 **Acceptance criteria:**
 - [ ] `render` skips when open and `cursor`/collection unchanged.
 **Verification:**
-- [ ] `pnpm test --filter @visora/plugin-grid`: no rebuild on no-op while open; toggle + cell-click still navigate.
+- [ ] `pnpm test --filter @gallerist/plugin-grid`: no rebuild on no-op while open; toggle + cell-click still navigate.
 - [ ] `pnpm e2e` grid toggle/cell still green.
 **Dependencies:** Task 5 (shares the gating approach).
 **Files:** `packages/plugin-grid/src/index.ts`, `packages/plugin-grid/src/index.test.ts`.
@@ -141,9 +141,9 @@ cleanup also destroys the viewer the ref/context still hold.
 - [ ] `viewer.destroy()` runs in an unmount-only effect (`[viewer]`); renderer-mount effect owns only `handle.destroy()`.
 - [ ] StrictMode double-mount/unmount leaves no leaked renderer and a usable viewer.
 **Verification:**
-- [ ] `pnpm test --filter @visora/react`: StrictMode mount→unmount→remount; ref methods work after remount; existing 8 tests green.
+- [ ] `pnpm test --filter @gallerist/react`: StrictMode mount→unmount→remount; ref methods work after remount; existing 8 tests green.
 **Dependencies:** None.
-**Files:** `packages/react/src/Visora.tsx`, `packages/react/src/Visora.test.tsx`.
+**Files:** `packages/react/src/Gallerist.tsx`, `packages/react/src/Gallerist.test.tsx`.
 **Scope:** Small.
 
 ### Task 8: Deterministic overlay ids via `useId` (XS)
@@ -151,9 +151,9 @@ cleanup also destroys the viewer the ref/context still hold.
 **Acceptance criteria:**
 - [ ] Auto id from `useId()` (called unconditionally); explicit `props.id` still wins.
 **Verification:**
-- [ ] `pnpm test --filter @visora/react`: overlay registers with a stable id; no module counter remains.
+- [ ] `pnpm test --filter @gallerist/react`: overlay registers with a stable id; no module counter remains.
 **Dependencies:** Task 7 (same file).
-**Files:** `packages/react/src/Visora.tsx`, `packages/react/src/Visora.test.tsx`.
+**Files:** `packages/react/src/Gallerist.tsx`, `packages/react/src/Gallerist.test.tsx`.
 **Scope:** XS.
 
 ### Checkpoint F4
@@ -170,7 +170,7 @@ genuine back/forward; malformed hash untested.
 - [ ] Replace latch with `lastWritten` compare (`location.hash.replace(/^#/,'') === lastWritten` → ignore).
 - [ ] Malformed hash (`#i=x` no `g`, empty values, bad encoding) → no-op, no throw.
 **Verification:**
-- [ ] `pnpm test --filter @visora/plugin-hash`: write→hashchange doesn't loop; external back/forward applies; malformed cases no-op.
+- [ ] `pnpm test --filter @gallerist/plugin-hash`: write→hashchange doesn't loop; external back/forward applies; malformed cases no-op.
 **Dependencies:** None.
 **Files:** `packages/plugin-hash/src/index.ts`, `packages/plugin-hash/src/index.test.ts`.
 **Scope:** Small. *(History-mode `replaceState` left as Phase 2 — behavior decision.)*
@@ -183,7 +183,7 @@ parity with plugin-video; `YTGlobal = any` leaks.
 - [ ] `advanceAxis: 'group'|'item'` option mirrors plugin-video's onEnded branch.
 - [ ] Minimal local YT interface replaces `any` on the public surface; optional `host`/nocookie option documented.
 **Verification:**
-- [ ] `pnpm test --filter @visora/plugin-video-youtube`: onerror rejects + clears memo; advance honors axis.
+- [ ] `pnpm test --filter @gallerist/plugin-video-youtube`: onerror rejects + clears memo; advance honors axis.
 **Dependencies:** Task 3 (same file).
 **Files:** `packages/plugin-video-youtube/src/index.ts`, `packages/plugin-video-youtube/src/index.test.ts`.
 **Scope:** Small.
@@ -194,7 +194,7 @@ parity with plugin-video; `YTGlobal = any` leaks.
 - [ ] Missing `client-zip` → fall back to per-file downloads (try/catch the dynamic import).
 - [ ] Zip entries skip non-`ok` responses; an `AbortSignal` threads through the fetches.
 **Verification:**
-- [ ] `pnpm test --filter @visora/plugin-download`: import-failure path falls back; failed fetch skipped not fatal.
+- [ ] `pnpm test --filter @gallerist/plugin-download`: import-failure path falls back; failed fetch skipped not fatal.
 **Dependencies:** Task 1 (same file).
 **Files:** `packages/plugin-download/src/index.ts`, `packages/plugin-download/src/index.test.ts`.
 **Scope:** Small.
@@ -204,7 +204,7 @@ parity with plugin-video; `YTGlobal = any` leaks.
 **Acceptance criteria:**
 - [ ] `getPlugins()` returns `[...pluginInstances]`.
 **Verification:**
-- [ ] `pnpm test --filter @visora/core`: mutating the returned array doesn't affect the registry.
+- [ ] `pnpm test --filter @gallerist/core`: mutating the returned array doesn't affect the registry.
 **Dependencies:** None.
 **Files:** `packages/core/src/controller/createViewer.ts`, `packages/core/src/plugins/registry.test.ts`.
 **Scope:** XS.
@@ -252,7 +252,7 @@ parity with plugin-video; `YTGlobal = any` leaks.
 
 - **Region remount reconcile** (`regions.ts` full `replaceChildren` on plugin change) — larger refactor; only loses transient region DOM state on add/remove; not blocking.
 - **React selector overload + inert SSR server snapshot** — API addition + design; current whole-state subscription is correct, just broad.
-- **`@visora/renderer-dom` peer → dependency** — packaging decision (singleton vs DX); document the install requirement for now.
+- **`@gallerist/renderer-dom` peer → dependency** — packaging decision (singleton vs DX); document the install requirement for now.
 - **hash `replaceState` history mode** — UX behavior decision (per-slide history entry).
 
 ## Open questions

@@ -1,7 +1,7 @@
 {
-  "name": "@visora/plugin-fullscreen",
+  "name": "@gallerist/plugin-fullscreen",
   "version": "0.2.0",
-  "description": "Visora plugin — native Fullscreen API toggle (toolbar button + 'f' key).",
+  "description": "Gallerist plugin — native Fullscreen API toggle (toolbar button + 'f' key).",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -27,21 +27,21 @@
     "prepack": "node ../../scripts/copy-license.mjs"
   },
   "peerDependencies": {
-    "@visora/core": "workspace:^"
+    "@gallerist/core": "workspace:^"
   },
   "devDependencies": {
-    "@visora/core": "workspace:*",
+    "@gallerist/core": "workspace:*",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shafayet9780/visora.git",
+    "url": "git+https://github.com/shafayet9780/gallerist.git",
     "directory": "packages/plugin-fullscreen"
   },
-  "homepage": "https://github.com/shafayet9780/visora#readme",
+  "homepage": "https://github.com/shafayet9780/gallerist#readme",
   "bugs": {
-    "url": "https://github.com/shafayet9780/visora/issues"
+    "url": "https://github.com/shafayet9780/gallerist/issues"
   },
   "author": "Shafayet Ahmmed",
   "keywords": [

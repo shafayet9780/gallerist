@@ -1,6 +1,6 @@
-import { type Collection, type Item, type OverlaySpec, createViewer } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
-import '@visora/theme-default/visora.css'
+import { type Collection, type Item, type OverlaySpec, createViewer } from '@gallerist/core'
+import { mount } from '@gallerist/renderer-dom'
+import '@gallerist/theme-default/gallerist.css'
 
 const svg = (w: number, h: number, color: string, label: string) =>
   `data:image/svg+xml,${encodeURIComponent(

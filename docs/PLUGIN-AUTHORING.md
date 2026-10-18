@@ -1,4 +1,4 @@
-# Authoring a Visora plugin
+# Authoring a Gallerist plugin
 
 A plugin is a factory the user binds (e.g. `fullscreen()`) that returns `(viewer) => PluginInstance`.
 Everything beyond the engine is a plugin; core ships with none enabled, so bundle size scales with
@@ -8,7 +8,7 @@ features used (spec §13). Plugins register on the **viewer** (`createViewer({ p
 ## Contract
 
 ```ts
-import type { Plugin } from '@visora/core'
+import type { Plugin } from '@gallerist/core'
 
 export function myPlugin(opts?: MyOptions): Plugin {
   return (viewer) => ({
@@ -49,7 +49,7 @@ dev warn).
 
 ## Rules
 
-- **DOM is fine in plugins** — the headless invariant binds `@visora/core` only. Guard `window`/
+- **DOM is fine in plugins** — the headless invariant binds `@gallerist/core` only. Guard `window`/
   `document` for SSR (see `plugin-hash`).
 - **Reuse core helpers**: `windowIndices` / `reconcileKeys` for windowed UI at scale (keep live DOM
   bounded — see `plugin-thumbnails`/`plugin-grid`).
@@ -63,4 +63,4 @@ dev warn).
 - **Decorative images get `alt=""`**; interactive controls get an `aria-label` (axe is a CI gate).
 - **Own your cleanup** in `destroy()` (listeners, observers, subscriptions). `viewer.use()` returns a
   disposer for per-instance lifecycles (the React adapter relies on this).
-- **One package per plugin**, `sideEffects:false`, depend on `@visora/core` types only.
+- **One package per plugin**, `sideEffects:false`, depend on `@gallerist/core` types only.

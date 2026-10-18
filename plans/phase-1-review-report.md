@@ -1,4 +1,4 @@
-# Visora — Phase 1 Publish-Readiness Review
+# Gallerist — Phase 1 Publish-Readiness Review
 
 **Date:** 2026-06-22 · **Branch:** `phase-1` (== `main`, @ `d0d31e5`) · **Goal:** ship a bug-free, performant, polished **v1** to npm.
 
@@ -52,7 +52,7 @@ small, surgical fixes. Estimate: the Criticals + publish-blockers are ~1–2 foc
 Every publishable `package.json` is `"version": "0.0.0"`, and core + renderer hardcode
 `export const VERSION = '0.0.0'`. CHANGELOG already documents through v0.2.0 — three sources disagree.
 Publishing `0.0.0` is **non-recoverable** (npm forbids re-publishing a version). Worse: changesets
-rewrite `workspace:^`/`workspace:*` to the *current* version at publish, so `@visora/react`'s peer
+rewrite `workspace:^`/`workspace:*` to the *current* version at publish, so `@gallerist/react`'s peer
 ranges become `^0.0.0` (caret on 0.0.x ⇒ exactly 0.0.0), guaranteeing a broken install graph.
 
 **Fix:** pick the launch version (CHANGELOG implies 0.2.0; or jump to 1.0.0 for the "v1"), create a
@@ -62,7 +62,7 @@ changeset, run `changeset version` to bump all packages + internal ranges togeth
 packed tarballs.
 
 ### C2 — No ResizeObserver anywhere: overlays drift and zoom/pan goes stale on any resize/rotate
-`packages/renderer-dom/src/mount.ts:383-399` · spec `docs/VISORA_SPEC.md:369` *(merges #3, #29, #44; verified: grep finds zero `ResizeObserver`/`resize`/`orientationchange` in renderer)*
+`packages/renderer-dom/src/mount.ts:383-399` · spec `docs/GALLERIST_SPEC.md:369` *(merges #3, #29, #44; verified: grep finds zero `ResizeObserver`/`resize`/`orientationchange` in renderer)*
 
 Spec §10.5 mandates "a single ResizeObserver on the stage … debounced to a frame." It doesn't exist.
 Image-space overlays compute absolute px from `stage.getBoundingClientRect()` only when the item
@@ -81,7 +81,7 @@ repaint (`rec.overlayItemId = undefined; renderWindow()`), re-clamp committed zo
 
 `onDown` never captures the pointer, so once the pointer leaves the stage the browser stops delivering
 `pointermove`/`pointerup`. If `pointerup` lands off-stage, `onUp` never runs: the `pointers` Map isn't
-drained, the live transform freezes, `--visora-dismiss` stays set (stage dimmed), and the **stale
+drained, the live transform freezes, `--gallerist-dismiss` stays set (stage dimmed), and the **stale
 pointer poisons the next gesture** (size becomes 2 → next single-finger drag is misread as a pinch).
 Easy to hit when panning a zoomed image past the edge or a fast swipe. Synthetic-event unit tests
 dispatch on the stage so they never catch it.
@@ -113,7 +113,7 @@ initial-focus, so it's uncaught.
 
 **Fix:** add Tab/Shift+Tab wrap-around among tabbable descendants; set `inert` (or `aria-hidden`) on all
 other body children on attach and restore on detach. Add a Playwright test that Tabs N+1× and asserts
-focus stays in `.visora`. (Pairs with I-UX1 dialog-name and S-UX focus-restore.)
+focus stays in `.gallerist`. (Pairs with I-UX1 dialog-name and S-UX focus-restore.)
 
 ---
 
@@ -123,20 +123,20 @@ Several of these are publish-blockers in their own right (marked **[publish-bloc
 
 ## Publish hygiene
 - **I-P1 [publish-blocker]** No `LICENSE` file anywhere, yet all 11 packages declare `"license":"MIT"`. Trips license scanners / corporate OSS gates. Add root `LICENSE` (MIT) and include it in each package's `files`/prepack. `README.md:87` *(#23, verified)*
-- **I-P2 [publish-blocker]** 10 of 11 packages ship **no README** → blank npmjs pages for `@visora/core`, `@visora/react`, etc. plugin-thumbnails' README uses repo-relative links that 404 on npm. Add a focused README per package. *(#24)*
+- **I-P2 [publish-blocker]** 10 of 11 packages ship **no README** → blank npmjs pages for `@gallerist/core`, `@gallerist/react`, etc. plugin-thumbnails' README uses repo-relative links that 404 on npm. Add a focused README per package. *(#24)*
 - **I-P3** Sourcemaps embed **full TS source** and ship in every tarball (~3× size bloat; effectively re-publishes `src` despite `files:["dist"]`). Maps are ~107kB of core's 172kB. Set `sourcesContent:false` or drop maps from the published build. `*/tsup.config.ts:8` *(#25)*
-- **I-P4** `@visora/core` depends on core via `workspace:*` in **`dependencies`** while react peers it — asymmetric, risks a duplicate core copy in consumer trees. Use `workspace:^` and consider making core a `peerDependency` of renderer-dom. `renderer-dom/package.json` *(#8)*
+- **I-P4** `@gallerist/core` depends on core via `workspace:*` in **`dependencies`** while react peers it — asymmetric, risks a duplicate core copy in consumer trees. Use `workspace:^` and consider making core a `peerDependency` of renderer-dom. `renderer-dom/package.json` *(#8)*
 
 ## Frozen-API correctness (costly to change post-1.0)
 - **I-A1** Public `EventMap` declares **`pan`/`load`/`loaded`/`loadError`** — none are ever emitted. Wire them (emit `load*` when the adapter `ready` settles; `pan` from gestures) or remove from the frozen map. `core/src/events/events.ts:51-53` *(#6)*
 - **I-A2** `ViewerState` exposes **`interaction`/`fullscreen`/`loaded`** — never written (permanently `idle`/`false`/`{}`). `INTERACT` is defined but never dispatched. Wire or drop before freezing. `core/src/types.ts:154-166` *(#7, #20)*
 - **I-C1** Lifecycle events fire on **no-op transitions**: `open()` twice emits `open`/`opened` ×2; `close()` on a closed viewer re-emits. `dispatch()` returns void so the controller can't tell. Make `dispatch` return whether it transitioned and gate emits. `core/src/controller/createViewer.ts:146-160` *(#10)*
-- **I-X1** **Amplifies I-C1 in React:** controlled `open` + `onClose={()=>setOpen(false)}` (the documented pattern) makes the close path run twice → **`onClose` fires twice on every dismissal** (double analytics/cleanup/routing). Fix root cause in core; also skip `close()` in the effect when already closed. `react/src/Visora.tsx:96-102` *(#14)*
+- **I-X1** **Amplifies I-C1 in React:** controlled `open` + `onClose={()=>setOpen(false)}` (the documented pattern) makes the close path run twice → **`onClose` fires twice on every dismissal** (double analytics/cleanup/routing). Fix root cause in core; also skip `close()` in the effect when already closed. `react/src/Gallerist.tsx:96-102` *(#14)*
 - **I-C2** `keepZoomOnNav` is accepted in options but **read nowhere**; zoom is never reset on nav (spec default = reset). Zoom into a corner, hit next → land pre-zoomed on a differently-sized image. Implement reset-on-group-change or remove the dead option. `core/src/controller/createViewer.ts:110-128`, `api.ts:26` *(#11)*
 
 ## Cross-package / lifecycle
-- **I-X2 (borderline critical)** `<Visora>` deliberately never calls `viewer.destroy()` (StrictMode workaround) and renderer `destroy()` doesn't dispose plugins → **plugins passed via `options.plugins` leak on every React remount** (store subscriptions, IntersectionObservers, DOM). The example forces a full remount (`key={mountKey}`) on every option toggle → unbounded growth + stale subscribers firing into detached DOM. Dispose plugin `destroy()` on unmount. `react/src/Visora.tsx:60-82`, `core/.../createViewer.ts:272`, `mount.ts:669-681` *(#1 — critic flagged this as the top cross-cutting miss)*
-- **I-X3** `<Visora.Overlay>`/`<Visora.Region>` effect deps include object/array props (`anchor`,`visibleAt`) — inline literals (as in the shipped example) are fresh each render → **dispose+re-register the overlay plugin on every parent render**, fanning out to a full overlay repaint. Stabilize registration or memoize. `react/src/Visora.tsx:128-161` *(#12)*
+- **I-X2 (borderline critical)** `<Gallerist>` deliberately never calls `viewer.destroy()` (StrictMode workaround) and renderer `destroy()` doesn't dispose plugins → **plugins passed via `options.plugins` leak on every React remount** (store subscriptions, IntersectionObservers, DOM). The example forces a full remount (`key={mountKey}`) on every option toggle → unbounded growth + stale subscribers firing into detached DOM. Dispose plugin `destroy()` on unmount. `react/src/Gallerist.tsx:60-82`, `core/.../createViewer.ts:272`, `mount.ts:669-681` *(#1 — critic flagged this as the top cross-cutting miss)*
+- **I-X3** `<Gallerist.Overlay>`/`<Gallerist.Region>` effect deps include object/array props (`anchor`,`visibleAt`) — inline literals (as in the shipped example) are fresh each render → **dispose+re-register the overlay plugin on every parent render**, fanning out to a full overlay repaint. Stabilize registration or memoize. `react/src/Gallerist.tsx:128-161` *(#12)*
 
 ## Renderer correctness
 - **I-R1** Overlays paint against a **wrong contain rect before the image decodes** (naturalSize is null → falls back to stage size → full-square fit) and never repaint on load. Image-space overlays are mis-placed on first view of any item without a `naturalSize` hint. Await `rec.media.ready` and repaint. `mount.ts:396`, `overlays/position.ts:24` *(#27)*
@@ -146,7 +146,7 @@ Several of these are publish-blockers in their own right (marked **[publish-bloc
 - **I-PL1** **plugin-hash crashes on hostile input:** `decodeURIComponent` is unguarded — a URL like `#g=%` throws `URIError`, breaking the hashchange listener and on-load deep-link. Wrap in try/catch. `plugin-hash/src/index.ts:12-22` *(#17)*
 - **I-PL2** plugin-hash truncates ids containing `=` (`split('=')` keeps only the first value) → deep links resolve to the **wrong item**. Split on first `=` only. `plugin-hash/src/index.ts:15-21` *(#18)*
 - **I-PL3** plugin-hash writes `location.hash` on **every** nav → one history entry per item → **Back-button trap**. Use `history.replaceState` for intra-gallery moves. (todo.md already lists this as deferred.) `plugin-hash/src/index.ts:47-55` *(#22)*
-- **I-PL4** plugin-fullscreen targets `document.querySelector('.visora')` (first match) instead of its bound viewer → **wrong element fullscreened with multiple viewers**. Resolve root from the viewer. `plugin-fullscreen/src/index.ts:14-17` *(#19)*
+- **I-PL4** plugin-fullscreen targets `document.querySelector('.gallerist')` (first match) instead of its bound viewer → **wrong element fullscreened with multiple viewers**. Resolve root from the viewer. `plugin-fullscreen/src/index.ts:14-17` *(#19)*
 - **I-PL5** plugin-download revokes the blob object URL **synchronously** right after click → bulk-zip downloads can be cancelled mid-flight (esp. older Firefox). Defer revoke (`setTimeout(…,0)`). `plugin-download/src/index.ts:102-105` *(#21)*
 - *(plugin-fullscreen Safari prefixes and YouTube empty-id are real but were downgraded to suggestions — see S-PL.)*
 
@@ -157,8 +157,8 @@ Several of these are publish-blockers in their own right (marked **[publish-bloc
 ## UI/UX & a11y
 - **I-UX1** Dialog has **no accessible name** (no `aria-label`/`labelledby`) — announced as just "dialog". axe misses it because the e2e uses only `wcag2a/wcag2aa` tags. Add a name + `best-practice` tag. `mount.ts:194-201` *(#32)*
 - **I-UX2** Root keydown handler **hijacks typing**: digits/`t`/`+`/`-`/plugin letters fire even when focus is in an overlay `<input>`/`<textarea>`/contenteditable. Bail when `e.target` is editable or modifiers held. `mount.ts:565-606` *(#33, #50)*
-- **I-UX3** **Broken/failed images stay permanently invisible** — `.visora-media-image` starts `opacity:0` and only `onLoad` reveals it; `onError` sets no marker. A 404 → blank stage with chrome, no feedback. Add a `data-visora-error` state + visible broken-state CSS (and a loading skeleton per spec §727). `image.ts:53-66`, `visora.css:119-130` *(#34)*
-- **I-UX4** Vertical-rail item-panel/peek flyout floats over the stage with **no collision/clamp** and (for vertical rails) CSS hard-overrides the JS-computed offset, so every card peeks to the same fixed spot. Affects the shipped `contact` preset. Compute cross-axis offset from the card rect; clamp to host. `visora.css:727-741`, `plugin-thumbnails/src/index.ts:225-254` *(#35)*
+- **I-UX3** **Broken/failed images stay permanently invisible** — `.gallerist-media-image` starts `opacity:0` and only `onLoad` reveals it; `onError` sets no marker. A 404 → blank stage with chrome, no feedback. Add a `data-gallerist-error` state + visible broken-state CSS (and a loading skeleton per spec §727). `image.ts:53-66`, `gallerist.css:119-130` *(#34)*
+- **I-UX4** Vertical-rail item-panel/peek flyout floats over the stage with **no collision/clamp** and (for vertical rails) CSS hard-overrides the JS-computed offset, so every card peeks to the same fixed spot. Affects the shipped `contact` preset. Compute cross-axis offset from the card rect; clamp to host. `gallerist.css:727-741`, `plugin-thumbnails/src/index.ts:225-254` *(#35)*
 
 ## Tests (gaps on risky paths)
 - **I-T1** **No resize test** at all (ties to C2) — overlay/pan-bounds desync is invisible to the suite. *(#29)*
@@ -175,11 +175,11 @@ Grouped; each is low-risk. Full detail (file:line + fix) in the source digest.
 
 **Core (3)** · S-C1 `sampleSpring(p,1)` → `[1]` (NaN intermediate); `count=0` → `[]`; public export, unguarded — clamp `count≥2` (#39/#59). · S-C2 item axis now wraps on `loop`, diverging from spec §5 (only primary axis wraps) — reconcile spec/code or split the flag (#40). · S-C3 `prevItem/nextItem` don't re-clamp an out-of-range incoming index — defensive clamp (#41).
 
-**Renderer (4)** · S-R1 drag-to-dismiss writes `--visora-dismiss` but the theme **never consumes it** — dead backdrop feedback; add the CSS rule (#42). · S-R2 stacked overlay viewers clobber the body scroll-lock restore (no refcount) → page scroll stays locked after nested close (#56). · S-R3 Home/End/digit keys ignore linear/flat mode — End doesn't reach the true last item (#57). · S-R4 wheel handler forces layout per tick via `getBoundingClientRect` (subset of I-PERF1) (#58).
+**Renderer (4)** · S-R1 drag-to-dismiss writes `--gallerist-dismiss` but the theme **never consumes it** — dead backdrop feedback; add the CSS rule (#42). · S-R2 stacked overlay viewers clobber the body scroll-lock restore (no refcount) → page scroll stays locked after nested close (#56). · S-R3 Home/End/digit keys ignore linear/flat mode — End doesn't reach the true last item (#57). · S-R4 wheel handler forces layout per tick via `getBoundingClientRect` (subset of I-PERF1) (#58).
 
 **Plugins (5)** · S-PL1 plugin-fullscreen has **no WebKit prefixes** → silently inert on Safari/iOS (downgraded only because spec targets unprefixed-capable versions; still worth it) (#47). · S-PL2 plugin-video-youtube: valid-but-unparseable URLs (playlist/homepage) build an empty player; `ready` hangs forever — reject or decline the match (#48). · S-PL3 youtube embed sets no `playerVars.origin` (postMessage hardening) + document CSP (#49). · S-PL4 plugin single-letter keymaps fire regardless of phase/focused input (overlaps I-UX2) (#50). · S-PL5 plugin-fullscreen toggle uses document-global `isFs()` — can exit an unrelated fullscreen element (#51).
 
-**Performance (4)** · S-PERF1 `store.select()` exists, documented, tested — but **zero prod callers**; every subscriber wakes on every commit. Adopt it for cursor-only consumers or drop it from the 1.0 surface (#43). · S-PERF2 resize re-measure missing (perf view of C2) (#44). · S-PERF3 idle `onActivity` does a `removeAttribute` on every pointermove/wheel even when not idle — guard with a flag (#45). · S-PERF4 `useVisora` reallocates 10 action closures + object every render → breaks referential stability; return stable refs or `useMemo([viewer])` (#46).
+**Performance (4)** · S-PERF1 `store.select()` exists, documented, tested — but **zero prod callers**; every subscriber wakes on every commit. Adopt it for cursor-only consumers or drop it from the 1.0 surface (#43). · S-PERF2 resize re-measure missing (perf view of C2) (#44). · S-PERF3 idle `onActivity` does a `removeAttribute` on every pointermove/wheel even when not idle — guard with a flag (#45). · S-PERF4 `useGallerist` reallocates 10 action closures + object every render → breaks referential stability; return stable refs or `useMemo([viewer])` (#46).
 
 **Publish (4)** · S-P1 `workspace:` → `^0.0.0` consequence of C1 (#52). · S-P2 no `repository`/`homepage`/`keywords`/`author`/`bugs`/`publishConfig` on any package → no npm source link, no provenance, poor SEO (#53). · S-P3 CJS type resolution falls back to ESM `.d.ts` (no nested `require.types`) — add per-condition `types`; run `attw` in CI (#54). · S-P4 theme-default ships unbuilt `src` with no `main`/`types` — minor; document or build to `dist` (#55).
 
@@ -190,8 +190,8 @@ Grouped; each is low-risk. Full detail (file:line + fix) in the source digest.
 # Cross-cutting themes (from the completeness critic)
 
 1. **Cross-package teardown is nobody's job.** Each package assumed the other disposed plugins; the result is the React remount leak (I-X2). Define teardown ownership end-to-end.
-2. **React referential-stability footguns.** Inline object/array props for overlays/regions (I-X3) and unstable `useVisora` closures (S-PERF4) thrash registration and re-renders. Either memoize internally or document the contract loudly.
-3. **Renderer→theme token handshakes go unverified.** `--visora-dismiss` is written but unconsumed (S-R1); footer offset uses an image-height token instead of the live rail height (S-UX1).
+2. **React referential-stability footguns.** Inline object/array props for overlays/regions (I-X3) and unstable `useGallerist` closures (S-PERF4) thrash registration and re-renders. Either memoize internally or document the contract loudly.
+3. **Renderer→theme token handshakes go unverified.** `--gallerist-dismiss` is written but unconsumed (S-R1); footer offset uses an image-height token instead of the live rail height (S-UX1).
 4. **One bug, many call sites.** `loop=false` is hardcoded in 4 places (C4), not one; fixing only the renderer leaves rails/grid wrong.
 5. **The frozen public surface has dead members** (events I-A1, state fields I-A2, `keepZoomOnNav` I-C2, `select()` S-PERF1). Decide wire-vs-remove for each *before* 1.0 — these are the expensive-to-change ones.
 

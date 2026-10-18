@@ -1,4 +1,4 @@
-# Visora — Phase 1 TODO
+# Gallerist — Phase 1 TODO
 
 Executable checklist for `tasks/plan.md`. Dependency-ordered. TDD per task (RED → GREEN → commit).
 Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pnpm typecheck && pnpm size`.
@@ -18,20 +18,20 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
     merged; region conflict = last-wins + `console.warn`; regions update on cursor/collection change.
   - Verify: `pnpm test` (happy-dom) — region node mounts, conflict warn, merge; existing mount tests green.
   - Files: `packages/renderer-dom/src/regions.ts`, `mount.ts`.
-- [x] **T7.3 — @visora/plugin-fullscreen** (real-fullscreen e2e deferred to M13 — headless flaky)
+- [x] **T7.3 — @gallerist/plugin-fullscreen** (real-fullscreen e2e deferred to M13 — headless flaky)
   - Acceptance: Fullscreen API toggle; `toolbar` button + keymap `f`; emits `fullscreenChange`; reflects
     `document.fullscreenElement`; no-op + guarded where API absent.
   - Verify: happy-dom unit (button calls requestFullscreen/exit, state reflects) + e2e (toggle + event).
   - Files: `packages/plugin-fullscreen/*`.
 - [x] **Checkpoint M7** — full gates green; commit. (194 unit, lint, typecheck, build green)
 
-## M8 — @visora/react adapter
+## M8 — @gallerist/react adapter
 
-- [x] **T8.1 — useVisora hook** — `useSyncExternalStore` over `viewer.subscribe`/`getState`; returns
-  `{ state, ...actions }`. Verify: @testing-library/react state sync on nav/zoom. Files: `packages/react/src/useVisora.ts`.
-- [x] **T8.2 — `<Visora>` component** — controlled `open`/`onClose` + imperative `ref`; mounts renderer;
+- [x] **T8.1 — useGallerist hook** — `useSyncExternalStore` over `viewer.subscribe`/`getState`; returns
+  `{ state, ...actions }`. Verify: @testing-library/react state sync on nav/zoom. Files: `packages/react/src/useGallerist.ts`.
+- [x] **T8.2 — `<Gallerist>` component** — controlled `open`/`onClose` + imperative `ref`; mounts renderer;
   SSR placeholder + hydrate; cleanup on unmount. Verify: open/close, ref methods, unmount teardown.
-- [x] **T8.3 — portal bridge** — `<Visora.Overlay anchor>` + `<Visora.Region name>` portal React children
+- [x] **T8.3 — portal bridge** — `<Gallerist.Overlay anchor>` + `<Gallerist.Region name>` portal React children
   into engine host nodes; re-portal on host change (overlay repaint). Verify: JSX overlay/region renders,
   updates, unmounts cleanly. Files: `packages/react/src/overlay.tsx`, `region.tsx`.
 - [x] **T8.4 — React example** (`examples/react`) + e2e smoke.
@@ -39,10 +39,10 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ## M9 — deep-link + download
 
-- [x] **T9.1 — @visora/plugin-hash** — read/write `#g=<id>&i=<id>`, `hashchange` + back/forward, open on
+- [x] **T9.1 — @gallerist/plugin-hash** — read/write `#g=<id>&i=<id>`, `hashchange` + back/forward, open on
   load if hash present, client-only (SSR guard), uses `goToId`/`getCollection`. Verify: unit (parse/format)
   + e2e (URL updates on nav, deep-link opens correct slide, back/forward).
-- [x] **T9.2 — @visora/plugin-download** — `toolbar` button(s): single (`<a download>`), all-in-group
+- [x] **T9.2 — @gallerist/plugin-download** — `toolbar` button(s): single (`<a download>`), all-in-group
   (sequential), bulk-range → `await import('client-zip')` → zip. Verify: unit (group/range selection,
   filename) + e2e (single download triggers).
 - [x] **Checkpoint M9** — gates green; commit.
@@ -66,10 +66,10 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ## M12 — video (HTML5) + youtube
 
-- [x] **T12.1 — @visora/plugin-video** — HTML5 `<video>` MediaAdapter; `activate/deactivate` → play/pause;
+- [x] **T12.1 — @gallerist/plugin-video** — HTML5 `<video>` MediaAdapter; `activate/deactivate` → play/pause;
   advance-on-ended → `next()`/`nextItem()`; poster via `placeholder`. Verify: happy-dom (mount, activate plays,
   deactivate pauses) + e2e (play/pause on enter/leave, advance on ended).
-- [x] **T12.2 — @visora/plugin-video-youtube** — IFrame API adapter (async script, guarded); `match` by URL;
+- [x] **T12.2 — @gallerist/plugin-video-youtube** — IFrame API adapter (async script, guarded); `match` by URL;
   activate/deactivate. Verify: unit (mock IFrame API); e2e behind opt-in flag.
 - [x] **Checkpoint M12** — gates green; commit.
 
@@ -85,7 +85,7 @@ Each milestone ends with a checkpoint: `pnpm test && pnpm e2e && pnpm lint && pn
 
 ---
 
-# Visora — Phase 1 Review Fixes (`v0.1.1`)
+# Gallerist — Phase 1 Review Fixes (`v0.1.1`)
 
 From `/agent-skills:review` (0 Critical, 8 Important, ~13 Suggestions). Plan: `plans/phase-1-fixes.md`.
 TDD per task (RED → GREEN → suite → build → commit). Security first (fail fast).
@@ -106,8 +106,8 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 - [x] **Checkpoint F3** — gates + e2e + size green.
 
 ## F4 — React lifecycle
-- [x] **T7 — stable viewer (`useState`) + decoupled `destroy`** (`react/Visora`)
-- [x] **T8 — deterministic overlay ids via `useId`** (`react/Visora`)
+- [x] **T7 — stable viewer (`useState`) + decoupled `destroy`** (`react/Gallerist`)
+- [x] **T8 — deterministic overlay ids via `useId`** (`react/Gallerist`)
 - [x] **Checkpoint F4** — gates green; StrictMode example smoke-tested.
 
 ## F5 — Robustness
@@ -124,12 +124,12 @@ TDD per task (RED → GREEN → suite → build → commit). Security first (fai
 ## Deferred → Phase 2
 - [ ] region remount reconcile (`regions.ts`)
 - [ ] React selector overload + inert SSR snapshot
-- [ ] `@visora/renderer-dom` peer → dependency (decision)
+- [ ] `@gallerist/renderer-dom` peer → dependency (decision)
 - [ ] hash `replaceState` history mode (decision)
 
 ---
 
-# Visora — M14 UX/UI Overhaul (`v0.2.0`)
+# Gallerist — M14 UX/UI Overhaul (`v0.2.0`)
 
 From a hands-on run of the React example (behavioral bugs + generic look). Plan in
 `~/.claude/plans/…snazzy-mountain.md` (M14 section). TDD per task (RED → GREEN → suite → build →
@@ -137,11 +137,11 @@ commit). Decisions driven by a UX interview (UX-A … UX-J).
 
 ## Phase A — foundations
 - [x] **U1** core: optional `caption` on `Group` (Item already had it)
-- [x] **U2** renderer `idle.ts`: idle timer → `data-visora-idle`; reduced-motion inert
+- [x] **U2** renderer `idle.ts`: idle timer → `data-gallerist-idle`; reduced-motion inert
 
 ## Phase B — renderer chrome
 - [x] **U3** SVG icon set (`icons.ts`) replacing Unicode glyphs
-- [x] **U4** configurable arrow placement → `data-visora-arrows` (default `pill-right`)
+- [x] **U4** configurable arrow placement → `data-gallerist-arrows` (default `pill-right`)
 - [x] **U5** rail collapse (`t` + toggle + fullscreen) + idle auto-hide wired
 
 ## Phase C — thumbnails rewrite
@@ -157,7 +157,7 @@ commit). Decisions driven by a UX interview (UX-A … UX-J).
 - [x] **U13** segmented position pills (≤8) + mono `n / N` fallback
 
 ## Phase E — React + example + docs
-- [x] **U14** React `<Visora preset theme arrows autoHide>` (theme reactive)
+- [x] **U14** React `<Gallerist preset theme arrows autoHide>` (theme reactive)
 - [x] **U15** example rebuild (work-session reviewer + preset/accent switchers) + landing redesign
 - [x] **U16** docs: CHANGELOG v0.2.0, thumbnails README, `docs/PRESETS.md`, ADR 0001, this checklist
 

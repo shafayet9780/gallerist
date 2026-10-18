@@ -2,7 +2,7 @@
 // slide. Content overlays live inside the transformed content layer so they track pan/zoom for
 // free; point overlays are counter-scaled to hold a constant screen size (decision per §9.1).
 
-import type { Group, Item, OverlaySpec, ViewerApi, ZoomState } from '@visora/core'
+import type { Group, Item, OverlaySpec, ViewerApi, ZoomState } from '@gallerist/core'
 import {
   type Size,
   contentAnchorBox,
@@ -57,7 +57,7 @@ export function paintOverlays(
 
   for (const spec of orderByLayer(specs)) {
     const host = document.createElement('div')
-    host.className = spec.class ? `visora-overlay ${spec.class}` : 'visora-overlay'
+    host.className = spec.class ? `gallerist-overlay ${spec.class}` : 'gallerist-overlay'
     host.dataset.overlay = spec.id
     host.style.position = 'absolute'
     if (spec.layer !== undefined) host.style.zIndex = String(spec.layer)

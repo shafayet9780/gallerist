@@ -1,7 +1,7 @@
 // Overlay positioning math (spec §9.1). Pure — maps content/viewport anchors to box geometry
 // within the content layer (which is CSS-contained, so natural coords map through the contain rect).
 
-import type { ContentAnchor, OverlaySpec, ViewportAnchor } from '@visora/core'
+import type { ContentAnchor, OverlaySpec, ViewportAnchor } from '@gallerist/core'
 
 export interface Size {
   w: number

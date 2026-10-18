@@ -9,7 +9,7 @@ export default defineConfig({
   sourcemap: true,
   minify: false,
   target: 'es2022',
-  external: ['react', 'react-dom', '@visora/core', '@visora/renderer-dom'],
+  external: ['react', 'react-dom', '@gallerist/core', '@gallerist/renderer-dom'],
   tsconfig: 'tsconfig.build.json',
   esbuildOptions(options) {
     options.jsx = 'automatic'

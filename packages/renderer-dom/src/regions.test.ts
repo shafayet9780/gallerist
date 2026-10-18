@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, type Plugin, createViewer } from '@visora/core'
+import { type Collection, type Item, type Plugin, createViewer } from '@gallerist/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from './mount'
 import { type RegionHosts, aggregateKeymap, mountPluginRegions } from './regions'
@@ -85,7 +85,7 @@ describe('mount — plugin consumption', () => {
     const v = createViewer({ collection: collection(), plugins: [p] })
     mount(v)
     v.open()
-    expect(document.querySelector('.visora-region-toolbar')?.textContent).toBe('btn')
+    expect(document.querySelector('.gallerist-region-toolbar')?.textContent).toBe('btn')
   })
 
   it('a plugin keymap handles its key', () => {
@@ -95,7 +95,7 @@ describe('mount — plugin consumption', () => {
     mount(v)
     v.open()
     document
-      .querySelector('.visora')
+      .querySelector('.gallerist')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
     expect(hit).toHaveBeenCalled()
   })
@@ -104,8 +104,8 @@ describe('mount — plugin consumption', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    expect(document.querySelector('.visora-region-toolbar')?.textContent).toBe('')
+    expect(document.querySelector('.gallerist-region-toolbar')?.textContent).toBe('')
     v.use(() => ({ name: 'late', regions: { toolbar: node('late') } }))
-    expect(document.querySelector('.visora-region-toolbar')?.textContent).toBe('late')
+    expect(document.querySelector('.gallerist-region-toolbar')?.textContent).toBe('late')
   })
 })

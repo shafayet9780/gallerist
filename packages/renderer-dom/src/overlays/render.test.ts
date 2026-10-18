@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import type { Group, Item, OverlaySpec, ViewerApi } from '@visora/core'
+import type { Group, Item, OverlaySpec, ViewerApi } from '@gallerist/core'
 import { describe, expect, it, vi } from 'vitest'
 import { gatherOverlays, paintOverlays, updateOverlays } from './render'
 

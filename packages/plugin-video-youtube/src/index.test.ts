@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import type { Item, ViewerApi } from '@visora/core'
+import type { Item, ViewerApi } from '@gallerist/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isYouTube, parseYouTubeId, youtubeAdapter } from './index'
 
@@ -143,7 +143,7 @@ describe('youtubeAdapter', () => {
       document.createElement('div'),
       ctx(),
     )
-    const script = document.querySelector('script[data-visora-yt]') as HTMLScriptElement
+    const script = document.querySelector('script[data-gallerist-yt]') as HTMLScriptElement
     expect(script).not.toBeNull()
     script.onerror?.(new Event('error'))
     await expect(m.ready).rejects.toThrow()

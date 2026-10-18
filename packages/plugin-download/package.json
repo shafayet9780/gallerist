@@ -1,7 +1,7 @@
 {
-  "name": "@visora/plugin-download",
+  "name": "@gallerist/plugin-download",
   "version": "0.2.0",
-  "description": "Visora plugin — download the current item, a whole group, or a bulk zip.",
+  "description": "Gallerist plugin — download the current item, a whole group, or a bulk zip.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -27,25 +27,25 @@
     "prepack": "node ../../scripts/copy-license.mjs"
   },
   "peerDependencies": {
-    "@visora/core": "workspace:^"
+    "@gallerist/core": "workspace:^"
   },
   "optionalDependencies": {
     "client-zip": "2.5.0"
   },
   "devDependencies": {
-    "@visora/core": "workspace:*",
+    "@gallerist/core": "workspace:*",
     "client-zip": "2.5.0",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shafayet9780/visora.git",
+    "url": "git+https://github.com/shafayet9780/gallerist.git",
     "directory": "packages/plugin-download"
   },
-  "homepage": "https://github.com/shafayet9780/visora#readme",
+  "homepage": "https://github.com/shafayet9780/gallerist#readme",
   "bugs": {
-    "url": "https://github.com/shafayet9780/visora/issues"
+    "url": "https://github.com/shafayet9780/gallerist/issues"
   },
   "author": "Shafayet Ahmmed",
   "keywords": [

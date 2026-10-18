@@ -6,16 +6,16 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@visora/core": ["../../packages/core/src/index.ts"],
-      "@visora/renderer-dom": ["../../packages/renderer-dom/src/index.ts"],
-      "@visora/react": ["../../packages/react/src/index.ts"],
-      "@visora/plugin-thumbnails": ["../../packages/plugin-thumbnails/src/index.ts"],
-      "@visora/plugin-grid": ["../../packages/plugin-grid/src/index.ts"],
-      "@visora/plugin-fullscreen": ["../../packages/plugin-fullscreen/src/index.ts"],
-      "@visora/plugin-download": ["../../packages/plugin-download/src/index.ts"],
-      "@visora/plugin-hash": ["../../packages/plugin-hash/src/index.ts"],
-      "@visora/plugin-video": ["../../packages/plugin-video/src/index.ts"],
-      "@visora/plugin-video-youtube": ["../../packages/plugin-video-youtube/src/index.ts"]
+      "@gallerist/core": ["../../packages/core/src/index.ts"],
+      "@gallerist/renderer-dom": ["../../packages/renderer-dom/src/index.ts"],
+      "@gallerist/react": ["../../packages/react/src/index.ts"],
+      "@gallerist/plugin-thumbnails": ["../../packages/plugin-thumbnails/src/index.ts"],
+      "@gallerist/plugin-grid": ["../../packages/plugin-grid/src/index.ts"],
+      "@gallerist/plugin-fullscreen": ["../../packages/plugin-fullscreen/src/index.ts"],
+      "@gallerist/plugin-download": ["../../packages/plugin-download/src/index.ts"],
+      "@gallerist/plugin-hash": ["../../packages/plugin-hash/src/index.ts"],
+      "@gallerist/plugin-video": ["../../packages/plugin-video/src/index.ts"],
+      "@gallerist/plugin-video-youtube": ["../../packages/plugin-video-youtube/src/index.ts"]
     }
   },
   "include": ["main.tsx", "env.d.ts"]

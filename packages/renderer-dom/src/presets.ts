@@ -23,7 +23,7 @@ export interface ResolvedPreset {
 const PRESETS: Record<PresetName, ResolvedPreset> = {
   // classic lightbox: bottom rail, side arrows, persistent chrome.
   filmstrip: {
-    rootAttrs: { 'data-visora-preset': 'filmstrip' },
+    rootAttrs: { 'data-gallerist-preset': 'filmstrip' },
     arrows: 'pill-right',
     autoHide: false,
     rail: 'bottom',
@@ -31,7 +31,7 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
   },
   // full-bleed: rail hidden by default, chrome auto-hides on idle, minimal UI.
   immersive: {
-    rootAttrs: { 'data-visora-preset': 'immersive' },
+    rootAttrs: { 'data-gallerist-preset': 'immersive' },
     arrows: 'pill-right',
     autoHide: true,
     rail: 'hidden',
@@ -39,7 +39,7 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
   },
   // time-series reviewer: bottom timeline rail with labels, corner arrow cluster.
   reviewer: {
-    rootAttrs: { 'data-visora-preset': 'reviewer' },
+    rootAttrs: { 'data-gallerist-preset': 'reviewer' },
     arrows: 'corner-br',
     autoHide: false,
     rail: 'bottom',
@@ -47,7 +47,7 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
   },
   // browse-heavy: a vertical rail down the right edge (pairs well with the grid plugin).
   contact: {
-    rootAttrs: { 'data-visora-preset': 'contact' },
+    rootAttrs: { 'data-gallerist-preset': 'contact' },
     arrows: 'pill-right',
     autoHide: false,
     rail: 'right',
@@ -59,7 +59,7 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
 export function resolvePreset(name: string): ResolvedPreset {
   const preset = PRESETS[name as PresetName]
   if (!preset && typeof console !== 'undefined') {
-    console.warn(`[visora] unknown preset "${name}" — falling back to "filmstrip"`)
+    console.warn(`[gallerist] unknown preset "${name}" — falling back to "filmstrip"`)
   }
   return preset ?? PRESETS.filmstrip
 }

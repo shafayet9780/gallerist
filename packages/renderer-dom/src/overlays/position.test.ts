@@ -1,4 +1,4 @@
-import type { ContentAnchor, ViewportAnchor } from '@visora/core'
+import type { ContentAnchor, ViewportAnchor } from '@gallerist/core'
 import { describe, expect, it } from 'vitest'
 import {
   containRect,

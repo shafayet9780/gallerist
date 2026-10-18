@@ -4,8 +4,13 @@ import {
   type ViewerApi,
   type ViewerOptions,
   createViewer,
-} from '@visora/core'
-import { type ArrowLayout, type PresetName, type RailPlacement, mount } from '@visora/renderer-dom'
+} from '@gallerist/core'
+import {
+  type ArrowLayout,
+  type PresetName,
+  type RailPlacement,
+  mount,
+} from '@gallerist/renderer-dom'
 import {
   type ReactNode,
   forwardRef,
@@ -16,17 +21,17 @@ import {
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { VisoraContext, useViewerContext } from './context'
+import { GalleristContext, useViewerContext } from './context'
 
-export interface VisoraProps extends ViewerOptions {
+export interface GalleristProps extends ViewerOptions {
   /** controlled visibility. */
   open?: boolean
   onClose?: () => void
   container?: HTMLElement | null
   controls?: boolean
-  /** layout preset (sets arrow placement, auto-hide, data-visora-preset) — UX-E. */
+  /** layout preset (sets arrow placement, auto-hide, data-gallerist-preset) — UX-E. */
   preset?: PresetName
-  /** accent variant, applied as data-visora-theme (reactive) — UX-I. */
+  /** accent variant, applied as data-gallerist-theme (reactive) — UX-I. */
   theme?: 'amber' | 'cyan' | 'vermilion'
   /** within-group arrow placement (overrides the preset default) — UX-D. */
   arrows?: ArrowLayout
@@ -39,7 +44,7 @@ export interface VisoraProps extends ViewerOptions {
   children?: ReactNode
 }
 
-const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref) {
+const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(props, ref) {
   const {
     open,
     onClose,
@@ -101,12 +106,12 @@ const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref
     }
   }, [viewer])
 
-  // theme is reactive — reflect it as data-visora-theme on the mounted root.
+  // theme is reactive — reflect it as data-gallerist-theme on the mounted root.
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
-    if (theme) root.setAttribute('data-visora-theme', theme)
-    else root.removeAttribute('data-visora-theme')
+    if (theme) root.setAttribute('data-gallerist-theme', theme)
+    else root.removeAttribute('data-gallerist-theme')
   }, [theme])
 
   useEffect(() => {
@@ -120,10 +125,10 @@ const VisoraBase = forwardRef<ViewerApi, VisoraProps>(function Visora(props, ref
     return viewer.on('closed', () => onClose())
   }, [onClose, viewer])
 
-  return <VisoraContext.Provider value={viewer}>{children}</VisoraContext.Provider>
+  return <GalleristContext.Provider value={viewer}>{children}</GalleristContext.Provider>
 })
 
-export interface VisoraOverlayProps {
+export interface GalleristOverlayProps {
   anchor: OverlaySpec['anchor']
   id?: string
   layer?: number
@@ -134,7 +139,7 @@ export interface VisoraOverlayProps {
 }
 
 /** Render a React subtree as an image-space / viewport overlay via a portal (decision P0-G). */
-function Overlay(props: VisoraOverlayProps): ReactNode {
+function Overlay(props: GalleristOverlayProps): ReactNode {
   const viewer = useViewerContext()
   const [host, setHost] = useState<HTMLElement | null>(null)
   // useId is SSR-deterministic (server + client agree), unlike a module-global counter.
@@ -170,13 +175,13 @@ function Overlay(props: VisoraOverlayProps): ReactNode {
   return host ? createPortal(props.children, host) : null
 }
 
-export interface VisoraRegionProps {
+export interface GalleristRegionProps {
   name: RegionName
   children?: ReactNode
 }
 
 /** Render a React subtree into a named renderer region (toolbar, footer, …) via a portal. */
-function Region(props: VisoraRegionProps): ReactNode {
+function Region(props: GalleristRegionProps): ReactNode {
   const viewer = useViewerContext()
   const [host, setHost] = useState<HTMLElement | null>(null)
   const { name } = props
@@ -197,4 +202,4 @@ function Region(props: VisoraRegionProps): ReactNode {
   return host ? createPortal(props.children, host) : null
 }
 
-export const Visora = Object.assign(VisoraBase, { Overlay, Region })
+export const Gallerist = Object.assign(GalleristBase, { Overlay, Region })

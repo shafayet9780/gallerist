@@ -1,96 +1,96 @@
 /*
- * @visora/theme-default — pure CSS skin for Visora (token prefix locked: --visora-*).
+ * @gallerist/theme-default — pure CSS skin for Gallerist (token prefix locked: --gallerist-*).
  * Identity: "pro-review console" (M14 UX-I) — warm graphite surfaces, a single signal accent,
  * monospaced tabular numerals for counters/timestamps/ticks. Default accent is signal-amber;
- * cyan + vermilion variants via [data-visora-theme]. System fonts only (no web-font downloads).
+ * cyan + vermilion variants via [data-gallerist-theme]. System fonts only (no web-font downloads).
  */
 
-.visora {
+.gallerist {
   /* surfaces — warm graphite, not pure black, so media still pops */
-  --visora-backdrop: rgb(14 15 18 / 0.96);
-  --visora-fg: #f2f3f5;
-  --visora-fg-muted: #9aa0ab;
-  --visora-chrome-bg: rgb(20 22 27 / 0.66);
-  --visora-hairline: rgb(255 255 255 / 0.1);
-  --visora-radius: 9px;
-  --visora-target: 44px;
-  --visora-thumb-h: 84px;
-  --visora-rail-handle-h: 22px;
-  --visora-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
-  --visora-rail-w: 130px; /* vertical (left/right) rail width */
-  --visora-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --gallerist-backdrop: rgb(14 15 18 / 0.96);
+  --gallerist-fg: #f2f3f5;
+  --gallerist-fg-muted: #9aa0ab;
+  --gallerist-chrome-bg: rgb(20 22 27 / 0.66);
+  --gallerist-hairline: rgb(255 255 255 / 0.1);
+  --gallerist-radius: 9px;
+  --gallerist-target: 44px;
+  --gallerist-thumb-h: 84px;
+  --gallerist-rail-handle-h: 22px;
+  --gallerist-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
+  --gallerist-rail-w: 130px; /* vertical (left/right) rail width */
+  --gallerist-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
-  /* signal accent (amber by default). --visora-accent-fg = ink that sits on the accent. */
-  --visora-accent: #ffb000;
-  --visora-accent-fg: #15110a;
+  /* signal accent (amber by default). --gallerist-accent-fg = ink that sits on the accent. */
+  --gallerist-accent: #ffb000;
+  --gallerist-accent-fg: #15110a;
 
-  --visora-speed: 300ms;
+  --gallerist-speed: 300ms;
 
   /* motion (spec §27.2) — bezier approximations of the named springs */
-  --visora-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --visora-ease-pop: cubic-bezier(0.34, 1.3, 0.5, 1);
-  --visora-dur-hero: 420ms;
-  --visora-dur-snappy: 340ms;
-  --visora-dur-gentle: 280ms;
+  --gallerist-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --gallerist-ease-pop: cubic-bezier(0.34, 1.3, 0.5, 1);
+  --gallerist-dur-hero: 420ms;
+  --gallerist-dur-snappy: 340ms;
+  --gallerist-dur-gentle: 280ms;
 
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
   font-family: system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
 }
 
 /* ── accent variants (UX-I) ─────────────────────────────────────────────────── */
-.visora[data-visora-theme="cyan"] {
-  --visora-accent: #22d3ee;
-  --visora-accent-fg: #04181c;
+.gallerist[data-gallerist-theme="cyan"] {
+  --gallerist-accent: #22d3ee;
+  --gallerist-accent-fg: #04181c;
 }
-.visora[data-visora-theme="vermilion"] {
-  --visora-accent: #ff5a36;
-  --visora-accent-fg: #fff;
+.gallerist[data-gallerist-theme="vermilion"] {
+  --gallerist-accent: #ff5a36;
+  --gallerist-accent-fg: #fff;
 }
 
-/* ── modes (data-attribute, not a class — avoids colliding with .visora-overlay elements) ── */
-.visora[data-visora-mode="overlay"] {
+/* ── modes (data-attribute, not a class — avoids colliding with .gallerist-overlay elements) ── */
+.gallerist[data-gallerist-mode="overlay"] {
   position: fixed;
   inset: 0;
   z-index: 2147483000;
 }
-.visora[data-visora-mode="inline"] {
+.gallerist[data-gallerist-mode="inline"] {
   position: relative;
   width: 100%;
   height: 100%;
 }
 
-.visora-backdrop {
+.gallerist-backdrop {
   position: absolute;
   inset: 0;
-  background: var(--visora-backdrop);
+  background: var(--gallerist-backdrop);
   /* recede as the user drags to dismiss so the page behind shows through — the renderer writes
-     --visora-dismiss (0..1) on the root during a close drag (S-R1). */
-  opacity: calc(1 - var(--visora-dismiss, 0) * 0.55);
+     --gallerist-dismiss (0..1) on the root during a close drag (S-R1). */
+  opacity: calc(1 - var(--gallerist-dismiss, 0) * 0.55);
 }
 
 /* ── stage / slides ────────────────────────────────────────────────────────── */
-.visora-stage {
+.gallerist-stage {
   position: absolute;
   inset: 0;
   overflow: hidden;
   touch-action: none; /* gestures are owned by the engine (spec §11) */
 }
-.visora-track {
+.gallerist-track {
   position: absolute;
   inset: 0;
 }
-.visora-slide {
+.gallerist-slide {
   position: absolute;
   inset: 0;
   display: none;
   align-items: center;
   justify-content: center;
 }
-.visora-slide[data-visora-current] {
+.gallerist-slide[data-gallerist-current] {
   display: flex;
 }
-.visora-content {
+.gallerist-content {
   position: absolute;
   inset: 0;
   transform-origin: 0 0;
@@ -98,28 +98,28 @@
 }
 
 /* ── overlays (spec §9) ────────────────────────────────────────────────────── */
-.visora-viewport-layer {
+.gallerist-viewport-layer {
   position: absolute;
   inset: 0;
   z-index: 5;
   pointer-events: none;
 }
-.visora-overlays-content {
+.gallerist-overlays-content {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
-.visora-overlay {
+.gallerist-overlay {
   pointer-events: none;
 }
-.visora-media {
+.gallerist-media {
   position: absolute;
   inset: 0;
   margin: auto;
   max-width: 100%;
   max-height: 100%;
 }
-.visora-media-image {
+.gallerist-media-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -128,13 +128,13 @@
   opacity: 0;
   transition: opacity 180ms ease-out;
 }
-.visora-media-image[data-visora-loaded] {
+.gallerist-media-image[data-gallerist-loaded] {
   opacity: 1;
 }
 /* A failed load shows a centered error card (icon + the item's alt as a caption) instead of a
    blank stage or the browser's default top-left broken-image glyph (I-UX3). The broken <img>
-   itself stays hidden (opacity:0); the adapter injects .visora-media-error as a sibling. */
-.visora-media-error {
+   itself stays hidden (opacity:0); the adapter injects .gallerist-media-error as a sibling. */
+.gallerist-media-error {
   position: absolute;
   inset: 0;
   display: flex;
@@ -144,22 +144,22 @@
   gap: 12px;
   padding: 24px;
   text-align: center;
-  color: var(--visora-fg-muted);
+  color: var(--gallerist-fg-muted);
   background: rgba(127, 127, 127, 0.06);
 }
-.visora-media-error-icon {
+.gallerist-media-error-icon {
   opacity: 0.75;
   line-height: 0;
 }
-.visora-media-error-label {
+.gallerist-media-error-label {
   font: 14px / 1.4 system-ui, -apple-system, sans-serif;
   max-width: 40ch;
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
 }
 /* Loading shimmer for slow media — shown only while an image is still pending (no loaded/error
    marker yet), delayed so fast loads never flash it. Degrades to nothing where :has is absent. */
-.visora-content:has(
-    .visora-media-image:not([data-visora-loaded]):not([data-visora-error])
+.gallerist-content:has(
+    .gallerist-media-image:not([data-gallerist-loaded]):not([data-gallerist-error])
   )::before {
   content: "";
   position: absolute;
@@ -172,9 +172,9 @@
     transparent 65%
   );
   background-size: 200% 100%;
-  animation: visora-shimmer 1.4s ease-in-out 0.6s infinite;
+  animation: gallerist-shimmer 1.4s ease-in-out 0.6s infinite;
 }
-@keyframes visora-shimmer {
+@keyframes gallerist-shimmer {
   from {
     background-position: 150% 0;
   }
@@ -183,80 +183,80 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .visora-content::before {
+  .gallerist-content::before {
     animation: none;
   }
 }
 
 /* ── plugin regions (spec §13) ─────────────────────────────────────────────── */
 /* containers never block gestures; only their injected children are interactive */
-.visora-region {
+.gallerist-region {
   pointer-events: none;
 }
-.visora-region > * {
+.gallerist-region > * {
   pointer-events: auto;
 }
-.visora-region-toolbar {
+.gallerist-region-toolbar {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  min-height: var(--visora-toolbar-h);
+  min-height: var(--gallerist-toolbar-h);
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 12px;
   z-index: 6;
 }
-.visora-region-thumbnails {
+.gallerist-region-thumbnails {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 6;
 }
-.visora-region-footer {
+.gallerist-region-footer {
   position: absolute;
   inset-inline: 0;
   /* sits above a horizontal bottom rail. With a vertical (left/right) rail or a collapsed/hidden
      rail there is no bottom strip to clear, so the band drops to the stage edge (S-UX1). */
-  bottom: var(--visora-thumb-h, 0);
+  bottom: var(--gallerist-thumb-h, 0);
   z-index: 6;
 }
-.visora[data-visora-orientation="vertical"] .visora-region-footer,
-.visora[data-visora-rail="collapsed"] .visora-region-footer {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-region-footer,
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-region-footer {
   bottom: 0;
 }
-.visora-region-stage {
+.gallerist-region-stage {
   position: absolute;
   inset: 0;
   z-index: 7;
 }
 /* plugin toolbar buttons (fullscreen, grid, download, …) */
-.visora-region-toolbar button {
-  min-width: var(--visora-target);
-  min-height: var(--visora-target);
+.gallerist-region-toolbar button {
+  min-width: var(--gallerist-target);
+  min-height: var(--gallerist-target);
   display: grid;
   place-items: center;
-  border: 0.5px solid var(--visora-hairline);
-  border-radius: var(--visora-radius);
-  background: var(--visora-chrome-bg);
-  color: var(--visora-fg);
+  border: 0.5px solid var(--gallerist-hairline);
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-chrome-bg);
+  color: var(--gallerist-fg);
   cursor: pointer;
   backdrop-filter: blur(20px) saturate(180%);
 }
-.visora-region-toolbar button:focus-visible {
-  outline: 2px solid var(--visora-accent);
+.gallerist-region-toolbar button:focus-visible {
+  outline: 2px solid var(--gallerist-accent);
   outline-offset: 2px;
 }
-.visora-region-backdrop {
+.gallerist-region-backdrop {
   position: absolute;
   inset: 0;
   z-index: 0;
 }
 
 /* ── grid (plugin-grid) ────────────────────────────────────────────────────── */
-.visora-grid {
+.gallerist-grid {
   position: absolute;
   inset: 0;
   overflow-y: auto;
@@ -264,21 +264,21 @@
   background: rgb(8 8 10 / 0.96);
   backdrop-filter: blur(8px);
 }
-.visora-grid-header {
+.gallerist-grid-header {
   position: sticky;
   top: 0;
   padding: 12px 4px 8px;
   font: 500 14px system-ui;
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
   background: rgb(8 8 10 / 0.96);
 }
-.visora-grid-cells {
+.gallerist-grid-cells {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
-.visora-grid-cell {
+.gallerist-grid-cell {
   aspect-ratio: 3 / 2;
   padding: 0;
   border: 2px solid transparent;
@@ -287,10 +287,10 @@
   cursor: pointer;
   background: #1a1a1f;
 }
-.visora-grid-cell[data-active] {
-  border-color: var(--visora-accent);
+.gallerist-grid-cell[data-active] {
+  border-color: var(--gallerist-accent);
 }
-.visora-grid-img {
+.gallerist-grid-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -300,94 +300,94 @@
 /* ── thumbnails rail (plugin-thumbnails) ───────────────────────────────────── */
 /* the region wrapper: holds the scrollable rail plus the floating item/peek panels as siblings, so
    the panels escape the rail's overflow-clip yet still ride along when the region is re-mounted. */
-.visora-thumbs-region {
+.gallerist-thumbs-region {
   position: relative;
 }
-.visora-thumbs {
+.gallerist-thumbs {
   display: flex;
   gap: 8px;
   align-items: center;
   padding: 8px 12px;
   overflow-x: auto;
-  background: var(--visora-chrome-bg);
+  background: var(--gallerist-chrome-bg);
   backdrop-filter: blur(20px) saturate(180%);
 }
 /* cards stack image + (optional) caption band; height grows for the caption */
-.visora-thumb {
+.gallerist-thumb {
   position: relative;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  width: calc(var(--visora-thumb-h) * 1.4);
+  width: calc(var(--gallerist-thumb-h) * 1.4);
   padding: 0;
   border: 2px solid transparent;
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
   background: #1a1c22;
-  transition: border-color var(--visora-dur-gentle) var(--visora-ease-out), box-shadow
-    var(--visora-dur-gentle) var(--visora-ease-out);
+  transition: border-color var(--gallerist-dur-gentle) var(--gallerist-ease-out), box-shadow
+    var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
-.visora-thumb[data-active] {
-  border-color: var(--visora-accent);
-  box-shadow: 0 0 0 1px var(--visora-accent), 0 8px 22px -8px var(--visora-accent);
+.gallerist-thumb[data-active] {
+  border-color: var(--gallerist-accent);
+  box-shadow: 0 0 0 1px var(--gallerist-accent), 0 8px 22px -8px var(--gallerist-accent);
 }
-.visora-thumb-img {
+.gallerist-thumb-img {
   width: 100%;
   object-fit: cover;
   display: block;
 }
-.visora-thumb > .visora-thumb-img {
+.gallerist-thumb > .gallerist-thumb-img {
   flex: 0 0 auto;
-  height: var(--visora-thumb-h);
+  height: var(--gallerist-thumb-h);
 }
-.visora-thumb-stacked {
+.gallerist-thumb-stacked {
   box-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
 }
-.visora-thumb-count {
+.gallerist-thumb-count {
   position: absolute;
   top: 4px;
   right: 4px;
-  font-family: var(--visora-mono);
+  font-family: var(--gallerist-mono);
   font-size: 10px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   background: rgb(0 0 0 / 0.62);
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
   padding: 1px 5px;
   border-radius: 999px;
   backdrop-filter: blur(6px);
 }
 /* single label band beneath each thumbnail (UX feedback: caption goes under the thumb) */
-.visora-thumb-caption {
+.gallerist-thumb-caption {
   flex: 0 0 auto;
   padding: 4px 6px 5px;
   font: 500 11px system-ui;
   line-height: 1.2;
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
   background: rgb(255 255 255 / 0.03);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.visora-thumb[data-active] .visora-thumb-caption {
-  color: var(--visora-accent);
+.gallerist-thumb[data-active] .gallerist-thumb-caption {
+  color: var(--gallerist-accent);
 }
-.visora-thumb-items {
+.gallerist-thumb-items {
   display: flex;
   gap: 6px;
   align-items: center;
 }
 /* horizontal (legacy): inline row separated from the group rail by a hairline. */
-.visora-thumb-items[data-axis="horizontal"] {
+.gallerist-thumb-items[data-axis="horizontal"] {
   padding-left: 8px;
   margin-left: 8px;
-  border-left: 1px solid var(--visora-hairline);
+  border-left: 1px solid var(--gallerist-hairline);
 }
 /* vertical (default, UX-A): a column floating just above the rail so ↑/↓ moves the highlight
    up/down. Absolutely positioned against the (positioned) region host; the rail is static so its
    overflow-x does not clip this panel. */
-.visora-thumb-items[data-axis="vertical"] {
+.gallerist-thumb-items[data-axis="vertical"] {
   flex-direction: column;
   align-items: stretch;
   position: absolute;
@@ -396,37 +396,37 @@
   max-height: 60vh;
   overflow-y: auto;
   padding: 6px;
-  border-radius: var(--visora-radius);
-  background: var(--visora-chrome-bg);
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-chrome-bg);
   backdrop-filter: blur(20px) saturate(180%);
 }
-.visora-thumb-item {
+.gallerist-thumb-item {
   position: relative;
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
-  width: calc(var(--visora-thumb-h) * 1.2);
+  width: calc(var(--gallerist-thumb-h) * 1.2);
   padding: 0;
   border: 2px solid transparent;
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
   background: #1a1c22;
-  transition: border-color var(--visora-dur-gentle) var(--visora-ease-out);
+  transition: border-color var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
-.visora-thumb-item > .visora-thumb-img {
+.gallerist-thumb-item > .gallerist-thumb-img {
   flex: 0 0 auto;
-  height: calc(var(--visora-thumb-h) * 0.7);
+  height: calc(var(--gallerist-thumb-h) * 0.7);
 }
-.visora-thumb-item[data-active] {
-  border-color: var(--visora-accent);
-  box-shadow: 0 0 0 1px var(--visora-accent);
+.gallerist-thumb-item[data-active] {
+  border-color: var(--gallerist-accent);
+  box-shadow: 0 0 0 1px var(--gallerist-accent);
 }
 
 /* ── peek flyout (stacked, UX-A): preview a non-active group's items on hover/focus without
    navigating in. Mirrors the vertical item column; `left` is set inline to anchor it to the
    hovered card. ──────────────────────────────────────────────────────────────────────────── */
-.visora-thumb-peek {
+.gallerist-thumb-peek {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -439,24 +439,24 @@
   max-width: min(280px, 60vw);
   overflow: auto;
   padding: 6px;
-  border-radius: var(--visora-radius);
-  background: var(--visora-chrome-bg);
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-chrome-bg);
   backdrop-filter: blur(20px) saturate(180%);
   box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6);
 }
-.visora-thumb-peek[data-axis="horizontal"] {
+.gallerist-thumb-peek[data-axis="horizontal"] {
   flex-direction: row;
   align-items: center;
 }
 
 /* touch (no hover): the group card is wrapped so a sibling expand button is valid HTML; tapping it
    opens the peek while the card itself still navigates on first tap. */
-.visora-thumb-wrap {
+.gallerist-thumb-wrap {
   position: relative;
   flex: 0 0 auto;
   display: flex;
 }
-.visora-thumb-expand {
+.gallerist-thumb-expand {
   position: absolute;
   top: 4px;
   left: 4px;
@@ -469,219 +469,219 @@
   border: none;
   border-radius: 6px;
   background: rgb(0 0 0 / 0.55);
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
   font: 700 13px / 1 system-ui;
   cursor: pointer;
   backdrop-filter: blur(6px);
 }
-.visora-thumb-expand::before {
+.gallerist-thumb-expand::before {
   content: "⊞";
 }
 
 /* items-toggle: a toolbar button (inherits the toolbar button base) that shows/hides the active
    group's item panel; accent-tinted while the panel is shown. */
-.visora-items-toggle[aria-pressed="true"] {
-  color: var(--visora-accent);
-  border-color: var(--visora-accent);
+.gallerist-items-toggle[aria-pressed="true"] {
+  color: var(--gallerist-accent);
+  border-color: var(--gallerist-accent);
 }
 
 /* ── flat rail (groupDisplay: flat): every item side-by-side, each group bracketed so it reads as
    one group. The accent left-rule + border mark the group; partial flags fade the bracket at the
    virtualization window edges. ───────────────────────────────────────────────────────────────── */
-.visora-thumbs[data-display="flat"] {
+.gallerist-thumbs[data-display="flat"] {
   align-items: stretch;
 }
-.visora-thumb-group {
+.gallerist-thumb-group {
   position: relative;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 6px 8px;
-  border: 1px solid var(--visora-hairline);
-  border-left: 3px solid var(--visora-accent);
-  border-radius: var(--visora-radius);
+  border: 1px solid var(--gallerist-hairline);
+  border-left: 3px solid var(--gallerist-accent);
+  border-radius: var(--gallerist-radius);
   background: rgb(255 255 255 / 0.02);
 }
 /* a group continuing off-window: soften the bracket so it reads as "more before/after". */
-.visora-thumb-group[data-partial-start] {
-  border-left-color: var(--visora-hairline);
+.gallerist-thumb-group[data-partial-start] {
+  border-left-color: var(--gallerist-hairline);
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
-.visora-thumb-group[data-partial-end] {
+.gallerist-thumb-group[data-partial-end] {
   border-right-style: dashed;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
-.visora-thumb-group-cap {
+.gallerist-thumb-group-cap {
   font: 600 11px system-ui;
   line-height: 1.2;
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
   opacity: 0.85;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
-.visora-thumb-group-row {
+.gallerist-thumb-group-row {
   display: flex;
   gap: 6px;
   align-items: center;
 }
 
 /* ── chrome ────────────────────────────────────────────────────────────────── */
-.visora-chrome {
+.gallerist-chrome {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
-.visora-chrome > * {
+.gallerist-chrome > * {
   pointer-events: auto;
 }
-.visora-chrome > button {
+.gallerist-chrome > button {
   position: absolute;
-  min-width: var(--visora-target);
-  min-height: var(--visora-target);
+  min-width: var(--gallerist-target);
+  min-height: var(--gallerist-target);
   display: grid;
   place-items: center;
-  border: 0.5px solid var(--visora-hairline);
-  border-radius: var(--visora-radius);
-  background: var(--visora-chrome-bg);
-  color: var(--visora-fg);
+  border: 0.5px solid var(--gallerist-hairline);
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-chrome-bg);
+  color: var(--gallerist-fg);
   cursor: pointer;
   backdrop-filter: blur(20px) saturate(180%);
 }
-.visora-chrome > button:focus-visible {
-  outline: 2px solid var(--visora-accent);
+.gallerist-chrome > button:focus-visible {
+  outline: 2px solid var(--gallerist-accent);
   outline-offset: 2px;
 }
-.visora-icon {
+.gallerist-icon {
   width: 22px;
   height: 22px;
   display: block;
   pointer-events: none;
 }
-.visora-close {
+.gallerist-close {
   top: 12px;
   right: 12px;
 }
-.visora-prev {
+.gallerist-prev {
   top: 50%;
   /* logical inset so prev/next mirror automatically in an RTL document (S-UX3) */
   inset-inline-start: 12px;
   transform: translateY(-50%);
 }
-.visora-next {
+.gallerist-next {
   top: 50%;
   inset-inline-end: 12px;
   transform: translateY(-50%);
 }
-.visora-item-prev {
+.gallerist-item-prev {
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
-.visora-item-next {
+.gallerist-item-next {
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
-.visora-zoom-reset {
+.gallerist-zoom-reset {
   bottom: 12px;
   right: 12px;
 }
 
-/* linear flat traversal (data-visora-linear): the item axis retires, so the ↑/↓ arrows and the
+/* linear flat traversal (data-gallerist-linear): the item axis retires, so the ↑/↓ arrows and the
    within-group position pills are removed — ←/→ alone walks the whole flattened sequence. */
-.visora[data-visora-linear="true"] .visora-item-prev,
-.visora[data-visora-linear="true"] .visora-item-next,
-.visora[data-visora-linear="true"] .visora-position {
+.gallerist[data-gallerist-linear="true"] .gallerist-item-prev,
+.gallerist[data-gallerist-linear="true"] .gallerist-item-next,
+.gallerist[data-gallerist-linear="true"] .gallerist-position {
   display: none;
 }
 
-/* ── arrow placement (data-visora-arrows, UX-D) ─────────────────────────────── */
+/* ── arrow placement (data-gallerist-arrows, UX-D) ─────────────────────────────── */
 /* base ↑/↓ above are the legacy "split" layout (top/bottom-center). Each layout below overrides. */
 
 /* pill-right (default): ↑/↓ stacked just inboard of the → side arrow. */
-.visora[data-visora-arrows="pill-right"] .visora-item-prev,
-.visora[data-visora-arrows="pill-right"] .visora-item-next {
+.gallerist[data-gallerist-arrows="pill-right"] .gallerist-item-prev,
+.gallerist[data-gallerist-arrows="pill-right"] .gallerist-item-next {
   top: 50%;
   bottom: auto;
   left: auto;
   right: 68px;
 }
-.visora[data-visora-arrows="pill-right"] .visora-item-prev {
+.gallerist[data-gallerist-arrows="pill-right"] .gallerist-item-prev {
   transform: translateY(calc(-50% - 24px));
 }
-.visora[data-visora-arrows="pill-right"] .visora-item-next {
+.gallerist[data-gallerist-arrows="pill-right"] .gallerist-item-next {
   transform: translateY(calc(-50% + 24px));
 }
 
 /* corner-br: ↑ ↓ paired in the bottom-right, left of the zoom-reset. */
-.visora[data-visora-arrows="corner-br"] .visora-item-prev,
-.visora[data-visora-arrows="corner-br"] .visora-item-next {
+.gallerist[data-gallerist-arrows="corner-br"] .gallerist-item-prev,
+.gallerist[data-gallerist-arrows="corner-br"] .gallerist-item-next {
   top: auto;
   bottom: 12px;
   left: auto;
   transform: none;
 }
-.visora[data-visora-arrows="corner-br"] .visora-item-prev {
+.gallerist[data-gallerist-arrows="corner-br"] .gallerist-item-prev {
   right: 116px;
 }
-.visora[data-visora-arrows="corner-br"] .visora-item-next {
+.gallerist[data-gallerist-arrows="corner-br"] .gallerist-item-next {
   right: 64px;
 }
 
 /* dpad: all four clustered as a directional pad in the bottom-right. */
-.visora[data-visora-arrows="dpad"] .visora-prev,
-.visora[data-visora-arrows="dpad"] .visora-next {
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-prev,
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-next {
   top: auto;
   bottom: 60px;
   left: auto;
   transform: none;
 }
-.visora[data-visora-arrows="dpad"] .visora-prev {
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-prev {
   right: 116px;
 }
-.visora[data-visora-arrows="dpad"] .visora-next {
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-next {
   right: 8px;
 }
-.visora[data-visora-arrows="dpad"] .visora-item-prev,
-.visora[data-visora-arrows="dpad"] .visora-item-next {
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-item-prev,
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-item-next {
   top: auto;
   left: auto;
   right: 62px;
   transform: none;
 }
-.visora[data-visora-arrows="dpad"] .visora-item-prev {
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-item-prev {
   bottom: 108px;
 }
-.visora[data-visora-arrows="dpad"] .visora-item-next {
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-item-next {
   bottom: 12px;
 }
 /* ── rail collapse + idle auto-hide (UX-C) ──────────────────────────────────── */
 /* The rail region stacks [handle][thumbs] and slides as a whole. Collapsing translates it down so
    only the handle peeks (translate uses the region's own height, so it works at any rail height). */
-.visora-region-thumbnails {
+.gallerist-region-thumbnails {
   display: flex;
   flex-direction: column;
-  transition: transform var(--visora-dur-snappy, 340ms) var(--visora-ease-out, ease);
+  transition: transform var(--gallerist-dur-snappy, 340ms) var(--gallerist-ease-out, ease);
 }
-.visora[data-visora-rail="collapsed"] .visora-region-thumbnails {
-  transform: translateY(calc(100% - var(--visora-rail-handle-h)));
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-region-thumbnails {
+  transform: translateY(calc(100% - var(--gallerist-rail-handle-h)));
 }
 
 /* the pull-handle: a grip tab on the rail's edge — clearly part of the gallery */
-.visora-rail-handle {
+.gallerist-rail-handle {
   flex: 0 0 auto;
-  height: var(--visora-rail-handle-h);
+  height: var(--gallerist-rail-handle-h);
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
 }
-.visora-rail-toggle {
+.gallerist-rail-toggle {
   pointer-events: auto;
   display: grid;
   grid-auto-flow: column;
@@ -690,14 +690,14 @@
   height: 22px;
   min-width: 52px;
   padding: 0 10px;
-  border: 1px solid var(--visora-hairline);
+  border: 1px solid var(--gallerist-hairline);
   border-radius: 999px;
-  background: var(--visora-chrome-bg);
-  color: var(--visora-fg);
+  background: var(--gallerist-chrome-bg);
+  color: var(--gallerist-fg);
   cursor: pointer;
   backdrop-filter: blur(20px) saturate(180%);
 }
-.visora-rail-toggle::before {
+.gallerist-rail-toggle::before {
   /* a small grip glyph so the tab reads as draggable/openable */
   content: "";
   width: 22px;
@@ -706,60 +706,60 @@
   background: currentColor;
   opacity: 0.5;
 }
-.visora-rail-toggle:focus-visible {
-  outline: 2px solid var(--visora-accent);
+.gallerist-rail-toggle:focus-visible {
+  outline: 2px solid var(--gallerist-accent);
   outline-offset: 2px;
 }
-.visora-rail-toggle .visora-icon {
+.gallerist-rail-toggle .gallerist-icon {
   width: 16px;
   height: 16px;
-  transition: transform var(--visora-dur-gentle, 280ms) var(--visora-ease-out, ease);
+  transition: transform var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
 }
 /* expanded = chevron points down (pull down to hide); collapsed = points up (pull up to show) */
-.visora-rail-toggle[aria-pressed="true"] .visora-icon {
+.gallerist-rail-toggle[aria-pressed="true"] .gallerist-icon {
   transform: rotate(180deg);
 }
 
 /* ── vertical rail (left/right, point 5): the strip runs down a side edge below the toolbar. The
    group axis is ↑/↓ and items ←/→ (keys/arrows remapped in the renderer); the rail scrolls
    vertically and the floating panels open toward the stage. ─────────────────────────────────── */
-.visora[data-visora-rail-pos="left"] .visora-region-thumbnails,
-.visora[data-visora-rail-pos="right"] .visora-region-thumbnails {
-  top: var(--visora-toolbar-h); /* clear the toolbar band (kept in sync via the token) */
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-region-thumbnails,
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-region-thumbnails {
+  top: var(--gallerist-toolbar-h); /* clear the toolbar band (kept in sync via the token) */
   bottom: 0;
   left: auto;
   right: auto;
   flex-direction: row; /* [handle][rail] side by side */
 }
-.visora[data-visora-rail-pos="left"] .visora-region-thumbnails {
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-region-thumbnails {
   left: 0;
 }
-.visora[data-visora-rail-pos="right"] .visora-region-thumbnails {
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-region-thumbnails {
   right: 0;
 }
-.visora[data-visora-orientation="vertical"] .visora-thumbs-region {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs-region {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
-.visora[data-visora-orientation="vertical"] .visora-thumbs {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs {
   flex: 1 1 auto;
   min-height: 0;
-  width: var(--visora-rail-w);
+  width: var(--gallerist-rail-w);
   flex-direction: column;
   align-items: stretch;
   overflow-x: hidden;
   overflow-y: auto;
 }
 /* the handle becomes a vertical grip on the rail's inboard edge; a left rail puts it on the right. */
-.visora[data-visora-rail-pos="left"] .visora-rail-handle {
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-rail-handle {
   order: 1;
 }
-.visora[data-visora-orientation="vertical"] .visora-rail-handle {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-rail-handle {
   height: auto;
-  width: var(--visora-rail-handle-h);
+  width: var(--gallerist-rail-handle-h);
 }
-.visora[data-visora-orientation="vertical"] .visora-rail-toggle {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-rail-toggle {
   grid-auto-flow: row;
   height: auto;
   min-width: 0;
@@ -767,69 +767,75 @@
   min-height: 52px;
   padding: 10px 0;
 }
-.visora[data-visora-orientation="vertical"] .visora-rail-toggle::before {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-rail-toggle::before {
   width: 3px;
   height: 22px;
 }
 /* chevron points the way the rail will travel: left rail hides leftward, shows rightward. */
-.visora[data-visora-rail-pos="left"] .visora-rail-toggle .visora-icon {
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-rail-toggle .gallerist-icon {
   transform: rotate(90deg);
 }
-.visora[data-visora-rail-pos="left"] .visora-rail-toggle[aria-pressed="true"] .visora-icon {
+.gallerist[data-gallerist-rail-pos="left"]
+  .gallerist-rail-toggle[aria-pressed="true"]
+  .gallerist-icon {
   transform: rotate(-90deg);
 }
-.visora[data-visora-rail-pos="right"] .visora-rail-toggle .visora-icon {
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-rail-toggle .gallerist-icon {
   transform: rotate(-90deg);
 }
-.visora[data-visora-rail-pos="right"] .visora-rail-toggle[aria-pressed="true"] .visora-icon {
+.gallerist[data-gallerist-rail-pos="right"]
+  .gallerist-rail-toggle[aria-pressed="true"]
+  .gallerist-icon {
   transform: rotate(90deg);
 }
 /* collapse slides the strip out sideways, leaving the handle peeking. */
-.visora[data-visora-rail-pos="left"][data-visora-rail="collapsed"] .visora-region-thumbnails {
-  transform: translateX(calc(-100% + var(--visora-rail-handle-h)));
+.gallerist[data-gallerist-rail-pos="left"][data-gallerist-rail="collapsed"]
+  .gallerist-region-thumbnails {
+  transform: translateX(calc(-100% + var(--gallerist-rail-handle-h)));
 }
-.visora[data-visora-rail-pos="right"][data-visora-rail="collapsed"] .visora-region-thumbnails {
-  transform: translateX(calc(100% - var(--visora-rail-handle-h)));
+.gallerist[data-gallerist-rail-pos="right"][data-gallerist-rail="collapsed"]
+  .gallerist-region-thumbnails {
+  transform: translateX(calc(100% - var(--gallerist-rail-handle-h)));
 }
 /* the active item column / peek open toward the stage (away from the rail), top-aligned. */
-.visora[data-visora-rail-pos="left"] .visora-thumb-items[data-axis="vertical"],
-.visora[data-visora-rail-pos="left"] .visora-thumb-peek {
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumb-items[data-axis="vertical"],
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumb-peek {
   left: calc(100% + 10px);
   right: auto;
   top: 8px;
   bottom: auto;
 }
-.visora[data-visora-rail-pos="right"] .visora-thumb-items[data-axis="vertical"],
-.visora[data-visora-rail-pos="right"] .visora-thumb-peek {
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-thumb-items[data-axis="vertical"],
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-thumb-peek {
   right: calc(100% + 10px);
   left: auto;
   top: 8px;
   bottom: auto;
 }
 /* arrows in vertical orientation: group ↑/↓ top/bottom-center, item ←/→ flanking the center. This
-   supersedes the `data-visora-arrows` layout (which only positions the horizontal mapping). */
-.visora[data-visora-orientation="vertical"] .visora-prev {
+   supersedes the `data-gallerist-arrows` layout (which only positions the horizontal mapping). */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-prev {
   top: 12px;
   bottom: auto;
   left: 50%;
   right: auto;
   transform: translateX(-50%);
 }
-.visora[data-visora-orientation="vertical"] .visora-next {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-next {
   bottom: 12px;
   top: auto;
   left: 50%;
   right: auto;
   transform: translateX(-50%);
 }
-.visora[data-visora-orientation="vertical"] .visora-item-prev {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-item-prev {
   top: 50%;
   bottom: auto;
   left: 50%;
   right: auto;
   transform: translate(calc(-50% - 26px), -50%);
 }
-.visora[data-visora-orientation="vertical"] .visora-item-next {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-item-next {
   top: 50%;
   bottom: auto;
   left: 50%;
@@ -837,21 +843,21 @@
   transform: translate(calc(-50% + 26px), -50%);
 }
 /* drop the within-group pills below the top-center group arrow so they don't collide. */
-.visora[data-visora-orientation="vertical"] .visora-position {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-position {
   top: 64px;
   bottom: auto;
 }
 
-.visora-chrome {
-  transition: opacity var(--visora-dur-gentle, 280ms) var(--visora-ease-out, ease);
+.gallerist-chrome {
+  transition: opacity var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
 }
-.visora[data-visora-idle] .visora-chrome {
+.gallerist[data-gallerist-idle] .gallerist-chrome {
   opacity: 0;
   pointer-events: none;
 }
 
 /* ── within-group position indicator (UX-H) ─────────────────────────────────── */
-.visora-position {
+.gallerist-position {
   position: absolute;
   top: 14px;
   left: 50%;
@@ -861,61 +867,61 @@
   gap: 4px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: var(--visora-chrome-bg);
+  background: var(--gallerist-chrome-bg);
   backdrop-filter: blur(20px) saturate(180%);
   font: 600 12px ui-monospace, "SF Mono", Menlo, monospace;
   font-variant-numeric: tabular-nums;
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
 }
-.visora-position[hidden] {
+.gallerist-position[hidden] {
   display: none;
 }
-.visora-position-label {
+.gallerist-position-label {
   opacity: 0.55;
   margin-right: 2px;
 }
-.visora-pill {
+.gallerist-pill {
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
   font: inherit;
   cursor: pointer;
   opacity: 0.55;
 }
-.visora-pill[data-active] {
-  background: var(--visora-accent);
-  color: var(--visora-accent-fg);
+.gallerist-pill[data-active] {
+  background: var(--gallerist-accent);
+  color: var(--gallerist-accent-fg);
   opacity: 1;
 }
-.visora-pill:focus-visible {
-  outline: 2px solid var(--visora-accent);
+.gallerist-pill:focus-visible {
+  outline: 2px solid var(--gallerist-accent);
   outline-offset: 2px;
 }
 
-.visora-counter {
+.gallerist-counter {
   position: absolute;
   top: 16px;
   left: 16px;
-  font-family: var(--visora-mono);
+  font-family: var(--gallerist-mono);
   font-size: 13px;
   font-weight: 600;
   /* the position counter is primary info — use full-contrast fg so it clears WCAG AA over the
      translucent chrome (the muted grey landed ~3.5:1) (S-UX5). */
-  color: var(--visora-fg);
+  color: var(--gallerist-fg);
   /* keep "N / M" reading left-to-right even in an RTL document (bidi would flip it to "M / N"). */
   direction: ltr;
   padding: 6px 10px;
-  border-radius: var(--visora-radius);
-  background: var(--visora-chrome-bg);
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-chrome-bg);
   backdrop-filter: blur(20px) saturate(180%);
 }
 
 /* ── a11y live region (visually hidden) ────────────────────────────────────── */
-.visora-live {
+.gallerist-live {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -928,7 +934,7 @@
 }
 
 /* ── motion: distinct axis transitions (spec §27.5) ────────────────────────── */
-@keyframes visora-enter-group {
+@keyframes gallerist-enter-group {
   from {
     opacity: 0;
     transform: translateX(6%);
@@ -938,7 +944,7 @@
     transform: none;
   }
 }
-@keyframes visora-enter-item {
+@keyframes gallerist-enter-item {
   from {
     opacity: 0;
     transform: scale(0.9) translateY(2%);
@@ -948,7 +954,7 @@
     transform: none;
   }
 }
-@keyframes visora-fade {
+@keyframes gallerist-fade {
   from {
     opacity: 0;
   }
@@ -958,40 +964,40 @@
 }
 
 /* time axis = horizontal slide; screen axis = depth pop — never the same motion */
-.visora-slide[data-visora-enter="group"] {
-  animation: visora-enter-group var(--visora-dur-snappy) var(--visora-ease-out);
+.gallerist-slide[data-gallerist-enter="group"] {
+  animation: gallerist-enter-group var(--gallerist-dur-snappy) var(--gallerist-ease-out);
 }
-.visora-slide[data-visora-enter="item"] {
-  animation: visora-enter-item var(--visora-dur-snappy) var(--visora-ease-pop);
+.gallerist-slide[data-gallerist-enter="item"] {
+  animation: gallerist-enter-item var(--gallerist-dur-snappy) var(--gallerist-ease-pop);
 }
-.visora[data-visora-mode="overlay"] {
-  animation: visora-fade var(--visora-dur-gentle) var(--visora-ease-out);
+.gallerist[data-gallerist-mode="overlay"] {
+  animation: gallerist-fade var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
 
 /* immersive preset: chrome AND the rail fade together on idle (UX-E). */
-.visora[data-visora-preset="immersive"][data-visora-idle] .visora-region-thumbnails,
-.visora[data-visora-preset="immersive"][data-visora-idle] .visora-region-toolbar {
+.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-thumbnails,
+.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-toolbar {
   opacity: 0;
   pointer-events: none;
 }
-.visora[data-visora-preset="immersive"] .visora-region-thumbnails,
-.visora[data-visora-preset="immersive"] .visora-region-toolbar {
-  transition: opacity var(--visora-dur-gentle) var(--visora-ease-out);
+.gallerist[data-gallerist-preset="immersive"] .gallerist-region-thumbnails,
+.gallerist[data-gallerist-preset="immersive"] .gallerist-region-toolbar {
+  transition: opacity var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .visora-media-image,
-  .visora-chrome,
-  .visora-thumb,
-  .visora-thumb-item,
-  .visora-region-thumbnails,
-  .visora-rail-toggle .visora-icon,
-  .visora[data-visora-preset="immersive"] .visora-region-thumbnails,
-  .visora[data-visora-preset="immersive"] .visora-region-toolbar {
+  .gallerist-media-image,
+  .gallerist-chrome,
+  .gallerist-thumb,
+  .gallerist-thumb-item,
+  .gallerist-region-thumbnails,
+  .gallerist-rail-toggle .gallerist-icon,
+  .gallerist[data-gallerist-preset="immersive"] .gallerist-region-thumbnails,
+  .gallerist[data-gallerist-preset="immersive"] .gallerist-region-toolbar {
     transition-duration: 0ms;
   }
-  .visora-slide[data-visora-enter],
-  .visora[data-visora-mode="overlay"] {
+  .gallerist-slide[data-gallerist-enter],
+  .gallerist[data-gallerist-mode="overlay"] {
     animation: none;
   }
 }

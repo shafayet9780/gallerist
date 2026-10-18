@@ -1,8 +1,15 @@
-// @visora/plugin-video-youtube — YouTube IFrame API adapter (spec §12, decision D8/P1-G).
+// @gallerist/plugin-video-youtube — YouTube IFrame API adapter (spec §12, decision D8/P1-G).
 // A separate sub-plugin so the YouTube API loads only when used. Matches YouTube URLs; play/pause
 // on slide enter/leave; advance on ended.
 
-import type { AdapterCtx, Item, MediaAdapter, MediaSource, Plugin, ViewerApi } from '@visora/core'
+import type {
+  AdapterCtx,
+  Item,
+  MediaAdapter,
+  MediaSource,
+  Plugin,
+  ViewerApi,
+} from '@gallerist/core'
 
 export interface YouTubeOptions {
   /** advance to the next slide when a video ends (default true). */
@@ -76,11 +83,11 @@ function loadYouTubeAPI(): Promise<YTNamespace> {
       clearTimeout(timer)
       resolve(w.YT as YTNamespace)
     }
-    if (!document.querySelector('script[data-visora-yt]')) {
+    if (!document.querySelector('script[data-gallerist-yt]')) {
       const s = document.createElement('script')
       s.src = 'https://www.youtube.com/iframe_api'
       s.async = true
-      s.dataset.visoraYt = ''
+      s.dataset.galleristYt = ''
       s.onerror = () => {
         if (settled) return
         settled = true
@@ -105,7 +112,7 @@ export function youtubeAdapter(viewer: ViewerApi, opts: YouTubeOptions = {}): Me
     },
     mount(item: Item, slot: HTMLElement, ctx: AdapterCtx) {
       const host = document.createElement('div')
-      host.className = 'visora-media visora-media-youtube'
+      host.className = 'gallerist-media gallerist-media-youtube'
       slot.appendChild(host)
       let player: YTPlayer | null = null
       const videoId = parseYouTubeId(srcOf(item.source) ?? '')

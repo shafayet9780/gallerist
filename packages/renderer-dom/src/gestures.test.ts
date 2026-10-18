@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@visora/core'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type Geometry, attachGestures } from './gestures'
 

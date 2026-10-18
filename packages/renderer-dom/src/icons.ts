@@ -3,7 +3,7 @@
 // innerHTML on buttons we create — no user data, no injection surface. Lucide-style paths (MIT).
 
 const svg = (body: string): string =>
-  `<svg class="visora-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`
+  `<svg class="gallerist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`
 
 export const ICONS = {
   close: svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),

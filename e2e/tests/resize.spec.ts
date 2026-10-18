@@ -11,7 +11,7 @@ test('re-anchors image-space overlays after a viewport resize (C2)', async ({ pa
   // stable selector (emoji text matching is unreliable on WebKit); the pin is anchored at the
   // image centre (point 0.5,0.5). Measure via in-page getBoundingClientRect — Playwright's
   // boundingBox() returns null for the transformed content-overlay host on WebKit.
-  const pin = page.locator('.visora-overlays-content [data-overlay="pin"]')
+  const pin = page.locator('.gallerist-overlays-content [data-overlay="pin"]')
   await expect(pin).toBeVisible()
   const left = () => pin.evaluate((el) => Math.round(el.getBoundingClientRect().left))
   const before = await left()
@@ -33,7 +33,7 @@ test('a swipe released off-stage does not strand the next gesture (C3)', async (
   await page.setViewportSize({ width: 1000, height: 800 })
   await page.goto('/')
   await page.click('#open')
-  const stage = page.locator('.visora-stage')
+  const stage = page.locator('.gallerist-stage')
   const box = await stage.boundingBox()
   if (!box) throw new Error('no stage')
 

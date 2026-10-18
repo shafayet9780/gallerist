@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { video, videoAdapter } from './index'
 
