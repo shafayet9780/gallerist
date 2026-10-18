@@ -3,6 +3,7 @@
 import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { applyAppearance } from './appearance'
 import { mount } from './mount'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg`, alt: id })
@@ -819,6 +820,19 @@ describe('mount — review fixes (M15)', () => {
     expect(root.getAttribute('data-gallerist-skin')).toBe('console')
     expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
     expect(root.getAttribute('data-gallerist-scheme')).toBe('auto')
+  })
+
+  it('applyAppearance changes only the options it is given', () => {
+    const v = createViewer({ collection: collection() })
+    const { root } = mount(v, { skin: 'console', scheme: 'light' })
+    applyAppearance(root, { accent: 'cyan' })
+    expect(root.getAttribute('data-gallerist-skin')).toBe('console')
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('light')
+    expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
+    applyAppearance(root, { scheme: undefined, accent: undefined })
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('dark')
+    expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
+    expect(root.getAttribute('data-gallerist-skin')).toBe('console')
   })
 
   it('marks the reading direction for the theme', () => {

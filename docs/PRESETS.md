@@ -143,7 +143,14 @@ to the skin's default. Gallery uses Instrument Sans when the page has loaded it 
 otherwise; the theme never downloads fonts.
 
 Everything is plain CSS custom properties (`--gallerist-*`). Override `--gallerist-accent-dark`,
-`--gallerist-backdrop`, `--gallerist-thumb-h`, etc. to restyle without forking the theme. A custom
-skin is a rule that sets tokens, e.g. `.gallerist[data-gallerist-skin="mine"] { … }`, loaded after
-`gallerist.css`; `base.css` documents every token it reads. Skins set tokens only; they never
-position chrome, so the layout guarantees hold in every skin.
+`--gallerist-backdrop`, `--gallerist-thumb-h`, etc. on `.gallerist` to restyle without forking the
+theme. The theme declares its tokens in cascade layers (`gallerist.base`, `.gallery`, `.console`,
+`.compact`), so a page's own rule wins in every skin, scheme and accent, and on phones. Scope it
+to narrow it, e.g. `.gallerist[data-gallerist-skin="console"] { --gallerist-accent-dark: … }`.
+The component rules themselves are not layered, so a page's element resets (`button { … }`)
+don't strip the chrome.
+
+A custom skin is a rule that sets tokens, e.g. `.gallerist[data-gallerist-skin="mine"] { … }`,
+loaded after `gallerist.css`; `base.css` documents every token it reads. Skins set tokens only;
+they never position chrome, so the layout guarantees hold in every skin. `applyAppearance(root,
+{ accent })` changes only the options it is given.

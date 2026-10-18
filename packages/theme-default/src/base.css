@@ -6,27 +6,40 @@
  * tokens; they never position chrome (plan P2-B).
  */
 
+/* Token declarations sit in cascade layers so a page's own --gallerist-* overrides always win,
+   whatever the skin, scheme or accent, and so the skins apply in a fixed order whatever order the
+   files load in. Component rules stay unlayered, so a page's element resets can't strip them. */
+@layer gallerist.base, gallerist.gallery, gallerist.console, gallerist.compact;
+
+@layer gallerist.base {
+  .gallerist {
+    /* structure: sizes every skin shares (a skin may tune them; the layout lint checks each skin) */
+    --gallerist-target: 44px;
+    --gallerist-thumb-h: 84px;
+    --gallerist-rail-handle-h: 22px;
+    --gallerist-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
+    --gallerist-rail-w: 130px; /* vertical (left/right) rail width */
+    --gallerist-speed: 300ms;
+
+    /* motion (spec §27.2) — bezier approximations of the named springs */
+    --gallerist-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --gallerist-ease-pop: cubic-bezier(0.34, 1.3, 0.5, 1);
+    --gallerist-dur-hero: 420ms;
+    --gallerist-dur-snappy: 340ms;
+    --gallerist-dur-gentle: 280ms;
+    --gallerist-dur-exit: 180ms; /* exits run shorter than entrances */
+
+    /* the accent: each skin names its accents as a dark/light pair, the scheme picks one */
+    --gallerist-accent: var(--gallerist-accent-dark);
+    --gallerist-accent-fg: var(--gallerist-accent-dark-fg);
+
+    /* hover: unchanged unless a skin sets one */
+    --gallerist-arrow-hover-bg: var(--gallerist-arrow-bg);
+    --gallerist-itemnav-button-hover-bg: var(--gallerist-itemnav-button-bg);
+  }
+}
+
 .gallerist {
-  /* structure: sizes every skin shares (a skin may tune them; the layout lint checks each skin) */
-  --gallerist-target: 44px;
-  --gallerist-thumb-h: 84px;
-  --gallerist-rail-handle-h: 22px;
-  --gallerist-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
-  --gallerist-rail-w: 130px; /* vertical (left/right) rail width */
-  --gallerist-speed: 300ms;
-
-  /* motion (spec §27.2) — bezier approximations of the named springs */
-  --gallerist-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --gallerist-ease-pop: cubic-bezier(0.34, 1.3, 0.5, 1);
-  --gallerist-dur-hero: 420ms;
-  --gallerist-dur-snappy: 340ms;
-  --gallerist-dur-gentle: 280ms;
-  --gallerist-dur-exit: 180ms; /* exits run shorter than entrances */
-
-  /* the accent: each skin names its accents as a dark/light pair, the scheme picks one */
-  --gallerist-accent: var(--gallerist-accent-dark);
-  --gallerist-accent-fg: var(--gallerist-accent-dark-fg);
-
   color: var(--gallerist-fg);
   font-family: var(--gallerist-font);
   font-variant-numeric: tabular-nums;
@@ -400,9 +413,15 @@
   opacity: var(--gallerist-thumb-idle-opacity);
   transition: opacity var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
-.gallerist-thumb:hover > .gallerist-thumb-img,
-.gallerist-thumb-item:hover > .gallerist-thumb-img {
+.gallerist-thumb:is(:hover, :focus-visible) > .gallerist-thumb-img,
+.gallerist-thumb-item:is(:hover, :focus-visible) > .gallerist-thumb-img {
   opacity: 1;
+}
+.gallerist-thumb:focus-visible,
+.gallerist-thumb-item:focus-visible,
+.gallerist-grid-cell:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: 2px;
 }
 .gallerist-thumb-img {
   width: 100%;
@@ -634,6 +653,12 @@
 .gallerist-itemnav > button {
   border: var(--gallerist-itemnav-button-border);
   background: var(--gallerist-itemnav-button-bg);
+}
+.gallerist-controls > button:hover {
+  background: var(--gallerist-arrow-hover-bg);
+}
+.gallerist-itemnav > button:hover {
+  background: var(--gallerist-itemnav-button-hover-bg);
 }
 .gallerist-bar button[hidden],
 .gallerist-controls > button[hidden] {
@@ -1196,14 +1221,23 @@
    Two independent axes: a narrow screen gets compact chrome and drops the side column; a coarse
    (touch) pointer gets 44px targets, swipes instead of on-image arrows, and the item position as
    text. Last in the file so it wins over the layouts above at equal specificity. */
-@media (max-width: 600px) {
-  /* compact sizes go on the root's children (every consumer is a descendant), so they beat a
-     skin's sizes on the root whatever its selector */
-  .gallerist > * {
-    --gallerist-thumb-h: 56px;
-    --gallerist-toolbar-h: 52px;
-    --gallerist-rail-w: 64px; /* a side rail leaves the stage most of a narrow screen */
+/* compact sizes: a layer above the skins (so they beat a skin's own sizes) and below the page (so a
+   host's --gallerist-* overrides still win) */
+@layer gallerist.compact {
+  @media (max-width: 600px) {
+    .gallerist {
+      --gallerist-thumb-h: 56px;
+      --gallerist-toolbar-h: 52px;
+      --gallerist-rail-w: 64px; /* a side rail leaves the stage most of a narrow screen */
+    }
   }
+  @media (pointer: coarse) {
+    .gallerist {
+      --gallerist-rail-handle-h: 44px;
+    }
+  }
+}
+@media (max-width: 600px) {
   .gallerist-region-aside,
   .gallerist .gallerist-bar .gallerist-items-toggle {
     display: none;
@@ -1222,9 +1256,6 @@
   }
 }
 @media (pointer: coarse) {
-  .gallerist > * {
-    --gallerist-rail-handle-h: 44px;
-  }
   .gallerist-rail-toggle {
     height: 44px;
   }
@@ -1269,10 +1300,6 @@
     inset-inline-end: auto;
     left: 50%;
     transform: translateX(-50%);
-  }
-  .gallerist .gallerist-dot[data-active]::before {
-    width: var(--gallerist-dot-active-along);
-    height: var(--gallerist-dot-active-across);
   }
   /* every navigator child back in the row (split positions them one by one) */
   .gallerist[data-gallerist-arrows][data-gallerist-orientation] .gallerist-itemnav > * {

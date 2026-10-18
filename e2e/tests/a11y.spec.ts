@@ -64,3 +64,25 @@ test('restores focus to the trigger on close (S-UX4)', async ({ page }) => {
   await expect(page.locator('.gallerist')).toHaveCount(0)
   await expect(page.locator('#open')).toBeFocused()
 })
+
+// every skin × scheme (and a non-default accent each): contrast and semantics hold in all of them
+const LOOKS = [
+  'skin=gallery',
+  'skin=gallery&scheme=light',
+  'skin=gallery&accent=amber',
+  'skin=console',
+  'skin=console&scheme=light',
+  'skin=console&accent=vermilion',
+]
+for (const look of LOOKS) {
+  test(`no axe violations in ${look}`, async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'axe runs once (chromium)')
+    await page.goto(`/layout.html?${look}&captions=1&indicator=pills`)
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    const results = await new AxeBuilder({ page })
+      .include('.gallerist')
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([])
+  })
+}

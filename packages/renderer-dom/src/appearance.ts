@@ -15,11 +15,18 @@ export interface Appearance {
   scheme?: ColorScheme
 }
 
-/** Write an appearance onto a viewer root (`data-gallerist-skin|accent|scheme`). Skin and scheme
- *  always carry a value (default `gallery` / `dark`); no accent means the skin's default. */
-export function applyAppearance(root: HTMLElement, { skin, accent, scheme }: Appearance): void {
-  root.setAttribute('data-gallerist-skin', skin ?? 'gallery')
-  root.setAttribute('data-gallerist-scheme', scheme ?? 'dark')
-  if (accent) root.setAttribute('data-gallerist-accent', accent)
-  else root.removeAttribute('data-gallerist-accent')
+/**
+ * Write an appearance onto a viewer root (`data-gallerist-skin|accent|scheme`). Only the options
+ * present in `appearance` change, so `applyAppearance(root, { accent: 'cyan' })` keeps the skin and
+ * scheme; an option present but `undefined` goes back to its default (`gallery`, `dark`, the skin's
+ * own accent).
+ */
+export function applyAppearance(root: HTMLElement, appearance: Appearance): void {
+  if ('skin' in appearance) root.setAttribute('data-gallerist-skin', appearance.skin ?? 'gallery')
+  if ('scheme' in appearance)
+    root.setAttribute('data-gallerist-scheme', appearance.scheme ?? 'dark')
+  if ('accent' in appearance) {
+    if (appearance.accent) root.setAttribute('data-gallerist-accent', appearance.accent)
+    else root.removeAttribute('data-gallerist-accent')
+  }
 }

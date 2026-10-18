@@ -294,7 +294,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   root.setAttribute('data-gallerist-orientation', orientation)
   root.setAttribute('data-gallerist-rail', railHidden ? 'collapsed' : 'expanded')
   if (linear) root.setAttribute('data-gallerist-linear', 'true')
-  applyAppearance(root, opts)
+  applyAppearance(root, { skin: opts.skin, accent: opts.accent, scheme: opts.scheme })
   if (preset) for (const [k, val] of Object.entries(preset.rootAttrs)) root.setAttribute(k, val)
   if (overlay) {
     root.setAttribute('role', 'dialog')

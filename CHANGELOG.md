@@ -13,7 +13,12 @@
   (named per skin) and `scheme` (`dark` | `light` | `auto`), reflected as `data-gallerist-skin`,
   `data-gallerist-accent` and `data-gallerist-scheme`. React's `theme` prop is replaced by `accent`,
   and the `data-gallerist-theme` attribute is gone. All three props are reactive in React, and
-  `applyAppearance(root, …)` changes them on a mounted vanilla viewer.
+  `applyAppearance(root, …)` changes them on a mounted vanilla viewer (only the options given).
+- **theme**: token declarations live in cascade layers, so a page's `--gallerist-*` override on
+  `.gallerist` wins in every skin, scheme and accent, also on phones, and the skins apply in a
+  fixed order whatever order the files load in. An existing override keeps working after
+  switching to `skin: 'console'`. Component rules are not layered.
+- **theme**: Console's vermilion accent puts dark ink on the accent (white was 3.1:1).
 - **core**: renderer/plugin plumbing moved off the public `ViewerApi` to
   `@gallerist/core/internal`: `viewer.emit`, `getPlugins` and `onPluginsChanged` are now
   `getInternals(viewer).emit(…)` etc. The engine building blocks (normalize, store, FSM, nav,

@@ -35,6 +35,7 @@ const CONFIGS: Record<string, string> = {
   'indicator-dots': 'indicator=dots',
   'indicator-counter': 'indicator=counter&arrows=corner-br',
   'scheme-light': 'scheme=light&captions=1&indicator=dots',
+  'scheme-auto-light': 'scheme=auto&accent=mint&captions=1', // run with the system in light mode
 }
 
 // every configuration runs in every skin: skins set tokens (sizes included), so each needs the sweep
@@ -163,6 +164,7 @@ test.describe('layout lint', () => {
       for (const skin of SKINS)
         for (const [name, query] of Object.entries(CONFIGS)) {
           test(`${skin} ${name}`, async ({ page }) => {
+            if (query.includes('scheme=auto')) await page.emulateMedia({ colorScheme: 'light' })
             await page.goto(`/layout.html?skin=${skin}&${query}`)
             await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
             await installClip(page)
@@ -353,6 +355,27 @@ test.describe('layout lint', () => {
 
 test.describe('layout behaviour', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'runs once (chromium)')
+
+  test('a page override of a token wins in every skin, accent and on phones', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 }) // the compact layer is active
+    for (const look of ['skin=console', 'skin=gallery&accent=mint', 'skin=console&scheme=light']) {
+      await page.goto(`/layout.html?${look}`)
+      await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+      await page.addStyleTag({
+        content:
+          '.gallerist { --gallerist-accent-dark: rgb(255, 0, 0); --gallerist-accent-light: rgb(255, 0, 0); --gallerist-thumb-h: 100px; }',
+      })
+      const got = await page.evaluate(() => {
+        const root = document.querySelector('.gallerist') as HTMLElement
+        const img = document.querySelector('.gallerist-thumbs .gallerist-thumb-img') as HTMLElement
+        return [
+          getComputedStyle(root).getPropertyValue('--gallerist-accent').trim(),
+          Math.round(img.getBoundingClientRect().height),
+        ]
+      })
+      expect(got, look).toEqual(['rgb(255, 0, 0)', 100])
+    }
+  })
 
   test('RTL: the group arrows point the reading direction', async ({ page }) => {
     const flipped = async () =>

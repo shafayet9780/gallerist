@@ -6,132 +6,115 @@
  *   schemes: dark = Graphite (default), light = Paper   (data-gallerist-scheme: dark | light | auto)
  */
 
-.gallerist[data-gallerist-skin="console"] {
-  color-scheme: normal; /* as before the skin split; Paper sets light */
-  /* surfaces — warm graphite, not pure black, so media still pops */
-  --gallerist-backdrop: rgb(14 15 18 / 0.96);
-  --gallerist-fg: #f2f3f5;
-  --gallerist-fg-muted: #9aa0ab;
-  --gallerist-chrome-bg: rgb(20 22 27 / 0.66);
-  --gallerist-hairline: rgb(255 255 255 / 0.1);
-  --gallerist-radius: 9px;
-  --gallerist-toolbar-h: 56px;
-  --gallerist-thumb-h: 84px;
-  --gallerist-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  --gallerist-font: system-ui, -apple-system, sans-serif;
+/* Token declarations sit in cascade layers so a page's own --gallerist-* overrides always win,
+   whatever the skin, scheme or accent, and so the skins apply in a fixed order whatever order the
+   files load in. Component rules stay unlayered, so a page's element resets can't strip them. */
+@layer gallerist.base, gallerist.gallery, gallerist.console, gallerist.compact;
 
-  /* surfaces and fills */
-  --gallerist-surface: #1a1c22; /* thumbnail cards */
-  --gallerist-cell-bg: #1a1a1f; /* grid cells */
-  --gallerist-panel: rgb(8 8 10 / 0.96); /* full-stage panels (grid) */
-  --gallerist-scrim: rgb(0 0 0 / 0.55); /* small controls over images */
-  --gallerist-badge-bg: rgb(0 0 0 / 0.62); /* count badges over images */
-  --gallerist-caption-band: rgb(255 255 255 / 0.03);
-  --gallerist-group-bg: rgb(255 255 255 / 0.02);
-  --gallerist-placeholder: rgba(127, 127, 127, 0.06);
-  --gallerist-shimmer: rgba(255, 255, 255, 0.06);
-  --gallerist-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6);
-  --gallerist-stack-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
-  --gallerist-blur: blur(20px) saturate(180%);
+@layer gallerist.console {
+  .gallerist[data-gallerist-skin="console"] {
+    color-scheme: normal; /* as before the skin split; Paper sets light */
+    /* surfaces — warm graphite, not pure black, so media still pops */
+    --gallerist-backdrop: rgb(14 15 18 / 0.96);
+    --gallerist-fg: #f2f3f5;
+    --gallerist-fg-muted: #9aa0ab;
+    --gallerist-chrome-bg: rgb(20 22 27 / 0.66);
+    --gallerist-hairline: rgb(255 255 255 / 0.1);
+    --gallerist-radius: 9px;
+    --gallerist-toolbar-h: 56px;
+    --gallerist-thumb-h: 84px;
+    --gallerist-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    --gallerist-font: system-ui, -apple-system, sans-serif;
 
-  /* controls (bar tools, arrows, item navigator) */
-  --gallerist-control-bg: var(--gallerist-chrome-bg);
-  --gallerist-control-border: 0.5px solid var(--gallerist-hairline);
-  --gallerist-control-radius: var(--gallerist-radius);
-  --gallerist-counter-font: var(--gallerist-mono);
-  --gallerist-counter-bg: var(--gallerist-chrome-bg);
-  --gallerist-counter-fg: var(--gallerist-fg);
-  --gallerist-title-size: 14px;
-  --gallerist-title-weight: 600;
-  --gallerist-caption-size: 14px;
-  --gallerist-caption-align: center;
-  /* bar tools, the group arrows and the item navigator can each take their own treatment */
-  --gallerist-tool-bg: var(--gallerist-control-bg);
-  --gallerist-tool-border: var(--gallerist-control-border);
-  --gallerist-tool-hover-bg: var(--gallerist-tool-bg);
-  --gallerist-arrow-size: var(--gallerist-target);
-  --gallerist-arrow-bg: var(--gallerist-control-bg);
-  --gallerist-arrow-border: var(--gallerist-control-border);
-  --gallerist-arrow-radius: var(--gallerist-control-radius);
-  --gallerist-itemnav-bg: transparent; /* the ↑ · position · ↓ cluster as a whole */
-  --gallerist-itemnav-border: none;
-  --gallerist-itemnav-radius: 0;
-  --gallerist-itemnav-padding: 0;
-  --gallerist-itemnav-button-bg: var(--gallerist-control-bg);
-  --gallerist-itemnav-button-border: var(--gallerist-control-border);
-  --gallerist-position-bg: var(--gallerist-chrome-bg);
-  --gallerist-position-font: var(--gallerist-mono);
-  --gallerist-position-size: 12px;
-  --gallerist-position-fg: var(--gallerist-fg);
-  --gallerist-dot-opacity: 0.45;
-  --gallerist-dot-active-along: 9px; /* the current dot, along the run and across it */
-  --gallerist-dot-active-across: 9px;
+    /* surfaces and fills */
+    --gallerist-surface: #1a1c22; /* thumbnail cards */
+    --gallerist-cell-bg: #1a1a1f; /* grid cells */
+    --gallerist-panel: rgb(8 8 10 / 0.96); /* full-stage panels (grid) */
+    --gallerist-scrim: rgb(0 0 0 / 0.55); /* small controls over images */
+    --gallerist-badge-bg: rgb(0 0 0 / 0.62); /* count badges over images */
+    --gallerist-caption-band: rgb(255 255 255 / 0.03);
+    --gallerist-group-bg: rgb(255 255 255 / 0.02);
+    --gallerist-placeholder: rgba(127, 127, 127, 0.06);
+    --gallerist-shimmer: rgba(255, 255, 255, 0.06);
+    --gallerist-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6);
+    --gallerist-stack-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
+    --gallerist-blur: blur(20px) saturate(180%);
 
-  /* thumbnails (rail, item stack, peek, grid) */
-  --gallerist-thumb-radius: 6px;
-  --gallerist-rail-bg: var(--gallerist-chrome-bg);
-  --gallerist-panel-bg: var(--gallerist-chrome-bg); /* the item stack */
-  --gallerist-flyout-bg: var(--gallerist-chrome-bg); /* the peek flyout */
-  --gallerist-thumb-active-border: var(--gallerist-selection);
-  --gallerist-thumb-ring: 0 0 0 1px var(--gallerist-selection), 0 8px 22px -8px
-    var(--gallerist-selection);
-  --gallerist-item-ring: 0 0 0 1px var(--gallerist-selection);
-  --gallerist-thumb-idle-opacity: 1; /* the image of a card that isn't current */
+    /* controls (bar tools, arrows, item navigator) */
+    --gallerist-control-bg: var(--gallerist-chrome-bg);
+    --gallerist-control-border: 0.5px solid var(--gallerist-hairline);
+    --gallerist-control-radius: var(--gallerist-radius);
+    --gallerist-counter-font: var(--gallerist-mono);
+    --gallerist-counter-bg: var(--gallerist-chrome-bg);
+    --gallerist-counter-fg: var(--gallerist-fg);
+    --gallerist-title-size: 14px;
+    --gallerist-title-weight: 600;
+    --gallerist-caption-size: 14px;
+    --gallerist-caption-align: center;
+    /* bar tools, the group arrows and the item navigator can each take their own treatment */
+    --gallerist-tool-bg: var(--gallerist-control-bg);
+    --gallerist-tool-border: var(--gallerist-control-border);
+    --gallerist-tool-hover-bg: var(--gallerist-tool-bg);
+    --gallerist-arrow-size: var(--gallerist-target);
+    --gallerist-arrow-bg: var(--gallerist-control-bg);
+    --gallerist-arrow-border: var(--gallerist-control-border);
+    --gallerist-arrow-radius: var(--gallerist-control-radius);
+    --gallerist-itemnav-bg: transparent; /* the ↑ · position · ↓ cluster as a whole */
+    --gallerist-itemnav-border: none;
+    --gallerist-itemnav-radius: 0;
+    --gallerist-itemnav-padding: 0;
+    --gallerist-itemnav-button-bg: var(--gallerist-control-bg);
+    --gallerist-itemnav-button-border: var(--gallerist-control-border);
+    --gallerist-position-bg: var(--gallerist-chrome-bg);
+    --gallerist-position-font: var(--gallerist-mono);
+    --gallerist-position-size: 12px;
+    --gallerist-position-fg: var(--gallerist-fg);
+    --gallerist-dot-opacity: 0.45;
+    --gallerist-dot-active-along: 9px; /* the current dot, along the run and across it */
+    --gallerist-dot-active-across: 9px;
 
-  /* signal accent: amber by default. *-fg is the ink that sits on the accent. */
-  --gallerist-accent: var(--gallerist-accent-dark);
-  --gallerist-accent-fg: var(--gallerist-accent-dark-fg);
-  --gallerist-accent-dark: #ffb000;
-  --gallerist-accent-dark-fg: #15110a;
-  --gallerist-accent-light: #9a5b00;
-  --gallerist-accent-light-fg: #fff;
-  /* roles derived from the accent; a skin may point them elsewhere */
-  --gallerist-focus: var(--gallerist-accent); /* focus rings */
-  --gallerist-selection: var(--gallerist-accent); /* the current thumb / pill / cell */
-  --gallerist-selection-fg: var(--gallerist-accent-fg);
-  --gallerist-pressed-bg: var(--gallerist-accent); /* a toggle that is on */
-  --gallerist-pressed-fg: var(--gallerist-accent-fg);
-}
+    /* thumbnails (rail, item stack, peek, grid) */
+    --gallerist-thumb-radius: 6px;
+    --gallerist-rail-bg: var(--gallerist-chrome-bg);
+    --gallerist-panel-bg: var(--gallerist-chrome-bg); /* the item stack */
+    --gallerist-flyout-bg: var(--gallerist-chrome-bg); /* the peek flyout */
+    --gallerist-thumb-active-border: var(--gallerist-selection);
+    --gallerist-thumb-ring: 0 0 0 1px var(--gallerist-selection), 0 8px 22px -8px
+      var(--gallerist-selection);
+    --gallerist-item-ring: 0 0 0 1px var(--gallerist-selection);
+    --gallerist-thumb-idle-opacity: 1; /* the image of a card that isn't current */
 
-/* accents */
-.gallerist[data-gallerist-skin="console"][data-gallerist-accent="cyan"] {
-  --gallerist-accent-dark: #22d3ee;
-  --gallerist-accent-dark-fg: #04181c;
-  --gallerist-accent-light: #00727f;
-  --gallerist-accent-light-fg: #fff;
-}
-.gallerist[data-gallerist-skin="console"][data-gallerist-accent="vermilion"] {
-  --gallerist-accent-dark: #ff5a36;
-  --gallerist-accent-dark-fg: #fff;
-  --gallerist-accent-light: #b93a1d;
-  --gallerist-accent-light-fg: #fff;
-}
+    /* signal accent: amber by default. *-fg is the ink that sits on the accent. */
+    --gallerist-accent: var(--gallerist-accent-dark);
+    --gallerist-accent-fg: var(--gallerist-accent-dark-fg);
+    --gallerist-accent-dark: #ffb000;
+    --gallerist-accent-dark-fg: #15110a;
+    --gallerist-accent-light: #9a5b00;
+    --gallerist-accent-light-fg: #fff;
+    /* roles derived from the accent; a skin may point them elsewhere */
+    --gallerist-focus: var(--gallerist-accent); /* focus rings */
+    --gallerist-selection: var(--gallerist-accent); /* the current thumb / pill / cell */
+    --gallerist-selection-fg: var(--gallerist-accent-fg);
+    --gallerist-pressed-bg: var(--gallerist-accent); /* a toggle that is on */
+    --gallerist-pressed-fg: var(--gallerist-accent-fg);
+  }
 
-/* Paper: the light scheme, for inline hosts on a light page */
-.gallerist[data-gallerist-skin="console"][data-gallerist-scheme="light"] {
-  color-scheme: light;
-  --gallerist-backdrop: rgb(233 234 236 / 0.97);
-  --gallerist-fg: #16181b;
-  --gallerist-fg-muted: #4a5058;
-  --gallerist-chrome-bg: rgb(255 255 255 / 0.78);
-  --gallerist-hairline: rgb(22 24 27 / 0.14);
-  --gallerist-surface: #fff;
-  --gallerist-cell-bg: #f4f5f6;
-  --gallerist-panel: rgb(244 245 246 / 0.97);
-  --gallerist-scrim: rgb(255 255 255 / 0.78);
-  --gallerist-badge-bg: rgb(255 255 255 / 0.88);
-  --gallerist-caption-band: rgb(22 24 27 / 0.04);
-  --gallerist-group-bg: rgb(22 24 27 / 0.03);
-  --gallerist-placeholder: rgb(22 24 27 / 0.05);
-  --gallerist-shimmer: rgb(255 255 255 / 0.6);
-  --gallerist-shadow: 0 10px 30px -12px rgb(22 24 27 / 0.28);
-  --gallerist-stack-shadow: 3px 3px 0 -1px #d3d6db, 6px 6px 0 -2px #bfc3c9;
-  --gallerist-accent: var(--gallerist-accent-light);
-  --gallerist-accent-fg: var(--gallerist-accent-light-fg);
-}
+  /* accents */
+  .gallerist[data-gallerist-skin="console"][data-gallerist-accent="cyan"] {
+    --gallerist-accent-dark: #22d3ee;
+    --gallerist-accent-dark-fg: #04181c;
+    --gallerist-accent-light: #00727f;
+    --gallerist-accent-light-fg: #fff;
+  }
+  .gallerist[data-gallerist-skin="console"][data-gallerist-accent="vermilion"] {
+    --gallerist-accent-dark: #ff5a36;
+    --gallerist-accent-dark-fg: #1a0703; /* white on this red is 3.1:1 */
+    --gallerist-accent-light: #b93a1d;
+    --gallerist-accent-light-fg: #fff;
+  }
 
-@media (prefers-color-scheme: light) {
-  .gallerist[data-gallerist-skin="console"][data-gallerist-scheme="auto"] {
+  /* Paper: the light scheme, for inline hosts on a light page */
+  .gallerist[data-gallerist-skin="console"][data-gallerist-scheme="light"] {
     color-scheme: light;
     --gallerist-backdrop: rgb(233 234 236 / 0.97);
     --gallerist-fg: #16181b;
@@ -151,5 +134,29 @@
     --gallerist-stack-shadow: 3px 3px 0 -1px #d3d6db, 6px 6px 0 -2px #bfc3c9;
     --gallerist-accent: var(--gallerist-accent-light);
     --gallerist-accent-fg: var(--gallerist-accent-light-fg);
+  }
+
+  @media (prefers-color-scheme: light) {
+    .gallerist[data-gallerist-skin="console"][data-gallerist-scheme="auto"] {
+      color-scheme: light;
+      --gallerist-backdrop: rgb(233 234 236 / 0.97);
+      --gallerist-fg: #16181b;
+      --gallerist-fg-muted: #4a5058;
+      --gallerist-chrome-bg: rgb(255 255 255 / 0.78);
+      --gallerist-hairline: rgb(22 24 27 / 0.14);
+      --gallerist-surface: #fff;
+      --gallerist-cell-bg: #f4f5f6;
+      --gallerist-panel: rgb(244 245 246 / 0.97);
+      --gallerist-scrim: rgb(255 255 255 / 0.78);
+      --gallerist-badge-bg: rgb(255 255 255 / 0.88);
+      --gallerist-caption-band: rgb(22 24 27 / 0.04);
+      --gallerist-group-bg: rgb(22 24 27 / 0.03);
+      --gallerist-placeholder: rgb(22 24 27 / 0.05);
+      --gallerist-shimmer: rgb(255 255 255 / 0.6);
+      --gallerist-shadow: 0 10px 30px -12px rgb(22 24 27 / 0.28);
+      --gallerist-stack-shadow: 3px 3px 0 -1px #d3d6db, 6px 6px 0 -2px #bfc3c9;
+      --gallerist-accent: var(--gallerist-accent-light);
+      --gallerist-accent-fg: var(--gallerist-accent-light-fg);
+    }
   }
 }
