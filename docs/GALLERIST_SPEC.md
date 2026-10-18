@@ -1,6 +1,6 @@
 # Gallerist — Technical Specification
 
-> **Name:** Gallerist (locked) — `vis-`, vision/viewing. Namespace `@gallerist/*` · GitHub `gallerist` · `gallerist.dev`.
+> **Name:** Gallerist (locked) — the person who runs galleries. Namespace `@gallerist/*` · GitHub `galleristjs` · `gallerist.dev`.
 > A headless, framework-agnostic media viewer for **grouped / nested** galleries, with **image-space overlays** and **virtualized rendering** at scale.
 > License: MIT (clean-room; no lightGallery source consulted at any point).
 > Status: design spec, **v1.1** — all 14 decisions locked (logged in §24). Implementation-ready.
@@ -58,11 +58,11 @@
 
 ## 2. Naming & identity
 
-The library is **Gallerist** (`vis-`, sight/vision). It was chosen for one decisive reason: of every candidate evaluated — Facet, Prism, Photon, Luma, Loupe, Tessera, Sheaf, Riffle — it was the only one with a genuinely open namespace. Evocative real words are uniformly squatted on npm in 2026; the reliable path to an ownable name is a coined one, the pattern the modern tooling ecosystem follows (Vite, Zod, Bun, Drizzle, Hono). Gallerist keeps an on-theme root (vision/viewing) while reading as a product brand that can scale past a single package.
+The library is **Gallerist**: a gallerist runs galleries and curates their collections, which is what the library does for galleries of galleries. It was renamed from the working name *Visora* before first publish (Oct 2026), because the `@visora` npm scope belongs to an unrelated publisher. The criteria, in order: understandable on first hearing, not generic-sounding, and no overlap with a direct competitor. That ruled out Foldview (generic), Enfilade (obscure), anything with "reel" (`@reelkit/*` is a direct competitor), and Loupe (chai's `loupe`).
 
-**Namespace:** npm scope `@gallerist` — `@gallerist/core`, `@gallerist/react`, `@gallerist/plugin-*`; GitHub org `gallerist`; primary domain `gallerist.dev`.
+**Namespace:** npm scope `@gallerist` — `@gallerist/core`, `@gallerist/react`, `@gallerist/plugin-*`; GitHub org `galleristjs` (`gallerist` is held by an empty org); primary domain `gallerist.dev` (`.com` and `.io` are taken).
 
-**Claim checklist (before any public release):** npm `gallerist` (bare) + the `@gallerist` org; the `gallerist` GitHub org; `gallerist.dev` (and `.com` if available); a trademark glance in software/SaaS classes.
+**Claim checklist (before any public release):** the `@gallerist` npm org ✅; npm `gallerist` (bare); the `galleristjs` GitHub org; `gallerist.dev`; a trademark glance in software/SaaS classes.
 
 ---
 
@@ -631,7 +631,7 @@ All forks are locked. Recorded here for provenance.
 
 | # | Decision | Locked choice | Why |
 |---|---|---|---|
-| D1 | Name & scope | **Gallerist**, `@gallerist/*` | Only candidate with a genuinely open namespace; on-theme (`vis-`); scales as a brand. |
+| D1 | Name & scope | **Gallerist**, `@gallerist/*` | Renamed from Visora (its npm scope was taken). Understandable at first hearing, on-theme (galleries of galleries), and the npm scope and bare name were free. |
 | D2 | Language | **TypeScript**, strict, ships `.d.ts` | A typed grouped model is a selling point. |
 | D3 | Core store | **Custom ~40-line zero-dep** signal store | Protects the zero-dependency promise and bundle budget. |
 | D4 | `itemMemory` default | **`reset`** (Apploye ships `preserve`) | Matches general galleries; monitoring keeps the same monitor across moments. |
