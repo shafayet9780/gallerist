@@ -479,3 +479,25 @@ describe('createViewer — lifecycle driver (async open/close)', () => {
     expect(() => pending.opening[0]?.()).not.toThrow()
   })
 })
+
+describe('createViewer — refresh', () => {
+  it('refresh() notifies the renderer listeners until they unsubscribe', () => {
+    const v = createViewer({ items: [item('a')] })
+    const fn = vi.fn()
+    const off = getInternals(v).onRefresh(fn)
+    v.refresh()
+    expect(fn).toHaveBeenCalledTimes(1)
+    off()
+    v.refresh()
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('refresh() is a no-op after destroy', () => {
+    const v = createViewer({ items: [item('a')] })
+    const fn = vi.fn()
+    getInternals(v).onRefresh(fn)
+    v.destroy()
+    v.refresh()
+    expect(fn).not.toHaveBeenCalled()
+  })
+})

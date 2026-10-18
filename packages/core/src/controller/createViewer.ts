@@ -178,6 +178,7 @@ export function createViewer(options: ViewerOptions): ViewerApi {
   // opening → open and closing → closed settle when the renderer's driver calls done(). Each
   // transition gets a generation so a done() from one that was superseded (close during opening,
   // reopen during closing) is ignored.
+  const refreshListeners = new Set<() => void>()
   let lifecycleDriver: LifecycleDriver | null = null
   let generation = 0
   let pendingSettle: (() => void) | null = null
@@ -292,7 +293,8 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       return collection
     },
     refresh() {
-      // renderer re-measures; no-op in the headless core.
+      if (destroyed) return
+      for (const fn of [...refreshListeners]) fn() // the renderer re-measures
     },
     getState() {
       return store.get()
@@ -313,6 +315,7 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       for (const inst of [...pluginInstances].reverse()) inst.destroy?.()
       pluginInstances.length = 0
       pluginsChanged.clear()
+      refreshListeners.clear()
       emitter.clear()
       store.clear()
     },
@@ -348,6 +351,12 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       return () => {
         // a later renderer (e.g. a StrictMode remount) may have replaced us — don't clear theirs
         if (zoomBounds === bounds) zoomBounds = null
+      }
+    },
+    onRefresh(fn) {
+      refreshListeners.add(fn)
+      return () => {
+        refreshListeners.delete(fn)
       }
     },
     setLifecycleDriver(driver) {

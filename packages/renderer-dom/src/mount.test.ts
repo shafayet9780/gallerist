@@ -341,6 +341,25 @@ describe('mount — zoom transform', () => {
       expect(v.getState().zoom).toEqual({ scale: 2, x: 0, y: -800 })
     })
 
+    it('viewer.refresh() re-measures and re-clamps after a layout change', () => {
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        cb(0)
+        return 1
+      })
+      try {
+        const v = createViewer({ collection: collection() })
+        mount(v)
+        v.open()
+        measure(1000, 800)
+        getInternals(v).setZoom({ scale: 2, x: -1000, y: 0 })
+        measure(300, 800) // the container shrank without a resize notification
+        v.refresh()
+        expect(v.getState().zoom.x).toBe(-300)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
     it('stops clamping once the renderer is destroyed', () => {
       const v = createViewer({ collection: collection() })
       const h = mount(v)

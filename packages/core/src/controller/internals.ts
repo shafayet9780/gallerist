@@ -41,6 +41,8 @@ export interface ViewerInternals {
   setZoomBounds(bounds: ZoomBounds): () => void
   /** Drive open/close transitions; returns a disposer that also settles one in flight. */
   setLifecycleDriver(driver: LifecycleDriver): () => void
+  /** Called by `viewer.refresh()`: the renderer re-measures (e.g. after a container resize). */
+  onRefresh(fn: () => void): () => void
 }
 
 export function attachInternals(viewer: ViewerApi, internals: ViewerInternals): void {

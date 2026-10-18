@@ -914,6 +914,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const resizeObserver =
     typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onStageResize) : null
   resizeObserver?.observe(stage)
+  // viewer.refresh(): an explicit re-measure, for layout changes a ResizeObserver can't see
+  const offRefresh = internals.onRefresh(onStageResize)
 
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
   const mountPluginRegions = createRegionMounter(regionHosts, { viewer })
@@ -942,6 +944,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       unsubscribe()
       offPlugins()
       offZoomBounds()
+      offRefresh()
       cancelPhaseWait?.()
       offLifecycle() // settles a transition in flight, so `closed` still fires
       detachGestures()
