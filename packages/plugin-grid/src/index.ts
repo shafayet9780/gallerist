@@ -3,7 +3,7 @@
 // the toolbar button or `g`; clicking a cell navigates and hides the grid.
 
 import type { Item, MediaSource, Plugin, ViewerApi } from '@gallerist/core'
-import { windowIndices } from '@gallerist/core/internal'
+import { ICONS, windowIndices } from '@gallerist/core/internal'
 
 export interface GridOptions {
   /** groups rendered on each side of the active group (default 12). */
@@ -129,7 +129,7 @@ export function grid(opts: GridOptions = {}): Plugin {
         ;(toolbarBtn as HTMLButtonElement).type = 'button'
         toolbarBtn.setAttribute('aria-label', 'Toggle grid')
         toolbarBtn.setAttribute('aria-pressed', 'false')
-        toolbarBtn.textContent = '▦'
+        toolbarBtn.innerHTML = ICONS.grid
         toolbarBtn.addEventListener('click', toggle)
         unsub = viewer.subscribe(() => {
           if (open) render()

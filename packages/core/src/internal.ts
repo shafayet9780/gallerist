@@ -37,3 +37,4 @@ export {
   type Vec2,
 } from './zoom/zoom'
 export { createEmitter, type Emitter, makeCancelable } from './events/events'
+export { ICONS, type IconName } from './icons'

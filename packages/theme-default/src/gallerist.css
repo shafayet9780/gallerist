@@ -1119,6 +1119,9 @@
   .gallerist[data-gallerist-orientation="vertical"] .gallerist-rail-toggle {
     width: 44px;
   }
+  .gallerist-thumb-item {
+    min-height: 44px;
+  }
   /* a 44px hit area with the glyph kept small, so it doesn't cover the thumbnail */
   .gallerist-thumb-expand {
     top: 0;

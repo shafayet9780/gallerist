@@ -3,6 +3,7 @@
 // zip lib so it costs nothing until used (decision P1-H).
 
 import type { Group, Item, MediaSource, Plugin } from '@gallerist/core'
+import { ICONS } from '@gallerist/core/internal'
 
 /** Resolve a MediaSource to a downloadable URL (string/responsive sync; loader async). */
 export async function urlOf(source: MediaSource): Promise<string | null> {
@@ -135,7 +136,7 @@ export function download(opts: DownloadOptions = {}): Plugin {
           btn.type = 'button'
           btn.className = 'gallerist-download-btn'
           btn.setAttribute('aria-label', 'Download')
-          btn.textContent = '⬇'
+          btn.innerHTML = ICONS.download
           btn.addEventListener('click', run)
           return btn
         },

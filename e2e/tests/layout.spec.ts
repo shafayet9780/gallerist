@@ -135,16 +135,32 @@ test.describe('layout lint', () => {
               if (stage && overlap(stage, r)) problems.push(`covers the stage: ${r.label}`)
             }
           }
-          // 4. touch targets on a phone
+          // 4. touch targets on a phone: every visible chrome button, not just the atoms above
+          // (user overlays inside the stage are the app's own UI and are left out)
           if (vpName === 'phone') {
-            for (const a of atoms) {
-              if (a.button && (a.w < 43.5 || a.h < 43.5)) {
+            const buttons = (await measure(page, ['.gallerist button'])).filter((b) => b.button)
+            const inStage = await page.evaluate(() =>
+              [...document.querySelectorAll('.gallerist button')].map(
+                (b) => !!b.closest('.gallerist-stage'),
+              ),
+            )
+            for (const [k, a] of buttons.entries()) {
+              if (inStage[k]) continue
+              if (a.w < 43.5 || a.h < 43.5) {
                 problems.push(
                   `touch target < 44px: ${a.label} (${Math.round(a.w)}×${Math.round(a.h)})`,
                 )
               }
             }
           }
+          // 5. one icon family: toolbar buttons carry the shared SVG icon, not a text glyph
+          const glyphButtons = await page.evaluate(() =>
+            [...document.querySelectorAll('.gallerist-region-toolbar > button')]
+              .filter((b) => !b.querySelector('svg.gallerist-icon'))
+              .map((b) => b.className),
+          )
+          for (const g of glyphButtons)
+            problems.push(`toolbar button without the shared icon: ${g}`)
           info.annotations.push({ type: 'atoms', description: String(atoms.length) })
           expect(problems, problems.join('\n')).toEqual([])
         })

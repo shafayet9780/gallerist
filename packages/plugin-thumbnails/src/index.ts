@@ -14,7 +14,7 @@
 // active node into view — no DOM churn, no scroll reset.
 
 import type { Group, Item, MediaSource, Plugin, PluginInstance, ViewerApi } from '@gallerist/core'
-import { windowIndices } from '@gallerist/core/internal'
+import { ICONS, windowIndices } from '@gallerist/core/internal'
 
 export interface ThumbnailsOptions {
   /** group thumbs rendered on each side of the active group (default 24). In `flat` mode this is
@@ -642,7 +642,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           toolbarBtn.className = 'gallerist-items-toggle'
           toolbarBtn.setAttribute('aria-label', 'Toggle group items')
           toolbarBtn.setAttribute('aria-pressed', String(panelOpen))
-          toolbarBtn.textContent = '▤'
+          toolbarBtn.innerHTML = ICONS.itemStack
           toolbarBtn.addEventListener('click', toggleActivePanel)
         }
         render()
