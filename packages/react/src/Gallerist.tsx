@@ -1,10 +1,13 @@
 import {
+  type EventHandlers,
+  type EventMap,
   type OverlaySpec,
   type RegionName,
   type ViewerApi,
   type ViewerOptions,
   createViewer,
 } from '@gallerist/core'
+import { normalize } from '@gallerist/core/internal'
 import {
   type ArrowLayout,
   type PresetName,
@@ -17,12 +20,20 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useInsertionEffect,
   useRef,
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
 import { GalleristContext, useViewerContext } from './context'
 
+/**
+ * `items` / `groups` / `collection` and `on` are reactive. A new data reference swaps the
+ * collection in place (diffed by id, keeping the cursor), so memoize it. Every other viewer option
+ * (`loop`, `itemMemory`, `startAt`, `plugins`, `overlays`, …) and the layout props (`container`,
+ * `preset`, `arrows`, `rail`, …) are read once; change the component's `key` to apply new ones.
+ * `theme` and `open` are reactive.
+ */
 export interface GalleristProps extends ViewerOptions {
   /** controlled visibility. */
   open?: boolean
@@ -44,6 +55,31 @@ export interface GalleristProps extends ViewerOptions {
   children?: ReactNode
 }
 
+// Every viewer event, checked against EventMap (a missing or unknown name fails to compile), so
+// the forwarders below can route each one to the latest `on` handlers.
+const EVENT_NAMES = Object.keys({
+  init: 1,
+  destroy: 1,
+  open: 1,
+  opened: 1,
+  close: 1,
+  closed: 1,
+  beforeSlide: 1,
+  slide: 1,
+  afterSlide: 1,
+  beforeItem: 1,
+  item: 1,
+  afterItem: 1,
+  zoom: 1,
+  zoomEnd: 1,
+  load: 1,
+  loaded: 1,
+  loadError: 1,
+  collectionChange: 1,
+  fullscreenChange: 1,
+  overlayClick: 1,
+} satisfies Record<keyof EventMap, 1>) as (keyof EventMap)[]
+
 const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(props, ref) {
   const {
     open,
@@ -60,14 +96,40 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     ...options
   } = props
   const rootRef = useRef<HTMLElement | null>(null)
+  const { items, groups, collection, on } = options
+
+  // The viewer outlives renders, so its handlers must not capture the first render's `on`: they
+  // forward to whatever `on` the latest committed render passed (a returned `false` still cancels).
+  const onRef = useRef<EventHandlers | undefined>(on)
+  useInsertionEffect(() => {
+    onRef.current = on
+  })
   // Create the viewer once (core is DOM-free → SSR-safe); options are read at construction. Lazy
   // useState (not useMemo, which React may discard) guarantees a single stable instance. Plugins
   // are deliberately NOT registered at construction — they're managed in an effect below so their
   // teardown runs on unmount (I-X2).
   const [viewer] = useState(() => {
-    const { plugins: _plugins, ...rest } = options
-    return createViewer(rest)
+    const { plugins: _plugins, on: _on, ...rest } = options
+    const forward: EventHandlers = {}
+    for (const name of EVENT_NAMES) {
+      ;(forward as Record<string, (p: unknown) => unknown>)[name] = (payload) =>
+        (onRef.current?.[name] as ((p: unknown) => unknown) | undefined)?.(payload)
+    }
+    return createViewer({ ...rest, on: forward })
   })
+
+  // Data props are reactive: a new items/groups/collection reference swaps the collection via
+  // setCollection (diffed by id, so the cursor and zoom survive when the current item does). The
+  // first render's data is already in the viewer, so only a changed reference applies.
+  const appliedData = useRef({ items, groups, collection })
+  useEffect(() => {
+    const prev = appliedData.current
+    if (prev.items === items && prev.groups === groups && prev.collection === collection) return
+    appliedData.current = { items, groups, collection }
+    const input =
+      collection !== undefined ? { collection } : groups !== undefined ? { groups } : { items }
+    viewer.setCollection(normalize(input))
+  }, [viewer, items, groups, collection])
   useImperativeHandle(ref, () => viewer, [viewer])
 
   // Register the construction-time plugins via use() and dispose them on unmount, so their

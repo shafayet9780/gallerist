@@ -19,6 +19,11 @@ import '@gallerist/theme-default/gallerist.css'
 <Gallerist items={[{ id: 'a', type: 'image', source: 'a.jpg' }]} open={open} onClose={() => setOpen(false)} />
 ```
 
+Props that update live: `items` / `groups` / `collection` (a new reference is applied in place and
+keeps the cursor on the same item, so memoize data you build inline), `on`, `open`, `onClose` and
+`theme`. Everything else (`loop`, `startAt`, `plugins`, `overlays`, `preset`, `container`, …) is
+read once; change the component's `key` to apply new values.
+
 Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 
 ## License

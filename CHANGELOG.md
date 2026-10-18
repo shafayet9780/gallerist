@@ -19,6 +19,10 @@
   `reportError`); a destructured `preventDefault()` works; `zoomTo` ignores NaN/negative input.
 - **core**: the `overlays` option of `createViewer` (and so `<Gallerist overlays>`) was declared but
   never read. Global overlays passed there now render.
+- **react**: `items` / `groups` / `collection` are reactive. They were read once at construction,
+  so data that arrived later (an API call) never showed. A new reference is applied with
+  `setCollection`, keeping the cursor on the same item.
+- **react**: `on` handlers always call the latest props instead of the first render's closures.
 - **renderer-dom**: cancelled media loads are no longer reported as `loadError`.
 - **core + renderer-dom**: zooming back out (keyboard, double-tap, pinch, `zoomTo`) no longer
   leaves the image off-centre or panned past its edge. The renderer lends the core its stage
