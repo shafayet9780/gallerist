@@ -665,12 +665,20 @@ All forks are locked. Recorded here for provenance.
 | D13 | Production direction | **Dogfood-first** | Apploye is the first consumer of the MVP; stress-tests the grouped model on a hard workload. |
 | D14 | Open-core boundary | **All generic features MIT; only Apploye domain logic proprietary** | Generosity in the core drives adoption; the moat is the domain layer, not withheld features. |
 | D15 | `loop` axis scope | **Both axes wrap on `loop`** (single flag) | Phase-1 review: `nextItem/prevItem` wrap within the group when `loop` is set, mirroring the primary axis, rather than introducing a separate per-axis flag. Simpler surface; the variant axis cycles like the group axis. |
+| D16 | Look layering | **Skin × preset × plugin** | Oct 2026 design review: six directions become three skins (`gallery`, `console`, `editorial`), layout presets (incl. new `editorial`, `tour`) and plugins/modes (`plugin-atlas`, `plugin-pins`, a later `stories` mode). Skins set tokens only and never position chrome. See `plans/phase-2-product.md`. |
+| D17 | Default look | **Gallery skin** | The neutral photo-first skin fits the mainstream; today's graphite + amber look moves unchanged into the `console` skin, paired with the `reviewer` preset as the flagship review demo. |
+| D18 | Theme options | **`skin`, `accent`, `scheme`** | Separates the skin from its accent and from dark/light. The React `theme` prop (an accent) is renamed `accent`; breaking, pre-1.0. |
+| D19 | Stories | **Gated after 0.3** | A portrait stories mode is effectively a second interaction model, and ReelKit already ships one; build only after an explicit go/no-go. |
 
 Note on D7: pure MIT + DCO means the open core cannot be *unilaterally* re-licensed commercially later. Accepted deliberately — that lever isn't needed, because value capture lives in the Apploye layer, which MIT already permits to stay closed.
 
 ---
 
 ## 25. Roadmap & phasing
+
+> **Current plan (Oct 2026):** `plans/phase-2-product.md` supersedes the Phase 2/3 ordering below:
+> chrome architecture and skins first, 0.3 with Gallery, Console, Editorial, Tour and pins, then
+> Atlas and the review plugins in 0.4, and Stories behind a go/no-go.
 
 **Phase 0 — Engine MVP (the foundation, ~the half-the-project the spec buys).**
 Core: data model + normalization, FSM, store, two-axis nav, zoom/pan + arbitration, overlay layer (both anchor types), slide windowing, a11y baseline, events. Renderer-dom + default theme. Image adapter. Vanilla API. → *At this point Gallerist already does something nobody else does: native grouped navigation with image-space overlays.*

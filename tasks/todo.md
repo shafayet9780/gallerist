@@ -1,3 +1,31 @@
+# Gallerist — Phase 2 TODO (one engine, six looks)
+
+> Plan: `plans/phase-2-product.md`. Each milestone merges on its own with every gate green.
+
+## Done before Phase 2
+- [x] Step 1: correctness and API meaning (`fix/correctness-pass`, incl. independent review fixes)
+- [x] Six design directions, 24 frames each (links in the plan)
+
+## Release 0.3
+- [ ] **M15** Chrome architecture: top bar region, reserved space, item indicator variants, hidden axes, mobile layer, `strings`, caption bar, SVG plugin icons, screenshot matrix gate
+- [ ] **M16** Skin system: base/skin split, `skin`/`accent`/`scheme`, Gallery default, `console` extracted with zero visual diff
+- [ ] **M17** Contained-rect zoom bounds + `plugin-pins` (`comment`, `tag`, `feature`)
+- [ ] **M18** Console: skin polish, `reviewer` preset upgrade, zoom navigator, comment pins in the monitoring example
+- [ ] **M19** Editorial: wall skin + Night scheme, framed media, placard caption with item controls, `editorial` preset
+- [ ] **M20** Tour: thumbnails `groupDisplay: 'index'`, grid `layout: 'sections'` + `startOpen`, `arrowLabels`, `tour` preset
+- [ ] **M21** Parity: `"use client"`, DOM-markup init, UMD build, strings audit
+- [ ] Release 0.3: positioning, docs site with skin × preset playground, migration notes, publish
+
+## Release 0.4
+- [ ] **M22** Atlas: renderer `peek`, `plugin-atlas` (skyline minimap, map mode), first-run hint
+- [ ] **M23** Review plugins: triage, compare, then slideshow, rotate, share, info, timeline, filter, redaction
+- [ ] Vue adapter; release 0.4
+
+## Later
+- [ ] **M24** Stories mode (go/no-go first)
+
+---
+
 # Gallerist — Phase 1 TODO
 
 Executable checklist for `tasks/plan.md`. Dependency-ordered. TDD per task (RED → GREEN → commit).
