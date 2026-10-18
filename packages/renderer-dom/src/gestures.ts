@@ -8,6 +8,7 @@ import {
   type Intent,
   arbitrate,
   clampPan,
+  clampPanToBox,
   clampScale,
   fitScale,
   focalZoom,
@@ -19,6 +20,9 @@ import { zoomTransform } from './transform'
 export interface Geometry {
   stageRect: { left: number; top: number; width: number; height: number }
   naturalSize: { w: number; h: number } | null
+  /** The painted media inside the content layer at fit (e.g. a letterboxed image); pan bounds
+   *  keep it covering the stage. Omitted: the whole content layer counts as media. */
+  mediaBox?: { x: number; y: number; w: number; h: number }
 }
 
 export interface GestureNav {
@@ -100,9 +104,9 @@ export function attachGestures(opts: GestureOptions): () => void {
   // left the image off-centre. The renderer's zoom bounds re-check the same in the core.
   const settle = (z: ZoomState, g: Geometry = geom()): ZoomState => {
     const scaled = { scale: clampScale(z.scale, fitOf(g), maxScale), x: z.x, y: z.y }
-    return g.naturalSize
-      ? clampPan(scaled, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-      : scaled
+    const stageSize = { w: g.stageRect.width, h: g.stageRect.height }
+    if (g.mediaBox) return clampPanToBox(scaled, stageSize, g.mediaBox)
+    return g.naturalSize ? clampPan(scaled, stageSize, g.naturalSize) : scaled
   }
   const internals = getInternals(viewer)
   // Commit, then show the committed transform: a commit identical to the stored zoom is skipped

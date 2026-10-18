@@ -367,6 +367,18 @@ describe('mount — zoom transform', () => {
       }
     })
 
+    it('a zoomed portrait pans only as far as its painted edges, not into the letterbox', () => {
+      const portrait = (id: string) => ({ ...item(id), naturalSize: { w: 500, h: 1000 } })
+      const v = createViewer({ collection: { groups: [{ id: 'p', items: [portrait('p0')] }] } })
+      mount(v)
+      v.open()
+      measure(1000, 800) // painted box: 400×800 at x 300
+      getInternals(v).setZoom({ scale: 2, x: -1000, y: 0 }) // still narrower than the stage
+      expect(v.getState().zoom.x).toBe(-500) // centred
+      getInternals(v).setZoom({ scale: 4, x: 0, y: 0 }) // dragged right, past the image's left edge
+      expect(v.getState().zoom.x).toBe(-1200) // the image's left edge stops at the stage's
+    })
+
     it('clamps the scale even before the stage is laid out', () => {
       const v = createViewer({ collection: collection() })
       mount(v)

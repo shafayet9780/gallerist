@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ZoomState } from '../types'
 import {
   clampPan,
+  clampPanToBox,
   clampScale,
   contentToStage,
   fitScale,
@@ -56,6 +57,30 @@ describe('clampPan', () => {
     expect(clampPan(Z(1.5, 100, 0), { w: 1000, h: 1000 }, { w: 1000, h: 1000 }).x).toBe(0)
     expect(clampPan(Z(1.5, -800, 0), { w: 1000, h: 1000 }, { w: 1000, h: 1000 }).x).toBe(-500)
     expect(clampPan(Z(1.5, -200, 0), { w: 1000, h: 1000 }, { w: 1000, h: 1000 }).x).toBe(-200)
+  })
+})
+
+describe('clampPanToBox (contained media)', () => {
+  // a portrait painted in a landscape stage: 1000×800 stage, image box x 300..700, full height
+  const stage = { w: 1000, h: 800 }
+  const box = { x: 300, y: 0, w: 400, h: 800 }
+  it('matches clampPan when the box is the whole content layer', () => {
+    const z = Z(1.5, -900, 37)
+    expect(clampPanToBox(z, stage, { x: 0, y: 0, ...stage })).toEqual(clampPan(z, stage, stage))
+  })
+  it('keeps an axis centred while the scaled box is still narrower than the stage', () => {
+    // at 2× the box is 800 wide < 1000: centred, so its left edge sits at 100 → x = 100 - 600
+    expect(clampPanToBox(Z(2, 0, 0), stage, box).x).toBe(-500)
+    expect(clampPanToBox(Z(2, -9999, 0), stage, box).x).toBe(-500)
+  })
+  it('stops the box edges at the stage edges once it is wider, never revealing the letterbox', () => {
+    // at 4× the box is 1600 wide, offset 1200: x in [1000 - 1600 - 1200, -1200] = [-1800, -1200]
+    expect(clampPanToBox(Z(4, 0, 0), stage, box).x).toBe(-1200)
+    expect(clampPanToBox(Z(4, -5000, 0), stage, box).x).toBe(-1800)
+    expect(clampPanToBox(Z(4, -1500, 0), stage, box).x).toBe(-1500)
+  })
+  it('is the identity at fit for a letterboxed box', () => {
+    expect(clampPanToBox(Z(1, 0, 0), stage, box)).toEqual(Z(1, 0, 0))
   })
 })
 

@@ -26,11 +26,13 @@ export { type KeyReconcile, reconcileKeys, windowIndices } from './windowing'
 export { type ArbitrationInput, arbitrate, type Intent } from './zoom/arbitration'
 export {
   clampPan,
+  clampPanToBox,
   clampScale,
   contentToStage,
   fitScale,
   fitTransform,
   focalZoom,
+  type Rect,
   type Size,
   stageToContent,
   toggleZoom,

@@ -76,6 +76,10 @@
   occlusion, stage size and item-axis reachability.
 
 ### Fixed
+- **core + renderer-dom (M17)**: zoom and pan are bounded by the painted image, not the stage. A
+  zoomed portrait in a landscape stage (or a panorama in a tall one) stays centred until it is wider
+  than the stage, and can no longer be dragged into the empty letterbox beside it. The bound updates
+  when the image's natural size arrives. New `clampPanToBox` in `@gallerist/core/internal`.
 - **core**: a throwing event handler no longer stops later handlers (it is reported via
   `reportError`); a destructured `preventDefault()` works; `zoomTo` ignores NaN/negative input.
 - **core**: the `overlays` option of `createViewer` (and so `<Gallerist overlays>`) was declared but
