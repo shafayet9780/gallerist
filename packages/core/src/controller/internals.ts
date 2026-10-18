@@ -6,8 +6,18 @@
 import type { ViewerApi } from '../api'
 import type { EventMap } from '../events/events'
 import type { PluginInstance } from '../plugins/types'
+import type { ZoomState } from '../types'
+import type { Vec2 } from '../zoom/zoom'
 
 const INTERNALS: unique symbol = Symbol.for('gallerist.internals')
+
+/** Stage geometry a renderer lends the headless core so committed zoom stays valid. */
+export interface ZoomBounds {
+  /** Stage-space point that `zoomTo()` pivots on when no focal point is given (its centre). */
+  center(): Vec2
+  /** Clamp a candidate committed transform: scale into [fit, max], pan so content covers the stage. */
+  constrain(zoom: ZoomState): ZoomState
+}
 
 export interface ViewerInternals {
   /** Emit a viewer event: the renderer surfaces load/overlay events, plugins their own. */
@@ -16,6 +26,10 @@ export interface ViewerInternals {
   getPlugins(): readonly PluginInstance[]
   /** Called when the plugin set changes (a late use(), or a use() disposer). */
   onPluginsChanged(fn: () => void): () => void
+  /** Commit a full transform (gesture end, resize re-clamp). Passes through the zoom bounds. */
+  setZoom(zoom: ZoomState): void
+  /** Lend the core the stage geometry; returns a disposer. Without bounds, zoom is unclamped. */
+  setZoomBounds(bounds: ZoomBounds): () => void
 }
 
 export function attachInternals(viewer: ViewerApi, internals: ViewerInternals): void {

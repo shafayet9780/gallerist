@@ -3,7 +3,7 @@
 // no store writes during a gesture), and commits the result on release. The arbitration matrix
 // itself is unit-tested in core; real multi-pointer flows are verified in Playwright (M3.5).
 
-import type { ViewerApi } from '@gallerist/core'
+import type { ViewerApi, ZoomState } from '@gallerist/core'
 import {
   type Intent,
   arbitrate,
@@ -11,6 +11,7 @@ import {
   clampScale,
   fitScale,
   focalZoom,
+  getInternals,
   toggleZoom,
 } from '@gallerist/core/internal'
 
@@ -96,6 +97,18 @@ export function attachGestures(opts: GestureOptions): () => void {
     const r = geom().stageRect
     return { x: p.x - r.left, y: p.y - r.top }
   }
+  // Every commit is settled first: scale into [fit, max], pan so the content covers the stage
+  // (centred once it fits). Without this a pinch or double-tap back to fit kept its pan offset and
+  // left the image off-centre. The renderer's zoom bounds re-check the same in the core.
+  const settle = (z: ZoomState): ZoomState => {
+    const g = geom()
+    const scaled = { scale: clampScale(z.scale, fit(), maxScale), x: z.x, y: z.y }
+    return g.naturalSize
+      ? clampPan(scaled, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
+      : scaled
+  }
+  const internals = getInternals(viewer)
+  const commit = (z: ZoomState) => internals.setZoom(z)
 
   const schedule = () => {
     if (frame) return
@@ -136,7 +149,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     wheelTimer = undefined
     wheelGeom = null
     if (wheelZoom) {
-      viewer.zoomTo(wheelZoom.scale, { x: wheelZoom.x, y: wheelZoom.y })
+      commit(wheelZoom) // already clamped per tick
       wheelZoom = null
     }
   }
@@ -237,7 +250,8 @@ export function attachGestures(opts: GestureOptions): () => void {
     // zoom now and re-seat the gesture onto the remaining finger so it continues as a fresh
     // pan/swipe. Otherwise the lingering finger is dead until the second finger lifts (I-R2).
     if (intent === 'zoom' && pointers.size === 1) {
-      viewer.zoomTo(live.scale, { x: live.x, y: live.y })
+      live = settle(live)
+      commit(live)
       const [remaining] = [...pointers.values()]
       startZoom = { ...live }
       start = remaining ? { x: remaining.x, y: remaining.y } : null
@@ -255,16 +269,11 @@ export function attachGestures(opts: GestureOptions): () => void {
     if (intent === 'none') intent = resolveIntent(dx, dy)
 
     switch (intent) {
-      case 'pan': {
-        const g = geom()
-        const committed = g.naturalSize
-          ? clampPan(live, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-          : live
-        viewer.zoomTo(committed.scale, { x: committed.x, y: committed.y })
+      case 'pan':
+        commit(settle(live))
         break
-      }
       case 'zoom':
-        if (pointers.size === 0) viewer.zoomTo(live.scale, { x: live.x, y: live.y })
+        if (pointers.size === 0) commit(settle(live))
         break
       case 'navigate':
         if (Math.abs(dx) >= commitNav) dx < 0 ? nav.next() : nav.prev()
@@ -272,7 +281,7 @@ export function attachGestures(opts: GestureOptions): () => void {
       case 'close':
         dismissEl.style.removeProperty('--gallerist-dismiss')
         if (Math.abs(dy) >= closeDismiss) viewer.close()
-        else viewer.zoomTo(startZoom.scale, { x: startZoom.x, y: startZoom.y })
+        else commit(startZoom) // snap back from the drag-to-dismiss shrink
         break
       case 'secondary':
         // Arbitration only yields 'secondary' for an upward drag (downward is dismiss), and like
@@ -335,8 +344,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     flushWheel() // commit a pending wheel zoom before reading the base for the toggle
     const z = viewer.getState().zoom
     const target = toggleZoom(z.scale, fit(), maxScale)
-    const next = focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), target)
-    viewer.zoomTo(next.scale, { x: next.x, y: next.y })
+    commit(settle(focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), target)))
   }
 
   // A mouse drag over an <img> starts the browser's native drag-and-drop, which fires

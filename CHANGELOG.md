@@ -10,11 +10,17 @@
   the app-facing API (spec §8.4). Root bundle 3.5 → 2.7 KB gz.
 - **core**: `normalize` (and so `createViewer` / `setCollection`) throws on a duplicate group id or
   item id.
+- **core**: `zoomTo(scale, focal?)` now does what spec §8.2 says: `focal` is a stage point (px) whose
+  content stays fixed, defaulting to the stage centre. It used to be treated as the pan offset. Set
+  a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
 
 ### Fixed
 - **core**: a throwing event handler no longer stops later handlers (it is reported via
   `reportError`); a destructured `preventDefault()` works; `zoomTo` ignores NaN/negative input.
 - **renderer-dom**: cancelled media loads are no longer reported as `loadError`.
+- **core + renderer-dom**: zooming back out (keyboard, double-tap, pinch, `zoomTo`) no longer
+  leaves the image off-centre or panned past its edge. The renderer lends the core its stage
+  geometry, and every committed zoom is clamped against it.
 - **renderer-dom**: `pointercancel` abandons the gesture instead of acting as a release (no stray
   navigate/dismiss); the item-axis swipe needs the same commit distance as the group axis.
 

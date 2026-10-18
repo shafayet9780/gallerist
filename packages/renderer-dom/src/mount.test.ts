@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from './mount'
 
@@ -292,12 +293,63 @@ describe('mount — zoom transform', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    v.zoomTo(2, { x: 10, y: 20 })
+    getInternals(v).setZoom({ scale: 2, x: 10, y: 20 }) // stage unmeasured in happy-dom: unclamped
     const content = document.querySelector(
       '.gallerist-content[data-gallerist-current]',
     ) as HTMLElement
     expect(content.style.transform).toContain('scale(2)')
     expect(content.style.transform).toContain('translate(10px, 20px)')
+  })
+
+  describe('zoom bounds (every commit clamped against the stage)', () => {
+    const measure = (w: number, h: number) => {
+      const stage = document.querySelector('.gallerist-stage') as HTMLElement
+      vi.spyOn(stage, 'getBoundingClientRect').mockImplementation(
+        () =>
+          ({ width: w, height: h, left: 0, top: 0, right: w, bottom: h, x: 0, y: 0 }) as DOMRect,
+      )
+    }
+
+    it('zooming back out to fit re-centres a panned image (keyboard)', () => {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      measure(1000, 800)
+      getInternals(v).setZoom({ scale: 2, x: -1000, y: 0 }) // zoomed and panned to the right edge
+      const root = document.querySelector('.gallerist') as HTMLElement
+      for (let k = 0; k < 6; k++) root.dispatchEvent(key({ key: '-' }))
+      expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+    })
+
+    it('zoomTo clamps scale into [fit, max] and pivots on the stage centre', () => {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      measure(1000, 800)
+      v.zoomTo(10)
+      expect(v.getState().zoom).toEqual({ scale: 4, x: -1500, y: -1200 }) // centre fixed: 500 = 500·4 + x
+      v.zoomTo(0.2)
+      expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+    })
+
+    it('a pan past the edge is clamped on commit', () => {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      measure(1000, 800)
+      getInternals(v).setZoom({ scale: 2, x: 400, y: -5000 })
+      expect(v.getState().zoom).toEqual({ scale: 2, x: 0, y: -800 })
+    })
+
+    it('stops clamping once the renderer is destroyed', () => {
+      const v = createViewer({ collection: collection() })
+      const h = mount(v)
+      v.open()
+      measure(1000, 800)
+      h.destroy()
+      v.zoomTo(10)
+      expect(v.getState().zoom.scale).toBe(10)
+    })
   })
 })
 
@@ -632,10 +684,11 @@ describe('mount — resize re-clamp (C2)', () => {
             y: 0,
           }) as DOMRect,
       )
-      v.zoomTo(2, { x: -900, y: 0 }) // core does not clamp; pan is far out of bounds
-      w = 300 // stage shrinks
+      getInternals(v).setZoom({ scale: 2, x: -1000, y: 0 }) // valid: the right edge of a 1000px stage
+      expect(v.getState().zoom.x).toBe(-1000)
+      w = 300 // stage shrinks: the content is now 600px wide, so x must lie in [-300, 0]
       roCb() // ResizeObserver fires
-      expect(v.getState().zoom.x).toBeGreaterThan(-900) // re-clamped inward to the new bounds
+      expect(v.getState().zoom.x).toBe(-300) // re-clamped to the new edge
       h.destroy()
     } finally {
       vi.unstubAllGlobals()

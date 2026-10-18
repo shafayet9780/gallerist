@@ -17,7 +17,8 @@ import * as nav from '../nav/nav'
 import type { Plugin, PluginInstance } from '../plugins/types'
 import { createStore } from '../store/store'
 import type { Collection, Cursor, LoadStatus, ViewerState, ZoomState } from '../types'
-import { attachInternals } from './internals'
+import { focalZoom } from '../zoom/zoom'
+import { type ZoomBounds, attachInternals } from './internals'
 
 const IDENTITY_ZOOM: ZoomState = { scale: 1, x: 0, y: 0 }
 
@@ -158,7 +159,17 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     else groupNav(target)
   }
 
-  const commitZoom = (z: ZoomState): void => {
+  // Zoom transforms are only meaningful against the stage, which the core never sees: the renderer
+  // lends its geometry as ZoomBounds, and every commit passes through it, so no caller (API,
+  // gesture, keyboard) can leave the image off-centre or panned past its edges.
+  let zoomBounds: ZoomBounds | null = null
+  const validZoom = (z: ZoomState): boolean =>
+    Number.isFinite(z.scale) && z.scale > 0 && Number.isFinite(z.x) && Number.isFinite(z.y)
+
+  const commitZoom = (candidate: ZoomState): void => {
+    if (destroyed || !validZoom(candidate)) return
+    const z = zoomBounds ? zoomBounds.constrain(candidate) : candidate
+    if (!validZoom(z)) return
     store.set((s) => ({ ...s, zoom: z }))
     emitter.emit('zoom', { ...basePayload(), zoom: z })
     emitter.emit('zoomEnd', { ...basePayload(), zoom: z })
@@ -211,11 +222,16 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       // focal computation built on it — ignore invalid input instead.
       if (!(Number.isFinite(scale) && scale > 0)) return
       if (focal && !(Number.isFinite(focal.x) && Number.isFinite(focal.y))) return
+      // Keep the content pixel under the focal point fixed (spec §8.2). No focal: the stage centre
+      // when a renderer lent its geometry, else the stage origin.
+      const pivot = focal ?? zoomBounds?.center() ?? { x: 0, y: 0 }
       const cur = store.get().zoom
-      commitZoom({ scale, x: focal?.x ?? cur.x, y: focal?.y ?? cur.y })
+      // Clamp the scale before pivoting: pivoting at an out-of-range scale and clamping after
+      // would keep the pan computed for the wrong scale and drift the focal point.
+      const target = zoomBounds ? zoomBounds.constrain({ ...cur, scale }).scale : scale
+      commitZoom(focalZoom(cur, pivot, target))
     },
     resetZoom() {
-      if (destroyed) return
       commitZoom({ ...IDENTITY_ZOOM })
     },
     setCollection(next) {
@@ -293,6 +309,16 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       pluginsChanged.add(fn)
       return () => {
         pluginsChanged.delete(fn)
+      }
+    },
+    setZoom(zoom) {
+      commitZoom({ scale: zoom.scale, x: zoom.x, y: zoom.y })
+    },
+    setZoomBounds(bounds) {
+      zoomBounds = bounds
+      return () => {
+        // a later renderer (e.g. a StrictMode remount) may have replaced us — don't clear theirs
+        if (zoomBounds === bounds) zoomBounds = null
       }
     },
   })

@@ -4,7 +4,7 @@
 // Live pan/zoom (imperative RAF) and motion land in M3.4 / M5.
 
 import type { MediaAdapter, OverlaySpec, Phase, ViewerApi, ZoomState } from '@gallerist/core'
-import { clampPan, clampScale, focalZoom, getInternals } from '@gallerist/core/internal'
+import { clampPan, clampScale, getInternals } from '@gallerist/core/internal'
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
@@ -106,6 +106,9 @@ function isEditableTarget(target: EventTarget | null): boolean {
   const node = target as HTMLElement | null
   return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName ?? ''))
 }
+
+/** Max committed zoom (fit == 1 in the contained model); shared by gestures, keys and bounds. */
+const MAX_ZOOM = 4
 
 function applyTransform(content: HTMLElement, zoom: ZoomState): void {
   content.style.transform = `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`
@@ -667,14 +670,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
 
-  // Keyboard zoom pivots on the stage centre (not the transform origin), spec §5.
-  const zoomAroundCenter = (factor: number) => {
-    const r = stage.getBoundingClientRect()
-    const z = viewer.getState().zoom
-    const newScale = clampScale(z.scale * factor, 1, 4) // fit == 1 in the contained model
-    const next = focalZoom(z, { x: r.width / 2, y: r.height / 2 }, newScale)
-    viewer.zoomTo(next.scale, { x: next.x, y: next.y })
-  }
+  // Keyboard zoom pivots on the stage centre (zoomTo's default pivot), spec §5; the zoom bounds
+  // clamp the scale and pan.
+  const zoomAroundCenter = (factor: number) => viewer.zoomTo(viewer.zoom.scale * factor)
 
   // ── keyboard (spec §5) ───────────────────────────────────────────────────────
   // Which physical arrow drives which axis depends on orientation (point 5): a vertical (left/right)
@@ -807,6 +805,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const detachGestures = attachGestures({
     stage,
     viewer,
+    maxScale: MAX_ZOOM,
     nav, // route swipes through the linear/oriented nav seam
     getContent: () => currentRec()?.content ?? null,
     getGeometry: () => {
@@ -822,6 +821,27 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     },
   })
 
+  // ── zoom bounds (spec §11.1) ───────────────────────────────────────────────────
+  // Lend the core the stage geometry so every committed zoom (API, keyboard, gesture end, resize)
+  // is clamped in one place. Contained model: the media is object-fit inside a stage-sized content
+  // layer, so fit == scale 1 and pan bounds use the stage size.
+  const stageSize = () => {
+    const r = stage.getBoundingClientRect()
+    return { w: r.width, h: r.height }
+  }
+  const constrainZoom = (z: ZoomState): ZoomState => {
+    const size = stageSize()
+    if (!(size.w > 0 && size.h > 0)) return z // not laid out (closed overlay): nothing to clamp to
+    return clampPan({ scale: clampScale(z.scale, 1, MAX_ZOOM), x: z.x, y: z.y }, size, size)
+  }
+  const offZoomBounds = internals.setZoomBounds({
+    center: () => {
+      const size = stageSize()
+      return { x: size.w / 2, y: size.h / 2 }
+    },
+    constrain: constrainZoom,
+  })
+
   // ── re-measure on resize (spec §10.5) ──────────────────────────────────────────
   // A single ResizeObserver on the stage, debounced to one frame. On resize / device rotation
   // it repaints the current slide's content overlays (their px box is derived from the stage
@@ -835,12 +855,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       if (!attached) return
       const cur = currentRec()
       if (cur) cur.overlayItemId = undefined // re-anchor overlays against the new stage rect
-      const r = stage.getBoundingClientRect()
-      const size = { w: r.width, h: r.height }
       const z = viewer.getState().zoom
-      const clamped = size.w > 0 && size.h > 0 ? clampPan(z, size, size) : z
-      if (clamped.x !== z.x || clamped.y !== z.y) {
-        viewer.zoomTo(clamped.scale, { x: clamped.x, y: clamped.y }) // commit → sync → repaint
+      const clamped = constrainZoom(z)
+      if (clamped.scale !== z.scale || clamped.x !== z.x || clamped.y !== z.y) {
+        internals.setZoom(clamped) // commit → sync → repaint
       } else {
         renderWindow() // repaint overlays at the new rect
       }
@@ -875,6 +893,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     destroy() {
       unsubscribe()
       offPlugins()
+      offZoomBounds()
       detachGestures()
       resizeObserver?.disconnect()
       if (resizeFrame) cancelAnimationFrame(resizeFrame)

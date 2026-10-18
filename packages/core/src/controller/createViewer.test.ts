@@ -131,13 +131,14 @@ describe('createViewer — navigation', () => {
 })
 
 describe('createViewer — zoom (committed)', () => {
-  it('zoomTo sets committed zoom and emits zoom + zoomEnd', () => {
+  it('zoomTo zooms around the focal point and emits zoom + zoomEnd', () => {
     const zoom = vi.fn()
     const zoomEnd = vi.fn()
     const v = createViewer({ items: [item('a')], on: { zoom, zoomEnd } })
     v.open()
     v.zoomTo(2, { x: 10, y: 20 })
-    expect(v.getState().zoom).toEqual({ scale: 2, x: 10, y: 20 })
+    // the content pixel under (10, 20) stays under it: 10 = 10·2 + x → x = -10
+    expect(v.getState().zoom).toEqual({ scale: 2, x: -10, y: -20 })
     expect(zoom).toHaveBeenCalled()
     expect(zoomEnd).toHaveBeenCalled()
     v.resetZoom()
@@ -149,11 +150,56 @@ describe('createViewer — zoom (committed)', () => {
     const v = createViewer({ items: [item('a')], on: { zoom } })
     v.open()
     v.zoomTo(2, { x: 10, y: 20 })
+    const before = v.getState().zoom
     zoom.mockClear()
     for (const bad of [Number.NaN, 0, -5, Number.POSITIVE_INFINITY]) v.zoomTo(bad)
     v.zoomTo(2, { x: Number.NaN, y: 0 })
-    expect(v.getState().zoom).toEqual({ scale: 2, x: 10, y: 20 })
+    getInternals(v).setZoom({ scale: 2, x: Number.NaN, y: 0 })
+    expect(v.getState().zoom).toEqual(before)
     expect(zoom).not.toHaveBeenCalled()
+  })
+
+  it('zoomTo without a focal point pivots on the stage origin when no renderer lent bounds', () => {
+    const v = createViewer({ items: [item('a')] })
+    v.zoomTo(2)
+    expect(v.getState().zoom).toEqual({ scale: 2, x: 0, y: 0 })
+  })
+
+  it('zoomTo without a focal point pivots on the bounds centre', () => {
+    const v = createViewer({ items: [item('a')] })
+    getInternals(v).setZoomBounds({ center: () => ({ x: 100, y: 50 }), constrain: (z) => z })
+    v.zoomTo(2)
+    expect(v.getState().zoom).toEqual({ scale: 2, x: -100, y: -50 })
+  })
+
+  it('every commit passes through the zoom bounds (zoomTo, resetZoom, setZoom)', () => {
+    const v = createViewer({ items: [item('a')] })
+    const constrain = vi.fn((z: { scale: number; x: number; y: number }) => ({
+      scale: Math.min(z.scale, 4),
+      x: 0,
+      y: 0,
+    }))
+    getInternals(v).setZoomBounds({ center: () => ({ x: 0, y: 0 }), constrain })
+    v.zoomTo(9, { x: 30, y: 30 })
+    expect(v.getState().zoom).toEqual({ scale: 4, x: 0, y: 0 })
+    getInternals(v).setZoom({ scale: 2, x: -50, y: -50 })
+    expect(v.getState().zoom).toEqual({ scale: 2, x: 0, y: 0 })
+    constrain.mockClear()
+    v.resetZoom()
+    expect(constrain).toHaveBeenCalledWith({ scale: 1, x: 0, y: 0 })
+  })
+
+  it('a bounds disposer only clears its own bounds (StrictMode remount)', () => {
+    const v = createViewer({ items: [item('a')] })
+    const internals = getInternals(v)
+    const offFirst = internals.setZoomBounds({
+      center: () => ({ x: 0, y: 0 }),
+      constrain: (z) => z,
+    })
+    internals.setZoomBounds({ center: () => ({ x: 10, y: 10 }), constrain: (z) => z })
+    offFirst() // the first renderer tears down after the second mounted
+    v.zoomTo(2)
+    expect(v.getState().zoom).toEqual({ scale: 2, x: -10, y: -10 }) // second bounds still active
   })
 
   it('resets committed zoom on group navigation by default (I-C2)', () => {
@@ -168,8 +214,9 @@ describe('createViewer — zoom (committed)', () => {
     const v = createViewer({ collection: grouped(), keepZoomOnNav: true })
     v.open()
     v.zoomTo(3, { x: 50, y: 50 })
+    const zoomed = v.getState().zoom
     v.next()
-    expect(v.getState().zoom).toEqual({ scale: 3, x: 50, y: 50 })
+    expect(v.getState().zoom).toEqual(zoomed)
   })
 })
 
@@ -253,8 +300,9 @@ describe('createViewer — setCollection diff', () => {
     v.open()
     v.goToId('g1', 'b1')
     v.zoomTo(2, { x: 10, y: 20 })
+    const zoomed = v.getState().zoom
     v.setCollection({ groups: [{ id: 'g1', items: [item('b0'), item('b1')] }] }) // b1 still present
-    expect(v.getState().zoom).toEqual({ scale: 2, x: 10, y: 20 })
+    expect(v.getState().zoom).toEqual(zoomed)
     v.setCollection({ groups: [{ id: 'zz', items: [item('z')] }] }) // b1 gone
     expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
   })

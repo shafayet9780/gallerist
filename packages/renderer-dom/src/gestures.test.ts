@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type Geometry, attachGestures } from './gestures'
 
@@ -66,7 +67,7 @@ describe('wheel zoom', () => {
     vi.useFakeTimers()
     try {
       const v = setup()
-      const spy = vi.spyOn(v, 'zoomTo')
+      const spy = vi.spyOn(getInternals(v), 'setZoom')
       stage.dispatchEvent(wheel(-100))
       vi.advanceTimersByTime(100) // wheel commit debounce
       expect(spy).toHaveBeenCalled()
@@ -92,7 +93,7 @@ describe('wheel zoom', () => {
     vi.useFakeTimers()
     try {
       const v = setup()
-      const spy = vi.spyOn(v, 'zoomTo')
+      const spy = vi.spyOn(getInternals(v), 'setZoom')
       for (let i = 0; i < 5; i++) stage.dispatchEvent(wheel(-100))
       expect(spy).not.toHaveBeenCalled() // imperative during the burst, no store commit yet
       vi.advanceTimersByTime(100)
@@ -134,7 +135,7 @@ describe('double-click', () => {
 describe('pointer gestures → arbitration', () => {
   it('pans when zoomed in (scale > fit) and commits clamped translation', () => {
     const v = setup() // default scale 1 > fit 0.5
-    const spy = vi.spyOn(v, 'zoomTo')
+    const spy = vi.spyOn(getInternals(v), 'setZoom')
     stage.dispatchEvent(pe('pointerdown', 500, 400))
     stage.dispatchEvent(pe('pointermove', 440, 400)) // dx -60 horizontal
     stage.dispatchEvent(pe('pointerup', 440, 400))
@@ -228,12 +229,12 @@ describe('pointercancel abandons the gesture', () => {
 
   it('snaps a cancelled pan back to the committed transform without committing', () => {
     const v = setup() // scale 1 > fit 0.5 → drags pan
-    const zoomTo = vi.spyOn(v, 'zoomTo')
+    const setZoom = vi.spyOn(getInternals(v), 'setZoom')
     stage.dispatchEvent(pe('pointerdown', 500, 400))
     stage.dispatchEvent(pe('pointermove', 400, 400)) // live pan dx -100
     expect(content.style.transform).toContain('-100px')
     stage.dispatchEvent(pe('pointercancel', 400, 400))
-    expect(zoomTo).not.toHaveBeenCalled()
+    expect(setZoom).not.toHaveBeenCalled()
     expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
     expect(content.style.transform).toBe('translate(0px, 0px) scale(1)')
   })
@@ -249,6 +250,30 @@ describe('pointercancel abandons the gesture', () => {
     stage.dispatchEvent(pe('pointermove', 380, 402))
     stage.dispatchEvent(pe('pointerup', 380, 402))
     expect(next).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('zoom commits settle back to a centred fit', () => {
+  // stage 1000x800, natural 2000x1000 → fit 0.5, centred fit transform = { 0.5, 0, 150 }
+  it('double-click from a panned zoom returns to the centred fit', () => {
+    const v = setup()
+    getInternals(v).setZoom({ scale: 1, x: -300, y: -50 })
+    stage.dispatchEvent(
+      Object.assign(new Event('dblclick', { bubbles: true }), { clientX: 900, clientY: 100 }),
+    )
+    expect(v.getState().zoom).toEqual({ scale: 0.5, x: 0, y: 150 })
+  })
+
+  it('pinching a panned zoom back out to fit re-centres instead of keeping the pan offset', () => {
+    const v = setup()
+    getInternals(v).setZoom({ scale: 1, x: -300, y: -50 }) // zoomed in and panned
+    stage.dispatchEvent(pe('pointerdown', 100, 100, 1)) // fingers 400px apart, off-centre
+    stage.dispatchEvent(pe('pointerdown', 500, 100, 2))
+    stage.dispatchEvent(pe('pointermove', 200, 100, 1)) // pinch to 200px apart → factor 0.5 → fit
+    stage.dispatchEvent(pe('pointermove', 400, 100, 2))
+    stage.dispatchEvent(pe('pointerup', 200, 100, 1))
+    stage.dispatchEvent(pe('pointerup', 400, 100, 2))
+    expect(v.getState().zoom).toEqual({ scale: 0.5, x: 0, y: 150 })
   })
 })
 

@@ -281,7 +281,7 @@ viewer.next() / prev(): void
 viewer.nextItem() / prevItem(): void
 viewer.goTo(g: number, i?: number): void
 viewer.goToId(groupId: string, itemId?: string): void
-viewer.zoomTo(scale: number, focal?: {x:number;y:number}): void
+viewer.zoomTo(scale: number, focal?: {x:number;y:number}): void  // keeps the content under `focal` (stage px) fixed; default: stage centre
 viewer.resetZoom(): void
 viewer.setCollection(next: Collection): void   // live diff update
 viewer.refresh(): void                         // re-measure (e.g. container resize)
@@ -306,6 +306,8 @@ const { emit, getPlugins, onPluginsChanged } = getInternals(viewer)
 
 - `emit(event, payload)`: surface an event (the renderer emits load/overlay events, plugins their own). Off the public API so app code can't forge, say, a `loaded` event.
 - `getPlugins()` / `onPluginsChanged(fn)`: the plugin registry the renderer mounts regions, adapters and overlays from.
+- `setZoom(transform)`: commit a full `{scale, x, y}` (gesture end, resize re-clamp).
+- `setZoomBounds({ center, constrain })`: the renderer lends the core its stage geometry. Every committed zoom, from `zoomTo`, `resetZoom` or `setZoom`, passes through `constrain` (scale into [fit, max], pan so the content covers the stage, centred at fit), and `zoomTo` without a focal point pivots on `center()`.
 - The engine building blocks: normalize, store, FSM, nav, windowing, springs, gesture arbitration and zoom math.
 
 `getInternals` finds the viewer's internals under a `Symbol.for` key, so it works even when the two entries are bundled as separate copies.

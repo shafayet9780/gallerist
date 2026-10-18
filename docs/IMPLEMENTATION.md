@@ -87,8 +87,9 @@ for Phase 0; overlays bridge the gap via the contain-rect mapping in
 
 `ViewerState.zoom` is the **last committed** transform, not the live one. During an active
 pan/zoom, `attachGestures` mutates `content.style.transform` directly via a RAF and **does not
-write the store**; it commits once on gesture end (`viewer.zoomTo`). This protects 60fps and stops
-framework adapters (Phase 1) from re-rendering 60×/second. See
+write the store**; it commits once on gesture end (`getInternals(viewer).setZoom`, clamped by the
+renderer's zoom bounds). This protects 60fps and stops framework adapters (Phase 1) from
+re-rendering 60×/second. See
 `packages/renderer-dom/src/gestures.ts`.
 
 ### 3.3 Lifecycle settles synchronously (Phase-0 limitation)
@@ -164,7 +165,7 @@ const viewer = createViewer({
 viewer.open(at?) / close()
 viewer.next() / prev() / nextItem() / prevItem()
 viewer.goTo(g, i?) / goToId(groupId, itemId?)
-viewer.zoomTo(scale, focal?) / resetZoom()
+viewer.zoomTo(scale, focal?) / resetZoom()  // focal: stage px kept fixed; default centre; clamped
 viewer.setCollection(next)          // diff by id, preserves cursor (+ zoom if same item)
 viewer.getState() / getCollection() / subscribe(fn)
 viewer.on(event, handler)           // runtime events
