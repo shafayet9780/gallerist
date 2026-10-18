@@ -342,6 +342,8 @@ export function attachGestures(opts: GestureOptions): () => void {
   }
 
   const onDblClick = (e: MouseEvent) => {
+    // a double click on a control in the stage (a pin, a card's link) belongs to that control
+    if ((e.target as Element | null)?.closest?.('button, a[href], input, select, textarea')) return
     flushWheel() // commit a pending wheel zoom before reading the base for the toggle
     const z = viewer.getState().zoom
     const target = toggleZoom(z.scale, fit(), maxScale)

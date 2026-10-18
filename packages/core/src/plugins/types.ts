@@ -2,7 +2,7 @@
 // A plugin is a factory bound by the user (e.g. `fullscreen()`) returning `(viewer) => instance`.
 
 import type { EventHandlers, ViewerApi } from '../api'
-import type { MediaAdapter, OverlaySpec } from '../types'
+import type { Group, Item, MediaAdapter, OverlaySpec } from '../types'
 
 /**
  * Named UI slots the renderer exposes; plugins inject Nodes into them. `toolbar` sits in the top
@@ -38,7 +38,9 @@ export interface PluginInstance {
   on?: EventHandlers
   /** UI region injection — the renderer mounts the returned Node into the named region. */
   regions?: Partial<Record<RegionName, (ctx: RegionCtx) => Node>>
-  overlays?: OverlaySpec[]
+  /** Overlays for every slide, or a function returning the overlays for one slide (e.g. pins
+   *  read from the item). The function runs when that slide's overlays are painted. */
+  overlays?: OverlaySpec[] | ((slide: { group: Group; item: Item }) => OverlaySpec[])
   mediaAdapters?: MediaAdapter[]
   keymap?: Record<string, (e: KeyboardEvent) => void>
   transitions?: Record<string, TransitionStrategy>

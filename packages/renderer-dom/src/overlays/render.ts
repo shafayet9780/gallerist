@@ -13,6 +13,8 @@ import {
   viewportAnchorStyle,
 } from './position'
 
+const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]'
+
 export interface OverlayPaintCtx {
   group: Group
   item: Item
@@ -70,7 +72,6 @@ export function paintOverlays(
     if (!visible) host.style.display = 'none'
 
     if (spec.interactive) {
-      host.tabIndex = 0
       host.addEventListener('click', () =>
         getInternals(ctx.viewer).emit('overlayClick', {
           viewer: ctx.viewer,
@@ -92,6 +93,9 @@ export function paintOverlays(
     })
     if (typeof out === 'string') host.textContent = out
     else host.appendChild(out)
+    // an interactive overlay is reachable by keyboard: through its own controls when it has any
+    // (a pin's button), otherwise the host itself takes focus
+    if (spec.interactive && !host.querySelector(FOCUSABLE)) host.tabIndex = 0
 
     let counterScaled = false
     if (spec.anchor.kind === 'viewport') {

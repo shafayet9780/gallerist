@@ -3,7 +3,15 @@
 // image adapter, minimal chrome, dialog a11y, keyboard map, and the committed zoom transform.
 // Live pan/zoom (imperative RAF) and motion land in M3.4 / M5.
 
-import type { MediaAdapter, OverlaySpec, Phase, ViewerApi, ZoomState } from '@gallerist/core'
+import type {
+  Group,
+  Item,
+  MediaAdapter,
+  OverlaySpec,
+  Phase,
+  ViewerApi,
+  ZoomState,
+} from '@gallerist/core'
 import { clampPanToBox, clampScale, getInternals } from '@gallerist/core/internal'
 import { imageAdapter } from './adapters/image'
 import { type Accent, type ColorScheme, type Skin, applyAppearance } from './appearance'
@@ -106,7 +114,8 @@ interface SlideRec {
   media?: ReturnType<MediaAdapter['mount']>
   abort?: AbortController
   overlayEls?: OverlayEntry[]
-  overlayItemId?: string
+  /** the item whose overlays are painted; a new object (changed data) repaints them */
+  overlayItem?: Item
   activated?: boolean
 }
 
@@ -229,9 +238,14 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     ...baseAdapters,
     ...internals.getPlugins().flatMap((p) => p.mediaAdapters ?? []),
   ]
-  const currentGlobalOverlays = () => [
+  // A plugin's overlays are a list, or a function of the slide (per-item pins, annotations).
+  const currentGlobalOverlays = (group: Group, item: Item) => [
     ...(opts.overlays ?? []),
-    ...internals.getPlugins().flatMap((p) => p.overlays ?? []),
+    ...internals
+      .getPlugins()
+      .flatMap((p) =>
+        typeof p.overlays === 'function' ? p.overlays({ group, item }) : (p.overlays ?? []),
+      ),
   ]
   let pluginKeymap = aggregateKeymap(plugins)
 
@@ -473,7 +487,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (col === lastWindowCol && cur.g === lastWindowG && cur.i === lastWindowI) {
       const rec = mounted.get(col.groups[cur.g]?.id ?? '')
       const it = col.groups[cur.g]?.items[cur.i]
-      if (rec && it && rec.itemId === it.id && rec.overlayItemId === it.id) {
+      if (rec && it && rec.itemId === it.id && rec.overlayItem === it) {
         applyTransform(rec.content, state.zoom)
         if (rec.overlayEls) updateOverlays(rec.overlayEls, state.zoom.scale)
         return
@@ -538,7 +552,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
             const r = mounted.get(slideKey)
             if (!r || r.itemId !== mountedId) return // navigated away / item swapped out
             if (groupIndex(slideKey) !== viewer.getState().cursor.g) return // no longer current
-            r.overlayItemId = undefined // force a repaint at the now-known natural size
+            r.overlayItem = undefined // force a repaint at the now-known natural size
             // a zoom committed before the size was known was bounded by the whole layer
             if (attached) reclampZoom()
           })
@@ -573,15 +587,16 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.content.setAttribute('data-gallerist-current', '')
         applyTransform(rec.content, state.zoom)
         if (it) {
-          // Repaint (re-invokes user render() + rebuilds DOM) only when the item changes.
+          // Repaint (re-invokes user render() + rebuilds DOM) only when the item changes, including
+          // new data for the same id (setCollection).
           // On a zoom-only change, update retained overlays in place (spec §9.2: no rebuild).
-          if (rec.overlayItemId !== it.id) {
+          if (rec.overlayItem !== it) {
             const r = stage.getBoundingClientRect()
             const stageSize = { w: r.width, h: r.height }
             rec.overlayEls = paintOverlays(
               viewportLayer,
               rec.overlayHost,
-              gatherOverlays(group, it, currentGlobalOverlays()),
+              gatherOverlays(group, it, currentGlobalOverlays(group, it)),
               {
                 group,
                 item: it,
@@ -591,7 +606,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
                 natural: rec.media?.naturalSize?.() ?? stageSize,
               },
             )
-            rec.overlayItemId = it.id
+            rec.overlayItem = it
           } else if (rec.overlayEls) {
             updateOverlays(rec.overlayEls, state.zoom.scale)
           }
@@ -601,7 +616,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.content.removeAttribute('data-gallerist-current')
         rec.overlayHost.replaceChildren()
         rec.overlayEls = undefined
-        rec.overlayItemId = undefined
+        rec.overlayItem = undefined
       }
     }
   }
@@ -1027,7 +1042,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       resizeFrame = 0
       if (!attached) return
       const cur = currentRec()
-      if (cur) cur.overlayItemId = undefined // re-anchor overlays against the new stage rect
+      if (cur) cur.overlayItem = undefined // re-anchor overlays against the new stage rect
       reclampZoom()
     })
   }
@@ -1108,7 +1123,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (!controls) bar.hidden = regionHosts.toolbar.childElementCount === 0
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
-    if (cur) cur.overlayItemId = undefined
+    if (cur) cur.overlayItem = undefined
     if (attached) renderWindow()
   }
   mountRegions()

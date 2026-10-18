@@ -30,6 +30,20 @@
   content stays fixed, defaulting to the stage centre. It used to be treated as the pan offset. Set
   a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
 
+### Added
+- **plugin-pins (M17)**: new `@gallerist/plugin-pins`. Pins are points on an item that follow pan
+  and zoom at a constant size and open a card. Three presentations: `comment` (numbered threads
+  with replies and a resolved state, plus `onPlace` to drop a new one with a click or `c`), `tag`
+  (a product hotspot with a card and link) and `feature` (numbered notes). Pins come from
+  `item.meta.pins` or a `pins(item, group)` reader. A toolbar toggle and `p` show or hide them;
+  Escape closes a card, not the viewer. `refresh()`, `setVisible()` and `open(id)` let the host
+  drive them. Styles are in `theme-default/pins.css`, which `gallerist.css` includes, and are drawn
+  from the skin's tokens. Demo: `examples/hotspots`.
+- **core + renderer-dom**: a plugin's `overlays` may be a function of the slide
+  (`({ group, item }) => OverlaySpec[]`). Overlays repaint when an item's data changes under the
+  same id. An interactive overlay whose content has its own controls is no longer an extra tab
+  stop, and double-clicking a control in the stage no longer zooms.
+
 ### Changed
 - **theme (M16)**: `theme-default` splits into `base.css` (structure: layout areas, reserved space,
   the mobile layer, RTL, reduced motion, every component rule) and skins that only set tokens.

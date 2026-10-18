@@ -137,7 +137,7 @@ describe('the overlays option', () => {
     const v = createViewer({ items: [item('a')], overlays: [spec] })
     const all = getInternals(v)
       .getPlugins()
-      .flatMap((p) => p.overlays ?? [])
+      .flatMap((p) => (Array.isArray(p.overlays) ? p.overlays : []))
     expect(all).toEqual([spec])
   })
 
