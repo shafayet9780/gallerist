@@ -1,8 +1,9 @@
 # Gallerist — Phase 2 Plan: one engine, six looks
 
-> Strategic plan. Executable checklist: `tasks/todo.md` (Phase 2 section). Design source of truth
-> for each look: the six design canvases (links below). Spec: `docs/GALLERIST_SPEC.md` (decisions
-> D16–D19 record the choices here).
+> Strategic plan. Executable checklist: `tasks/todo.md` (Phase 2 section). Design reference for
+> each look: the six design canvases (links below); a local copy with rendered frames may live in
+> the gitignored `design/prototypes/`. Spec: `docs/GALLERIST_SPEC.md` (decisions D16–D19 record the
+> choices here).
 
 ## Context
 
