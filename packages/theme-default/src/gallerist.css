@@ -19,10 +19,38 @@
   --gallerist-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
   --gallerist-rail-w: 130px; /* vertical (left/right) rail width */
   --gallerist-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --gallerist-font: system-ui, -apple-system, sans-serif;
+
+  /* surfaces and fills */
+  --gallerist-surface: #1a1c22; /* thumbnail cards */
+  --gallerist-cell-bg: #1a1a1f; /* grid cells */
+  --gallerist-panel: rgb(8 8 10 / 0.96); /* full-stage panels (grid) */
+  --gallerist-scrim: rgb(0 0 0 / 0.55); /* small controls over images */
+  --gallerist-badge-bg: rgb(0 0 0 / 0.62); /* count badges over images */
+  --gallerist-caption-band: rgb(255 255 255 / 0.03);
+  --gallerist-group-bg: rgb(255 255 255 / 0.02);
+  --gallerist-placeholder: rgba(127, 127, 127, 0.06);
+  --gallerist-shimmer: rgba(255, 255, 255, 0.06);
+  --gallerist-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6);
+  --gallerist-stack-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
+  --gallerist-blur: blur(20px) saturate(180%);
+
+  /* controls (bar tools, arrows, item navigator) */
+  --gallerist-control-bg: var(--gallerist-chrome-bg);
+  --gallerist-control-border: 0.5px solid var(--gallerist-hairline);
+  --gallerist-control-radius: var(--gallerist-radius);
+  --gallerist-counter-font: var(--gallerist-mono);
+  --gallerist-counter-bg: var(--gallerist-chrome-bg);
 
   /* signal accent (amber by default). --gallerist-accent-fg = ink that sits on the accent. */
   --gallerist-accent: #ffb000;
   --gallerist-accent-fg: #15110a;
+  /* roles derived from the accent; a skin may point them elsewhere */
+  --gallerist-focus: var(--gallerist-accent); /* focus rings */
+  --gallerist-selection: var(--gallerist-accent); /* the current thumb / pill / cell */
+  --gallerist-selection-fg: var(--gallerist-accent-fg);
+  --gallerist-pressed-bg: var(--gallerist-accent); /* a toggle that is on */
+  --gallerist-pressed-fg: var(--gallerist-accent-fg);
 
   --gallerist-speed: 300ms;
 
@@ -35,7 +63,7 @@
   --gallerist-dur-exit: 180ms; /* exits run shorter than entrances */
 
   color: var(--gallerist-fg);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--gallerist-font);
   font-variant-numeric: tabular-nums;
 }
 
@@ -218,14 +246,14 @@
   padding: 24px;
   text-align: center;
   color: var(--gallerist-fg-muted);
-  background: rgba(127, 127, 127, 0.06);
+  background: var(--gallerist-placeholder);
 }
 .gallerist-media-error-icon {
   opacity: 0.75;
   line-height: 0;
 }
 .gallerist-media-error-label {
-  font: 14px / 1.4 system-ui, -apple-system, sans-serif;
+  font: 14px / 1.4 var(--gallerist-font);
   max-width: 40ch;
   color: var(--gallerist-fg);
 }
@@ -241,7 +269,7 @@
   background: linear-gradient(
     100deg,
     transparent 35%,
-    rgba(255, 255, 255, 0.06) 50%,
+    var(--gallerist-shimmer) 50%,
     transparent 65%
   );
   background-size: 200% 100%;
@@ -334,16 +362,16 @@
   inset: 0;
   overflow-y: auto;
   padding: 16px;
-  background: rgb(8 8 10 / 0.96);
+  background: var(--gallerist-panel);
   backdrop-filter: blur(8px);
 }
 .gallerist-grid-header {
   position: sticky;
   top: 0;
   padding: 12px 4px 8px;
-  font: 500 14px system-ui;
+  font: 500 14px var(--gallerist-font);
   color: var(--gallerist-fg);
-  background: rgb(8 8 10 / 0.96);
+  background: var(--gallerist-panel);
 }
 .gallerist-grid-cells {
   display: grid;
@@ -358,10 +386,10 @@
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  background: #1a1a1f;
+  background: var(--gallerist-cell-bg);
 }
 .gallerist-grid-cell[data-active] {
-  border-color: var(--gallerist-accent);
+  border-color: var(--gallerist-selection);
 }
 .gallerist-grid-img {
   width: 100%;
@@ -390,7 +418,7 @@
   padding: 8px 12px;
   overflow-x: auto;
   background: var(--gallerist-chrome-bg);
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--gallerist-blur);
 }
 /* cards stack image + (optional) caption band; height grows for the caption */
 .gallerist-thumb {
@@ -404,13 +432,13 @@
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  background: #1a1c22;
+  background: var(--gallerist-surface);
   transition: border-color var(--gallerist-dur-gentle) var(--gallerist-ease-out), box-shadow
     var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
 .gallerist-thumb[data-active] {
-  border-color: var(--gallerist-accent);
-  box-shadow: 0 0 0 1px var(--gallerist-accent), 0 8px 22px -8px var(--gallerist-accent);
+  border-color: var(--gallerist-selection);
+  box-shadow: 0 0 0 1px var(--gallerist-selection), 0 8px 22px -8px var(--gallerist-selection);
 }
 .gallerist-thumb-img {
   width: 100%;
@@ -422,7 +450,7 @@
   height: var(--gallerist-thumb-h);
 }
 .gallerist-thumb-stacked {
-  box-shadow: 3px 3px 0 -1px #444, 6px 6px 0 -2px #333;
+  box-shadow: var(--gallerist-stack-shadow);
 }
 .gallerist-thumb-count {
   position: absolute;
@@ -432,7 +460,7 @@
   font-size: 10px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  background: rgb(0 0 0 / 0.62);
+  background: var(--gallerist-badge-bg);
   color: var(--gallerist-fg);
   padding: 1px 5px;
   border-radius: 999px;
@@ -442,16 +470,16 @@
 .gallerist-thumb-caption {
   flex: 0 0 auto;
   padding: 4px 6px 5px;
-  font: 500 11px system-ui;
+  font: 500 11px var(--gallerist-font);
   line-height: 1.2;
   color: var(--gallerist-fg);
-  background: rgb(255 255 255 / 0.03);
+  background: var(--gallerist-caption-band);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .gallerist-thumb[data-active] .gallerist-thumb-caption {
-  color: var(--gallerist-accent);
+  color: var(--gallerist-selection);
 }
 .gallerist-thumb-items {
   display: flex;
@@ -473,7 +501,7 @@
   padding: 6px;
   border-radius: var(--gallerist-radius);
   background: var(--gallerist-chrome-bg);
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--gallerist-blur);
 }
 .gallerist-thumbs-aside {
   display: flex;
@@ -496,7 +524,7 @@
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  background: #1a1c22;
+  background: var(--gallerist-surface);
   transition: border-color var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
 .gallerist-thumb-item > .gallerist-thumb-img {
@@ -504,8 +532,8 @@
   height: calc(var(--gallerist-thumb-h) * 0.7);
 }
 .gallerist-thumb-item[data-active] {
-  border-color: var(--gallerist-accent);
-  box-shadow: 0 0 0 1px var(--gallerist-accent);
+  border-color: var(--gallerist-selection);
+  box-shadow: 0 0 0 1px var(--gallerist-selection);
 }
 
 /* ── peek flyout (stacked, UX-A): preview a non-active group's items on hover/focus without
@@ -526,8 +554,8 @@
   padding: 6px;
   border-radius: var(--gallerist-radius);
   background: var(--gallerist-chrome-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6);
+  backdrop-filter: var(--gallerist-blur);
+  box-shadow: var(--gallerist-shadow);
 }
 .gallerist-thumb-peek[data-axis="horizontal"] {
   flex-direction: row;
@@ -553,9 +581,9 @@
   padding: 0;
   border: none;
   border-radius: 6px;
-  background: rgb(0 0 0 / 0.55);
+  background: var(--gallerist-scrim);
   color: var(--gallerist-fg);
-  font: 700 13px / 1 system-ui;
+  font: 700 13px / 1 var(--gallerist-font);
   cursor: pointer;
   backdrop-filter: blur(6px);
 }
@@ -579,7 +607,7 @@
   border: 1px solid var(--gallerist-hairline);
   border-left: 3px solid var(--gallerist-accent);
   border-radius: var(--gallerist-radius);
-  background: rgb(255 255 255 / 0.02);
+  background: var(--gallerist-group-bg);
 }
 /* a group continuing off-window: soften the bracket so it reads as "more before/after". */
 .gallerist-thumb-group[data-partial-start] {
@@ -593,7 +621,7 @@
   border-bottom-right-radius: 0;
 }
 .gallerist-thumb-group-cap {
-  font: 600 11px system-ui;
+  font: 600 11px var(--gallerist-font);
   line-height: 1.2;
   color: var(--gallerist-fg);
   opacity: 0.85;
@@ -617,13 +645,13 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 0.5px solid var(--gallerist-hairline);
-  border-radius: var(--gallerist-radius);
-  background: var(--gallerist-chrome-bg);
+  border: var(--gallerist-control-border);
+  border-radius: var(--gallerist-control-radius);
+  background: var(--gallerist-control-bg);
   color: var(--gallerist-fg);
   font: inherit;
   cursor: pointer;
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--gallerist-blur);
 }
 .gallerist-bar button[hidden],
 .gallerist-controls > button[hidden] {
@@ -631,14 +659,14 @@
 }
 /* pressed (a toggle that is on) reads differently from focus: an accent fill vs a ring */
 .gallerist-bar button[aria-pressed="true"] {
-  background: var(--gallerist-accent);
-  border-color: var(--gallerist-accent);
-  color: var(--gallerist-accent-fg);
+  background: var(--gallerist-pressed-bg);
+  border-color: var(--gallerist-pressed-bg);
+  color: var(--gallerist-pressed-fg);
 }
 .gallerist-bar button:focus-visible,
 .gallerist-controls > button:focus-visible,
 .gallerist-itemnav button:focus-visible {
-  outline: 2px solid var(--gallerist-accent);
+  outline: 2px solid var(--gallerist-focus);
   outline-offset: 2px;
 }
 .gallerist-icon {
@@ -664,7 +692,7 @@
 }
 .gallerist-counter {
   flex: none;
-  font-family: var(--gallerist-mono);
+  font-family: var(--gallerist-counter-font);
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -674,7 +702,7 @@
   direction: ltr;
   padding: 6px 10px;
   border-radius: var(--gallerist-radius);
-  background: var(--gallerist-chrome-bg);
+  background: var(--gallerist-counter-bg);
 }
 .gallerist-title {
   flex: 1 1 auto;
@@ -837,7 +865,7 @@
   padding: 4px;
   border-radius: 999px;
   background: var(--gallerist-chrome-bg);
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--gallerist-blur);
   font: 600 12px var(--gallerist-mono);
   font-variant-numeric: tabular-nums;
   color: var(--gallerist-fg);
@@ -863,8 +891,8 @@
   opacity: 0.6;
 }
 .gallerist-pill[data-active] {
-  background: var(--gallerist-accent);
-  color: var(--gallerist-accent-fg);
+  background: var(--gallerist-selection);
+  color: var(--gallerist-selection-fg);
   opacity: 1;
 }
 /* dots: a small mark per item inside a 20px hit area; the active one grows */
@@ -893,7 +921,7 @@
 }
 .gallerist-dot:focus-visible,
 .gallerist-pill:focus-visible {
-  outline: 2px solid var(--gallerist-accent);
+  outline: 2px solid var(--gallerist-focus);
   outline-offset: 1px;
 }
 
@@ -933,7 +961,7 @@
   background: var(--gallerist-chrome-bg);
   color: var(--gallerist-fg);
   cursor: pointer;
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--gallerist-blur);
 }
 .gallerist-rail-toggle::before {
   /* a small grip glyph so the tab reads as draggable/openable */
@@ -945,7 +973,7 @@
   opacity: 0.5;
 }
 .gallerist-rail-toggle:focus-visible {
-  outline: 2px solid var(--gallerist-accent);
+  outline: 2px solid var(--gallerist-focus);
   outline-offset: 2px;
 }
 .gallerist-rail-toggle .gallerist-icon {
