@@ -21,6 +21,7 @@
     "baseUrl": ".",
     "paths": {
       "@gallerist/core": ["./packages/core/src/index.ts"],
+      "@gallerist/core/internal": ["./packages/core/src/internal.ts"],
       "@gallerist/renderer-dom": ["./packages/renderer-dom/src/index.ts"]
     }
   }

@@ -6,7 +6,7 @@ import { defineConfig } from 'tsup'
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'))
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/internal.ts'],
   format: ['esm', 'cjs'],
   dts: true,
   clean: true,

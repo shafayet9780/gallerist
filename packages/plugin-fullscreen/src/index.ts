@@ -3,6 +3,7 @@
 // Plugins may touch the DOM (the headless invariant binds @gallerist/core only).
 
 import type { Plugin } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 
 export interface FullscreenOptions {
   /** CSS selector for the element to fullscreen; defaults to the bound viewer's root. */
@@ -57,8 +58,9 @@ export function fullscreen(opts: FullscreenOptions = {}): Plugin {
       }
     }
 
+    const { emit } = getInternals(viewer)
     const onChange = () =>
-      viewer.emit('fullscreenChange', { viewer, fullscreen: isOurFullscreen(resolveRoot()) })
+      emit('fullscreenChange', { viewer, fullscreen: isOurFullscreen(resolveRoot()) })
 
     const button = () => {
       const btn = document.createElement('button')

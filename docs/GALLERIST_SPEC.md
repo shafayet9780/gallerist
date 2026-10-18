@@ -295,6 +295,21 @@ viewer.destroy(): void
 
 Single flag (`container`) toggles between a full-screen lightbox (default, mounted to a portal) and an **inline** embedded viewer (carousel-in-page). All features work in both; inline mode can "maximize" to overlay if a plugin provides the control. This subsumes lightGallery's separate inline-gallery concept into one code path.
 
+### 8.4 Internal surface (`@gallerist/core/internal`)
+
+The root entry is the app-facing API that freezes at 1.0. Renderers and plugin authors also need plumbing that apps should not touch, so it lives behind a second entry, unstable before 1.0:
+
+```ts
+import { getInternals } from '@gallerist/core/internal'
+const { emit, getPlugins, onPluginsChanged } = getInternals(viewer)
+```
+
+- `emit(event, payload)`: surface an event (the renderer emits load/overlay events, plugins their own). Off the public API so app code can't forge, say, a `loaded` event.
+- `getPlugins()` / `onPluginsChanged(fn)`: the plugin registry the renderer mounts regions, adapters and overlays from.
+- The engine building blocks: normalize, store, FSM, nav, windowing, springs, gesture arbitration and zoom math.
+
+`getInternals` finds the viewer's internals under a `Symbol.for` key, so it works even when the two entries are bundled as separate copies.
+
 ---
 
 ## 9. Overlay system (image-space) — wedge #2

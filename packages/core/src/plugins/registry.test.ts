@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createViewer } from '../controller/createViewer'
+import { getInternals } from '../controller/internals'
 import type { Item } from '../types'
 import type { Plugin } from './types'
 
@@ -20,9 +21,9 @@ describe('plugin registry (spec §13)', () => {
   it('getPlugins() returns a copy — mutating it does not affect the registry', () => {
     const p: Plugin = () => ({ name: 'p' })
     const v = createViewer({ ...base(), plugins: [p] })
-    const list = v.getPlugins() as unknown as unknown[]
+    const list = getInternals(v).getPlugins() as unknown as unknown[]
     list.length = 0 // attempt to mutate the returned array
-    expect(v.getPlugins()).toHaveLength(1)
+    expect(getInternals(v).getPlugins()).toHaveLength(1)
   })
 
   it('wires plugin on-handlers (fire on emitted events)', () => {
@@ -43,25 +44,33 @@ describe('plugin registry (spec §13)', () => {
   it('exposes registered instances via getPlugins()', () => {
     const p: Plugin = () => ({ name: 'thumbs', keymap: { t: () => {} } })
     const v = createViewer({ ...base(), plugins: [p] })
-    expect(v.getPlugins().map((i) => i.name)).toEqual(['thumbs'])
-    expect(v.getPlugins()[0]?.keymap?.t).toBeTypeOf('function')
+    expect(
+      getInternals(v)
+        .getPlugins()
+        .map((i) => i.name),
+    ).toEqual(['thumbs'])
+    expect(getInternals(v).getPlugins()[0]?.keymap?.t).toBeTypeOf('function')
   })
 
   it('use() registers late and notifies onPluginsChanged', () => {
     const v = createViewer(base())
     const changed = vi.fn()
-    v.onPluginsChanged(changed)
+    getInternals(v).onPluginsChanged(changed)
     const init = vi.fn()
     v.use(() => ({ name: 'late', init }))
     expect(init).toHaveBeenCalledOnce()
     expect(changed).toHaveBeenCalledOnce()
-    expect(v.getPlugins().map((i) => i.name)).toEqual(['late'])
+    expect(
+      getInternals(v)
+        .getPlugins()
+        .map((i) => i.name),
+    ).toEqual(['late'])
   })
 
   it('onPluginsChanged unsubscribe stops notifications', () => {
     const v = createViewer(base())
     const changed = vi.fn()
-    const off = v.onPluginsChanged(changed)
+    const off = getInternals(v).onPluginsChanged(changed)
     off()
     v.use(() => ({ name: 'x' }))
     expect(changed).not.toHaveBeenCalled()
@@ -71,13 +80,17 @@ describe('plugin registry (spec §13)', () => {
     const destroy = vi.fn()
     const changed = vi.fn()
     const v = createViewer(base())
-    v.onPluginsChanged(changed)
+    getInternals(v).onPluginsChanged(changed)
     const off = v.use(() => ({ name: 'temp', destroy }))
-    expect(v.getPlugins().map((i) => i.name)).toEqual(['temp'])
+    expect(
+      getInternals(v)
+        .getPlugins()
+        .map((i) => i.name),
+    ).toEqual(['temp'])
     changed.mockClear()
     off()
     expect(destroy).toHaveBeenCalledOnce()
-    expect(v.getPlugins()).toHaveLength(0)
+    expect(getInternals(v).getPlugins()).toHaveLength(0)
     expect(changed).toHaveBeenCalledOnce()
   })
 
@@ -108,7 +121,7 @@ describe('plugin registry (spec §13)', () => {
       ],
     })
     const v = createViewer({ ...base(), plugins: [p] })
-    const inst = v.getPlugins()[0]
+    const inst = getInternals(v).getPlugins()[0]
     expect(inst?.overlays).toHaveLength(1)
     expect(inst?.mediaAdapters?.[0]?.type).toBe('video')
   })

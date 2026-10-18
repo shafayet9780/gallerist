@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+- **core**: renderer/plugin plumbing moved off the public `ViewerApi` to
+  `@gallerist/core/internal`: `viewer.emit`, `getPlugins` and `onPluginsChanged` are now
+  `getInternals(viewer).emit(…)` etc. The engine building blocks (normalize, store, FSM, nav,
+  windowing, springs, arbitration, zoom math, emitter) moved there too, so the root entry is just
+  the app-facing API (spec §8.4). Root bundle 3.5 → 2.7 KB gz.
+- **core**: `normalize` (and so `createViewer` / `setCollection`) throws on a duplicate group id or
+  item id.
+
+### Fixed
+- **core**: a throwing event handler no longer stops later handlers (it is reported via
+  `reportError`); a destructured `preventDefault()` works; `zoomTo` ignores NaN/negative input.
+- **renderer-dom**: cancelled media loads are no longer reported as `loadError`.
+- **renderer-dom**: `pointercancel` abandons the gesture instead of acting as a release (no stray
+  navigate/dismiss); the item-axis swipe needs the same commit distance as the group axis.
+
 ## v0.2.0 — first public release
 
 > **Renamed before first publish:** the project was developed as *Visora* (`@visora/*`); the

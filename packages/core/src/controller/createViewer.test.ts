@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Collection, Item } from '../types'
 import { createViewer } from './createViewer'
+import { getInternals } from './internals'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
 const grouped = (): Collection => ({
@@ -176,11 +177,11 @@ describe('createViewer — load status + trimmed state (WS-1 hybrid)', () => {
   it('load/loaded/loadError events drive state.loaded', () => {
     const v = createViewer({ items: [item('a')] })
     const base = { viewer: v, cursor: v.cursor, id: 'a' }
-    v.emit('load', base)
+    getInternals(v).emit('load', base)
     expect(v.getState().loaded.a).toBe('loading')
-    v.emit('loaded', base)
+    getInternals(v).emit('loaded', base)
     expect(v.getState().loaded.a).toBe('loaded')
-    v.emit('loadError', { ...base, error: new Error('boom') })
+    getInternals(v).emit('loadError', { ...base, error: new Error('boom') })
     expect(v.getState().loaded.a).toBe('error')
   })
 
@@ -263,5 +264,40 @@ describe('createViewer — setCollection diff', () => {
     v.open()
     expect(() => v.setCollection({ groups: [] })).not.toThrow()
     expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+  })
+})
+
+describe('createViewer — internals boundary (spec §8.4)', () => {
+  it('keeps renderer plumbing off the public api', () => {
+    const v = createViewer({ items: [item('a')] }) as unknown as Record<string, unknown>
+    expect(v.emit).toBeUndefined()
+    expect(v.getPlugins).toBeUndefined()
+    expect(v.onPluginsChanged).toBeUndefined()
+  })
+
+  it('exposes them through getInternals, non-enumerably', () => {
+    const v = createViewer({ items: [item('a')] })
+    const internals = getInternals(v)
+    expect(typeof internals.emit).toBe('function')
+    expect(Object.keys(v)).not.toContain('emit')
+    expect(Object.getOwnPropertySymbols({ ...v })).toHaveLength(0) // not copied by a spread
+  })
+
+  it('is reachable from a plugin factory', () => {
+    let seen: unknown
+    createViewer({
+      items: [item('a')],
+      plugins: [
+        (viewer) => {
+          seen = getInternals(viewer).getPlugins()
+          return { name: 'probe' }
+        },
+      ],
+    })
+    expect(seen).toEqual([])
+  })
+
+  it('throws a clear error for an object that is not a viewer', () => {
+    expect(() => getInternals({} as never)).toThrow(/not a viewer created by createViewer/)
   })
 })

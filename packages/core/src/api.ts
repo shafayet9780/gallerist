@@ -1,9 +1,11 @@
 // Public API contract (spec §8). Implemented by createViewer (M1.6).
 // Defined as an interface first so overlay/plugin types can reference it without a cycle.
+// Renderer/plugin plumbing (emit, the plugin registry) lives in ViewerInternals instead
+// (controller/internals.ts, exposed via @gallerist/core/internal).
 
 import type { EventMap, Handler } from './events/events'
 export type { EventMap, Handler } from './events/events'
-import type { Plugin, PluginInstance } from './plugins/types'
+import type { Plugin } from './plugins/types'
 import type {
   Collection,
   CollectionInput,
@@ -47,14 +49,8 @@ export interface ViewerApi {
   subscribe(fn: (s: Readonly<ViewerState>) => void): () => void
   /** Runtime event subscription (complements the `on` constructor option, spec §18). */
   on<K extends keyof EventMap>(event: K, handler: Handler<EventMap[K]>): () => void
-  /** Emit an event — used by the renderer, adapters, and plugins to surface events. */
-  emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): boolean
   /** Late plugin registration (spec §8.2); returns a disposer that unregisters the plugin. */
   use(plugin: Plugin): () => void
-  /** Registered plugin instances — consumed by the renderer to mount regions/adapters. */
-  getPlugins(): readonly PluginInstance[]
-  /** Notify the renderer when the plugin set changes (e.g. late use()). */
-  onPluginsChanged(fn: () => void): () => void
   destroy(): void
   // navigation/zoom accessors used by overlays & adapters:
   readonly cursor: Cursor

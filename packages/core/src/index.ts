@@ -1,5 +1,4 @@
-// @gallerist/core — headless engine entry point.
-// Phase 0 build order (see plans/phase-0.md): M1 model/store/FSM/nav, M2 zoom/arbitration math.
+// @gallerist/core — headless engine entry point: the stable, app-facing surface.
 declare const __GALLERIST_VERSION__: string | undefined
 /** Package version, injected from package.json at build (tsup `define`). Guarded with `typeof` so
  *  importing the source directly without the define (e2e / example vite fixtures, or any consumer
@@ -17,41 +16,11 @@ export type {
   RegionName,
   TransitionStrategy,
 } from './plugins/types'
-export { normalize } from './model/normalize'
-export { createStore, type Store } from './store/store'
-export {
-  applyItemMemory,
-  goTo,
-  type NavCtx,
-  nextGroup,
-  nextItem,
-  prevGroup,
-  prevItem,
-  resolveId,
-} from './nav/nav'
-export { type FsmEvent, type FsmState, initialFsm, reduceFsm } from './fsm/fsm'
-export { sampleSpring, type SpringParams, type SpringSample, SPRINGS } from './motion/spring'
-export { type KeyReconcile, reconcileKeys, windowIndices } from './windowing'
-export { type ArbitrationInput, arbitrate, type Intent } from './zoom/arbitration'
-export {
-  clampPan,
-  clampScale,
-  contentToStage,
-  fitScale,
-  fitTransform,
-  focalZoom,
-  type Size,
-  stageToContent,
-  toggleZoom,
-  type Vec2,
-} from './zoom/zoom'
-export {
-  type Cancelable,
-  type CancelableNavPayload,
-  createEmitter,
-  type Emitter,
-  type EventMap,
-  type Handler,
-  makeCancelable,
-  type ViewerEventPayload,
+export type {
+  Cancelable,
+  CancelableNavPayload,
+  EventMap,
+  Handler,
+  ViewerEventPayload,
 } from './events/events'
+// Engine building blocks and the renderer/plugin plumbing live in `@gallerist/core/internal`.

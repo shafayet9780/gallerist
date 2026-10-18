@@ -167,7 +167,9 @@ viewer.goTo(g, i?) / goToId(groupId, itemId?)
 viewer.zoomTo(scale, focal?) / resetZoom()
 viewer.setCollection(next)          // diff by id, preserves cursor (+ zoom if same item)
 viewer.getState() / getCollection() / subscribe(fn)
-viewer.on(event, handler) / emit(event, payload)   // runtime events (renderer/plugins)
+viewer.on(event, handler)           // runtime events
+// renderer/plugin plumbing: getInternals(viewer).emit / getPlugins / onPluginsChanged
+// from '@gallerist/core/internal' (spec §8.4), alongside the zoom/nav/windowing math
 viewer.destroy()
 
 // renderer-dom
@@ -247,9 +249,6 @@ items are deferred with rationale (we launch at 0.x, so none is frozen):
   reveal letterbox area and anchor to the stage box rather than the painted image box. The true
   contained-rect mapping is the spec's M4 work; until then, pass `item.naturalSize` for best results
   and avoid anchored overlays on extreme ratios.
-- **Public surface breadth (review S-A1).** `@gallerist/core` still re-exports some engine internals
-  (FSM reducer, store factory, spring tables, raw nav). At 0.x this is harmless; the surface will be
-  split to a deep `@gallerist/core/internal` entry before 1.0 so the frozen root stays minimal.
 - **Gesture discoverability (review S-UX2).** There is no first-run hint for swipe / pinch /
   swipe-to-dismiss. Planned as an opt-in coachmark; for now, document the gestures in your UI.
 - **Cross-browser e2e.** The Playwright suite runs on chromium + webkit. Five synthetic-input/

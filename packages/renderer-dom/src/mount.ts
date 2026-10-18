@@ -3,16 +3,8 @@
 // image adapter, minimal chrome, dialog a11y, keyboard map, and the committed zoom transform.
 // Live pan/zoom (imperative RAF) and motion land in M3.4 / M5.
 
-import {
-  type MediaAdapter,
-  type OverlaySpec,
-  type Phase,
-  type ViewerApi,
-  type ZoomState,
-  clampPan,
-  clampScale,
-  focalZoom,
-} from '@gallerist/core'
+import type { MediaAdapter, OverlaySpec, Phase, ViewerApi, ZoomState } from '@gallerist/core'
+import { clampPan, clampScale, focalZoom, getInternals } from '@gallerist/core/internal'
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
@@ -177,17 +169,18 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
-  const plugins = viewer.getPlugins()
+  const internals = getInternals(viewer)
+  const plugins = internals.getPlugins()
   const baseAdapters = opts.adapters ?? [imageAdapter()]
   // Adapters, overlays, and keymap are recomputed live so a plugin added via use() after mount
   // contributes all of its extensions, not just regions (review T4 / Important #5).
   const currentAdapters = () => [
     ...baseAdapters,
-    ...viewer.getPlugins().flatMap((p) => p.mediaAdapters ?? []),
+    ...internals.getPlugins().flatMap((p) => p.mediaAdapters ?? []),
   ]
   const currentGlobalOverlays = () => [
     ...(opts.overlays ?? []),
-    ...viewer.getPlugins().flatMap((p) => p.overlays ?? []),
+    ...internals.getPlugins().flatMap((p) => p.overlays ?? []),
   ]
   let pluginKeymap = aggregateKeymap(plugins)
 
@@ -457,10 +450,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         // group/item are stable for this slide; the cursor is read fresh at emit time because
         // loaded/loadError fire later from the ready promise, when the cursor may have moved (review #5).
         const loadBase = { viewer, group, item: it }
-        viewer.emit('load', { ...loadBase, cursor: viewer.cursor, id: mountedId })
+        internals.emit('load', { ...loadBase, cursor: viewer.cursor, id: mountedId })
         rec.media?.ready
           ?.then(() => {
-            viewer.emit('loaded', { ...loadBase, cursor: viewer.cursor, id: mountedId })
+            internals.emit('loaded', { ...loadBase, cursor: viewer.cursor, id: mountedId })
             const r = mounted.get(slideKey)
             if (!r || r.itemId !== mountedId) return // navigated away / item swapped out
             if (groupIndex(slideKey) !== viewer.getState().cursor.g) return // no longer current
@@ -471,7 +464,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
             // A load we cancelled (slide torn down, item swapped out) is not a failure — adapters
             // reject `ready` on abort, and reporting it would mark the item 'error'.
             if (abort.signal.aborted) return
-            viewer.emit('loadError', { ...loadBase, cursor: viewer.cursor, id: mountedId, error })
+            internals.emit('loadError', {
+              ...loadBase,
+              cursor: viewer.cursor,
+              id: mountedId,
+              error,
+            })
           })
       }
       // activate/deactivate media on slide enter/leave (spec §12 — play/pause for video)
@@ -854,8 +852,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
   const mountRegions = () => {
-    pluginKeymap = aggregateKeymap(viewer.getPlugins())
-    mountPluginRegions(regionHosts, viewer.getPlugins(), { viewer })
+    pluginKeymap = aggregateKeymap(internals.getPlugins())
+    mountPluginRegions(regionHosts, internals.getPlugins(), { viewer })
     // attach the pull-handle into the rail region (only when a rail is mounted); mountPluginRegions
     // replaceChildren'd the host, so prepend it fresh each time.
     if (regionHosts.thumbnails.childElementCount > 0) {
@@ -867,7 +865,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (attached) renderWindow()
   }
   mountRegions()
-  const offPlugins = viewer.onPluginsChanged(mountRegions)
+  const offPlugins = internals.onPluginsChanged(mountRegions)
 
   const unsubscribe = viewer.subscribe(sync)
   sync()

@@ -17,6 +17,7 @@ import * as nav from '../nav/nav'
 import type { Plugin, PluginInstance } from '../plugins/types'
 import { createStore } from '../store/store'
 import type { Collection, Cursor, LoadStatus, ViewerState, ZoomState } from '../types'
+import { attachInternals } from './internals'
 
 const IDENTITY_ZOOM: ZoomState = { scale: 1, x: 0, y: 0 }
 
@@ -257,20 +258,8 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     on(event, handler) {
       return emitter.on(event, handler)
     },
-    emit(event, payload) {
-      return emitter.emit(event, payload)
-    },
     use(plugin) {
       return registerPlugin(plugin)
-    },
-    getPlugins() {
-      return [...pluginInstances] // copy — callers must not mutate the registry
-    },
-    onPluginsChanged(fn) {
-      pluginsChanged.add(fn)
-      return () => {
-        pluginsChanged.delete(fn)
-      }
     },
     destroy() {
       if (destroyed) return
@@ -292,6 +281,21 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       return loop
     },
   }
+
+  attachInternals(api, {
+    emit(event, payload) {
+      return emitter.emit(event, payload)
+    },
+    getPlugins() {
+      return [...pluginInstances] // copy — callers must not mutate the registry
+    },
+    onPluginsChanged(fn) {
+      pluginsChanged.add(fn)
+      return () => {
+        pluginsChanged.delete(fn)
+      }
+    },
+  })
 
   // wire `on` option handlers
   if (options.on) {

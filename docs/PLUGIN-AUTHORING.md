@@ -3,7 +3,11 @@
 A plugin is a factory the user binds (e.g. `fullscreen()`) that returns `(viewer) => PluginInstance`.
 Everything beyond the engine is a plugin; core ships with none enabled, so bundle size scales with
 features used (spec §13). Plugins register on the **viewer** (`createViewer({ plugins })` or
-`viewer.use()`); the renderer reads them at mount and reacts to `onPluginsChanged`.
+`viewer.use()`); the renderer reads them at mount and reacts to plugin-set changes.
+
+Plugins that need engine plumbing (emitting an event, the zoom/windowing math) import it from
+`@gallerist/core/internal` (spec §8.4). It is shared by the official plugins but not covered by
+semver before 1.0.
 
 ## Contract
 
@@ -44,8 +48,8 @@ dev warn).
 - **A media type**: return a `mediaAdapters: [adapter]`. The adapter's `match(item)` selects it;
   `mount()` returns `MountedMedia` with `activate()`/`deactivate()` (called on slide enter/leave) and
   `destroy()`. See `plugin-video`.
-- **An event**: surface one with `viewer.emit('overlayClick', …)`; consumers subscribe via the `on`
-  option or `viewer.on(...)`.
+- **An event**: surface one with `getInternals(viewer).emit('fullscreenChange', …)` (from
+  `@gallerist/core/internal`); consumers subscribe via the `on` option or `viewer.on(...)`.
 
 ## Rules
 

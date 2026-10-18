@@ -3,16 +3,16 @@
 // no store writes during a gesture), and commits the result on release. The arbitration matrix
 // itself is unit-tested in core; real multi-pointer flows are verified in Playwright (M3.5).
 
+import type { ViewerApi } from '@gallerist/core'
 import {
   type Intent,
-  type ViewerApi,
   arbitrate,
   clampPan,
   clampScale,
   fitScale,
   focalZoom,
   toggleZoom,
-} from '@gallerist/core'
+} from '@gallerist/core/internal'
 
 export interface Geometry {
   stageRect: { left: number; top: number; width: number; height: number }

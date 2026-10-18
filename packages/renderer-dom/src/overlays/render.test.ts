@@ -1,17 +1,19 @@
 // @vitest-environment happy-dom
 
-import type { Group, Item, OverlaySpec, ViewerApi } from '@gallerist/core'
+import {
+  type Group,
+  type Item,
+  type OverlaySpec,
+  type ViewerApi,
+  createViewer,
+} from '@gallerist/core'
 import { describe, expect, it, vi } from 'vitest'
 import { gatherOverlays, paintOverlays, updateOverlays } from './render'
 
 const group: Group = { id: 'g', items: [] }
 const item: Item = { id: 'i', type: 'image', source: 'x.jpg' }
 
-const fakeViewer = () =>
-  ({
-    emit: vi.fn(),
-    getState: () => ({ cursor: { g: 0, i: 0 } }),
-  }) as unknown as ViewerApi
+const fakeViewer = () => createViewer({ items: [item] })
 
 const ctx = (viewer: ViewerApi, scale = 2) => ({
   group,
@@ -85,6 +87,8 @@ describe('paintOverlays — content layer', () => {
 describe('paintOverlays — interactive + visibility', () => {
   it('an interactive overlay is focusable and emits overlayClick', () => {
     const viewer = fakeViewer()
+    const overlayClick = vi.fn()
+    viewer.on('overlayClick', overlayClick)
     const { vp } = paint(
       [
         {
@@ -100,7 +104,7 @@ describe('paintOverlays — interactive + visibility', () => {
     expect(el.style.pointerEvents).toBe('auto')
     expect(el.tabIndex).toBe(0)
     el.click()
-    expect(viewer.emit).toHaveBeenCalledWith('overlayClick', expect.objectContaining({ id: 'btn' }))
+    expect(overlayClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'btn', item }))
   })
 
   it('hides an overlay outside its visibleAt range', () => {
