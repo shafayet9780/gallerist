@@ -20,8 +20,9 @@
 - **core**: the `overlays` option of `createViewer` (and so `<Gallerist overlays>`) was declared but
   never read. Global overlays passed there now render.
 - **react**: `items` / `groups` / `collection` are reactive. They were read once at construction,
-  so data that arrived later (an API call) never showed. A new reference is applied with
-  `setCollection`, keeping the cursor on the same item.
+  so data that arrived later (an API call) never showed. Changed content is applied with
+  `setCollection`, keeping the cursor on the same item. Inline data rebuilt with the same content
+  is ignored, and an invalid update is logged instead of crashing the tree.
 - **react**: `on` handlers always call the latest props instead of the first render's closures.
 - **core + renderer-dom + theme**: open/close are real transitions. `opened` / `closed` fire when
   the open fade (280ms) or close fade (180ms) ends, and the overlay stays mounted through its exit

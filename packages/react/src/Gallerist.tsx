@@ -1,13 +1,15 @@
 import {
+  type Collection,
   type EventHandlers,
   type EventMap,
+  type Group,
+  type Item,
   type OverlaySpec,
   type RegionName,
   type ViewerApi,
   type ViewerOptions,
   createViewer,
 } from '@gallerist/core'
-import { normalize } from '@gallerist/core/internal'
 import {
   type ArrowLayout,
   type PresetName,
@@ -28,8 +30,8 @@ import { createPortal } from 'react-dom'
 import { GalleristContext, useViewerContext } from './context'
 
 /**
- * `items` / `groups` / `collection` and `on` are reactive. A new data reference swaps the
- * collection in place (diffed by id, keeping the cursor), so memoize it. Every other viewer option
+ * `items` / `groups` / `collection` and `on` are reactive. Changed data swaps the collection in
+ * place (diffed by id, keeping the cursor); data rebuilt with the same content is ignored. Every other viewer option
  * (`loop`, `itemMemory`, `startAt`, `plugins`, `overlays`, …) and the layout props (`container`,
  * `preset`, `arrows`, `rail`, …) are read once; change the component's `key` to apply new ones.
  * `theme` and `open` are reactive.
@@ -80,6 +82,50 @@ const EVENT_NAMES = Object.keys({
   overlayClick: 1,
 } satisfies Record<keyof EventMap, 1>) as (keyof EventMap)[]
 
+// The collection a data prop describes (flat items → singleton groups). setCollection validates it.
+const toCollection = (items?: Item[], groups?: Group[], collection?: Collection): Collection =>
+  collection ?? { groups: groups ?? (items ?? []).map((it) => ({ id: it.id, items: [it] })) }
+
+// Values equal at one level of depth: identical, or arrays/plain objects with identical entries
+// (a `source: { src }`, `naturalSize`, or a re-created `overlays` array of the same specs).
+const shallowSame = (a: unknown, b: unknown): boolean => {
+  if (Object.is(a, b)) return true
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => Object.is(v, b[i]))
+  }
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
+  const ka = Object.keys(a)
+  const rb = b as Record<string, unknown>
+  return (
+    ka.length === Object.keys(b).length &&
+    ka.every((k) => Object.is((a as Record<string, unknown>)[k], rb[k]))
+  )
+}
+const sameRecord = (a: object, b: object, skip?: string): boolean => {
+  const ra = a as Record<string, unknown>
+  const rb = b as Record<string, unknown>
+  const ka = Object.keys(ra).filter((k) => k !== skip)
+  const kb = Object.keys(rb).filter((k) => k !== skip)
+  return ka.length === kb.length && ka.every((k) => shallowSame(ra[k], rb[k]))
+}
+// Same content (groups, items and their fields), even when rebuilt as fresh objects — so an
+// inline `items={photos.map(…)}` doesn't swap the collection (and reset load status) every render.
+const sameCollection = (a: Collection, b: Readonly<Collection>): boolean =>
+  a.groups.length === b.groups.length &&
+  shallowSame(a.meta, b.meta) &&
+  a.groups.every((g, gi) => {
+    const h = b.groups[gi]
+    return (
+      !!h &&
+      sameRecord(g, h, 'items') &&
+      g.items.length === h.items.length &&
+      g.items.every((it, ii) => {
+        const other = h.items[ii]
+        return !!other && sameRecord(it, other)
+      })
+    )
+  })
+
 const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(props, ref) {
   const {
     open,
@@ -118,17 +164,22 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     return createViewer({ ...rest, on: forward })
   })
 
-  // Data props are reactive: a new items/groups/collection reference swaps the collection via
-  // setCollection (diffed by id, so the cursor and zoom survive when the current item does). The
-  // first render's data is already in the viewer, so only a changed reference applies.
+  // Data props are reactive: new data swaps the collection via setCollection (diffed by id, so the
+  // cursor and zoom survive when the current item does). The first render's data is already in the
+  // viewer; a new reference with the same content is ignored; invalid data (a duplicate id) is
+  // reported and the viewer keeps its current collection instead of crashing the React tree.
   const appliedData = useRef({ items, groups, collection })
   useEffect(() => {
     const prev = appliedData.current
     if (prev.items === items && prev.groups === groups && prev.collection === collection) return
     appliedData.current = { items, groups, collection }
-    const input =
-      collection !== undefined ? { collection } : groups !== undefined ? { groups } : { items }
-    viewer.setCollection(normalize(input))
+    const next = toCollection(items, groups, collection)
+    if (sameCollection(next, viewer.getCollection())) return
+    try {
+      viewer.setCollection(next)
+    } catch (error) {
+      console.error('[gallerist] ignored an invalid collection update:', error)
+    }
   }, [viewer, items, groups, collection])
   useImperativeHandle(ref, () => viewer, [viewer])
 

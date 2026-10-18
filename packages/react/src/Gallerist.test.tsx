@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { Collection, ViewerApi } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { StrictMode, createRef, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -124,6 +125,48 @@ describe('<Gallerist> reactive props', () => {
       </StrictMode>,
     )
     expect(collectionChange).not.toHaveBeenCalled()
+  })
+
+  it('re-rendering with rebuilt-but-identical inline data does not swap the collection', () => {
+    const ref = createRef<ViewerApi>()
+    const collectionChange = vi.fn()
+    const photos = ['a', 'b', 'c']
+    const view = (theme: 'cyan' | 'amber') => (
+      <Gallerist
+        ref={ref}
+        items={photos.map((id) => ({ id, type: 'image' as const, source: { src: `${id}.jpg` } }))}
+        on={{ collectionChange }}
+        theme={theme}
+        open
+      />
+    )
+    const { rerender } = render(view('cyan'))
+    act(() => {
+      getInternals(ref.current as ViewerApi).emit('loaded', {
+        viewer: ref.current as ViewerApi,
+        cursor: { g: 0, i: 0 },
+        id: 'a',
+      })
+    })
+    rerender(view('amber')) // fresh item objects, same content
+    expect(collectionChange).not.toHaveBeenCalled()
+    expect(ref.current?.getState().loaded.a).toBe('loaded') // load status survives
+  })
+
+  it('an invalid data update is reported and the current collection kept (no crash)', () => {
+    const ref = createRef<ViewerApi>()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { rerender } = render(<Gallerist ref={ref} items={[img('a'), img('b')]} open />)
+      rerender(<Gallerist ref={ref} items={[img('a'), img('a')]} open />)
+      expect(error).toHaveBeenCalledWith(
+        '[gallerist] ignored an invalid collection update:',
+        expect.any(Error),
+      )
+      expect(ref.current?.getCollection().groups.map((g) => g.id)).toEqual(['a', 'b'])
+    } finally {
+      error.mockRestore()
+    }
   })
 
   it('calls the latest on handler, not the one from the first render', () => {
