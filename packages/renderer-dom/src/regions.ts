@@ -62,11 +62,28 @@ export function createRegionMounter(
       }
     }
     for (const [host, list] of desired) {
-      const prev = applied.get(host)
-      if (prev && prev.length === list.length && prev.every((n, i) => n === list[i])) continue
-      host.replaceChildren(...list)
+      const prev = applied.get(host) ?? []
+      if (prev.length === list.length && prev.every((n, i) => n === list[i])) continue
+      reconcile(host, prev, list)
       applied.set(host, list)
     }
+  }
+}
+
+// Move the host from `prev` to `next` plugin nodes with the fewest DOM moves: nodes that stay in
+// order are never detached (keeping focus, scroll and running transitions), and nodes the renderer
+// added itself (the rail handle) are left alone.
+function reconcile(host: HTMLElement, prev: Node[], next: Node[]): void {
+  const keep = new Set(next)
+  for (const node of prev) if (!keep.has(node) && node.parentNode === host) host.removeChild(node)
+  let before: Node | null = null
+  for (const node of next) {
+    if (before) {
+      if (before.nextSibling !== node) host.insertBefore(node, before.nextSibling)
+    } else if (node.parentNode !== host) {
+      host.appendChild(node)
+    }
+    before = node
   }
 }
 

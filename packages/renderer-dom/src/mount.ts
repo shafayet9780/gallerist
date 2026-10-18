@@ -941,11 +941,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(internals.getPlugins())
     mountPluginRegions(internals.getPlugins())
-    // attach the pull-handle into the rail region (only when a rail is mounted); the mounter
-    // replaces a host's children when its plugin nodes change, so (re)prepend it each time.
-    if (regionHosts.thumbnails.childElementCount > 0) {
-      regionHosts.thumbnails.prepend(railHandle)
-    }
+    // The pull-handle leads the rail region while a rail plugin is mounted. The mounter leaves
+    // nodes it didn't add alone, so place (or drop) the handle here.
+    const thumbs = regionHosts.thumbnails
+    const hasRail = [...thumbs.childNodes].some((n) => n !== railHandle)
+    if (!hasRail) railHandle.remove()
+    else if (thumbs.firstChild !== railHandle) thumbs.prepend(railHandle)
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItemId = undefined

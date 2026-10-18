@@ -79,6 +79,50 @@ describe('createRegionMounter', () => {
     expect(replace).not.toHaveBeenCalled()
   })
 
+  it('adding a node to an additive host does not detach the existing ones (focus survives)', () => {
+    const h = hosts()
+    document.body.appendChild(h.toolbar)
+    const button = document.createElement('button')
+    const a = { name: 'a', regions: { toolbar: () => button } }
+    const mountRegions = createRegionMounter(h, { viewer: {} as never })
+    mountRegions([a])
+    button.focus()
+    const removed: Node[] = []
+    new MutationObserver((records) => {
+      for (const r of records) removed.push(...r.removedNodes)
+    }).observe(h.toolbar, { childList: true })
+    mountRegions([a, { name: 'b', regions: { toolbar: node('B') } }])
+    expect(h.toolbar.textContent).toBe('B')
+    expect(h.toolbar.firstChild).toBe(button)
+    expect(document.activeElement).toBe(button)
+    return Promise.resolve().then(() => expect(removed).toEqual([])) // observer records are async
+  })
+
+  it('reorders and removes nodes correctly', () => {
+    const h = hosts()
+    const a = { name: 'a', regions: { toolbar: node('A') } }
+    const b = { name: 'b', regions: { toolbar: node('B') } }
+    const c = { name: 'c', regions: { toolbar: node('C') } }
+    const mountRegions = createRegionMounter(h, { viewer: {} as never })
+    mountRegions([a, b, c])
+    mountRegions([c, a])
+    expect(h.toolbar.textContent).toBe('CA')
+    mountRegions([a, b, c])
+    expect(h.toolbar.textContent).toBe('ABC')
+  })
+
+  it('leaves nodes the renderer added itself in place', () => {
+    const h = hosts()
+    const handle = document.createElement('i')
+    const a = { name: 'a', regions: { thumbnails: node('rail') } }
+    const mountRegions = createRegionMounter(h, { viewer: {} as never })
+    mountRegions([a])
+    h.thumbnails.prepend(handle)
+    mountRegions([{ name: 'a2', regions: { thumbnails: node('rail2') } }])
+    expect(h.thumbnails.firstChild).toBe(handle)
+    expect(h.thumbnails.textContent).toBe('rail2')
+  })
+
   it('removes a disposed plugin node and renders a new instance fresh', () => {
     const h = hosts()
     const a = { name: 'a', regions: { toolbar: node('A') } }
@@ -139,6 +183,17 @@ describe('mount — plugin consumption', () => {
     dispose()
     expect(render).toHaveBeenCalledTimes(1)
     expect(document.querySelector('.gallerist-region-toolbar')?.firstChild).toBe(el)
+  })
+
+  it('the rail handle leads a mounted rail and goes away with it', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const host = document.querySelector('.gallerist-region-thumbnails') as HTMLElement
+    const dispose = v.use(() => ({ name: 'rail', regions: { thumbnails: node('rail') } }))
+    expect(host.firstElementChild?.classList.contains('gallerist-rail-handle')).toBe(true)
+    dispose()
+    expect(host.childElementCount).toBe(0)
   })
 
   it('late use() mounts the new plugin region', () => {
