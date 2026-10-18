@@ -818,6 +818,35 @@
   color: var(--gallerist-accent-fg);
   opacity: 1;
 }
+/* dots: a small mark per item inside a 20px hit area; the active one grows */
+.gallerist-dot {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.gallerist-dot::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--gallerist-fg);
+  opacity: 0.45;
+}
+.gallerist-dot[data-active]::before {
+  width: 9px;
+  height: 9px;
+  opacity: 1;
+}
+.gallerist-dot:focus-visible,
+.gallerist-pill:focus-visible {
+  outline: 2px solid var(--gallerist-accent);
+  outline-offset: 1px;
+}
 
 /* linear flat traversal: the item axis retires (the renderer also hides the navigator) */
 .gallerist[data-gallerist-linear="true"] .gallerist-itemnav {
@@ -1153,7 +1182,8 @@
     white-space: nowrap;
     border: 0;
   }
-  .gallerist-pill {
+  .gallerist-pill,
+  .gallerist-dot {
     display: none;
   }
   .gallerist-position[data-mode="pills"] .gallerist-position-text {

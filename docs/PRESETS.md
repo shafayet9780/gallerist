@@ -79,6 +79,10 @@ The ←/→ group arrows stay on the side edges; the option places the **item na
 - `dpad` — a keyboard-arrow cluster in the bottom inline-end corner: ↑ on top, ← ↓ → along the bottom.
 - `split` — ↑ at top-centre with the position under it, ↓ at bottom-centre.
 
+The position inside the navigator follows `itemIndicator` (`mount` option / `<Gallerist itemIndicator>`):
+`pills` (default — numbered pills up to 8 items, then `n / N`), `dots` (plain dots plus the `n / N`
+count, up to 12 items), or `counter` (always `n / N`).
+
 On a touch screen the on-image arrows are visually hidden (swipes navigate; screen readers still
 reach them) and the navigator shows only the `n / N` position, at the bottom centre of the stage.
 

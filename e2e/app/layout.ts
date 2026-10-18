@@ -7,6 +7,7 @@ import { grid } from '@gallerist/plugin-grid'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import {
   type ArrowLayout,
+  type ItemIndicator,
   type PresetName,
   type RailPlacement,
   mount,
@@ -59,6 +60,7 @@ mount(viewer, {
   arrows: (p.get('arrows') ?? undefined) as ArrowLayout | undefined,
   rail,
   linear: p.get('linear') === '1',
+  itemIndicator: (p.get('indicator') ?? undefined) as ItemIndicator | undefined,
   autoHide: false, // deterministic: chrome never fades mid-measurement
 })
 ;(window as unknown as { viewer: typeof viewer }).viewer = viewer

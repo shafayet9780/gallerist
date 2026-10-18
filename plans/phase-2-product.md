@@ -39,7 +39,7 @@ and where a canvas and this plan disagree, the plan wins.
 | P2-H | Atlas | Neighbour peeks are a renderer option (`peek: 'none' \| 'groups' \| 'both'`), because the renderer owns slide placement (neighbours are already mounted, just off-screen). The skyline minimap and the map mode live in `@gallerist/plugin-atlas`. |
 | P2-I | Anchored overlays | One `@gallerist/plugin-pins` with presentations: `comment` (numbered pins + threads, Console), `tag` (product card, Gallery), `feature` (amenity pins, Tour). Requires contained-rect zoom bounds first. |
 | P2-J | Stories | `mode: 'stories'` in renderer-dom (portrait stage, progress segments, tap zones, auto-advance) plus a story-tray rail. Scheduled after 0.3, with an explicit go/no-go: ReelKit already ships a stories player. |
-| P2-K | Verification | A Playwright screenshot matrix (skin × preset × desktop/phone × scheme, representative cells) becomes a CI gate, alongside axe per skin and an RTL pass per skin. Three skins and six presets cannot be kept collision-free by eye. |
+| P2-K | Verification | A Playwright layout lint (`e2e/tests/layout.spec.ts`) sweeps configurations × desktop/phone × direction and fails on overlapping chrome, off-screen chrome, a covered stage, small touch targets or a text glyph instead of the shared icons. It measures geometry, so it is deterministic across macOS and Linux CI, unlike screenshot baselines. Skins add their configurations to it, alongside axe and an RTL pass per skin. |
 
 ## Architecture changes in the code
 

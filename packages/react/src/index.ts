@@ -1,6 +1,7 @@
 // @gallerist/react — React adapter (spec §16). Thin binding over the headless store.
 export {
   type ArrowLayout,
+  type ItemIndicator,
   type PresetName,
   type RailPlacement,
   type ResolvedPreset,

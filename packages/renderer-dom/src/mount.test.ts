@@ -717,6 +717,48 @@ describe('mount — strings (translation)', () => {
   })
 })
 
+describe('mount — item indicator variants', () => {
+  const big = (n: number): Collection => ({
+    groups: [{ id: 'g', items: Array.from({ length: n }, (_, k) => item(`i${k}`)) }],
+  })
+  const ind = () => document.querySelector('.gallerist-position') as HTMLElement
+
+  it('pills (default): numbered pills up to 8 items, then the count', () => {
+    let v = createViewer({ collection: big(8) })
+    mount(v)
+    v.open()
+    expect(ind().dataset.mode).toBe('pills')
+    expect(ind().querySelectorAll('.gallerist-pill')).toHaveLength(8)
+    document.body.innerHTML = ''
+    v = createViewer({ collection: big(9) })
+    mount(v)
+    v.open()
+    expect(ind().dataset.mode).toBe('counter')
+    expect(ind().querySelector('.gallerist-pill')).toBeNull()
+  })
+
+  it('dots: a dot per item (up to 12) that jumps to it, with the count alongside', () => {
+    const v = createViewer({ collection: big(5) })
+    mount(v, { itemIndicator: 'dots' })
+    v.open()
+    expect(ind().dataset.mode).toBe('dots')
+    const dots = ind().querySelectorAll<HTMLButtonElement>('.gallerist-dot')
+    expect(dots).toHaveLength(5)
+    dots[3]?.click()
+    expect(v.getState().cursor).toEqual({ g: 0, i: 3 })
+    expect(dots[3]?.hasAttribute('data-active')).toBe(true)
+    expect(ind().querySelector('.gallerist-position-text')?.textContent).toBe('4 / 5')
+  })
+
+  it('counter: always the count, no jump buttons', () => {
+    const v = createViewer({ collection: big(3) })
+    mount(v, { itemIndicator: 'counter' })
+    v.open()
+    expect(ind().dataset.mode).toBe('counter')
+    expect(ind().querySelector('button')).toBeNull()
+  })
+})
+
 describe('mount — destroy', () => {
   it('removes the root and stops reacting', () => {
     const v = createViewer({ collection: collection() })

@@ -16,6 +16,8 @@ import { DEFAULT_STRINGS, type Strings } from './strings'
 import { zoomTransform } from './transform'
 import { reconcileKeys, windowIndices } from './windowing'
 
+export type ItemIndicator = 'pills' | 'dots' | 'counter'
+
 export interface MountOptions {
   /** null/undefined → overlay (portal to body); element → inline. */
   container?: HTMLElement | null
@@ -63,6 +65,13 @@ export interface MountOptions {
   loop?: boolean
   /** UI text overrides (button labels, announcements) for translation; merged over English. */
   strings?: Partial<Strings>
+  /**
+   * How the position within a multi-item group is shown, surfaced as the indicator's `data-mode`.
+   * `pills` (default): numbered pills up to 8 items, then `n / N`. `dots`: plain dots with the
+   * `n / N` count, up to 12 items, then the count alone. `counter`: always `n / N`. On a touch
+   * screen the theme shows the count only (swipes navigate).
+   */
+  itemIndicator?: ItemIndicator
   /** Accessible name for the overlay dialog (default 'Media viewer'); sets aria-label. */
   label?: string
   /** Element (or getter) to return focus to when the overlay closes. Falls back to whatever
@@ -196,6 +205,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // explicit mount({ loop }) still overrides for the rare case they should differ (review #2).
   const loop = opts.loop ?? viewer.loop
   const t: Strings = { ...DEFAULT_STRINGS, ...opts.strings }
+  const itemIndicator: ItemIndicator = opts.itemIndicator ?? 'pills'
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
@@ -590,27 +600,33 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
 
-  // Within-group position (UX-H): always an "n / N" text, plus segmented pills for small groups
-  // (≤ PILL_MAX) that jump straight to an item. The theme decides which to show per device (pills
-  // on a fine pointer; the text, and swipes, on touch).
+  // Within-group position (UX-H): always an "n / N" text, plus a jump button per item while the
+  // group is small enough — numbered pills (≤ PILL_MAX) or plain dots (≤ DOT_MAX), per the
+  // `itemIndicator` option. The theme decides what to show per device (the text alone on touch).
   const PILL_MAX = 8
+  const DOT_MAX = 12
   const updatePosition = (g: number, i: number, itemCount: number) => {
     if (!position) return
-    const mode = itemCount > PILL_MAX ? 'counter' : 'pills'
+    const mode =
+      itemIndicator === 'pills' && itemCount <= PILL_MAX
+        ? 'pills'
+        : itemIndicator === 'dots' && itemCount <= DOT_MAX
+          ? 'dots'
+          : 'counter'
     if (g !== posG || itemCount !== posM || position.dataset.mode !== mode) {
       position.dataset.mode = mode
       position.replaceChildren()
       const text = el('span', 'gallerist-position-text')
       position.appendChild(text)
-      if (mode === 'pills') {
+      if (mode !== 'counter') {
         for (let k = 0; k < itemCount; k++) {
-          const pill = el('button', 'gallerist-pill', {
+          const jump = el('button', mode === 'pills' ? 'gallerist-pill' : 'gallerist-dot', {
             type: 'button',
             'aria-label': t.item(k + 1),
           })
-          pill.textContent = String(k + 1)
-          pill.addEventListener('click', () => viewer.goTo(g, k))
-          position.appendChild(pill)
+          if (mode === 'pills') jump.textContent = String(k + 1)
+          jump.addEventListener('click', () => viewer.goTo(g, k))
+          position.appendChild(jump)
         }
       }
       posG = g
@@ -618,9 +634,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
     const text = position.querySelector('.gallerist-position-text')
     if (text) text.textContent = `${i + 1} / ${itemCount}`
-    for (const [k, pill] of position.querySelectorAll('.gallerist-pill').entries()) {
-      if (k === i) pill.setAttribute('data-active', '')
-      else pill.removeAttribute('data-active')
+    for (const [k, jump] of position
+      .querySelectorAll('.gallerist-pill, .gallerist-dot')
+      .entries()) {
+      if (k === i) jump.setAttribute('data-active', '')
+      else jump.removeAttribute('data-active')
     }
   }
 

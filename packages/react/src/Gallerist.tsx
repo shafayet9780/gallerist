@@ -12,6 +12,7 @@ import {
 } from '@gallerist/core'
 import {
   type ArrowLayout,
+  type ItemIndicator,
   type PresetName,
   type RailPlacement,
   type Strings,
@@ -57,6 +58,8 @@ export interface GalleristProps extends ViewerOptions {
   linear?: boolean
   /** UI text overrides (button labels, announcements) for translation; read once at mount. */
   strings?: Partial<Strings>
+  /** item position indicator: `pills` (default), `dots` or `counter`; read once at mount. */
+  itemIndicator?: ItemIndicator
   children?: ReactNode
 }
 
@@ -142,6 +145,7 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     autoHide,
     linear,
     strings,
+    itemIndicator,
     children,
     ...options
   } = props
@@ -215,6 +219,7 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
       autoHide,
       linear,
       strings,
+      itemIndicator,
       loop: options.loop,
     })
     rootRef.current = handle.root

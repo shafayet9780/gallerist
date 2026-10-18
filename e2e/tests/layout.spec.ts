@@ -23,6 +23,8 @@ const CONFIGS: Record<string, string> = {
   'single-item-group': 'g=0',
   'large-group': 'g=5',
   'rtl-reviewer': 'preset=reviewer&dir=rtl&captions=1',
+  'indicator-dots': 'indicator=dots',
+  'indicator-counter': 'indicator=counter&arrows=corner-br',
 }
 
 const VIEWPORTS = {
