@@ -107,3 +107,12 @@ describe('plugin-fullscreen', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ fullscreen: true }))
   })
 })
+
+describe('fullscreen() against a stand-in viewer', () => {
+  it('can be constructed without a createViewer() viewer (internals are looked up on emit)', () => {
+    const stub = { getState: () => ({}), on: () => () => {} } as unknown as Parameters<
+      ReturnType<typeof fullscreen>
+    >[0]
+    expect(() => fullscreen()(stub)).not.toThrow()
+  })
+})

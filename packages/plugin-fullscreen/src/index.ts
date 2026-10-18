@@ -58,9 +58,13 @@ export function fullscreen(opts: FullscreenOptions = {}): Plugin {
       }
     }
 
-    const { emit } = getInternals(viewer)
+    // Look the internals up when emitting, not at construction, so building the plugin against a
+    // wrapped viewer or a test double doesn't throw.
     const onChange = () =>
-      emit('fullscreenChange', { viewer, fullscreen: isOurFullscreen(resolveRoot()) })
+      getInternals(viewer).emit('fullscreenChange', {
+        viewer,
+        fullscreen: isOurFullscreen(resolveRoot()),
+      })
 
     const button = () => {
       const btn = document.createElement('button')
