@@ -186,21 +186,36 @@ describe('pointer gestures → arbitration', () => {
 })
 
 describe('pointercancel abandons the gesture', () => {
-  it('prevents native drag-and-drop on the stage (it would fire pointercancel mid-swipe)', () => {
-    setup()
-    const img = document.createElement('img')
-    stage.appendChild(img)
+  const dragStart = (target: Element) => {
     const e = new Event('dragstart', { bubbles: true, cancelable: true })
-    img.dispatchEvent(e)
-    expect(e.defaultPrevented).toBe(true)
+    target.dispatchEvent(e)
+    return e.defaultPrevented
+  }
+
+  it('prevents native drag-and-drop of the media (it would fire pointercancel mid-swipe)', () => {
+    setup()
+    stage.appendChild(content) // as in the renderer: the content layer lives inside the stage
+    const img = content.appendChild(document.createElement('img'))
+    expect(dragStart(img)).toBe(true)
+  })
+
+  it('leaves drag-and-drop alone for overlays and other stage UI', () => {
+    setup()
+    stage.appendChild(content)
+    const overlays = content.appendChild(document.createElement('div'))
+    overlays.className = 'gallerist-overlays-content'
+    const pin = overlays.appendChild(document.createElement('img'))
+    const pluginUi = stage.appendChild(document.createElement('a'))
+    expect(dragStart(pin)).toBe(false)
+    expect(dragStart(pluginUi)).toBe(false)
   })
 
   it('stops preventing native drag once detached', () => {
     setup()
+    stage.appendChild(content)
+    const img = content.appendChild(document.createElement('img'))
     detach()
-    const e = new Event('dragstart', { bubbles: true, cancelable: true })
-    stage.dispatchEvent(e)
-    expect(e.defaultPrevented).toBe(false)
+    expect(dragStart(img)).toBe(false)
   })
 
   it('does not navigate when a swipe is cancelled past the commit distance', () => {
@@ -254,6 +269,16 @@ describe('pointercancel abandons the gesture', () => {
 })
 
 describe('zoom commits settle back to a centred fit', () => {
+  it('a pan clamped back to where it started shows the committed transform, not the drag', () => {
+    const v = setup() // scale 1 > fit 0.5; x is bounded to [-1000, 0]
+    stage.dispatchEvent(pe('pointerdown', 500, 400))
+    stage.dispatchEvent(pe('pointermove', 600, 400)) // live x = +100, past the left edge
+    expect(content.style.transform).toContain('translate(100px')
+    stage.dispatchEvent(pe('pointerup', 600, 400)) // settles to x = 0: same as the stored zoom
+    expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+    expect(content.style.transform).toBe('translate(0px, 0px) scale(1)')
+  })
+
   // stage 1000x800, natural 2000x1000 → fit 0.5, centred fit transform = { 0.5, 0, 150 }
   it('double-click from a panned zoom returns to the centred fit', () => {
     const v = setup()

@@ -360,6 +360,14 @@ describe('mount — zoom transform', () => {
       }
     })
 
+    it('clamps the scale even before the stage is laid out', () => {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open() // happy-dom: the stage measures 0×0
+      v.zoomTo(50)
+      expect(v.getState().zoom.scale).toBe(4)
+    })
+
     it('stops clamping once the renderer is destroyed', () => {
       const v = createViewer({ collection: collection() })
       const h = mount(v)
@@ -463,7 +471,12 @@ describe('mount — load lifecycle', () => {
     v.next()
     await flush()
     expect(loadError).not.toHaveBeenCalled()
-    expect(Object.values(v.getState().loaded)).not.toContain('error')
+    const statuses = v.getState().loaded
+    expect(Object.values(statuses)).not.toContain('error')
+    // b1's load was abandoned: back to idle instead of reading 'loading' forever. b0 was
+    // remounted as g1's preview once g1 stopped being current, so its fresh load owns the status.
+    expect(statuses.b1).toBe('idle')
+    expect(statuses.b0).toBe('loading')
   })
 
   it('a genuine load failure still emits loadError and marks the item error', async () => {
@@ -546,6 +559,30 @@ describe('mount — open/close transitions (lifecycle driver)', () => {
     v.open()
     animationEnd(document.querySelector('.gallerist-slide') as HTMLElement)
     expect(v.getState().phase).toBe('opening')
+  })
+
+  it('the backup timer covers every iteration of the phase animation', () => {
+    vi.useFakeTimers()
+    try {
+      vi.spyOn(window, 'getComputedStyle').mockImplementation(
+        () =>
+          ({
+            animationName: 'pulse',
+            animationDuration: '100ms',
+            animationDelay: '0s',
+            animationIterationCount: '3',
+          }) as CSSStyleDeclaration,
+      )
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      vi.advanceTimersByTime(340) // 3 × 100ms + 50ms grace = 350ms
+      expect(v.getState().phase).toBe('opening')
+      vi.advanceTimersByTime(20)
+      expect(v.getState().phase).toBe('open')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('settles on a timer if animationend never fires', () => {

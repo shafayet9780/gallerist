@@ -43,6 +43,8 @@ export interface ViewerInternals {
   setLifecycleDriver(driver: LifecycleDriver): () => void
   /** Called by `viewer.refresh()`: the renderer re-measures (e.g. after a container resize). */
   onRefresh(fn: () => void): () => void
+  /** The renderer abandoned this item's load (torn down mid-load): 'loading' returns to 'idle'. */
+  cancelLoad(id: string): void
 }
 
 export function attachInternals(viewer: ViewerApi, internals: ViewerInternals): void {

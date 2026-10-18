@@ -544,3 +544,58 @@ describe('createViewer — open(at)', () => {
     expect(slide).not.toHaveBeenCalled()
   })
 })
+
+describe('createViewer — review follow-ups', () => {
+  it('a commit identical to the current zoom is skipped (no store change, no zoom event)', () => {
+    const zoom = vi.fn()
+    const subscriber = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { zoom } })
+    getInternals(v).setZoomBounds({
+      center: () => ({ x: 0, y: 0 }),
+      constrain: (z) => ({ ...z, scale: Math.min(z.scale, 4) }),
+    })
+    v.zoomTo(4)
+    v.subscribe(subscriber)
+    zoom.mockClear()
+    v.zoomTo(9) // already at max: clamps to the same transform
+    v.zoomTo(4)
+    expect(zoom).not.toHaveBeenCalled()
+    expect(subscriber).not.toHaveBeenCalled()
+  })
+
+  it('a transition settles when its driver is disposed even after another driver replaced it', () => {
+    const closed = vi.fn()
+    const v = createViewer({ items: [item('a')], on: { closed } })
+    const internals = getInternals(v)
+    const offA = internals.setLifecycleDriver({ closing: () => {} }) // A never reports done
+    v.open()
+    v.close() // A is running the closing transition
+    internals.setLifecycleDriver({ closing: () => {} }) // renderer B takes over
+    offA() // A is destroyed mid-close
+    expect(v.getState().phase).toBe('closed')
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it('open({ g }) while closing navigates with events, then reopens', () => {
+    const slide = vi.fn()
+    const v = createViewer({ collection: grouped(), on: { slide } })
+    getInternals(v).setLifecycleDriver({ closing: () => {} }) // keep it in 'closing'
+    v.open()
+    v.close()
+    v.open({ g: 2 })
+    expect(slide).toHaveBeenCalledTimes(1)
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+    expect(v.getState().phase).toBe('open')
+  })
+
+  it('cancelLoad returns a loading item to idle and leaves other statuses alone', () => {
+    const v = createViewer({ items: [item('a'), item('b')] })
+    const internals = getInternals(v)
+    const base = { viewer: v, cursor: v.cursor }
+    internals.emit('load', { ...base, id: 'a' })
+    internals.emit('loaded', { ...base, id: 'b' })
+    internals.cancelLoad('a')
+    internals.cancelLoad('b')
+    expect(v.getState().loaded).toEqual({ a: 'idle', b: 'loaded' })
+  })
+})

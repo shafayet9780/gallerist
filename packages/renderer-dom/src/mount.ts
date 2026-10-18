@@ -12,6 +12,7 @@ import { type IdleController, createIdleController } from './idle'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
 import { type PresetName, resolvePreset } from './presets'
 import { type RegionHosts, aggregateKeymap, createRegionMounter } from './regions'
+import { zoomTransform } from './transform'
 import { reconcileKeys, windowIndices } from './windowing'
 
 export interface MountOptions {
@@ -107,23 +108,33 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName ?? ''))
 }
 
-/** Longest animation (duration + delay) in ms from a computed style's comma lists. */
+/** Longest animation (delay + duration × iterations) in ms from a computed style's comma lists.
+ *  An infinite animation counts one iteration: it never ends, so the timer settles after one. */
 function animationMs(style: CSSStyleDeclaration): number {
   const ms = (v: string) => {
     const n = Number.parseFloat(v)
     if (!Number.isFinite(n)) return 0
     return v.trim().endsWith('ms') ? n : n * 1000
   }
+  const count = (v: string | undefined) => {
+    const n = Number.parseFloat(v ?? '1')
+    return Number.isFinite(n) && n > 0 ? n : 1
+  }
+  const at = (list: string[], i: number) => list[i % list.length]
   const durations = style.animationDuration.split(',')
   const delays = style.animationDelay.split(',')
-  return Math.max(0, ...durations.map((d, i) => ms(d) + ms(delays[i % delays.length] ?? '0s')))
+  const iterations = (style.animationIterationCount || '1').split(',')
+  return Math.max(
+    0,
+    ...durations.map((d, i) => ms(at(delays, i) ?? '0s') + ms(d) * count(at(iterations, i))),
+  )
 }
 
 /** Max committed zoom (fit == 1 in the contained model); shared by gestures, keys and bounds. */
 const MAX_ZOOM = 4
 
 function applyTransform(content: HTMLElement, zoom: ZoomState): void {
-  content.style.transform = `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`
+  content.style.transform = zoomTransform(zoom)
 }
 
 // Body scroll-lock is shared across all open overlay viewers: the original overflow is
@@ -477,8 +488,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
           })
           .catch((error) => {
             // A load we cancelled (slide torn down, item swapped out) is not a failure — adapters
-            // reject `ready` on abort, and reporting it would mark the item 'error'.
-            if (abort.signal.aborted) return
+            // reject `ready` on abort, and reporting it would mark the item 'error'. Return its
+            // status to 'idle' unless the item is already mounted again (a fresh load owns it now).
+            if (abort.signal.aborted) {
+              const remounted = [...mounted.values()].some((r) => r.itemId === mountedId)
+              if (!remounted) internals.cancelLoad(mountedId)
+              return
+            }
             internals.emit('loadError', {
               ...loadBase,
               cursor: viewer.cursor,
@@ -877,9 +893,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     return { w: r.width, h: r.height }
   }
   const constrainZoom = (z: ZoomState): ZoomState => {
+    const scaled = { scale: clampScale(z.scale, 1, MAX_ZOOM), x: z.x, y: z.y }
     const size = stageSize()
-    if (!(size.w > 0 && size.h > 0)) return z // not laid out (closed overlay): nothing to clamp to
-    return clampPan({ scale: clampScale(z.scale, 1, MAX_ZOOM), x: z.x, y: z.y }, size, size)
+    // Not laid out (closed overlay, hidden container): the scale range needs no geometry, the pan
+    // bounds do; the ResizeObserver re-clamps the pan once the stage has a size.
+    if (!(size.w > 0 && size.h > 0)) return scaled
+    return clampPan(scaled, size, size)
   }
   const offZoomBounds = internals.setZoomBounds({
     center: () => {

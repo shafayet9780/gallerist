@@ -169,6 +169,10 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     if (destroyed || !validZoom(candidate)) return
     const z = zoomBounds ? zoomBounds.constrain(candidate) : candidate
     if (!validZoom(z)) return
+    // Nothing changed (holding + at max zoom, a re-clamp that lands where it was): skip the commit,
+    // its re-render and the zoom events. Gestures restore their own live transform after committing.
+    const cur = store.get().zoom
+    if (z.scale === cur.scale && z.x === cur.x && z.y === cur.y) return
     store.set((s) => ({ ...s, zoom: z }))
     emitter.emit('zoom', { ...basePayload(), zoom: z })
     emitter.emit('zoomEnd', { ...basePayload(), zoom: z })
@@ -184,14 +188,19 @@ export function createViewer(options: ViewerOptions): ViewerApi {
   let lifecycleDriver: LifecycleDriver | null = null
   let generation = 0
   let pendingSettle: (() => void) | null = null
+  // The driver whose hook is running the in-flight transition: if it goes away, even after another
+  // renderer replaced it as the active driver, nobody else will ever report that transition done.
+  let pendingDriver: LifecycleDriver | null = null
   const runTransition = (hook: 'opening' | 'closing', settle: () => void): void => {
     const gen = ++generation
     const done = () => {
       if (gen !== generation || destroyed) return
       pendingSettle = null
+      pendingDriver = null
       settle()
     }
     pendingSettle = done
+    pendingDriver = lifecycleDriver
     const run = lifecycleDriver?.[hook]
     if (!run) {
       done()
@@ -217,8 +226,13 @@ export function createViewer(options: ViewerOptions): ViewerApi {
         if (at) navTo(target)
         return
       }
-      // A fresh open starts at fit; a zoom left over from the last session would open pre-zoomed.
-      store.set((st) => ({ ...st, cursor: target, zoom: { ...IDENTITY_ZOOM } }))
+      if (s.phase === 'closing') {
+        // Still on screen (fading out): moving is a navigation too, then the reopen cancels the close.
+        if (at) navTo(target)
+      } else {
+        // A fresh open starts at fit; a zoom left over from the last session would open pre-zoomed.
+        store.set((st) => ({ ...st, cursor: target, zoom: { ...IDENTITY_ZOOM } }))
+      }
       if (!dispatch({ t: 'OPEN' })) return
       emitter.emit('open', basePayload())
       runTransition('opening', () => {
@@ -362,6 +376,11 @@ export function createViewer(options: ViewerOptions): ViewerApi {
         if (zoomBounds === bounds) zoomBounds = null
       }
     },
+    cancelLoad(id) {
+      store.set((s) =>
+        s.loaded[id] === 'loading' ? { ...s, loaded: { ...s.loaded, [id]: 'idle' } } : s,
+      )
+    },
     onRefresh(fn) {
       refreshListeners.add(fn)
       return () => {
@@ -371,11 +390,10 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     setLifecycleDriver(driver) {
       lifecycleDriver = driver
       return () => {
-        if (lifecycleDriver !== driver) return
-        lifecycleDriver = null
-        // The renderer is going away: its transition will never report back, so settle it now
-        // rather than leaving the viewer stuck in opening/closing (and `closed` never firing).
-        pendingSettle?.()
+        if (lifecycleDriver === driver) lifecycleDriver = null
+        // The renderer is going away: a transition it is running will never report back, so settle
+        // it now rather than leaving the viewer stuck in opening/closing (`closed` never firing).
+        if (pendingDriver === driver) pendingSettle?.()
       }
     },
   })

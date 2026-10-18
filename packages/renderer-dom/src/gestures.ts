@@ -14,6 +14,7 @@ import {
   getInternals,
   toggleZoom,
 } from '@gallerist/core/internal'
+import { zoomTransform } from './transform'
 
 export interface Geometry {
   stageRect: { left: number; top: number; width: number; height: number }
@@ -87,12 +88,9 @@ export function attachGestures(opts: GestureOptions): () => void {
   let gestureGeom: Geometry | null = null
 
   const geom = () => gestureGeom ?? getGeometry()
-  const fit = () => {
-    const g = geom()
-    return g.naturalSize
-      ? fitScale({ w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-      : 1
-  }
+  const fitOf = (g: Geometry) =>
+    g.naturalSize ? fitScale({ w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize) : 1
+  const fit = () => fitOf(geom())
   const toStage = (p: Pt): Pt => {
     const r = geom().stageRect
     return { x: p.x - r.left, y: p.y - r.top }
@@ -100,15 +98,21 @@ export function attachGestures(opts: GestureOptions): () => void {
   // Every commit is settled first: scale into [fit, max], pan so the content covers the stage
   // (centred once it fits). Without this a pinch or double-tap back to fit kept its pan offset and
   // left the image off-centre. The renderer's zoom bounds re-check the same in the core.
-  const settle = (z: ZoomState): ZoomState => {
-    const g = geom()
-    const scaled = { scale: clampScale(z.scale, fit(), maxScale), x: z.x, y: z.y }
+  const settle = (z: ZoomState, g: Geometry = geom()): ZoomState => {
+    const scaled = { scale: clampScale(z.scale, fitOf(g), maxScale), x: z.x, y: z.y }
     return g.naturalSize
       ? clampPan(scaled, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
       : scaled
   }
   const internals = getInternals(viewer)
-  const commit = (z: ZoomState) => internals.setZoom(z)
+  // Commit, then show the committed transform: a commit identical to the stored zoom is skipped
+  // (no store change, so the renderer won't repaint), which would leave the content at the live
+  // gesture transform — e.g. a pan dragged past the edge and clamped back to where it started.
+  const commit = (z: ZoomState) => {
+    internals.setZoom(z)
+    const content = getContent()
+    if (content) content.style.transform = zoomTransform(viewer.getState().zoom)
+  }
 
   const schedule = () => {
     if (frame) return
@@ -116,7 +120,7 @@ export function attachGestures(opts: GestureOptions): () => void {
       frame = 0
       const content = getContent()
       if (content) {
-        content.style.transform = `translate(${live.x}px, ${live.y}px) scale(${live.scale})`
+        content.style.transform = zoomTransform(live)
       }
     })
   }
@@ -310,10 +314,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     }
     dismissEl.style.removeProperty('--gallerist-dismiss')
     const content = getContent()
-    if (content) {
-      const z = viewer.getState().zoom
-      content.style.transform = `translate(${z.x}px, ${z.y}px) scale(${z.scale})`
-    }
+    if (content) content.style.transform = zoomTransform(viewer.getState().zoom)
     start = null
     intent = 'none'
     gestureGeom = null
@@ -325,15 +326,11 @@ export function attachGestures(opts: GestureOptions): () => void {
     const g = wheelGeom
     const base = wheelZoom ?? viewer.getState().zoom
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
-    const fitW = g.naturalSize
-      ? fitScale({ w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-      : 1
-    const newScale = clampScale(base.scale * factor, fitW, maxScale)
+    // clamp the scale before pivoting (so the cursor point stays put), then settle the pan; uses
+    // the burst's geometry snapshot, never a fresh measure per tick
+    const newScale = clampScale(base.scale * factor, fitOf(g), maxScale)
     const focal = { x: e.clientX - g.stageRect.left, y: e.clientY - g.stageRect.top }
-    const next = focalZoom(base, focal, newScale)
-    wheelZoom = g.naturalSize
-      ? clampPan(next, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-      : next
+    wheelZoom = settle(focalZoom(base, focal, newScale), g)
     live = { ...wheelZoom }
     schedule()
     if (wheelTimer) clearTimeout(wheelTimer)
@@ -347,9 +344,16 @@ export function attachGestures(opts: GestureOptions): () => void {
     commit(settle(focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), target)))
   }
 
-  // A mouse drag over an <img> starts the browser's native drag-and-drop, which fires
-  // pointercancel and steals the gesture. The stage is a gesture surface, never a drag source.
-  const onDragStart = (e: Event) => e.preventDefault()
+  // A mouse drag over the media starts the browser's native image drag-and-drop, which fires
+  // pointercancel and steals the gesture. Block it on the media only: overlays and plugin UI in the
+  // stage keep their own drag-and-drop.
+  const onDragStart = (e: Event) => {
+    const target = e.target as Element | null
+    const content = getContent()
+    if (!target || !content?.contains(target)) return
+    if (target.closest?.('.gallerist-overlays-content')) return
+    e.preventDefault()
+  }
 
   stage.addEventListener('dragstart', onDragStart)
   stage.addEventListener('pointerdown', onDown)
