@@ -4,6 +4,10 @@
 // renderer never assumes what a group or an item is ("screen", "product"); data captions carry that.
 
 export interface Strings {
+  /** accessible name of the overlay dialog (the `label` mount option still wins) */
+  dialog: string
+  /** role description announced for an inline viewer */
+  carousel: string
   close: string
   previous: string
   next: string
@@ -21,6 +25,8 @@ export interface Strings {
 }
 
 export const DEFAULT_STRINGS: Strings = {
+  dialog: 'Media viewer',
+  carousel: 'carousel',
   close: 'Close',
   previous: 'Previous',
   next: 'Next',

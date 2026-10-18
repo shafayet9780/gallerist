@@ -84,6 +84,24 @@
     "caption aside rail"
     "footer aside rail";
 }
+/* side rails are named for the physical side, so in RTL (columns run right to left) they swap
+   templates to stay there */
+.gallerist[data-gallerist-dir="rtl"][data-gallerist-rail-pos="left"] {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "bar bar bar"
+    "main aside rail"
+    "caption aside rail"
+    "footer aside rail";
+}
+.gallerist[data-gallerist-dir="rtl"][data-gallerist-rail-pos="right"] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "bar bar bar"
+    "rail main aside"
+    "rail caption aside"
+    "rail footer aside";
+}
 /* modes (data-attribute, not a class — avoids colliding with .gallerist-overlay elements) */
 .gallerist[data-gallerist-mode="overlay"] {
   position: fixed;
@@ -111,6 +129,17 @@
   min-width: 0;
   min-height: 0;
   z-index: 1;
+}
+/* the on-stage controls (arrows, item navigator); inset by the renderer in immersive so they stay
+   clear of the chrome floating over the stage */
+.gallerist-controls {
+  position: absolute;
+  inset: var(--gallerist-controls-inset, 0);
+  z-index: 4;
+  pointer-events: none;
+}
+.gallerist-controls > * {
+  pointer-events: auto;
 }
 
 /* ── stage / slides ────────────────────────────────────────────────────────── */
@@ -245,6 +274,26 @@
   align-items: center;
   gap: 6px;
   margin-inline-start: auto; /* tools sit at the end of the bar, after the title */
+  /* on a narrow screen the tools scroll sideways so the counter and Close always fit */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  pointer-events: auto;
+}
+.gallerist-region-toolbar::-webkit-scrollbar {
+  display: none;
+}
+.gallerist-region-toolbar > * {
+  flex: none;
+}
+.gallerist-counter,
+.gallerist-zoom-reset,
+.gallerist-close {
+  flex: none;
+}
+.gallerist-bar[hidden] {
+  display: none;
 }
 .gallerist-region-aside {
   grid-area: aside;
@@ -253,12 +302,6 @@
   display: flex;
   gap: 8px;
   min-height: 0;
-  padding: 8px;
-  padding-inline-start: 0;
-}
-/* an empty aside takes no space */
-.gallerist-region-aside:not(:has(> :not([hidden]):not(:empty))) {
-  display: none;
 }
 .gallerist-region-thumbnails {
   grid-area: rail;
@@ -435,6 +478,12 @@
 .gallerist-thumbs-aside {
   display: flex;
   min-height: 0;
+  padding: 8px;
+  padding-inline-start: 0;
+}
+/* collapsing the rail puts its item stack away too (fullscreen, `t`, rail: 'hidden') */
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside {
+  display: none;
 }
 .gallerist-thumb-item {
   position: relative;
@@ -514,13 +563,6 @@
   content: "⊞";
 }
 
-/* items-toggle: a toolbar button (inherits the toolbar button base) that shows/hides the active
-   group's item panel; accent-tinted while the panel is shown. */
-.gallerist-items-toggle[aria-pressed="true"] {
-  color: var(--gallerist-accent);
-  border-color: var(--gallerist-accent);
-}
-
 /* ── flat rail (groupDisplay: flat): every item side-by-side, each group bracketed so it reads as
    one group. The accent left-rule + border mark the group; partial flags fade the bracket at the
    virtualization window edges. ───────────────────────────────────────────────────────────────── */
@@ -568,7 +610,7 @@
 
 /* ── chrome buttons (one look for bar tools, arrows, item navigator, plugin buttons) ───────── */
 .gallerist-bar button,
-.gallerist-main > button,
+.gallerist-controls > button,
 .gallerist-itemnav > button {
   min-width: var(--gallerist-target);
   min-height: var(--gallerist-target);
@@ -584,7 +626,7 @@
   backdrop-filter: blur(20px) saturate(180%);
 }
 .gallerist-bar button[hidden],
-.gallerist-main > button[hidden] {
+.gallerist-controls > button[hidden] {
   display: none;
 }
 /* pressed (a toggle that is on) reads differently from focus: an accent fill vs a ring */
@@ -594,7 +636,7 @@
   color: var(--gallerist-accent-fg);
 }
 .gallerist-bar button:focus-visible,
-.gallerist-main > button:focus-visible,
+.gallerist-controls > button:focus-visible,
 .gallerist-itemnav button:focus-visible {
   outline: 2px solid var(--gallerist-accent);
   outline-offset: 2px;
@@ -652,20 +694,27 @@
   grid-area: caption;
   position: relative;
   z-index: 2;
+  box-sizing: border-box;
+  height: calc(2 * 1.4em + 16px); /* a fixed two-line band: long captions clamp, never squeeze */
   padding: 8px 16px;
   font-size: 14px;
   line-height: 1.4;
   text-align: center;
   color: var(--gallerist-fg);
+  overflow: hidden;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .gallerist-caption[hidden] {
   display: none;
 }
 
 /* ── arrows and the item navigator, over the stage (inside main) ────────────────── */
-.gallerist-main > .gallerist-prev,
-.gallerist-main > .gallerist-next {
+.gallerist-controls > .gallerist-prev,
+.gallerist-controls > .gallerist-next {
   position: absolute;
   z-index: 4;
   top: 50%;
@@ -708,8 +757,8 @@
   inset-inline-end: calc(12px + var(--gallerist-target) + 6px);
   inset-block-end: 12px;
 }
-.gallerist[data-gallerist-arrows="dpad"] .gallerist-main > .gallerist-prev,
-.gallerist[data-gallerist-arrows="dpad"] .gallerist-main > .gallerist-next {
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-controls > .gallerist-prev,
+.gallerist[data-gallerist-arrows="dpad"] .gallerist-controls > .gallerist-next {
   top: auto;
   transform: none;
   inset-block-end: 12px;
@@ -741,17 +790,17 @@
 /* side rail (vertical orientation): the group axis is ↑/↓, so the group arrows stack at the
    inline end and the item navigator runs horizontally along the bottom. Supersedes the arrow
    layouts above, which only position the horizontal mapping. */
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-main > .gallerist-prev,
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-main > .gallerist-next {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-controls > .gallerist-prev,
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-controls > .gallerist-next {
   top: 50%;
   bottom: auto;
   inset-inline-start: auto;
   inset-inline-end: 12px;
 }
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-main > .gallerist-prev {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-controls > .gallerist-prev {
   transform: translateY(calc(-100% - 4px));
 }
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-main > .gallerist-next {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-controls > .gallerist-next {
   transform: translateY(4px);
 }
 .gallerist[data-gallerist-orientation="vertical"][data-gallerist-arrows]
@@ -770,10 +819,10 @@
 }
 
 /* RTL: horizontal arrows point the reading direction (the keymap flips ←/→ the same way) */
-.gallerist[data-gallerist-orientation="horizontal"]:dir(rtl)
+.gallerist[data-gallerist-orientation="horizontal"][data-gallerist-dir="rtl"]
   :is(.gallerist-prev, .gallerist-next)
   .gallerist-icon,
-.gallerist[data-gallerist-orientation="vertical"]:dir(rtl)
+.gallerist[data-gallerist-orientation="vertical"][data-gallerist-dir="rtl"]
   :is(.gallerist-item-prev, .gallerist-item-next)
   .gallerist-icon {
   transform: scaleX(-1);
@@ -914,6 +963,13 @@
   flex-direction: row;
 }
 .gallerist[data-gallerist-rail-pos="left"] .gallerist-rail-handle {
+  order: 1; /* on the stage-facing side */
+}
+/* RTL reverses the row, so the stage-facing side flips */
+.gallerist[data-gallerist-dir="rtl"][data-gallerist-rail-pos="left"] .gallerist-rail-handle {
+  order: 0;
+}
+.gallerist[data-gallerist-dir="rtl"][data-gallerist-rail-pos="right"] .gallerist-rail-handle {
   order: 1;
 }
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs-region {
@@ -990,8 +1046,16 @@
 }
 /* minimal UI: no side stack (the in-stage item navigator covers the item axis) */
 .gallerist[data-gallerist-preset="immersive"] .gallerist-region-aside,
-.gallerist[data-gallerist-preset="immersive"] .gallerist-items-toggle {
+.gallerist[data-gallerist-preset="immersive"] .gallerist-bar .gallerist-items-toggle {
   display: none;
+}
+/* the bands over the stage pass gestures through except on their controls */
+.gallerist[data-gallerist-preset="immersive"] .gallerist-bar,
+.gallerist[data-gallerist-preset="immersive"] .gallerist-caption {
+  pointer-events: none;
+}
+.gallerist[data-gallerist-preset="immersive"] .gallerist-bar > * {
+  pointer-events: auto;
 }
 .gallerist[data-gallerist-preset="immersive"] .gallerist-caption {
   background: var(--gallerist-chrome-bg);
@@ -999,13 +1063,13 @@
 
 /* ── idle auto-hide (UX-C): chrome fades but keeps its place (no layout jump) ───── */
 .gallerist-bar,
-.gallerist-main > button,
+.gallerist-controls > button,
 .gallerist-itemnav,
 .gallerist-caption {
   transition: opacity var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
 }
 .gallerist[data-gallerist-idle] .gallerist-bar,
-.gallerist[data-gallerist-idle] .gallerist-main > button,
+.gallerist[data-gallerist-idle] .gallerist-controls > button,
 .gallerist[data-gallerist-idle] .gallerist-itemnav,
 .gallerist[data-gallerist-idle] .gallerist-caption {
   opacity: 0;
@@ -1080,28 +1144,24 @@
 }
 
 /* immersive preset: chrome AND the rail fade together on idle (UX-E). */
-.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-thumbnails,
-.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-toolbar {
+.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-thumbnails {
   opacity: 0;
   pointer-events: none;
 }
-.gallerist[data-gallerist-preset="immersive"] .gallerist-region-thumbnails,
-.gallerist[data-gallerist-preset="immersive"] .gallerist-region-toolbar {
+.gallerist[data-gallerist-preset="immersive"] .gallerist-region-thumbnails {
   transition: opacity var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .gallerist-media-image,
   .gallerist-bar,
-  .gallerist-main > button,
+  .gallerist-controls > button,
   .gallerist-itemnav,
   .gallerist-caption,
   .gallerist-thumb,
   .gallerist-thumb-item,
-  .gallerist-region-thumbnails,
   .gallerist-rail-toggle .gallerist-icon,
-  .gallerist[data-gallerist-preset="immersive"] .gallerist-region-thumbnails,
-  .gallerist[data-gallerist-preset="immersive"] .gallerist-region-toolbar {
+  .gallerist[data-gallerist-preset="immersive"] .gallerist-region-thumbnails {
     transition-duration: 0ms;
   }
   /* the phase selector must match the phase rules' specificity (0,3,0) so this later rule wins */
@@ -1119,10 +1179,10 @@
   .gallerist {
     --gallerist-thumb-h: 56px;
     --gallerist-toolbar-h: 52px;
-    --gallerist-rail-w: 96px;
+    --gallerist-rail-w: 64px; /* a side rail leaves the stage most of a narrow screen */
   }
   .gallerist-region-aside,
-  .gallerist-items-toggle {
+  .gallerist .gallerist-bar .gallerist-items-toggle {
     display: none;
   }
   .gallerist-bar {
@@ -1151,26 +1211,10 @@
   .gallerist-thumb-item {
     min-height: 44px;
   }
-  /* a 44px hit area with the glyph kept small, so it doesn't cover the thumbnail */
-  .gallerist-thumb-expand {
-    top: 0;
-    left: 0;
-    width: 44px;
-    height: 44px;
-    background: transparent;
-  }
-  .gallerist-thumb-expand::before {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    background: rgb(0 0 0 / 0.55);
-  }
-  /* swipes navigate on touch: the on-image arrows stay available to assistive tech only */
-  .gallerist-main > .gallerist-prev,
-  .gallerist-main > .gallerist-next,
-  .gallerist-itemnav > button {
+  /* swipes move between groups on touch: the group arrows stay available to assistive tech, and
+     reappear when focused from a keyboard */
+  .gallerist-controls > .gallerist-prev:not(:focus-visible),
+  .gallerist-controls > .gallerist-next:not(:focus-visible) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1181,6 +1225,10 @@
     clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
+  }
+  /* tapping a card navigates; peeking is a hover nicety, so no caret over the thumbnail */
+  .gallerist-thumb-expand {
+    display: none;
   }
   .gallerist-pill,
   .gallerist-dot {
@@ -1199,9 +1247,8 @@
     left: 50%;
     transform: translateX(-50%);
   }
-  .gallerist[data-gallerist-arrows][data-gallerist-orientation]
-    .gallerist-itemnav
-    > .gallerist-position {
+  /* every navigator child back in the row (split positions them one by one) */
+  .gallerist[data-gallerist-arrows][data-gallerist-orientation] .gallerist-itemnav > * {
     position: static;
     transform: none;
   }

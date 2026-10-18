@@ -204,7 +204,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // Default to the viewer's resolved loop so linear traversal and the slide window agree; an
   // explicit mount({ loop }) still overrides for the rare case they should differ (review #2).
   const loop = opts.loop ?? viewer.loop
-  const t: Strings = { ...DEFAULT_STRINGS, ...opts.strings }
+  const ui: Strings = { ...DEFAULT_STRINGS, ...opts.strings }
   const itemIndicator: ItemIndicator = opts.itemIndicator ?? 'pills'
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
@@ -288,11 +288,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   if (overlay) {
     root.setAttribute('role', 'dialog')
     root.setAttribute('aria-modal', 'true')
-    root.setAttribute('aria-label', opts.label ?? 'Media viewer') // dialog accessible name (I-UX1)
+    root.setAttribute('aria-label', opts.label ?? ui.dialog) // dialog accessible name (I-UX1)
     root.tabIndex = -1
   } else {
     root.setAttribute('role', 'group')
-    root.setAttribute('aria-roledescription', 'carousel')
+    root.setAttribute('aria-roledescription', ui.carousel)
+    root.tabIndex = -1 // focus lands here when a focused control hides (see setHiddenKeepingFocus)
   }
 
   if (overlay) root.appendChild(el('div', 'gallerist-backdrop'))
@@ -337,7 +338,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const railHandle = el('div', 'gallerist-rail-handle')
   const railToggle = el('button', 'gallerist-rail-toggle', {
     type: 'button',
-    'aria-label': railHidden ? t.showThumbnails : t.hideThumbnails,
+    'aria-label': railHidden ? ui.showThumbnails : ui.hideThumbnails,
     'aria-pressed': String(railHidden),
   })
   railToggle.innerHTML = ICONS.collapse
@@ -346,7 +347,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     railCollapsed = v
     root.setAttribute('data-gallerist-rail', v ? 'collapsed' : 'expanded')
     railToggle.setAttribute('aria-pressed', String(v))
-    railToggle.setAttribute('aria-label', v ? t.showThumbnails : t.hideThumbnails)
+    railToggle.setAttribute('aria-label', v ? ui.showThumbnails : ui.hideThumbnails)
     // a manual toggle while fullscreen wins over the on-exit restore
     if (manual) preFsCollapsed = null
   }
@@ -356,6 +357,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   let title: HTMLElement | undefined
   let position: HTMLElement | undefined
   let itemNav: HTMLElement | undefined
+  let controlsBox: HTMLElement | undefined
   let reset: HTMLElement | undefined
   // segmented pills are rebuilt only when the active group / its size changes (UX-H)
   let posG = -1
@@ -365,11 +367,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     counter = el('div', 'gallerist-counter')
     title = el('div', 'gallerist-title')
     title.hidden = true
-    reset = el('button', 'gallerist-zoom-reset', { type: 'button', 'aria-label': t.resetZoom })
+    reset = el('button', 'gallerist-zoom-reset', { type: 'button', 'aria-label': ui.resetZoom })
     reset.innerHTML = ICONS.zoomReset
     reset.hidden = true // only while zoomed in
     reset.addEventListener('click', () => viewer.resetZoom())
-    const close = el('button', 'gallerist-close', { type: 'button', 'aria-label': t.close })
+    const close = el('button', 'gallerist-close', { type: 'button', 'aria-label': ui.close })
     close.innerHTML = ICONS.close
     close.addEventListener('click', () => viewer.close())
     bar.append(counter, title, regionHosts.toolbar, reset, close)
@@ -377,21 +379,21 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // over the stage: group arrows and the item navigator (↑ · position · ↓) as one cluster, so
     // each arrow layout places it as a unit. Icons follow the orientation: horizontal → group ←/→,
     // item ↑/↓; vertical (side rail) → group ↑/↓, item ←/→.
-    const prev = el('button', 'gallerist-prev', { type: 'button', 'aria-label': t.previous })
+    const prev = el('button', 'gallerist-prev', { type: 'button', 'aria-label': ui.previous })
     prev.innerHTML = vertical ? ICONS.itemPrev : ICONS.prev
     prev.addEventListener('click', () => nav.prev())
-    const next = el('button', 'gallerist-next', { type: 'button', 'aria-label': t.next })
+    const next = el('button', 'gallerist-next', { type: 'button', 'aria-label': ui.next })
     next.innerHTML = vertical ? ICONS.itemNext : ICONS.next
     next.addEventListener('click', () => nav.next())
     const prevItem = el('button', 'gallerist-item-prev', {
       type: 'button',
-      'aria-label': t.previousItem,
+      'aria-label': ui.previousItem,
     })
     prevItem.innerHTML = vertical ? ICONS.prev : ICONS.itemPrev
     prevItem.addEventListener('click', () => nav.prevItem())
     const nextItem = el('button', 'gallerist-item-next', {
       type: 'button',
-      'aria-label': t.nextItem,
+      'aria-label': ui.nextItem,
     })
     nextItem.innerHTML = vertical ? ICONS.next : ICONS.itemNext
     nextItem.addEventListener('click', () => nav.nextItem())
@@ -399,7 +401,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     itemNav = el('div', 'gallerist-itemnav')
     itemNav.hidden = true // shown only for groups with more than one item (and not in linear mode)
     itemNav.append(prevItem, position, nextItem)
-    main.append(prev, next, itemNav)
+    controlsBox = el('div', 'gallerist-controls')
+    controlsBox.append(prev, next, itemNav)
+    main.appendChild(controlsBox)
   } else {
     bar.appendChild(regionHosts.toolbar) // plugin tools keep their place without built-in chrome
   }
@@ -622,7 +626,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         for (let k = 0; k < itemCount; k++) {
           const jump = el('button', mode === 'pills' ? 'gallerist-pill' : 'gallerist-dot', {
             type: 'button',
-            'aria-label': t.item(k + 1),
+            'aria-label': ui.item(k + 1),
           })
           if (mode === 'pills') jump.textContent = String(k + 1)
           jump.addEventListener('click', () => viewer.goTo(g, k))
@@ -642,6 +646,15 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
 
+  // Hide a control without dropping keyboard focus: if it (or a child) has focus, hand focus to the
+  // viewer root first — otherwise the browser drops it to <body> and the root's keymap goes deaf.
+  const setHiddenKeepingFocus = (node: HTMLElement, hidden: boolean) => {
+    if (hidden && !node.hidden && node.contains(document.activeElement)) {
+      root.focus({ preventScroll: true })
+    }
+    node.hidden = hidden
+  }
+
   // gate chrome updates to cursor/collection changes — skip zoom/pan commits (mirrors the rail)
   let chromeG = -1
   let chromeI = -1
@@ -650,6 +663,14 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const col = viewer.getCollection()
     const cur = viewer.getState().cursor
     if (col === chromeCol && cur.g === chromeG && cur.i === chromeI) return
+    if (col !== chromeCol) {
+      // Reserve the caption track for the whole collection when any item has a text caption, so
+      // moving between captioned and uncaptioned items never resizes the stage.
+      const anyCaption = col.groups.some((grp) =>
+        grp.items.some((it) => typeof it.caption === 'string'),
+      )
+      caption.hidden = !(controls && anyCaption)
+    }
     chromeCol = col
     chromeG = cur.g
     chromeI = cur.i
@@ -659,15 +680,14 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const itemCount = group?.items.length ?? 0
     // the item axis exists only for multi-item groups, and retires in linear mode
     const multi = !linear && itemCount > 1
-    root.setAttribute('data-gallerist-items', multi ? 'multi' : 'single')
-    if (itemNav) itemNav.hidden = !multi
+    if (itemNav) setHiddenKeepingFocus(itemNav, !multi)
     if (title) {
       title.textContent = group?.caption ?? ''
       title.hidden = !group?.caption
     }
-    // plain-text captions go in the caption bar; a rich (OverlaySpec) caption renders as an overlay
-    caption.textContent = controls && typeof item?.caption === 'string' ? item.caption : ''
-    caption.hidden = !caption.textContent
+    // Text captions go in the caption bar (the theme clamps them); an OverlaySpec caption isn't
+    // rendered by the DOM renderer yet (planned with the captions plugin).
+    caption.textContent = typeof item?.caption === 'string' ? item.caption : ''
     // Announce the item's own description alongside the position so SR users hear what they
     // navigated to, not just the index (S-UX4).
     const desc = item?.alt ? ` — ${item.alt}` : ''
@@ -676,19 +696,19 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       const pos = flatPosition(cur.g, cur.i) + 1 // flatPosition() also rebuilds flatSeq if needed
       const total = flatSeq.length
       if (counter) counter.textContent = `${pos} / ${total}`
-      live.textContent = `${t.itemOf(pos, total)}${desc}`
+      live.textContent = `${ui.itemOf(pos, total)}${desc}`
     } else {
       if (counter) counter.textContent = `${cur.g + 1} / ${G}`
       if (multi) updatePosition(cur.g, cur.i, itemCount)
       live.textContent = multi
-        ? `${t.groupOf(cur.g + 1, G)}, ${t.itemOf(cur.i + 1, itemCount)}${desc}`
-        : `${t.groupOf(cur.g + 1, G)}${desc}`
+        ? `${ui.groupOf(cur.g + 1, G)}, ${ui.itemOf(cur.i + 1, itemCount)}${desc}`
+        : `${ui.groupOf(cur.g + 1, G)}${desc}`
     }
   }
 
   // zoom reset only while zoomed in (fit == 1 in the contained model)
   const updateZoomChrome = () => {
-    if (reset) reset.hidden = !(viewer.getState().zoom.scale > 1.001)
+    if (reset) setHiddenKeepingFocus(reset, !(viewer.getState().zoom.scale > 1.001))
   }
 
   // ── attach / detach ──────────────────────────────────────────────────────────
@@ -712,6 +732,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       inertBackground(root)
       root.focus()
     }
+    setDir()
     idle?.poke() // start the idle countdown from when the viewer is shown
   }
   const detach = () => {
@@ -746,6 +767,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       else detach()
     }
     if (attached) {
+      if (!root.hasAttribute('data-gallerist-dir')) setDir() // inline mode: attached at mount
       renderWindow()
       updateChrome()
       updateZoomChrome()
@@ -781,6 +803,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       return false
     }
   }
+  // Mirror the keymap's notion of direction onto the root so the theme agrees with it (arrow glyphs,
+  // physical side rails) — no reliance on :dir(), and it honours a CSS-only `direction: rtl`.
+  const setDir = () => root.setAttribute('data-gallerist-dir', isRtl() ? 'rtl' : 'ltr')
 
   const onKey = (e: KeyboardEvent) => {
     // Don't hijack typing inside an embedded control (overlay input/textarea/etc); Escape still
@@ -984,6 +1009,63 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const resizeObserver =
     typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onStageResize) : null
   resizeObserver?.observe(stage)
+
+  // Immersive floats the bar, caption, rail and side column over the full-bleed stage. Measure
+  // where they overlap it and inset the on-stage controls box by that much, so arrows and the item
+  // navigator never end up underneath chrome (in every arrow layout, rail expanded or collapsed).
+  let insetFrame = 0
+  const updateControlsInset = () => {
+    insetFrame = 0
+    if (!controlsBox) return
+    if (root.getAttribute('data-gallerist-preset') !== 'immersive' || !attached) {
+      controlsBox.style.removeProperty('--gallerist-controls-inset')
+      return
+    }
+    const m = main.getBoundingClientRect()
+    let top = 0
+    let right = 0
+    let bottom = 0
+    let left = 0
+    for (const band of [
+      bar,
+      caption,
+      regionHosts.footer,
+      regionHosts.thumbnails,
+      regionHosts.aside,
+    ]) {
+      if (band.hidden) continue
+      const r = band.getBoundingClientRect()
+      if (r.width < 1 || r.height < 1) continue
+      if (r.width >= m.width * 0.5) {
+        // a horizontal band: it covers the top or the bottom of the stage
+        if (r.top - m.top < m.bottom - r.bottom) top = Math.max(top, r.bottom - m.top)
+        else bottom = Math.max(bottom, m.bottom - r.top)
+      } else if (r.left - m.left < m.right - r.right) {
+        left = Math.max(left, r.right - m.left)
+      } else {
+        right = Math.max(right, m.right - r.left)
+      }
+    }
+    controlsBox.style.setProperty(
+      '--gallerist-controls-inset',
+      `${top}px ${right}px ${bottom}px ${left}px`,
+    )
+  }
+  const scheduleInset = () => {
+    if (!insetFrame) insetFrame = requestAnimationFrame(updateControlsInset)
+  }
+  const bandObserver =
+    controlsBox && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleInset) : null
+  for (const band of [
+    main,
+    bar,
+    caption,
+    regionHosts.footer,
+    regionHosts.thumbnails,
+    regionHosts.aside,
+  ]) {
+    bandObserver?.observe(band)
+  }
   // viewer.refresh(): an explicit re-measure, for layout changes a ResizeObserver can't see
   const offRefresh = internals.onRefresh(onStageResize)
 
@@ -998,6 +1080,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const hasRail = [...thumbs.childNodes].some((n) => n !== railHandle)
     if (!hasRail) railHandle.remove()
     else if (thumbs.firstChild !== railHandle) thumbs.prepend(railHandle)
+    if (!controls) bar.hidden = regionHosts.toolbar.childElementCount === 0
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItemId = undefined
@@ -1020,6 +1103,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       offLifecycle() // settles a transition in flight, so `closed` still fires
       detachGestures()
       resizeObserver?.disconnect()
+      bandObserver?.disconnect()
+      if (insetFrame) cancelAnimationFrame(insetFrame)
       if (resizeFrame) cancelAnimationFrame(resizeFrame)
       idle?.destroy()
       document.removeEventListener('fullscreenchange', onFsChange)

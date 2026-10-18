@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 import { mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { thumbnails } from './index'
@@ -488,6 +489,30 @@ describe('plugin-thumbnails — active item panel (expandActive)', () => {
     mount(v)
     v.open()
     expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
+  })
+
+  it('falls back to the rail region under a renderer without an aside region', async () => {
+    const v = createViewer({ collection: collection(), plugins: [thumbnails()] })
+    // a minimal custom renderer that hosts only the thumbnails region
+    const host = document.body.appendChild(document.createElement('div'))
+    const inst = getInternals(v).getPlugins()[0]
+    const node = inst?.regions?.thumbnails?.({ viewer: v })
+    if (node) host.appendChild(node)
+    v.open()
+    v.next() // g1: three items
+    await Promise.resolve()
+    expect(
+      document.querySelector('.gallerist-thumb-items')?.closest('.gallerist-thumbs-region'),
+    ).not.toBeNull()
+  })
+
+  it('moves the stack into the aside column once the renderer mounts it', async () => {
+    const v = open()
+    v.next()
+    await Promise.resolve()
+    expect(
+      document.querySelector('.gallerist-thumb-items')?.closest('.gallerist-region-aside'),
+    ).not.toBeNull()
   })
 
   it('a horizontal item row stays inline in the rail region', () => {

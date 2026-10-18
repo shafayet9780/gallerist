@@ -96,13 +96,22 @@ exception: the stage fills the viewer and the bar, caption and rail float over i
 
 - **Collapse the thumbnail rail** with the `t` key or the toggle button; tracked as
   `data-gallerist-rail="collapsed|expanded"`. The rail shrinks to its handle and the stage grows into
-  the space. Entering fullscreen collapses it by default and exit restores the prior state.
+  the space (a grid track, so it snaps rather than animates). Collapsing also hides the `aside`
+  item stack. Entering fullscreen collapses it by default and exit restores the prior state.
 - **Auto-hide chrome on idle** (`autoHide`, default `true`) flags `data-gallerist-idle` after
-  inactivity; the chrome fades but keeps its place, so nothing jumps. It is **inert under
-  `prefers-reduced-motion`**. The `immersive` preset additionally fades the rail + toolbar.
+  inactivity; the chrome fades but keeps its place, so nothing jumps. Plugin tools in the bar fade
+  with it on purpose; they come back on the next pointer move or key press. It is **inert under
+  `prefers-reduced-motion`**. The `immersive` preset additionally fades the rail + toolbar, and
+  there the floating bar and caption let clicks through to the image except on their buttons.
 - **Zoom reset** appears only while zoomed in.
-- **Phones:** under 600px wide the chrome compacts and the `aside` column is dropped; on a touch
-  screen every target is at least 44px and safe-area insets are respected.
+- **Phones:** under 600px wide the chrome compacts, the `aside` column and the items toggle are
+  dropped and the bar's tools scroll sideways if they don't fit. On a touch screen every target is
+  at least 44px, the ↑ · position · ↓ navigator stays visible (group arrows give way to swipes but
+  reappear on keyboard focus) and safe-area insets are respected.
+- **Captions** take a fixed two-line band (longer text is clamped), reserved for the whole
+  collection when any item has one, so the stage keeps its size as you move between items.
+- **Right-to-left:** the renderer sets `data-gallerist-dir="ltr|rtl"` from the computed direction;
+  the theme mirrors arrow glyphs and keeps `rail: 'left' | 'right'` on the physical side.
 
 ## Theming (`data-gallerist-theme`)
 

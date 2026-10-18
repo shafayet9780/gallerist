@@ -343,7 +343,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const rebuildItemColumn = (activeGroup: Group | undefined, gIndex: number) => {
       if (!root) return
       itemBtns.clear()
-      const mountEl = (itemAxis === 'vertical' ? asideEl : null) ?? regionEl ?? root
+      // the aside column when the renderer hosts one (asideEl is in the document); otherwise fall
+      // back to the rail region rather than letting the stack silently disappear
+      const mountEl =
+        (itemAxis === 'vertical' && asideEl?.isConnected ? asideEl : null) ?? regionEl ?? root
       const show =
         panelOpen &&
         !!activeGroup &&
@@ -609,7 +612,13 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       thumbnails: () => regionEl ?? document.createElement('div'),
     }
     if (groupDisplay === 'stacked' && itemAxis === 'vertical') {
-      regions.aside = () => asideEl ?? document.createElement('div')
+      regions.aside = () => {
+        // the renderer attaches asideEl right after this returns: move the stack in then
+        queueMicrotask(() => {
+          if (asideEl?.isConnected && itemRow && itemRow.parentNode !== asideEl) syncPanel()
+        })
+        return asideEl ?? document.createElement('div')
+      }
     }
     const keymap: PluginInstance['keymap'] = {}
     // the item panel + its toggle only exist in stacked mode (flat lays every item out already).

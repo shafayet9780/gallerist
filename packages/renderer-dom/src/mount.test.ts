@@ -237,9 +237,6 @@ describe('mount — chrome + keyboard', () => {
     const itemNav = document.querySelector('.gallerist-itemnav') as HTMLElement
     expect(itemNav.hidden).toBe(true)
     expect(itemNav.querySelector('.gallerist-item-prev')).not.toBeNull() // ↑/↓ live inside it
-    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-items')).toBe(
-      'single',
-    )
     v.next() // g1 → three items
     expect(itemNav.hidden).toBe(false)
     expect(document.querySelector('.gallerist-position-text')?.textContent).toBe('1 / 3')
@@ -657,9 +654,9 @@ describe('mount — chrome structure (M15)', () => {
     const cap = document.querySelector('.gallerist-caption') as HTMLElement
     expect([title.hidden, title.textContent]).toEqual([false, 'Morning'])
     expect([cap.hidden, cap.textContent]).toEqual([false, 'Front view'])
-    v.next() // no captions
+    v.next() // no captions: the title hides, the caption track stays reserved (no stage jump)
     expect(title.hidden).toBe(true)
-    expect(cap.hidden).toBe(true)
+    expect([cap.hidden, cap.textContent]).toEqual([false, ''])
   })
 
   it('shows zoom reset only while zoomed in', () => {
@@ -756,6 +753,78 @@ describe('mount — item indicator variants', () => {
     v.open()
     expect(ind().dataset.mode).toBe('counter')
     expect(ind().querySelector('button')).toBeNull()
+  })
+})
+
+describe('mount — review fixes (M15)', () => {
+  const captioned = (): Collection => ({
+    groups: [
+      { id: 'g0', items: [{ ...item('a0'), caption: 'Front view' }, item('a1')] },
+      { id: 'g1', items: [item('b0')] },
+    ],
+  })
+
+  it('no captions anywhere: no caption track at all', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect((document.querySelector('.gallerist-caption') as HTMLElement).hidden).toBe(true)
+  })
+
+  it('reserves the caption track across items once the collection has captions', () => {
+    const v = createViewer({ collection: captioned() })
+    mount(v)
+    v.open()
+    const cap = document.querySelector('.gallerist-caption') as HTMLElement
+    expect([cap.hidden, cap.textContent]).toEqual([false, 'Front view'])
+    v.nextItem()
+    expect([cap.hidden, cap.textContent]).toEqual([false, ''])
+  })
+
+  it('hiding a focused control hands focus to the viewer root (keymap keeps working)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open({ g: 1 })
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const nextItemBtn = document.querySelector('.gallerist-item-next') as HTMLElement
+    nextItemBtn.focus()
+    v.goTo(0) // single-item group: the item navigator hides under focus
+    expect(document.activeElement).toBe(root)
+  })
+
+  it('an empty bar is hidden when there are no built-in controls and no plugin tools', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { controls: false })
+    v.open()
+    expect((document.querySelector('.gallerist-bar') as HTMLElement).hidden).toBe(true)
+    v.use(() => ({ name: 'tool', regions: { toolbar: () => document.createElement('button') } }))
+    expect((document.querySelector('.gallerist-bar') as HTMLElement).hidden).toBe(false)
+  })
+
+  it('marks the reading direction for the theme', () => {
+    document.documentElement.dir = 'rtl'
+    try {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-dir')).toBe('rtl')
+    } finally {
+      document.documentElement.removeAttribute('dir')
+    }
+  })
+
+  it('translates the dialog name and the inline role description', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { strings: { dialog: 'Visionneuse' } })
+    v.open()
+    expect(document.querySelector('.gallerist')?.getAttribute('aria-label')).toBe('Visionneuse')
+    document.body.innerHTML = ''
+    const host = document.body.appendChild(document.createElement('div'))
+    mount(createViewer({ collection: collection() }), {
+      container: host,
+      strings: { carousel: 'carrousel' },
+    })
+    expect(host.querySelector('.gallerist')?.getAttribute('aria-roledescription')).toBe('carrousel')
   })
 })
 
@@ -948,10 +1017,14 @@ describe('mount — linear Home/End (S-R3)', () => {
 
 describe('mount — resize re-clamp (C2)', () => {
   it('re-clamps committed zoom when the stage shrinks', () => {
-    let roCb: () => void = () => {}
+    // every ResizeObserver the renderer creates; "the stage resized" fires them all
+    const roCbs: (() => void)[] = []
+    const roCb = () => {
+      for (const cb of roCbs) cb()
+    }
     class FakeRO {
       constructor(cb: () => void) {
-        roCb = cb
+        roCbs.push(cb)
       }
       observe() {}
       disconnect() {}

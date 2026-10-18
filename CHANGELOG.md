@@ -38,6 +38,18 @@
   (`ICONS`) and the toolbar buttons of thumbnails, grid, fullscreen and download use it instead of
   Unicode glyphs. Zoom reset gets its own icon (it used to look like fullscreen). The fullscreen
   button exposes `aria-pressed`, and a pressed toggle (accent fill) looks different from focus (ring).
+- **renderer-dom + theme (M15 review)**: the chrome contract was hardened after an independent
+  review. Captions get a fixed two-line band, reserved per collection so the stage doesn't jump.
+  Focus stays in the viewer when the focused zoom reset or item navigator hides. With
+  `controls: false` an empty top bar is hidden. Immersive arrows are inset clear of the floating bar,
+  caption and rail, and the floating chrome lets clicks through to the image. On touch the item
+  navigator is always reachable, and group arrows reappear on keyboard focus. Phones drop the items
+  toggle and let bar tools scroll instead of overflowing. Collapsing the rail hides the `aside` item
+  stack. Side rails stay on their physical side in RTL, using the new `data-gallerist-dir`
+  attribute instead of `:dir()`. The dialog name and carousel role description are translatable
+  (`strings.dialog`, `strings.carousel`). The layout lint now also covers long captions, zoom,
+  `controls: false`, RTL side rails, immersive arrow layouts and a 320px touch screen, and checks
+  occlusion, stage size and item-axis reachability.
 
 ### Fixed
 - **core**: a throwing event handler no longer stops later handlers (it is reported via
