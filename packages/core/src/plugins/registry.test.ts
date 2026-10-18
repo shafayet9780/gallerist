@@ -126,3 +126,25 @@ describe('plugin registry (spec §13)', () => {
     expect(inst?.mediaAdapters?.[0]?.type).toBe('video')
   })
 })
+
+describe('the overlays option', () => {
+  it('registers global overlays where the renderer collects them', () => {
+    const spec = {
+      id: 'wm',
+      anchor: { kind: 'viewport' as const, at: 'top-right' as const },
+      render: () => 'x',
+    }
+    const v = createViewer({ items: [item('a')], overlays: [spec] })
+    const all = getInternals(v)
+      .getPlugins()
+      .flatMap((p) => p.overlays ?? [])
+    expect(all).toEqual([spec])
+  })
+
+  it('registers nothing when there are no overlays', () => {
+    expect(getInternals(createViewer({ items: [item('a')] })).getPlugins()).toHaveLength(0)
+    expect(
+      getInternals(createViewer({ items: [item('a')], overlays: [] })).getPlugins(),
+    ).toHaveLength(0)
+  })
+})

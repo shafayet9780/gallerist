@@ -462,6 +462,19 @@ describe('mount — load lifecycle', () => {
   })
 })
 
+describe('mount — overlays option', () => {
+  it('paints global overlays passed to createViewer({ overlays })', () => {
+    const v = createViewer({
+      collection: collection(),
+      overlays: [{ id: 'wm', anchor: { kind: 'viewport', at: 'top-right' }, render: () => 'WM' }],
+    })
+    mount(v)
+    v.open()
+    const el = document.querySelector('.gallerist-viewport-layer [data-overlay="wm"]')
+    expect(el?.textContent).toBe('WM')
+  })
+})
+
 describe('mount — destroy', () => {
   it('removes the root and stops reacting', () => {
     const v = createViewer({ collection: collection() })

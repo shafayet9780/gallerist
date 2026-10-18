@@ -333,6 +333,11 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     }
   }
 
+  // Global overlays from the `overlays` option reach the renderer the same way plugin overlays do.
+  const globalOverlays = options.overlays
+  if (globalOverlays?.length)
+    registerPlugin(() => ({ name: 'options:overlays', overlays: globalOverlays }))
+
   // register plugins before init so their on-handlers see the init event
   if (options.plugins) for (const plugin of options.plugins) registerPlugin(plugin)
 
