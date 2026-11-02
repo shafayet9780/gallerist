@@ -15,6 +15,7 @@ import {
   type ArrowLayout,
   type ColorScheme,
   type ItemIndicator,
+  type MountOptions,
   type PresetName,
   type RailPlacement,
   type Skin,
