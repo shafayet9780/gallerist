@@ -75,7 +75,7 @@ merges on its own. Estimates are solo-developer weeks.
 | **M19 Editorial** | `editorial` skin (wall + Night scheme), framed media, placard caption hosting the item controls, crossfade motion tokens, `editorial` preset. | 1 | 2 |
 | **M20 Tour** | Thumbnails `groupDisplay: 'index'`, grid `layout: 'sections'` + `startOpen`, `arrowLabels`, `tour` preset, a listing example. | 1 | — |
 | **M21 Parity** | `"use client"` banner, DOM-markup init (`data-gallerist` links), a UMD/CDN build, translatable strings audited. | 0.5 | 4 |
-| **Release 0.3** | Honest positioning, docs site with a live playground that switches skin × preset, migration notes for P2-D/P2-E, then publish (repo public, `NPM_TOKEN`, manual release workflow). | 1.5 | 5 |
+| **Release 0.3** | Honest positioning, docs site with a live playground that switches skin × preset, then publish (no migration notes: nothing was ever published) (repo public, `NPM_TOKEN`, manual release workflow). | 1.5 | 5 |
 | **M22 Atlas** | Renderer `peek`, `plugin-atlas` (skyline minimap, map mode on the grid), first-run hint. | 1.5 | — |
 | **M23 Review plugins** | `triage` and `compare` first (Console), then `slideshow`, `rotate`, `share`, `info`, `timeline`, `filter`, `redaction`, each styled by tokens in all three skins. | 3 | 6 |
 | **Release 0.4** | Atlas + review plugins, Vue adapter. | 1 | 5 |

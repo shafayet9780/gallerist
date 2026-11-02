@@ -85,9 +85,9 @@ test('docs render, and links between pages stay on the site', async ({ page }) =
   await page.locator('#doc a', { hasText: 'Presets and layout' }).click()
   await expect(page).toHaveURL(/#presets$/)
   await expect(page.locator('#doc h1')).toContainText('Layout presets')
-  await page.locator('#doc-nav a', { hasText: 'Migrating to 0.3' }).click()
-  await expect(page.locator('#doc h1')).toHaveText('Migrating to 0.3')
-  await expect(page.locator('#doc-nav a[aria-current]')).toHaveText('Migrating to 0.3')
+  await page.locator('#doc-nav a', { hasText: 'Writing a plugin' }).click()
+  await expect(page.locator('#doc h1')).toBeVisible()
+  await expect(page.locator('#doc-nav a[aria-current]')).toHaveText('Writing a plugin')
 })
 
 for (const path of ['/index.html', '/docs.html', '/docs.html#presets']) {

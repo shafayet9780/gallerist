@@ -2,8 +2,6 @@
 
 ## v0.3.0
 
-Moving from git? See the [migration notes](docs/MIGRATION-0.3.md).
-
 ### Fixed
 - **plugin-thumbnails, plugin-grid**: moving the cursor no longer scrolls the page around an inline
   viewer; only the viewer's own panels scroll.

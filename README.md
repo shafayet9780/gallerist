@@ -5,7 +5,7 @@ moments with their screens, listings with their rooms. Each group is a place you
 each item a place inside it (↑/↓), and you can pin content to a point on the image.
 
 MIT licensed. The core has no runtime dependencies and doesn't touch the DOM. **Pre-1.0:** the API can
-still change between minor versions, and [migration notes](docs/MIGRATION-0.3.md) cover each change.
+still change between minor versions.
 
 ## Is it the right tool?
 

@@ -1,7 +1,6 @@
 import './site.css'
 import { marked } from 'marked'
 import start from '../../docs/GETTING-STARTED.md?raw'
-import migration from '../../docs/MIGRATION-0.3.md?raw'
 import authoring from '../../docs/PLUGIN-AUTHORING.md?raw'
 import presets from '../../docs/PRESETS.md?raw'
 import cdn from '../../packages/cdn/README.md?raw'
@@ -45,12 +44,6 @@ const PAGES: Page[] = [
     title: 'Writing a plugin',
     path: 'docs/PLUGIN-AUTHORING.md',
     source: authoring,
-  },
-  {
-    slug: 'migration',
-    title: 'Migrating to 0.3',
-    path: 'docs/MIGRATION-0.3.md',
-    source: migration,
   },
 ]
 
