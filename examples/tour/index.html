@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gallerist — property tour (tour preset)</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #f6f3ee;
+        color: #23201c;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 32px 20px;
+      }
+      h1 {
+        margin: 0;
+      }
+      p {
+        margin: 6px 0 20px;
+        color: #5e5850;
+      }
+      .mosaic {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+      }
+      .mosaic button {
+        padding: 0;
+        border: 0;
+        border-radius: 16px;
+        overflow: hidden;
+        cursor: pointer;
+        background: #fff;
+        font: inherit;
+        text-align: start;
+      }
+      .mosaic img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 3 / 2;
+        object-fit: cover;
+      }
+      .mosaic span {
+        display: block;
+        padding: 8px 12px;
+      }
+      #all {
+        margin-bottom: 20px;
+        min-height: 44px;
+        padding: 0 20px;
+        border: 0;
+        border-radius: 999px;
+        font: 600 15px system-ui, sans-serif;
+        color: #fff;
+        background: #0f6e62;
+        cursor: pointer;
+      }
+      /* the tour's look, on the Gallery skin's light scheme: only tokens change */
+      .gallerist[data-gallerist-preset="tour"] {
+        --gallerist-bg: #f6f3ee;
+        --gallerist-backdrop: #f6f3ee;
+        --gallerist-chrome-bg: #fff;
+        --gallerist-rail-bg: #fff;
+        --gallerist-surface: #fff;
+        --gallerist-hairline: #e7e1d8;
+        --gallerist-fg: #23201c;
+        --gallerist-fg-muted: #5e5850;
+        --gallerist-accent: #0f6e62;
+        --gallerist-accent-fg: #fff;
+        --gallerist-selection: #0f6e62;
+        --gallerist-group-bg: #e2f0ec;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Linden House</h1>
+      <p>Open the whole tour on its overview, or tap a room to go straight there.</p>
+      <button id="all" type="button">View all photos</button>
+      <div class="mosaic" id="mosaic"></div>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

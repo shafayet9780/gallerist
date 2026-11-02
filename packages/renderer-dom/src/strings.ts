@@ -13,6 +13,9 @@ export interface Strings {
   next: string
   previousItem: string
   nextItem: string
+  /** name of a labelled group arrow (`arrowLabels`), given the group it goes to */
+  previousTo: (name: string) => string
+  nextTo: (name: string) => string
   resetZoom: string
   showThumbnails: string
   hideThumbnails: string
@@ -32,6 +35,8 @@ export const DEFAULT_STRINGS: Strings = {
   next: 'Next',
   previousItem: 'Previous item',
   nextItem: 'Next item',
+  previousTo: (name) => `Previous: ${name}`,
+  nextTo: (name) => `Next: ${name}`,
   resetZoom: 'Reset zoom',
   showThumbnails: 'Show thumbnails',
   hideThumbnails: 'Hide thumbnails',

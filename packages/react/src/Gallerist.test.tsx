@@ -54,6 +54,21 @@ describe('<Gallerist>', () => {
     expect(document.querySelector('.gallerist-navigator')).toBeNull()
   })
 
+  it('passes groupAxis and arrowLabels to the renderer, overriding the preset', () => {
+    render(
+      <Gallerist
+        collection={collection}
+        open
+        preset="tour"
+        groupAxis="vertical"
+        arrowLabels={false}
+      />,
+    )
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-axis')).toBe('vertical')
+    expect(root.hasAttribute('data-gallerist-arrow-labels')).toBe(false)
+  })
+
   it('passes frame to the renderer, overriding the preset', () => {
     render(<Gallerist collection={collection} open preset="editorial" frame={false} />)
     const root = document.querySelector('.gallerist') as HTMLElement

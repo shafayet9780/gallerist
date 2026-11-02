@@ -18,6 +18,7 @@
     --gallerist-thumb-h: 84px;
     --gallerist-rail-handle-h: 22px;
     --gallerist-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
+    --gallerist-index-w: 280px; /* a section index (`groupDisplay: 'index'`) in a side rail */
     --gallerist-rail-w: 130px; /* vertical (left/right) rail width */
     --gallerist-speed: 300ms;
 
@@ -969,24 +970,23 @@
 .gallerist[data-gallerist-arrows="split"] .gallerist-item-next {
   bottom: 12px;
 }
-/* side rail (vertical orientation): the group axis is ↑/↓, so the group arrows stack at the
+/* vertical group axis (a side rail, by default): group ↑/↓, so the group arrows stack at the
    inline end and the item navigator runs horizontally along the bottom. Supersedes the arrow
    layouts above, which only position the horizontal mapping. */
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-controls > .gallerist-prev,
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-controls > .gallerist-next {
+.gallerist[data-gallerist-axis="vertical"] .gallerist-controls > .gallerist-prev,
+.gallerist[data-gallerist-axis="vertical"] .gallerist-controls > .gallerist-next {
   top: 50%;
   bottom: auto;
   inset-inline-start: auto;
   inset-inline-end: 12px;
 }
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-controls > .gallerist-prev {
+.gallerist[data-gallerist-axis="vertical"] .gallerist-controls > .gallerist-prev {
   transform: translateY(calc(-100% - 4px));
 }
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-controls > .gallerist-next {
+.gallerist[data-gallerist-axis="vertical"] .gallerist-controls > .gallerist-next {
   transform: translateY(4px);
 }
-.gallerist[data-gallerist-orientation="vertical"][data-gallerist-arrows]
-  .gallerist-itemnav:not([hidden]) {
+.gallerist[data-gallerist-axis="vertical"][data-gallerist-arrows] .gallerist-itemnav:not([hidden]) {
   display: flex;
   flex-direction: row;
   top: auto;
@@ -995,16 +995,16 @@
   left: 50%;
   transform: translateX(-50%);
 }
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-itemnav > * {
+.gallerist[data-gallerist-axis="vertical"] .gallerist-itemnav > * {
   position: static;
   transform: none;
 }
 
 /* RTL: horizontal arrows point the reading direction (the keymap flips ←/→ the same way) */
-.gallerist[data-gallerist-orientation="horizontal"][data-gallerist-dir="rtl"]
+.gallerist[data-gallerist-axis="horizontal"][data-gallerist-dir="rtl"]
   :is(.gallerist-prev, .gallerist-next)
   .gallerist-icon,
-.gallerist[data-gallerist-orientation="vertical"][data-gallerist-dir="rtl"]
+.gallerist[data-gallerist-axis="vertical"][data-gallerist-dir="rtl"]
   :is(.gallerist-item-prev, .gallerist-item-next)
   .gallerist-icon {
   transform: scaleX(-1);
@@ -1076,7 +1076,7 @@
 /* where the dots run as a row, the current one stretches sideways */
 .gallerist[data-gallerist-arrows="corner-br"] .gallerist-dot[data-active]::before,
 .gallerist[data-gallerist-arrows="split"] .gallerist-dot[data-active]::before,
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-dot[data-active]::before {
+.gallerist[data-gallerist-axis="vertical"] .gallerist-dot[data-active]::before {
   width: var(--gallerist-dot-active-along);
   height: var(--gallerist-dot-active-across);
 }
@@ -1315,6 +1315,168 @@
   transform: rotate(180deg);
 }
 
+/* labelled group arrows (`arrowLabels`): the name hangs under the arrow, so the arrows move in far
+   enough to keep it on the stage */
+.gallerist[data-gallerist-arrow-labels] .gallerist-controls > .gallerist-prev {
+  inset-inline-start: 36px;
+}
+.gallerist[data-gallerist-arrow-labels] .gallerist-controls > .gallerist-next {
+  inset-inline-end: 36px;
+}
+.gallerist[data-gallerist-arrow-labels] .gallerist-itemnav {
+  inset-inline-end: calc(36px + var(--gallerist-arrow-size) + 12px);
+}
+.gallerist-arrow-label {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 96px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 12px / 1.4 var(--gallerist-font);
+  color: var(--gallerist-fg-muted);
+  background: var(--gallerist-scrim);
+  pointer-events: none;
+}
+.gallerist-arrow-label[hidden] {
+  display: none;
+}
+
+/* the `tour` preset: the photo keeps clear of the arrows and the item navigator */
+.gallerist[data-gallerist-preset="tour"][data-gallerist-frame] .gallerist-media,
+.gallerist[data-gallerist-preset="tour"][data-gallerist-frame] .gallerist-media-image {
+  border-radius: 16px;
+}
+
+/* the section index (`groupDisplay: 'index'`): rows in a side rail */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs[data-display="index"] {
+  width: var(--gallerist-index-w);
+  gap: 6px;
+  padding: 12px;
+}
+.gallerist-thumb-section {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.gallerist-thumb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 12px;
+  font: 500 14px / 1.25 var(--gallerist-font);
+  text-align: start;
+  color: var(--gallerist-fg);
+  background: transparent;
+  cursor: pointer;
+}
+.gallerist-thumb-row:hover {
+  background: var(--gallerist-tool-hover-bg);
+}
+.gallerist-thumb-row:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: 1px;
+}
+.gallerist-thumb-row[data-active] {
+  color: var(--gallerist-selection);
+  background: var(--gallerist-group-bg);
+  box-shadow: inset 0 0 0 1px var(--gallerist-selection);
+}
+.gallerist-thumb-row > .gallerist-thumb-img {
+  flex: none;
+  width: 56px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--gallerist-cell-bg);
+}
+.gallerist-thumb-row-text {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gallerist-thumb-row-name,
+.gallerist-thumb-row-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gallerist-thumb-row-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--gallerist-fg-muted);
+}
+.gallerist-thumb-row-count {
+  flex: none;
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--gallerist-fg-muted);
+  background: var(--gallerist-group-bg);
+}
+/* the active section's items, a wrapping row under its row */
+.gallerist[data-gallerist-orientation] .gallerist-thumb-section > .gallerist-thumb-items {
+  flex-direction: row;
+  flex-wrap: wrap;
+  max-height: none;
+  overflow: visible;
+  padding: 0 0 6px;
+  margin: 0;
+  border: 0;
+}
+/* the numbers name them here: captions would only truncate at this size */
+.gallerist-thumb-section .gallerist-thumb-caption {
+  display: none;
+}
+/* a scrolled-to chip or row clears the strip's edge */
+.gallerist-thumbs[data-display="index"] {
+  scroll-padding: 12px;
+}
+.gallerist-thumb-section > .gallerist-thumb-items > .gallerist-thumb-item {
+  flex: 0 0 calc((100% - 12px) / 3);
+  width: auto;
+  min-width: 0;
+}
+/* a bottom rail: a strip of chips, name and count (the item navigator covers the items) */
+.gallerist[data-gallerist-orientation="horizontal"]
+  .gallerist-thumbs[data-display="index"]
+  .gallerist-thumb-row {
+  width: auto;
+  min-height: 44px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.gallerist[data-gallerist-orientation="horizontal"]
+  .gallerist-thumbs[data-display="index"]
+  :is(.gallerist-thumb-img, .gallerist-thumb-row-sub) {
+  display: none;
+}
+.gallerist[data-gallerist-orientation="horizontal"]
+  .gallerist-thumb-section
+  > .gallerist-thumb-items {
+  display: none;
+}
+/* an overview (`grid({ layout: 'sections' })`) is a whole screen: nothing stays over it */
+.gallerist:has(.gallerist-grid[data-layout="sections"][aria-hidden="false"])
+  :is(.gallerist-controls, .gallerist-caption) {
+  display: none;
+}
+
 /* side rails: the strip runs down an edge; the handle sits on its stage-facing side */
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-region-thumbnails {
   flex-direction: row;
@@ -1549,7 +1711,14 @@
 /* compact sizes: a layer above the skins (so they beat a skin's own sizes) and below the page (so a
    host's --gallerist-* overrides still win) */
 @layer gallerist.compact {
+  .gallerist[data-gallerist-preset="tour"] {
+    --gallerist-frame-inset: 156px; /* the labelled arrows + item navigator, beside the photo */
+    --gallerist-frame-shadow: var(--gallerist-shadow);
+  }
   @media (max-width: 600px) {
+    .gallerist[data-gallerist-preset="tour"] {
+      --gallerist-frame-inset: 12px;
+    }
     .gallerist {
       --gallerist-thumb-h: 56px;
       --gallerist-toolbar-h: 52px;
@@ -1656,5 +1825,63 @@
     left: auto;
     inset-inline-end: 12px;
     transform: translateY(-50%);
+  }
+}
+
+/* a section index on a phone: the side rail becomes the bottom strip of chips */
+@media (max-width: 600px) {
+  .gallerist[data-gallerist-rail-pos]:has(.gallerist-thumbs[data-display="index"]) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-areas:
+      "bar"
+      "main"
+      "caption"
+      "footer"
+      "rail";
+  }
+  .gallerist[data-gallerist-orientation="vertical"]
+    .gallerist-region-thumbnails:has(.gallerist-thumbs[data-display="index"]) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  /* stretched to the screen, so the strip scrolls rather than running off both edges */
+  .gallerist[data-gallerist-orientation="vertical"]
+    .gallerist-region-thumbnails:has(.gallerist-thumbs[data-display="index"])
+    .gallerist-thumbs-region {
+    align-items: stretch;
+  }
+  .gallerist[data-gallerist-orientation="vertical"]
+    .gallerist-region-thumbnails:has(.gallerist-thumbs[data-display="index"])
+    .gallerist-rail-handle {
+    display: none;
+  }
+  .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs[data-display="index"] {
+    flex-direction: row;
+    width: auto;
+    gap: 8px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-inline: 0 none;
+  }
+  .gallerist[data-gallerist-orientation="vertical"]
+    .gallerist-thumbs[data-display="index"]
+    .gallerist-thumb-row {
+    width: auto;
+    min-height: 48px;
+    padding: 4px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .gallerist[data-gallerist-orientation="vertical"]
+    .gallerist-thumbs[data-display="index"]
+    :is(.gallerist-thumb-img, .gallerist-thumb-row-sub) {
+    display: none;
+  }
+  .gallerist[data-gallerist-orientation="vertical"]
+    .gallerist-thumb-section
+    > .gallerist-thumb-items {
+    display: none;
   }
 }

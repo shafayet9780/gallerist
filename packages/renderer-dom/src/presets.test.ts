@@ -43,6 +43,15 @@ describe('resolvePreset', () => {
     expect(p.rootAttrs['data-gallerist-preset']).toBe('contact')
   })
 
+  it('tour: section index beside the stage, group arrows still horizontal and labelled', () => {
+    const p = resolvePreset('tour')
+    expect(p.rail).toBe('left')
+    expect(p.groupAxis).toBe('horizontal')
+    expect(p.arrowLabels).toBe(true)
+    expect(p.frame).toBe(true)
+    expect(p.thumbnails.groupDisplay).toBe('index')
+  })
+
   it('falls back to filmstrip for an unknown name (and warns)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(resolvePreset('nope')).toEqual(resolvePreset('filmstrip'))

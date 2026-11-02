@@ -44,3 +44,100 @@
   object-fit: cover;
   display: block;
 }
+
+/* ── overview (`layout: 'sections'`) ───────────────────────────────────────── */
+.gallerist-grid[data-layout="sections"] {
+  padding: 24px clamp(16px, 4vw, 48px);
+  background: var(--gallerist-bg);
+  backdrop-filter: none;
+}
+.gallerist-grid-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.gallerist-grid-title {
+  font: 600 28px / 1.2 var(--gallerist-font);
+  color: var(--gallerist-fg);
+}
+.gallerist-grid-start {
+  margin-inline-start: auto;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  font: 600 15px var(--gallerist-font);
+  color: var(--gallerist-accent-fg);
+  background: var(--gallerist-accent);
+  cursor: pointer;
+}
+.gallerist-grid-start:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: 2px;
+}
+.gallerist-grid-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  align-items: start;
+  gap: 24px;
+}
+.gallerist-grid-section {
+  padding: 12px;
+  border-radius: 20px;
+  background: var(--gallerist-surface);
+  box-shadow: 0 0 0 1px var(--gallerist-hairline);
+}
+.gallerist-grid-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 10px;
+}
+.gallerist-grid-section-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 16px var(--gallerist-font);
+  color: var(--gallerist-fg);
+}
+.gallerist-grid-section-count {
+  flex: none;
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font: 500 12px var(--gallerist-font);
+  text-align: center;
+  color: var(--gallerist-fg-muted);
+  background: var(--gallerist-group-bg);
+}
+.gallerist-grid-section-sub {
+  flex: none;
+  margin-inline-start: auto;
+  font: 400 12px var(--gallerist-font);
+  color: var(--gallerist-fg-muted);
+}
+.gallerist-grid-section-cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.gallerist-grid-section-cells > .gallerist-grid-cell {
+  position: relative;
+  border-radius: 12px;
+}
+.gallerist-grid-section-cells > .gallerist-grid-cell:first-child {
+  grid-column: 1 / -1;
+  aspect-ratio: 5 / 3;
+}
+.gallerist-grid-more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 600 14px var(--gallerist-font);
+  color: var(--gallerist-fg);
+  background: var(--gallerist-scrim);
+}

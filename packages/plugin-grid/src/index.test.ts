@@ -92,4 +92,89 @@ describe('plugin-grid', () => {
     ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
     expect(gridEl().querySelectorAll('.gallerist-grid-cell').length).toBeLessThan(200)
   })
+
+  describe('sections layout', () => {
+    const named = (): Collection => ({
+      meta: { title: 'House' },
+      groups: [
+        {
+          id: 'g0',
+          caption: 'Kitchen',
+          meta: { subtitle: 'Ground floor' },
+          items: [item('a0'), item('a1')],
+        },
+        { id: 'g1', caption: 'Study', items: [item('b0')] },
+      ],
+    })
+    const openSections = (
+      col = named(),
+      opts: Parameters<typeof grid>[0] = {},
+      at?: { g: number; i?: number },
+    ) => {
+      const v = createViewer({
+        collection: col,
+        plugins: [grid({ layout: 'sections', startOpen: true, ...opts })],
+      })
+      mount(v)
+      v.open(at)
+      return v
+    }
+
+    it('startOpen shows one card per group on opening at the first item', () => {
+      openSections()
+      expect(gridEl().style.display).not.toBe('none')
+      expect(gridEl().querySelector('.gallerist-grid-title')?.textContent).toBe('House')
+      const names = [...gridEl().querySelectorAll('.gallerist-grid-section-name')]
+      expect(names.map((n) => n.textContent)).toEqual(['Kitchen', 'Study'])
+      expect(gridEl().querySelector('.gallerist-grid-section-sub')?.textContent).toBe(
+        'Ground floor',
+      )
+      expect(gridEl().querySelector('.gallerist-grid-section-count')?.textContent).toBe('2')
+    })
+
+    it('opening at another item skips the overview', () => {
+      const v = openSections(named(), {}, { g: 1 })
+      expect(v.getState().cursor.g).toBe(1)
+      expect(gridEl().style.display).toBe('none')
+    })
+
+    it('shows again on the next open, not while navigating after start', () => {
+      const v = openSections()
+      ;(gridEl().querySelector('.gallerist-grid-start') as HTMLButtonElement).click()
+      expect(gridEl().style.display).toBe('none')
+      v.next()
+      expect(gridEl().style.display).toBe('none')
+      v.goTo(0, 0)
+      v.close()
+      v.open()
+      expect(gridEl().style.display).not.toBe('none')
+    })
+
+    it('the start button uses startLabel and keeps focus inside the viewer', () => {
+      openSections(named(), { startLabel: 'Start tour' })
+      const start = gridEl().querySelector('.gallerist-grid-start') as HTMLButtonElement
+      expect(start.textContent).toBe('Start tour')
+      start.focus()
+      start.click()
+      expect(document.activeElement).toBe(document.querySelector('.gallerist'))
+    })
+
+    it('a cell navigates; a long group is capped with the rest counted', () => {
+      const long: Collection = {
+        groups: [{ id: 'g0', items: Array.from({ length: 30 }, (_, i) => item(`x${i}`)) }],
+      }
+      const v = openSections(long)
+      const cells = gridEl().querySelectorAll<HTMLButtonElement>('.gallerist-grid-cell')
+      expect(cells.length).toBe(9)
+      expect(gridEl().querySelector('.gallerist-grid-more')?.textContent).toBe('+21')
+      cells[3]?.click()
+      expect(v.getState().cursor).toEqual({ g: 0, i: 3 })
+      expect(gridEl().style.display).toBe('none')
+    })
+
+    it('without startOpen stays hidden until toggled', () => {
+      openSections(named(), { startOpen: false })
+      expect(gridEl().style.display).toBe('none')
+    })
+  })
 })

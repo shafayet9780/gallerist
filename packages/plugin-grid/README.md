@@ -27,3 +27,17 @@ Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readm
 ## License
 
 MIT © Shafayet Ahmmed
+
+## Overview (`layout: 'sections'`)
+
+```ts
+grid({ layout: 'sections', startOpen: true, startLabel: 'Start tour' })
+```
+
+- **`layout: 'sections'`** draws one card per group: `group.caption`, `group.meta.subtitle`, the item
+  count, a large first item and thumbnails of the next ones (9 items at most; the rest are counted on
+  the last one). `collection.meta.title` heads the screen, beside the start button. The stage's arrows
+  and caption hide while it shows.
+- **`startOpen`** shows the grid when the viewer opens on its first item, every time it opens. Opening
+  at any other item (a tapped photo, a deep link) goes straight there.
+- **`startLabel`** is the start button's text (default `Start`).

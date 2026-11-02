@@ -19,6 +19,7 @@ distinct layout.
 | `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
 | `contact`   | `right`  | `pill-right`| no        | Browse-heavy; vertical rail on the right (pairs with `plugin-grid`). |
 | `editorial` | `bottom` | `pill-right`| no        | A gallery wall: the work framed with room around it (`frame`), a placard beside it holding the caption and the item navigator (`itemIndicator: 'placard'`), numbered items inline in the rail. Pairs with `skin: 'editorial'`. With a side rail the placard becomes the caption band under the stage. |
+| `tour`      | `left`   | `pill-right`| no        | A walkthrough of named sections: a section index (`groupDisplay: 'index'`), ←/→ between sections on labelled arrows (`groupAxis: 'horizontal'`, `arrowLabels`), ↑/↓ within one, framed media. Pairs with `grid({ layout: 'sections', startOpen: true })`. On a phone the index becomes a strip of chips along the bottom. |
 
 ```tsx
 // React
@@ -35,7 +36,7 @@ createViewer({ collection, plugins: [thumbnails(t)] })
 ```
 
 `resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails,
-navigator? }`. Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide`/`navigator`
+navigator?, frame?, itemIndicator?, groupAxis?, arrowLabels? }`. Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide`/`navigator`
 options always win over the preset.
 
 ## Rail placement (`data-gallerist-rail-pos`)
@@ -47,6 +48,14 @@ options always win over the preset.
   the stage. Touch swipes stay conventional (horizontal = group, swipe-down = dismiss). In an RTL
   document the whole layout mirrors, side rails included.
 - `hidden` — the rail starts collapsed; reveal it with the toggle, the `t` key, or fullscreen exit.
+
+`groupAxis` overrides which arrows move between groups, whatever the rail does: `tour` keeps
+`horizontal` beside its left rail, so ←/→ moves between sections and ↑/↓ within one
+(`data-gallerist-axis`; the rail's own direction stays `data-gallerist-orientation`).
+
+`arrowLabels` names the group arrows after where they go (`true` = `group.caption`, or a function).
+It needs horizontal group arrows in the `pill-right` layout and is ignored otherwise. Translate the
+arrow's accessible name with `strings.previousTo` / `strings.nextTo`.
 
 ## Group display (`thumbnails({ groupDisplay })`)
 
