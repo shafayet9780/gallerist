@@ -46,9 +46,9 @@ const viewer = createViewer({
 })
 mount(viewer, { preset: 'tour', skin: 'gallery', scheme: 'light', label: 'Linden House tour' })
 
-// the whole tour opens on the overview; a room's tile goes straight to that room (the first room's
+// open() resumes where the viewer was, so the overview needs the first item asked for; a room's tile goes straight to that room (the first room's
 // first photo is where the overview shows, so its tile lands there)
-document.getElementById('all')?.addEventListener('click', () => viewer.open())
+document.getElementById('all')?.addEventListener('click', () => viewer.open({ g: 0, i: 0 }))
 const mosaic = document.getElementById('mosaic')
 collection.groups.forEach((group, g) => {
   const tile = document.createElement('button')

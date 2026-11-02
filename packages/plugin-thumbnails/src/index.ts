@@ -1,6 +1,6 @@
 // @gallerist/plugin-thumbnails — windowed thumbnail rail (spec §10.3, §14).
 //
-// Two display modes (`groupDisplay`):
+// Three display modes (`groupDisplay`):
 //  • 'stacked' (default): one card per group; multi-item groups stack with a count badge. The
 //    active multi-item group expands its item thumbs (secondary axis), and hovering/focusing any
 //    OTHER multi-item card opens a transient *peek* flyout of its items — preview without
@@ -9,8 +9,8 @@
 //    wrapped in a bordered container so it reads as one group. Item-windowed so it stays bounded
 //    even for huge galleries or one giant group.
 //  • 'index': a section index. One row per group (cover, `group.caption`, `group.meta.subtitle`, item
-//    count); the active group's items expand in place under its row. On a bottom rail, or a side rail
-//    on a phone, the rows become a strip of chips.
+//    count); the active group's items expand in place under its row. On a bottom rail, or any rail at
+//    900px wide or less, the rows become a strip of chips.
 //
 // Reconcile-in-place (M14 UX-B): the rail is NOT torn down on cursor moves. It is rebuilt only when
 // the collection or the visible window changes; cursor moves just flip `data-active` and scroll the
@@ -37,7 +37,7 @@ export interface ThumbnailsOptions {
    */
   groupDisplay?: 'stacked' | 'flat' | 'index'
   /**
-   * Auto-expand the active multi-item group's item panel (`stacked` mode). Default `true`. Users
+   * Auto-expand the active multi-item group's item panel (`stacked` and `index` modes). Default `true`. Users
    * can hide/show it with the toolbar items-toggle button or the `e` key; the chosen state persists
    * as you navigate. Ignored in `flat` mode (every item is already laid out).
    */

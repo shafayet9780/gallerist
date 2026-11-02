@@ -138,16 +138,63 @@ describe('plugin-grid', () => {
       expect(gridEl().style.display).toBe('none')
     })
 
-    it('shows again on the next open, not while navigating after start', () => {
+    it('shows again on opening at the first item; a plain open resumes where it was', () => {
       const v = openSections()
       ;(gridEl().querySelector('.gallerist-grid-start') as HTMLButtonElement).click()
       expect(gridEl().style.display).toBe('none')
       v.next()
       expect(gridEl().style.display).toBe('none')
-      v.goTo(0, 0)
       v.close()
       v.open()
+      expect(v.getState().cursor.g).toBe(1)
+      expect(gridEl().style.display).toBe('none')
+      v.close()
+      v.open({ g: 0, i: 0 })
       expect(gridEl().style.display).not.toBe('none')
+    })
+
+    it('moving the cursor leaves the overview', () => {
+      const v = openSections()
+      v.next()
+      expect(v.getState().cursor.g).toBe(1)
+      expect(gridEl().style.display).toBe('none')
+    })
+
+    it('a cell click keeps focus inside the viewer', () => {
+      openSections()
+      const cell = gridEl().querySelector('[data-item="b0"]') as HTMLButtonElement
+      cell.focus()
+      cell.click()
+      expect(document.activeElement).toBe(document.querySelector('.gallerist'))
+    })
+
+    it('opening the overview from a stage control keeps focus inside the viewer', () => {
+      const v = createViewer({ collection: named(), plugins: [grid({ layout: 'sections' })] })
+      mount(v)
+      v.open()
+      const next = document.querySelector('.gallerist-next') as HTMLButtonElement
+      next.focus()
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      expect(document.activeElement).toBe(document.querySelector('.gallerist'))
+    })
+
+    it('draws every section; an explicit overscan bounds them', () => {
+      const many: Collection = {
+        groups: Array.from({ length: 20 }, (_, i) => ({ id: `g${i}`, items: [item(`m${i}`)] })),
+      }
+      openSections(many)
+      expect(gridEl().querySelectorAll('.gallerist-grid-section').length).toBe(20)
+      document.body.innerHTML = ''
+      openSections(many, { overscan: 2 })
+      expect(gridEl().querySelectorAll('.gallerist-grid-section').length).toBe(3)
+    })
+
+    it('added to an open viewer, startOpen does not cover what is being viewed', () => {
+      const v = createViewer({ collection: named() })
+      mount(v)
+      v.open()
+      v.use(grid({ layout: 'sections', startOpen: true }))
+      expect(gridEl().style.display).toBe('none')
     })
 
     it('the start button uses startLabel and keeps focus inside the viewer', () => {
@@ -167,6 +214,7 @@ describe('plugin-grid', () => {
       const cells = gridEl().querySelectorAll<HTMLButtonElement>('.gallerist-grid-cell')
       expect(cells.length).toBe(9)
       expect(gridEl().querySelector('.gallerist-grid-more')?.textContent).toBe('+21')
+      expect(cells[8]?.getAttribute('aria-label')).toContain('+21')
       cells[3]?.click()
       expect(v.getState().cursor).toEqual({ g: 0, i: 3 })
       expect(gridEl().style.display).toBe('none')

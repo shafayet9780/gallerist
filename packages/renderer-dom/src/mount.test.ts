@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { type Collection, type Group, type Item, createViewer } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyAppearance } from './appearance'
@@ -1452,6 +1452,38 @@ describe('groupAxis and arrowLabels', () => {
     v.goTo(2)
     expect(label('.gallerist-next')?.textContent).toBe('Hall') // past the end, back to the first
     expect(label('.gallerist-prev')?.textContent).toBe('Kitchen')
+  })
+
+  it('a looping viewer with one group has nowhere to name', () => {
+    const v = createViewer({ collection: { groups: [rooms().groups[0] as Group] }, loop: true })
+    mount(v, { preset: 'tour' })
+    v.open()
+    expect(label('.gallerist-next')?.hasAttribute('hidden')).toBe(true)
+    expect(document.querySelector('.gallerist-next')?.getAttribute('aria-label')).toBe('Next')
+  })
+
+  it('labels follow a replaced collection', () => {
+    const v = open({ preset: 'tour' })
+    v.setCollection({
+      groups: [
+        { id: 'x', items: [{ id: 'x0', type: 'image', source: 'x0.jpg' }] },
+        { id: 'y', caption: 'Attic', items: [{ id: 'y0', type: 'image', source: 'y0.jpg' }] },
+      ],
+    })
+    expect(label('.gallerist-next')?.textContent).toBe('Attic')
+  })
+
+  it('in RTL the horizontal group axis mirrors beside a side rail; items never flip', () => {
+    document.documentElement.dir = 'rtl'
+    try {
+      const v = open({ rail: 'left', groupAxis: 'horizontal' })
+      key('ArrowLeft')
+      expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+      key('ArrowDown')
+      expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    } finally {
+      document.documentElement.removeAttribute('dir')
+    }
   })
 
   it('a function names them, and strings translate the accessible name', () => {

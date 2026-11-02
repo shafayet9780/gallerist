@@ -165,7 +165,9 @@ const FOCUSABLE_SELECTOR =
 /** Tabbable descendants of `root`, in DOM order (used by the dialog focus trap). */
 function focusableWithin(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter(
-    (node) => node.tabIndex !== -1 && !node.hasAttribute('disabled'),
+    // a hidden control can't take focus: counted as the last one, it would let Tab out of the trap
+    (node) =>
+      node.tabIndex !== -1 && !node.hasAttribute('disabled') && node.checkVisibility?.() !== false,
   )
 }
 /** True when the key event originates from a control where typing must not be hijacked. */
@@ -806,7 +808,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
     if (arrowLabel) {
       const nameAt = (step: number) => {
-        const n = viewer.loop ? (cur.g + step + G) % G : cur.g + step
+        const n = viewer.loop && G > 1 ? (cur.g + step + G) % G : cur.g + step
         const target = col.groups[n]
         return target ? arrowLabel(target, n) : undefined
       }

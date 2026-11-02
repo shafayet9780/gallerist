@@ -8,9 +8,11 @@
   groups, independent of the rail) and `arrowLabels` (name the group arrows after their target), with
   `strings.previousTo` / `nextTo`. Both are React props too.
 - **plugin-thumbnails (M20)**: `groupDisplay: 'index'`, a section index with names, subtitles and
-  counts, the active section expanded; chips on a bottom rail or a phone.
+  counts, the active section expanded; chips on a bottom rail or at 900px wide or less.
 - **plugin-grid (M20)**: `layout: 'sections'` (an overview, one card per group), `startOpen` and
   `startLabel`. Hiding the grid now hands focus to the viewer, so keys keep working after a cell click.
+- **renderer-dom (M20)**: the overlay's Tab trap skips hidden controls, so Tab can't leave the dialog
+  past one.
 - **examples/tour**: a listing page using all of the above.
 
 ### Breaking

@@ -4,9 +4,9 @@ Windowed thumbnail rail for [Gallerist](https://github.com/shafayet9780/galleris
 axis; the active multi-item group expands into its item thumbs along the secondary (↑/↓) axis.
 Windowed + lazy, so 10k-item galleries stay bounded (≤ ~200 live nodes).
 
-Two display modes via `groupDisplay`: **`stacked`** (default — collapsed group cards, with a peek
+Three display modes via `groupDisplay`: **`stacked`** (default — collapsed group cards, with a peek
 flyout to preview a group without navigating in) and **`flat`** (every image side-by-side, each
-group bracketed). Both stay windowed + lazy.
+group bracketed), and **`index`** (a section index with names and counts). All stay windowed + lazy.
 
 ```ts
 import { createViewer } from '@gallerist/core'
@@ -53,7 +53,7 @@ mount(viewer)
 thumbnails({
   overscan: 24,            // cards rendered each side of the cursor (windowing bound)
   itemAxis: 'vertical',    // 'vertical' (default) | 'horizontal' — layout of the active group's items
-  groupDisplay: 'stacked', // 'stacked' (default) | 'flat'
+  groupDisplay: 'stacked', // 'stacked' (default) | 'flat' | 'index'
   expandActive: true,      // auto-expand the active group's item panel (stacked); toggle with `e`
 })
 ```
@@ -62,10 +62,10 @@ thumbnails({
 |----------------|------------------------------|-------------|-------|
 | `overscan`     | `number`                     | `24`        | Live cards ≈ `2·overscan + 1` (group cards in `stacked`, item cards in `flat`). |
 | `itemAxis`     | `'vertical' \| 'horizontal'` | `'vertical'`| `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. Ignored in `flat`. |
-| `groupDisplay` | `'stacked' \| 'flat'`        | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, bracketed per group. |
-| `expandActive` | `boolean`                    | `true`      | `stacked` only. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |
+| `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, bracketed per group. |
+| `expandActive` | `boolean`                    | `true`      | `stacked` and `index`. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |
 | `timeline`     | `boolean \| (group, index) => string` | off | `stacked` only. A label with a tick above each card, joined into a track, the current one in the accent. `true` reads `group.meta.time`. The label joins the card's accessible name. |
-| `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or a side rail on a phone, shows chips instead; chips don't expand items. Used by the `tour` preset. |
+| `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 
 Presets configure these for you — see [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md). The rail's **position**

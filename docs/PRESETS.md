@@ -19,7 +19,7 @@ distinct layout.
 | `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
 | `contact`   | `right`  | `pill-right`| no        | Browse-heavy; vertical rail on the right (pairs with `plugin-grid`). |
 | `editorial` | `bottom` | `pill-right`| no        | A gallery wall: the work framed with room around it (`frame`), a placard beside it holding the caption and the item navigator (`itemIndicator: 'placard'`), numbered items inline in the rail. Pairs with `skin: 'editorial'`. With a side rail the placard becomes the caption band under the stage. |
-| `tour`      | `left`   | `pill-right`| no        | A walkthrough of named sections: a section index (`groupDisplay: 'index'`), ←/→ between sections on labelled arrows (`groupAxis: 'horizontal'`, `arrowLabels`), ↑/↓ within one, framed media. Pairs with `grid({ layout: 'sections', startOpen: true })`. On a phone the index becomes a strip of chips along the bottom. |
+| `tour`      | `left`   | `pill-right`| no        | A walkthrough of named sections: a section index (`groupDisplay: 'index'`), ←/→ between sections on labelled arrows (`groupAxis: 'horizontal'`, `arrowLabels`), ↑/↓ within one, framed media. Pairs with `grid({ layout: 'sections', startOpen: true })`. At 900px wide or less the index becomes a strip of chips along the bottom. |
 
 ```tsx
 // React
@@ -36,8 +36,8 @@ createViewer({ collection, plugins: [thumbnails(t)] })
 ```
 
 `resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails,
-navigator?, frame?, itemIndicator?, groupAxis?, arrowLabels? }`. Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide`/`navigator`
-options always win over the preset.
+navigator?, frame?, itemIndicator?, groupAxis?, arrowLabels? }`. Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide`/`navigator`/
+`frame`/`itemIndicator`/`groupAxis`/`arrowLabels` options always win over the preset.
 
 ## Rail placement (`data-gallerist-rail-pos`)
 
@@ -59,8 +59,8 @@ arrow's accessible name with `strings.previousTo` / `strings.nextTo`.
 
 ## Group display (`thumbnails({ groupDisplay })`)
 
-A `thumbnails()` option (not a preset/rail field), so set it on the plugin. All presets default to
-`stacked`; opt into `flat` explicitly, e.g. `thumbnails({ ...resolvePreset('contact').thumbnails,
+A `thumbnails()` option (not a preset/rail field), so set it on the plugin. Presets default to
+`stacked` (`tour` uses `index`); opt into `flat` explicitly, e.g. `thumbnails({ ...resolvePreset('contact').thumbnails,
 groupDisplay: 'flat' })`.
 
 - `stacked` (default) — one collapsed card per group. Hover/focus a multi-item card to **peek** its
@@ -70,6 +70,9 @@ groupDisplay: 'flat' })`.
   the stage, and stays up for one-item groups so the stage doesn't change width as you navigate.
 - `flat` — every item renders side-by-side, each group bracketed (left accent rule + caption
   header). Item-windowed, so it stays bounded for large galleries and for a single giant group.
+- `index` — a section index: a row per group with its cover, `group.caption`, `group.meta.subtitle`
+  and item count; the active group's items expand under its row. At 900px wide or less, or on a
+  bottom rail, it's a strip of chips instead, which don't expand.
 
 ## Linear traversal (`mount({ linear })`, `<Gallerist linear>`)
 

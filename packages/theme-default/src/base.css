@@ -1471,6 +1471,11 @@
   > .gallerist-thumb-items {
   display: none;
 }
+.gallerist[data-gallerist-orientation="horizontal"]:has(.gallerist-thumbs[data-display="index"])
+  .gallerist-bar
+  .gallerist-items-toggle {
+  display: none; /* chips don't expand their items */
+}
 /* an overview (`grid({ layout: 'sections' })`) is a whole screen: nothing stays over it */
 .gallerist:has(.gallerist-grid[data-layout="sections"][aria-hidden="false"])
   :is(.gallerist-controls, .gallerist-caption) {
@@ -1828,8 +1833,12 @@
   }
 }
 
-/* a section index on a phone: the side rail becomes the bottom strip of chips */
-@media (max-width: 600px) {
+/* a section index where it can't share the width: below this the frame inset (a quarter of the stage
+   at most) no longer clears the labelled arrows, so the side rail becomes the bottom strip of chips */
+@media (max-width: 900px) {
+  .gallerist:has(.gallerist-thumbs[data-display="index"]) .gallerist-bar .gallerist-items-toggle {
+    display: none; /* chips don't expand their items */
+  }
   .gallerist[data-gallerist-rail-pos]:has(.gallerist-thumbs[data-display="index"]) {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto auto auto;

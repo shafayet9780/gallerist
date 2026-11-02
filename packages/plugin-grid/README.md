@@ -37,7 +37,9 @@ grid({ layout: 'sections', startOpen: true, startLabel: 'Start tour' })
 - **`layout: 'sections'`** draws one card per group: `group.caption`, `group.meta.subtitle`, the item
   count, a large first item and thumbnails of the next ones (9 items at most; the rest are counted on
   the last one). `collection.meta.title` heads the screen, beside the start button. The stage's arrows
-  and caption hide while it shows.
-- **`startOpen`** shows the grid when the viewer opens on its first item, every time it opens. Opening
-  at any other item (a tapped photo, a deep link) goes straight there.
+  and caption hide while it shows, and moving anywhere (a cell, an index row, the keys) leaves it. It
+  draws every group unless you set `overscan`, so keep that bound for very large collections.
+- **`startOpen`** shows the grid whenever the viewer opens on its first item. Opening at any other
+  item (a tapped photo, a deep link) goes straight there. `viewer.open()` resumes at the last item, so
+  call `viewer.open({ g: 0, i: 0 })` to come back to the overview.
 - **`startLabel`** is the start button's text (default `Start`).

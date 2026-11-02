@@ -60,7 +60,7 @@ function lazyImg(src: string | null, observer: IntersectionObserver | null): HTM
   return img
 }
 
-const span = (className: string, text: string): HTMLElement => {
+const textSpan = (className: string, text: string): HTMLElement => {
   const node = document.createElement('span')
   node.className = className
   node.textContent = text
@@ -143,8 +143,9 @@ export function grid(opts: GridOptions = {}): Plugin {
       cell.dataset.item = item.id
       cell.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
       cell.addEventListener('click', () => {
-        viewer.goTo(g, i)
+        // hide first: navigating rebuilds an open grid, which would drop the focused cell
         setOpen(false)
+        viewer.goTo(g, i)
       })
       return cell
     }
@@ -153,7 +154,7 @@ export function grid(opts: GridOptions = {}): Plugin {
       const top = document.createElement('div')
       top.className = 'gallerist-grid-top'
       const title = col.meta?.title
-      if (typeof title === 'string') top.appendChild(span('gallerist-grid-title', title))
+      if (typeof title === 'string') top.appendChild(textSpan('gallerist-grid-title', title))
       const start = document.createElement('button')
       start.type = 'button'
       start.className = 'gallerist-grid-start'
@@ -165,7 +166,9 @@ export function grid(opts: GridOptions = {}): Plugin {
       const sections = document.createElement('div')
       sections.className = 'gallerist-grid-sections'
       let activeSection: HTMLElement | null = null
-      for (const g of windowIndices(cur.g, col.groups.length, overscan, overscan, false)) {
+      // every section unless asked otherwise: an overview that loses sections isn't one
+      const span = opts.overscan ?? col.groups.length
+      for (const g of windowIndices(cur.g, col.groups.length, span, span, false)) {
         const group = col.groups[g]
         if (!group) continue
         const name = group.caption ?? `Group ${g + 1}`
@@ -174,11 +177,11 @@ export function grid(opts: GridOptions = {}): Plugin {
         section.setAttribute('aria-label', name)
         const head = document.createElement('div')
         head.className = 'gallerist-grid-section-head'
-        head.appendChild(span('gallerist-grid-section-name', name))
-        head.appendChild(span('gallerist-grid-section-count', String(group.items.length)))
+        head.appendChild(textSpan('gallerist-grid-section-name', name))
+        head.appendChild(textSpan('gallerist-grid-section-count', String(group.items.length)))
         const subtitle = (group.meta as { subtitle?: unknown } | undefined)?.subtitle
         if (typeof subtitle === 'string') {
-          head.appendChild(span('gallerist-grid-section-sub', subtitle))
+          head.appendChild(textSpan('gallerist-grid-section-sub', subtitle))
         }
         section.appendChild(head)
         const cells = document.createElement('div')
@@ -190,7 +193,8 @@ export function grid(opts: GridOptions = {}): Plugin {
         shown.forEach((item: Item, i: number) => {
           const cell = buildCell(group, item, g, i, name, cur)
           if (more > 0 && i === shown.length - 1) {
-            cell.appendChild(span('gallerist-grid-more', `+${more}`))
+            cell.appendChild(textSpan('gallerist-grid-more', `+${more}`))
+            cell.setAttribute('aria-label', `${name}, item ${i + 1}, +${more}`)
           }
           cells.appendChild(cell)
         })
@@ -207,6 +211,15 @@ export function grid(opts: GridOptions = {}): Plugin {
       // hiding the focused control would drop focus to <body>, where the viewer's keys don't reach
       if (!v && root?.contains(document.activeElement)) {
         root.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
+      }
+      // an overview hides the stage's controls (theme): same rescue for a control focused there
+      if (v && opts.layout === 'sections') {
+        const active = document.activeElement
+        if (root?.closest('.gallerist')?.contains(active)) {
+          if (active?.closest('.gallerist-controls, .gallerist-caption')) {
+            root.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
+          }
+        }
       }
       open = v
       if (root) {
@@ -237,17 +250,19 @@ export function grid(opts: GridOptions = {}): Plugin {
         toolbarBtn.setAttribute('aria-pressed', 'false')
         toolbarBtn.innerHTML = ICONS.grid
         toolbarBtn.addEventListener('click', toggle)
-        let wasClosed = true
-        const syncStartOpen = () => {
+        // a plugin added to an already open viewer doesn't cover what's being viewed
+        let wasClosed = viewer.getState().phase === 'closed'
+        unsub = viewer.subscribe(() => {
           const { phase, cursor } = viewer.getState()
           const closed = phase === 'closed'
           if (opts.startOpen && wasClosed && !closed) setOpen(cursor.g === 0 && cursor.i === 0)
           wasClosed = closed
-        }
-        syncStartOpen()
-        unsub = viewer.subscribe(() => {
-          syncStartOpen()
-          if (open) render()
+          if (!open) return
+          // an overview is a place to leave from: moving anywhere (an index row, the keys) enters it
+          const moved = cursor.g !== lastG || cursor.i !== lastI
+          if (opts.layout === 'sections' && viewer.getCollection() === lastCol && moved)
+            setOpen(false)
+          else render()
         })
       },
       destroy() {
