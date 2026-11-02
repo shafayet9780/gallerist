@@ -60,6 +60,8 @@ test('closing the viewer offers the way back', async ({ page }) => {
   const reopen = page.getByRole('button', { name: 'Open the viewer again' })
   await reopen.click()
   await expect(reopen).toBeHidden()
+  await page.keyboard.press('ArrowRight') // focus landed back in the viewer
+  await expect(page.locator(`${root} .gallerist-title`)).toHaveText('Afternoon')
   await expect(page.locator(`${root} .gallerist-close`)).toBeVisible()
 })
 

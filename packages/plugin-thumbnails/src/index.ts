@@ -172,15 +172,18 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
 // viewer's host page every time the cursor changes.
 function scrollActiveIntoView(btn: HTMLElement | undefined): void {
   if (!btn) return
+  const target = btn.getBoundingClientRect()
+  if (!target.width && !target.height) return // hidden (an index chip's items): nothing to reveal
   for (let box = btn.parentElement; box; box = box.parentElement) {
     if (box.classList.contains('gallerist')) return
     const { overflowX, overflowY } = getComputedStyle(box)
-    const target = btn.getBoundingClientRect()
     const edge = box.getBoundingClientRect()
-    if (/auto|scroll/.test(overflowX))
+    if (/auto|scroll/.test(overflowX)) {
       box.scrollLeft += nearest(target.left, target.right, edge.left, edge.right)
-    if (/auto|scroll/.test(overflowY))
+    }
+    if (/auto|scroll/.test(overflowY)) {
       box.scrollTop += nearest(target.top, target.bottom, edge.top, edge.bottom)
+    }
   }
 }
 

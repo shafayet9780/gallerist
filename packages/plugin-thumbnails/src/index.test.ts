@@ -692,6 +692,17 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       expect(panel.scrollTop).toBe(0)
     })
 
+    it('a hidden button moves nothing, wherever the viewer sits on the page', () => {
+      const v = open()
+      v.next()
+      const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+      rail.style.overflowX = 'auto'
+      rail.getBoundingClientRect = () =>
+        ({ top: 0, bottom: 80, left: 250, right: 1150, width: 900, height: 80 }) as DOMRect
+      v.nextItem() // happy-dom gives the buttons an all-zero box, as display: none does
+      expect(rail.scrollLeft).toBe(0)
+    })
+
     it('never asks the browser to scroll the page', () => {
       const real = Element.prototype.scrollIntoView
       const spy = vi.fn()

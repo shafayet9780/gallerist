@@ -56,8 +56,8 @@
             On changing group
             <select id="memory">
               <option value="reset">start at its first item (reset)</option>
-              <option value="preserve">keep the same position (preserve)</option>
-              <option value="clamp">keep the position if it exists (clamp)</option>
+              <option value="preserve">keep the position, or its first item if shorter (preserve)</option>
+              <option value="clamp">keep the position, or its last item if shorter (clamp)</option>
             </select>
           </label>
         </div>
@@ -78,7 +78,7 @@
           <ul>
             <li>your media is really two-level, not one list</li>
             <li>people review it: comments pinned to a screenshot, a timeline of captures</li>
-            <li>you need thousands of items with a bounded DOM</li>
+            <li>you have thousands of groups, or use the flat rail: the DOM stays bounded</li>
             <li>keyboard, touch, RTL and screen readers all matter</li>
           </ul>
         </div>
@@ -103,10 +103,10 @@
             <tr><td>core</td><td>Data model, navigation, zoom, gestures; no DOM</td><td class="num">3.1</td></tr>
             <tr><td>core + renderer-dom</td><td>A working viewer</td><td class="num">15.5</td></tr>
             <tr><td>theme-default base.css</td><td>Structure, plus 1.1 to 1.2 KB per skin</td><td class="num">6.4</td></tr>
-            <tr><td>plugin-thumbnails</td><td>Rail, flat strip or section index</td><td class="num">3.3</td></tr>
+            <tr><td>plugin-thumbnails</td><td>Rail, flat strip or section index</td><td class="num">3.5</td></tr>
             <tr><td>plugin-pins</td><td>Comments, tags and features on the image</td><td class="num">2.8</td></tr>
             <tr><td>react</td><td>Component and hook</td><td class="num">1.7</td></tr>
-            <tr><td>cdn</td><td>Everything on one script tag, CSS aside</td><td class="num">28.9</td></tr>
+            <tr><td>cdn</td><td>Everything on one script tag, CSS aside</td><td class="num">29.1</td></tr>
           </tbody>
         </table>
         <p><a href="./docs.html">Read the getting started guide</a></p>

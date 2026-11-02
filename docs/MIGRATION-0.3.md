@@ -6,7 +6,8 @@
 ## The default look changed
 
 **Gallery** is now the default skin: quiet near-black surfaces and round controls. The old graphite and
-amber look is the **Console** skin, unchanged. To keep it:
+amber look is now the **Console** skin, the closest match, though it has since been polished: opaque
+bands, flat tools and adjusted accent values. To use it:
 
 ```ts
 import '@gallerist/theme-default/gallerist.css'
@@ -34,6 +35,8 @@ own default. CSS that selected that attribute needs `:not([data-gallerist-scheme
 
 - Chrome now takes space instead of floating over the image. CSS that positioned `.gallerist-*` chrome
   absolutely, or reserved room for it, should be removed.
+- The `.gallerist-chrome` wrapper is gone: the root is now a grid of bar, main, aside, caption, footer
+  and rail. plugin-thumbnails' vertical item stack moved to the `aside` region, beside the stage.
 - The `top` rail is gone; `rail` is `bottom`, `left`, `right` or `hidden`. The `contact` preset moved to
   `right`.
 

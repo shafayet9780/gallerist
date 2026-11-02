@@ -50,6 +50,7 @@ A **skin** sets colour, type and motion; a **preset** sets the layout. Any skin 
 Skins other than the default need their stylesheet too.
 
 ```ts
+import { createViewer } from '@gallerist/core'
 import { mount, resolvePreset } from '@gallerist/renderer-dom'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import '@gallerist/theme-default/gallerist.css'

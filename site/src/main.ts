@@ -195,8 +195,11 @@ function render() {
       stage.append(reopen)
       reopen.focus()
     } else if (!closed && reopen) {
+      // removing the focused button would drop focus to <body>, where the viewer's keys don't reach
+      const hadFocus = document.activeElement === reopen
       reopen.remove()
       reopen = null
+      if (hadFocus) stage.querySelector<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
     }
   })
   $('snippet').textContent = snippet(state)

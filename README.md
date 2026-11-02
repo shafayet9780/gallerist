@@ -11,7 +11,7 @@ still change between minor versions, and [migration notes](docs/MIGRATION-0.3.md
 
 **A good fit if** your media is really two-level, or people review it: comments pinned to a screenshot, a
 timeline of captures, rooms in a listing. Rendering is windowed, so the DOM stays bounded with thousands
-of items, and it ships keyboard, touch, RTL and screen-reader support.
+of groups (a single group draws all its item thumbs unless you use the `flat` rail), and it ships keyboard, touch, RTL and screen-reader support.
 
 **Look elsewhere if** you have one flat strip of photos and already have a lightbox you like, if you need
 Vue or Svelte today (React and plain DOM only; Vue is planned for 0.4), or if you want a stories player.

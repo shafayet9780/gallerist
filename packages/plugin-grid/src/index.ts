@@ -233,7 +233,7 @@ export function grid(opts: GridOptions = {}): Plugin {
       const section = activeSection as HTMLElement | null
       if (section) {
         const top = section.getBoundingClientRect().top - host.getBoundingClientRect().top
-        if (top > host.clientHeight - section.offsetHeight) host.scrollTop += top
+        if (top < 0 || top > host.clientHeight - section.offsetHeight) host.scrollTop += top
       }
     }
 

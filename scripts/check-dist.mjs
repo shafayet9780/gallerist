@@ -22,4 +22,7 @@ for (const name of ['createViewer', 'mount', 'bind', 'thumbnails', 'grid', 'pins
   if (typeof api[name] !== 'function') fail(`${umd} doesn't export ${name}`)
 }
 
+const { version } = JSON.parse(readFileSync('packages/cdn/package.json', 'utf8'))
+if (api.VERSION !== version) fail(`${umd} reports version ${api.VERSION}, not ${version}`)
+
 if (!process.exitCode) console.log('check-dist: ok')
