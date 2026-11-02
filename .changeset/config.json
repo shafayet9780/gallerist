@@ -23,5 +23,13 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@gallerist/example-vanilla", "@gallerist/example-monitoring", "@gallerist/e2e"]
+  "ignore": [
+    "@gallerist/e2e",
+    "@gallerist/example-hotspots",
+    "@gallerist/example-monitoring",
+    "@gallerist/example-react",
+    "@gallerist/example-tour",
+    "@gallerist/example-vanilla",
+    "@gallerist/site"
+  ]
 }

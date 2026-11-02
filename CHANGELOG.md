@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## v0.3.0
+
+Moving from git? See the [migration notes](docs/MIGRATION-0.3.md).
+
+### Fixed
+- **plugin-thumbnails, plugin-grid**: moving the cursor no longer scrolls the page around an inline
+  viewer; only the viewer's own panels scroll.
+- **plugin-thumbnails**: a viewer opening on a far group now scrolls the rail to it.
 
 ### Added
 - **renderer-dom (M21)**: `bind()` and `collectionFromLinks()`: open a viewer from `data-gallerist`
@@ -178,14 +185,14 @@
 - **renderer-dom**: `pointercancel` abandons the gesture instead of acting as a release (no stray
   navigate/dismiss); the item-axis swipe needs the same commit distance as the group axis.
 
-## v0.2.0 — first public release
+## v0.2.0
 
 > **Renamed before first publish:** the project was developed as *Visora* (`@visora/*`); the
 > `@visora` npm scope belongs to an unrelated publisher, so every package ships as `@gallerist/*`.
 > CSS tokens are `--gallerist-*`, attributes `data-gallerist-*`, and the React API is
 > `<Gallerist>` / `useGallerist()`.
 
-This is the first version published to npm. Alongside the UX overhaul below, a multi-axis
+This version was tagged in git but never reached npm; 0.3.0 is the first npm release. Alongside the UX overhaul below, a multi-axis
 publish-readiness review drove a hardening pass (all critical + important findings fixed):
 
 - **Correctness**: a `ResizeObserver` now re-anchors image-space overlays and re-clamps zoom on

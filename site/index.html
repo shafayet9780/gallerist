@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gallerist: a media viewer for galleries of galleries</title>
+    <meta name="description" content="An open-source media viewer for nested galleries, with pins anchored to the image. Three skins, six layouts, React or plain DOM." />
+  </head>
+  <body>
+    <header class="top">
+      <a class="wordmark" href="./index.html">Gallerist</a>
+      <nav aria-label="Site">
+        <a href="./index.html#playground">Playground</a>
+        <a href="./docs.html">Docs</a>
+        <a href="https://github.com/shafayet9780/gallerist">GitHub</a>
+      </nav>
+    </header>
+    <main>
+      <section class="intro">
+        <h1>A media viewer for galleries that have galleries in them.</h1>
+        <p>
+          Product colours with their angles, review moments with their screens, listings with their
+          rooms. Gallerist treats each group as a place you move between and each item as a place
+          inside it.
+        </p>
+      </section>
+
+      <section id="playground" class="playground" aria-label="Playground">
+        <form class="controls" id="controls">
+          <fieldset id="pairings" class="pairings">
+            <legend>Start from a pairing</legend>
+          </fieldset>
+          <fieldset id="skin"><legend>Skin</legend></fieldset>
+          <fieldset id="preset"><legend>Layout preset</legend></fieldset>
+          <fieldset id="accent"><legend>Accent</legend></fieldset>
+          <fieldset id="scheme"><legend>Colour scheme</legend></fieldset>
+        </form>
+        <div class="stage-wrap">
+          <div class="stage" id="stage"></div>
+          <div class="code">
+            <button type="button" id="copy">Copy</button>
+            <pre tabindex="0" aria-label="Code for this setup"><code id="snippet"></code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="sheet-section">
+        <div class="prose">
+          <h2>Two axes, not one long strip</h2>
+          <p>
+            Most viewers flatten everything into a line. Here a collection is a sheet: rows are groups,
+            and each row holds its own items. This sheet is driven by the headless core with no renderer
+            at all, the same state the viewer above runs on.
+          </p>
+          <label class="memory">
+            On changing group
+            <select id="memory">
+              <option value="reset">start at its first item (reset)</option>
+              <option value="preserve">keep the same position (preserve)</option>
+              <option value="clamp">keep the position if it exists (clamp)</option>
+            </select>
+          </label>
+        </div>
+        <div class="sheet-wrap">
+          <div class="sheet" id="sheet"></div>
+          <div class="pad" role="group" aria-label="Move the marker">
+            <button type="button" id="up" aria-label="Previous item">↑</button>
+            <button type="button" id="left" aria-label="Previous group">←</button>
+            <button type="button" id="down" aria-label="Next item">↓</button>
+            <button type="button" id="right" aria-label="Next group">→</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="fit">
+        <div>
+          <h2>A good fit if</h2>
+          <ul>
+            <li>your media is really two-level, not one list</li>
+            <li>people review it: comments pinned to a screenshot, a timeline of captures</li>
+            <li>you need thousands of items with a bounded DOM</li>
+            <li>keyboard, touch, RTL and screen readers all matter</li>
+          </ul>
+        </div>
+        <div>
+          <h2>Look elsewhere if</h2>
+          <ul>
+            <li>you have one flat strip and a lightbox you already like</li>
+            <li>you need Vue or Svelte today: it's React and plain DOM, with Vue planned for 0.4</li>
+            <li>you want a stories player</li>
+            <li>you need a stable API: this is pre-1.0, and minor versions can still change it</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="install">
+        <h2>Install what you use</h2>
+        <pre tabindex="0" aria-label="Install command"><code>npm i @gallerist/core @gallerist/renderer-dom @gallerist/theme-default</code></pre>
+        <table>
+          <caption>Measured size, minified and gzipped</caption>
+          <thead><tr><th scope="col">Package</th><th scope="col">Gets you</th><th scope="col" class="num">KB</th></tr></thead>
+          <tbody>
+            <tr><td>core</td><td>Data model, navigation, zoom, gestures; no DOM</td><td class="num">3.1</td></tr>
+            <tr><td>core + renderer-dom</td><td>A working viewer</td><td class="num">15.5</td></tr>
+            <tr><td>theme-default base.css</td><td>Structure, plus 1.1 to 1.2 KB per skin</td><td class="num">6.4</td></tr>
+            <tr><td>plugin-thumbnails</td><td>Rail, flat strip or section index</td><td class="num">3.3</td></tr>
+            <tr><td>plugin-pins</td><td>Comments, tags and features on the image</td><td class="num">2.8</td></tr>
+            <tr><td>react</td><td>Component and hook</td><td class="num">1.7</td></tr>
+            <tr><td>cdn</td><td>Everything on one script tag, CSS aside</td><td class="num">28.9</td></tr>
+          </tbody>
+        </table>
+        <p><a href="./docs.html">Read the getting started guide</a></p>
+      </section>
+    </main>
+    <footer class="foot">MIT licensed. Demo photos from Unsplash.</footer>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

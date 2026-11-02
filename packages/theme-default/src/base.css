@@ -1442,10 +1442,6 @@
 .gallerist-thumb-section .gallerist-thumb-caption {
   display: none;
 }
-/* a scrolled-to chip or row clears the strip's edge */
-.gallerist-thumbs[data-display="index"] {
-  scroll-padding: 12px;
-}
 .gallerist-thumb-section > .gallerist-thumb-items > .gallerist-thumb-item {
   flex: 0 0 calc((100% - 12px) / 3);
   width: auto;

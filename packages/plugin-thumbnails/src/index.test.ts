@@ -149,15 +149,11 @@ describe('plugin-thumbnails', () => {
     expect(spy).not.toHaveBeenCalled() // reconciled in place, never wiped
   })
 
-  it('reconciles item nav in place: stable node identity, active flips, scrolls into view', () => {
-    if (!Element.prototype.scrollIntoView) {
-      Element.prototype.scrollIntoView = () => {}
-    }
+  it('reconciles item nav in place: stable node identity, active flips', () => {
     const v = open()
     v.next() // g1 (3 items) active
     const groupBefore = document.querySelector('.gallerist-thumb[data-group="g1"]')
     const itemsBefore = [...document.querySelectorAll('.gallerist-thumb-item')]
-    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView')
 
     v.nextItem() // i: 0 → 1, same group — must NOT rebuild
 
@@ -168,8 +164,6 @@ describe('plugin-thumbnails', () => {
     expect(
       document.querySelector('.gallerist-thumb-item[data-active]')?.getAttribute('data-item'),
     ).toBe('b1')
-    expect(scrollSpy).toHaveBeenCalled()
-    scrollSpy.mockRestore()
   })
 
   it('the expanded item row is its own listbox (host-mounted sibling of the rail)', () => {
@@ -668,6 +662,49 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       (n) => n.textContent,
     )
     expect(nums).toEqual(['1', '2'])
+  })
+
+  describe('scrolling', () => {
+    const rect = (top: number, bottom: number) =>
+      ({ top, bottom, left: 0, right: 100, width: 100, height: bottom - top }) as DOMRect
+
+    it('brings the active item into view inside its panel', () => {
+      const v = open()
+      v.next()
+      const panel = document.querySelector('.gallerist-thumb-items') as HTMLElement
+      panel.style.overflowY = 'auto'
+      panel.getBoundingClientRect = () => rect(0, 100)
+      const second = panel.querySelector('[data-item="b1"]') as HTMLElement
+      second.getBoundingClientRect = () => rect(150, 200)
+      v.nextItem()
+      expect(panel.scrollTop).toBe(100)
+    })
+
+    it('leaves a panel alone when the active item already shows', () => {
+      const v = open()
+      v.next()
+      const panel = document.querySelector('.gallerist-thumb-items') as HTMLElement
+      panel.style.overflowY = 'auto'
+      panel.getBoundingClientRect = () => rect(0, 300)
+      const second = panel.querySelector('[data-item="b1"]') as HTMLElement
+      second.getBoundingClientRect = () => rect(150, 200)
+      v.nextItem()
+      expect(panel.scrollTop).toBe(0)
+    })
+
+    it('never asks the browser to scroll the page', () => {
+      const real = Element.prototype.scrollIntoView
+      const spy = vi.fn()
+      Element.prototype.scrollIntoView = spy
+      try {
+        const v = open()
+        v.next()
+        v.next()
+        expect(spy).not.toHaveBeenCalled()
+      } finally {
+        Element.prototype.scrollIntoView = real
+      }
+    })
   })
 
   describe('section index (groupDisplay: index)', () => {

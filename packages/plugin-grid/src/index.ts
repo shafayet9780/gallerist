@@ -228,8 +228,13 @@ export function grid(opts: GridOptions = {}): Plugin {
         if (g === cur.g) activeSection = section
       }
       host.appendChild(sections)
-      // a rebuild starts at the top: bring the current section back into view
-      ;(activeSection as HTMLElement | null)?.scrollIntoView?.({ block: 'nearest' })
+      // a rebuild starts at the top: bring the current section back into view, without touching the
+      // page (scrollIntoView would scroll an inline viewer's host page too)
+      const section = activeSection as HTMLElement | null
+      if (section) {
+        const top = section.getBoundingClientRect().top - host.getBoundingClientRect().top
+        if (top > host.clientHeight - section.offsetHeight) host.scrollTop += top
+      }
     }
 
     const setOpen = (v: boolean) => {

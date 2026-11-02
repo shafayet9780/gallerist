@@ -168,8 +168,26 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
   return btn
 }
 
+// Scrolls only the viewer's own panels. scrollIntoView would also scroll the page, moving an inline
+// viewer's host page every time the cursor changes.
 function scrollActiveIntoView(btn: HTMLElement | undefined): void {
-  btn?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  if (!btn) return
+  for (let box = btn.parentElement; box; box = box.parentElement) {
+    if (box.classList.contains('gallerist')) return
+    const { overflowX, overflowY } = getComputedStyle(box)
+    const target = btn.getBoundingClientRect()
+    const edge = box.getBoundingClientRect()
+    if (/auto|scroll/.test(overflowX))
+      box.scrollLeft += nearest(target.left, target.right, edge.left, edge.right)
+    if (/auto|scroll/.test(overflowY))
+      box.scrollTop += nearest(target.top, target.bottom, edge.top, edge.bottom)
+  }
+}
+
+/** How far to scroll so [start, end] shows inside [min, max], moving as little as possible. */
+function nearest(start: number, end: number, min: number, max: number): number {
+  if (start < min) return start - min
+  return end > max ? end - max : 0
 }
 
 /** Whether the primary pointer can hover (desktop). Defaults true when undetectable (SSR/test). */
@@ -703,8 +721,28 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       groupIndexById.clear()
     }
 
+    // The rail first renders before it has any layout, so a viewer opening on a far group has to
+    // reveal the active thumb once it's on screen.
+    let wasClosed = true
+    const revealOnOpen = () => {
+      const closed = viewer.getState().phase === 'closed'
+      if (wasClosed && !closed) {
+        requestAnimationFrame(() => {
+          if (!root) return
+          const { g, i } = viewer.getState().cursor
+          const group = viewer.getCollection().groups[g]
+          if (!group) return
+          scrollActiveIntoView(groupBtns.get(group.id))
+          const item = group.items[i]
+          if (item) scrollActiveIntoView(itemBtns.get(item.id))
+        })
+      }
+      wasClosed = closed
+    }
+
     const render = () => {
       if (!root) return
+      revealOnOpen()
       const col = viewer.getCollection()
       const cur = viewer.getState().cursor
       if (col === lastCol && cur.g === lastG && cur.i === lastI) return // skip zoom/pan/etc.
