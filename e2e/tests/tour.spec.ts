@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { viewerSettled } from './settled'
 
 // The tour preset end to end: labelled arrows, ←/→ between sections beside a side rail, the section
 // index, and the overview it can open on.
@@ -153,6 +154,7 @@ for (const [name, query] of [
   test(`no axe violations: ${name}`, async ({ page }) => {
     await page.goto(`/layout.html?${query}`)
     await expect(page.locator('.gallerist')).toBeVisible()
+    await viewerSettled(page)
     const { violations } = await new AxeBuilder({ page })
       .include('.gallerist')
       .disableRules(['color-contrast'])

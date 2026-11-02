@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { viewerSettled } from './settled'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/plugins.html')
@@ -141,6 +142,7 @@ test('hovering the active card peeks once its panel is hidden', async ({ page })
 })
 
 test('no axe violations with the full plugin set', async ({ page }) => {
+  await viewerSettled(page)
   const results = await new AxeBuilder({ page })
     .include('.gallerist')
     .withTags(['wcag2a', 'wcag2aa'])
@@ -165,6 +167,7 @@ test.describe('flat rail (groupDisplay: flat)', () => {
   })
 
   test('no axe violations in flat mode', async ({ page }) => {
+    await viewerSettled(page)
     const results = await new AxeBuilder({ page })
       .include('.gallerist')
       .withTags(['wcag2a', 'wcag2aa'])
@@ -203,6 +206,7 @@ test.describe('linear flat traversal', () => {
   })
 
   test('no axe violations in linear mode', async ({ page }) => {
+    await viewerSettled(page)
     const results = await new AxeBuilder({ page })
       .include('.gallerist')
       .withTags(['wcag2a', 'wcag2aa'])
@@ -250,6 +254,7 @@ test.describe('vertical rail (right)', () => {
   })
 
   test('no axe violations (vertical rail)', async ({ page }) => {
+    await viewerSettled(page)
     const results = await new AxeBuilder({ page })
       .include('.gallerist')
       .withTags(['wcag2a', 'wcag2aa'])
