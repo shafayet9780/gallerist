@@ -24,6 +24,12 @@ viewer.open()
 
 Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 
+## Markup init
+
+`bind()` opens a viewer from `<a href="big.jpg" data-gallerist="trip">` links, with no collection to
+write. Attributes are listed in [`@gallerist/cdn`](../cdn/README.md), which puts it on a global for
+pages with no build step.
+
 ## License
 
 MIT © Shafayet Ahmmed

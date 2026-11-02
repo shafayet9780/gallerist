@@ -5,7 +5,10 @@ export default defineConfig({
   format: ['esm', 'cjs'],
   dts: true,
   clean: true,
-  treeshake: true,
+  // esbuild still drops unused code; rollup's pass (treeshake: true) would strip the banner
+  treeshake: false,
+  // the adapter uses hooks, so a React Server Components tree must treat it as a client boundary
+  banner: { js: '"use client";' },
   sourcemap: true,
   minify: false,
   target: 'es2022',

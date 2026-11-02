@@ -15,6 +15,7 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "size": "size-limit",
+    "check:dist": "node scripts/check-dist.mjs",
     "e2e": "playwright test",
     "changeset": "changeset",
     "release": "changeset publish"

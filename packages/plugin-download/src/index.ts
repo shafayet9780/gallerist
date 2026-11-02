@@ -111,9 +111,18 @@ export async function downloadItems(items: Item[], opts: ZipOptions = {}): Promi
 export const downloadGroup = (group: Group, opts?: ZipOptions): Promise<void> =>
   downloadItems(group.items, opts)
 
+export interface DownloadStrings {
+  /** the toolbar button's label */
+  download: string
+}
+
+export const DEFAULT_DOWNLOAD_STRINGS: DownloadStrings = { download: 'Download' }
+
 export interface DownloadOptions {
   /** keyboard shortcut for downloading the current item (default 'd'). */
   key?: string
+  /** UI text overrides, for translation; merged over English. */
+  strings?: Partial<DownloadStrings>
 }
 
 export function download(opts: DownloadOptions = {}): Plugin {
@@ -135,7 +144,10 @@ export function download(opts: DownloadOptions = {}): Plugin {
           const btn = document.createElement('button')
           btn.type = 'button'
           btn.className = 'gallerist-download-btn'
-          btn.setAttribute('aria-label', 'Download')
+          btn.setAttribute(
+            'aria-label',
+            opts.strings?.download ?? DEFAULT_DOWNLOAD_STRINGS.download,
+          )
           btn.innerHTML = ICONS.download
           btn.addEventListener('click', run)
           return btn

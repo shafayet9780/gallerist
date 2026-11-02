@@ -6,6 +6,7 @@ export const VERSION =
   typeof __GALLERIST_VERSION__ !== 'undefined' ? __GALLERIST_VERSION__ : '0.0.0-dev'
 
 export { imageAdapter } from './adapters/image'
+export { type BindHandle, type BindOptions, bind, collectionFromLinks } from './bind'
 export {
   type Accent,
   type Appearance,

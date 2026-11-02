@@ -22,6 +22,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: pnpm size
+      - run: pnpm check:dist
       # Gate the published type-resolution surface (node10/node16 CJS+ESM/bundler).
       # theme-default is CSS-only (no types) and is excluded.
       - name: Check published types (are-the-types-wrong)

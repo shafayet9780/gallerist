@@ -41,7 +41,7 @@ const viewer = createViewer({
   collection,
   plugins: [
     thumbnails(resolvePreset('tour').thumbnails),
-    grid({ layout: 'sections', startOpen: true, startLabel: 'Start tour' }),
+    grid({ layout: 'sections', startOpen: true, strings: { start: 'Start tour' } }),
   ],
 })
 mount(viewer, { preset: 'tour', skin: 'gallery', scheme: 'light', label: 'Linden House tour' })

@@ -70,5 +70,11 @@
     "path": "packages/theme-default/src/editorial.css",
     "limit": "6 kB",
     "gzip": true
+  },
+  {
+    "name": "@gallerist/cdn global build (gz)",
+    "path": "packages/cdn/dist/gallerist.umd.js",
+    "limit": "35 kB",
+    "gzip": true
   }
 ]

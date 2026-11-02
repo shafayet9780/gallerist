@@ -1,0 +1,49 @@
+<!doctype html>
+<!--
+  No bundler: a script tag and data-gallerist links. Run `pnpm build`, then open this file directly.
+  On a real page use the CDN URLs in packages/cdn/README.md instead of these local paths.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gallerist — one script tag</title>
+    <link rel="stylesheet" href="../../packages/theme-default/src/gallerist.css" />
+    <style>
+      body {
+        margin: 32px;
+        font-family: system-ui, sans-serif;
+      }
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .links img {
+        display: block;
+        width: 200px;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>One script tag</h1>
+    <div class="links">
+      <a href="../react/public/photos/tech-01.jpg" data-gallerist="desk" data-gallerist-caption="First">
+        <img src="../react/public/photos/tech-01-thumb.jpg" alt="Photo one" />
+      </a>
+      <a href="../react/public/photos/tech-02.jpg" data-gallerist="desk" data-gallerist-group="pair" data-gallerist-group-caption="A pair">
+        <img src="../react/public/photos/tech-02-thumb.jpg" alt="Photo two" />
+      </a>
+      <a href="../react/public/photos/tech-03.jpg" data-gallerist="desk" data-gallerist-group="pair">
+        <img src="../react/public/photos/tech-03-thumb.jpg" alt="Photo three" />
+      </a>
+    </div>
+    <script src="../../packages/cdn/dist/gallerist.umd.js"></script>
+    <script>
+      Gallerist.bind({
+        viewer: { plugins: [Gallerist.thumbnails(), Gallerist.fullscreen()] },
+      })
+    </script>
+  </body>
+</html>

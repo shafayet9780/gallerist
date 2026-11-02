@@ -80,7 +80,7 @@ const viewer = createViewer({
           }),
           grid(
             p.get('overview') === '1'
-              ? { layout: 'sections', startOpen: true, startLabel: 'Start tour' }
+              ? { layout: 'sections', startOpen: true, strings: { start: 'Start tour' } }
               : {},
           ),
           fullscreen(),

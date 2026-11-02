@@ -3,6 +3,7 @@ export {
   type Accent,
   type ArrowLayout,
   type ColorScheme,
+  type GroupAxis,
   type ItemIndicator,
   type PresetName,
   type RailPlacement,

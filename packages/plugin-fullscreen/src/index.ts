@@ -5,9 +5,18 @@
 import type { Plugin } from '@gallerist/core'
 import { ICONS, getInternals } from '@gallerist/core/internal'
 
+export interface FullscreenStrings {
+  /** the toolbar button's label */
+  toggle: string
+}
+
+export const DEFAULT_FULLSCREEN_STRINGS: FullscreenStrings = { toggle: 'Toggle fullscreen' }
+
 export interface FullscreenOptions {
   /** CSS selector for the element to fullscreen; defaults to the bound viewer's root. */
   target?: string
+  /** UI text overrides, for translation; merged over English. */
+  strings?: Partial<FullscreenStrings>
 }
 
 // WebKit (older Safari / iPadOS) ships the prefixed Fullscreen API. iPhone has no element
@@ -71,7 +80,7 @@ export function fullscreen(opts: FullscreenOptions = {}): Plugin {
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = 'gallerist-fullscreen-btn'
-      btn.setAttribute('aria-label', 'Toggle fullscreen')
+      btn.setAttribute('aria-label', opts.strings?.toggle ?? DEFAULT_FULLSCREEN_STRINGS.toggle)
       btn.setAttribute('aria-pressed', 'false')
       btn.innerHTML = ICONS.fullscreen
       btnEl = btn
