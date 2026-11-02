@@ -74,6 +74,16 @@ describe('collectionFromLinks', () => {
     expect(positions.has(link('#none'))).toBe(false)
   })
 
+  it('a repeated explicit id does not break the collection', () => {
+    page(`<a href="a.jpg" data-gallerist-id="hero"></a><a href="b.jpg" data-gallerist-id="hero"></a>
+      <a href="c.jpg" data-gallerist-id="hero"></a>`)
+    const ids = collectionFromLinks(links()).collection.groups.flatMap((g) =>
+      g.items.map((i) => i.id),
+    )
+    expect(ids[0]).toBe('hero')
+    expect(new Set(ids).size).toBe(3)
+  })
+
   it('ids are unique across links', () => {
     page('<a href="a.jpg"></a><a href="b.jpg"></a>')
     const ids = collectionFromLinks(links()).collection.groups.flatMap((g) =>
@@ -189,6 +199,77 @@ describe('bind', () => {
     handle.viewer('trip')?.close()
     await new Promise((r) => setTimeout(r, 400))
     expect(document.activeElement).toBe(a)
+  })
+
+  it('links with a repeated id still open', () => {
+    page(
+      '<a id="x" href="a.jpg" data-gallerist="t" data-gallerist-id="i"></a><a id="y" href="b.jpg" data-gallerist="t" data-gallerist-id="i"></a>',
+    )
+    handle = bind()
+    expect(click(link('#y')).defaultPrevented).toBe(true)
+    expect(handle.viewer('t')?.getState().cursor.g).toBe(1)
+  })
+
+  it('open() from code returns focus to the caller, not an earlier link', async () => {
+    page(`${two}<button id="btn">Open</button>`)
+    handle = bind()
+    click(link('#one'))
+    handle.viewer('trip')?.close()
+    await new Promise((r) => setTimeout(r, 400))
+    const btn = link('#btn')
+    btn.focus()
+    handle.open('trip')
+    handle.viewer('trip')?.close()
+    await new Promise((r) => setTimeout(r, 400))
+    expect(document.activeElement).toBe(btn)
+  })
+
+  it('a link removed while open falls back to what had focus', async () => {
+    page(two)
+    handle = bind()
+    const a = link('#two')
+    a.focus()
+    click(a)
+    a.remove()
+    handle.viewer('trip')?.close()
+    await new Promise((r) => setTimeout(r, 400))
+    expect(document.contains(document.activeElement)).toBe(true)
+  })
+
+  it('a broad selector ignores links inside the viewer', () => {
+    page('<a id="a" href="a.jpg"></a>')
+    handle = bind({ selector: 'a' })
+    click(link('#a'))
+    const inner = document.createElement('a')
+    inner.href = 'in.jpg'
+    document.querySelector('.gallerist')?.appendChild(inner)
+    expect(click(inner).defaultPrevented).toBe(false)
+    handle.open('')
+    expect(handle.viewer()?.getCollection().groups.length).toBe(1)
+  })
+
+  it('a function gives each gallery its own plugins', () => {
+    page(two)
+    const asked: string[] = []
+    handle = bind({
+      viewer: (gallery) => {
+        asked.push(gallery)
+        return { plugins: [] }
+      },
+    })
+    click(link('#one'))
+    click(link('#other'))
+    expect(asked).toEqual(['trip', 'work'])
+  })
+
+  it('open() after destroy does nothing', () => {
+    page(two)
+    handle = bind()
+    handle.destroy()
+    handle.open('trip')
+    expect(handle.viewer('trip')).toBeUndefined()
+    expect(document.querySelector('.gallerist')).toBeNull()
+    handle = null
   })
 
   it('destroy stops listening and removes the viewers', () => {

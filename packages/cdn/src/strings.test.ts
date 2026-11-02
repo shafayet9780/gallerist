@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 
 // The strings audit: with every label translated, no UI text may still be English. Each default is
-// marked with §; any other word on screen is text that can't be translated. Relative imports, since
+// wrapped in ⟦…⟧ (they nest, as a label can hold a name); any word outside the marks is text that can't be translated. Relative imports, since
 // this runs before the packages are built.
 import { type Collection, type Plugin, createViewer } from '@gallerist/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DEFAULT_DOWNLOAD_STRINGS, download } from '../../plugin-download/src/index'
 import { DEFAULT_FULLSCREEN_STRINGS, fullscreen } from '../../plugin-fullscreen/src/index'
 import { DEFAULT_GRID_STRINGS, grid } from '../../plugin-grid/src/index'
-import { DEFAULT_PINS_STRINGS, pins } from '../../plugin-pins/src/index'
+import { DEFAULT_PINS_STRINGS, type Pin, pins } from '../../plugin-pins/src/index'
 import { DEFAULT_THUMBNAILS_STRINGS, thumbnails } from '../../plugin-thumbnails/src/index'
 import { DEFAULT_STRINGS, type MountOptions, mount } from '../../renderer-dom/src/index'
 
@@ -17,8 +17,8 @@ const mark = <T extends object>(defaults: T): T =>
     Object.entries(defaults).map(([k, v]) => [
       k,
       typeof v === 'function'
-        ? (...args: unknown[]) => `§${(v as (...a: unknown[]) => string)(...args)}`
-        : `§${v}`,
+        ? (...args: unknown[]) => `⟦${(v as (...a: unknown[]) => string)(...args)}⟧`
+        : `⟦${v}⟧`,
     ]),
   ) as T
 
@@ -36,8 +36,25 @@ const collection = (): Collection => ({
   })),
 })
 
-const NUMERIC = /^[\d\s/+.,:-]*$/
-const ATTRS = ['aria-label', 'aria-roledescription', 'title', 'placeholder', 'alt']
+// once the marks are taken out, only punctuation and numbers may be left
+const isTranslated = (value: string) => {
+  let rest = value
+  for (let last = ''; last !== rest; ) {
+    last = rest
+    rest = rest.replace(/⟦[^⟦⟧]*⟧/g, '')
+  }
+  return /^[\d\s/+.,:—-]*$/.test(rest)
+}
+
+const ATTRS = [
+  'aria-label',
+  'aria-roledescription',
+  'aria-description',
+  'aria-valuetext',
+  'title',
+  'placeholder',
+  'alt',
+]
 
 function untranslated(): string[] {
   const bad: string[] = []
@@ -47,11 +64,11 @@ function untranslated(): string[] {
     if (el.closest('svg')) continue
     for (const name of ATTRS) {
       const value = el.getAttribute(name)
-      if (value && !value.includes('§') && !NUMERIC.test(value)) bad.push(`${name}="${value}"`)
+      if (value && !isTranslated(value)) bad.push(`${name}="${value}"`)
     }
     for (const node of el.childNodes) {
       const text = node.nodeType === 3 ? (node.textContent ?? '').trim() : ''
-      if (text && !text.includes('§') && !NUMERIC.test(text)) bad.push(`text "${text}"`)
+      if (text && !isTranslated(text)) bad.push(`text "${text}"`)
     }
   }
   return bad
@@ -71,7 +88,7 @@ const openWith = (rail: Plugin, options: MountOptions = {}) => {
     plugins: [rail, ...shared()],
     startAt: { g: 1 },
   })
-  mount(v, { strings: mark(DEFAULT_STRINGS), arrowLabels: (_g, i) => `§${i}`, ...options })
+  mount(v, { strings: mark(DEFAULT_STRINGS), arrowLabels: (_g, i) => `⟦${i}⟧`, ...options })
   v.open()
   return v
 }
@@ -126,6 +143,61 @@ describe('strings audit', () => {
     v.open()
     expect(document.querySelector('.gallerist-grid-more')).not.toBeNull()
     expect(untranslated()).toEqual([])
+  })
+
+  describe('pins', () => {
+    const openPins = (presentation: 'comment' | 'tag', pin: Pin, onPlace?: () => void) => {
+      const v = createViewer({
+        collection: collection(),
+        plugins: [
+          pins({
+            presentation,
+            pins: () => [pin],
+            onPlace,
+            strings: mark(DEFAULT_PINS_STRINGS),
+          }),
+        ],
+      })
+      mount(v, { strings: mark(DEFAULT_STRINGS) })
+      v.open()
+      ;(document.querySelector('.gallerist-pin-marker') as HTMLButtonElement).click()
+      expect(document.querySelector('.gallerist-pin-card')).not.toBeNull()
+    }
+
+    it('a card with its default link', () => {
+      openPins('tag', { id: 'p', x: 0.5, y: 0.5, href: 'https://example.com/' })
+      expect(document.querySelector('.gallerist-pin-card a')).not.toBeNull()
+      expect(untranslated()).toEqual([])
+    })
+
+    it('a resolved thread with replies, and placing a comment', () => {
+      openPins(
+        'comment',
+        {
+          id: 'p',
+          x: 0.5,
+          y: 0.5,
+          label: '⟦host⟧',
+          body: '⟦host⟧',
+          resolved: true,
+          replies: [{ author: '⟦host⟧', body: '⟦host⟧' }],
+        },
+        () => {},
+      )
+      expect(untranslated()).toEqual([])
+      ;(document.querySelector('.gallerist-pin-add') as HTMLButtonElement).click()
+      expect(document.querySelector('[data-gallerist-placing]')).not.toBeNull()
+      expect(untranslated()).toEqual([])
+    })
+  })
+
+  it('text outside the marks fails, even beside a marked word', () => {
+    expect(isTranslated('⟦Group 1⟧')).toBe(true)
+    expect(isTranslated('⟦Group 2⟧, ⟦Item 3⟧')).toBe(true)
+    expect(isTranslated('⟦Group ⟦Kitchen⟧, item 2⟧')).toBe(true)
+    expect(isTranslated('3 / 12')).toBe(true)
+    expect(isTranslated('⟦Group 1⟧ photos')).toBe(false)
+    expect(isTranslated('Group 1')).toBe(false)
   })
 
   it('the audit can fail: an untranslated plugin is caught', () => {

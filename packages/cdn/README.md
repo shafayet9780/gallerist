@@ -15,8 +15,9 @@ on a global `Gallerist`. Using a bundler? Install the packages you need instead;
 </script>
 ```
 
-Pin a version in production (`@gallerist/cdn@0.3.0/dist/...`). Other skins are separate files:
-`.../theme-default/src/console.css`, `.../editorial.css`, loaded after `gallerist.css`.
+Pin a version in production (`@gallerist/cdn@<version>/dist/...`). Other skins are separate files,
+`.../theme-default/src/console.css` and `.../editorial.css`: load one after `gallerist.css` and select
+it with `mount: { skin: 'console' }`. Editorial looks as designed with `preset: 'editorial'` too.
 
 ## Link attributes
 
@@ -30,7 +31,7 @@ Each `data-gallerist` value is one gallery; links without a value share a defaul
 | `data-gallerist-caption` | | caption |
 | `data-gallerist-type` | `image` | `video` needs the matching plugin |
 | `data-gallerist-width`, `-height` | | natural size, to reserve the space |
-| `data-gallerist-id` | generated | a stable item id (deep links) |
+| `data-gallerist-id` | generated | a stable item id; a repeated one falls back to a generated id |
 | `data-gallerist-group` | own group | links with the same value form one group |
 | `data-gallerist-group-caption`, `-group-subtitle` | | the group's name and subtitle, from its first link |
 
@@ -38,6 +39,10 @@ Each `data-gallerist` value is one gallery; links without a value share a defaul
 tab, download) stay the browser's, and focus returns to the link on close. It takes `selector`, `root`,
 `viewer` and `mount`; the last two may be functions of the gallery name. It returns `open(gallery, at)`,
 `viewer(gallery)` and `destroy()`.
+
+With several galleries, pass `viewer` as a function if you use `pins()`, so each gets its own instance:
+`viewer: () => ({ plugins: [Gallerist.pins()] })`. Viewers are created on first open, so `hash()` can't
+open one from the URL on page load.
 
 `bind` is also exported by `@gallerist/renderer-dom`, for bundled pages.
 

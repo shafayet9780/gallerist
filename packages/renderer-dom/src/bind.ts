@@ -20,7 +20,11 @@ export interface BindOptions {
   selector?: string
   /** where to look for them (default `document`). */
   root?: Document | HTMLElement
-  /** `createViewer` options besides the collection (`plugins`, `loop`…), or one set per gallery. */
+  /**
+   * `createViewer` options besides the collection (`plugins`, `loop`…), or a function returning a set
+   * per gallery. With several galleries use the function for `pins()`, which holds its state on the
+   * plugin and so can't be shared between viewers.
+   */
   viewer?: PerGallery<Omit<ViewerOptions, 'collection' | 'groups' | 'items'>>
   /** `mount` options (`preset`, `skin`…), or one set per gallery. */
   mount?: PerGallery<MountOptions>
@@ -76,10 +80,15 @@ export function collectionFromLinks(links: Iterable<Element>, idPrefix = 'link')
   const groups: Group[] = []
   const byId = new Map<string, number>()
   const positions = new Map<Element, { g: number; i: number }>()
+  const usedIds = new Set<string>()
   let n = 0
   for (const el of links) {
-    const item = itemFromLink(el, `${idPrefix}-${n}`)
+    const generated = `${idPrefix}-${n}`
+    const item = itemFromLink(el, generated)
     if (!item) continue
+    // the same id on two links (a hero and its gallery copy) would fail the whole collection
+    if (usedIds.has(item.id)) item.id = usedIds.has(generated) ? `${generated}-dup` : generated
+    usedIds.add(item.id)
     const groupId = attr(el, 'group')
     let g = groupId ? byId.get(groupId) : undefined
     if (g === undefined) {
@@ -113,10 +122,12 @@ export function bind(opts: BindOptions = {}): BindHandle {
     link: Element | null
   }
   const live = new Map<string, Live>()
+  let destroyed = false
 
+  // the viewer's own controls and pin links aren't gallery links, however broad the selector
   const linksOf = (gallery: string) =>
     [...root.querySelectorAll(selector)].filter(
-      (el) => (el.getAttribute('data-gallerist') ?? '') === gallery,
+      (el) => (el.getAttribute('data-gallerist') ?? '') === gallery && !el.closest('.gallerist'),
     )
   const pick = <T>(value: PerGallery<T> | undefined, gallery: string): T | undefined =>
     typeof value === 'function' ? (value as (g: string) => T)(gallery) : value
@@ -136,7 +147,11 @@ export function bind(opts: BindOptions = {}): BindHandle {
     }
     const viewer = createViewer({ ...pick(opts.viewer, gallery), collection })
     const handle = mount(viewer, {
-      returnFocus: () => live.get(gallery)?.link as HTMLElement | null,
+      // a link removed meanwhile falls back to what had focus on opening
+      returnFocus: () => {
+        const link = live.get(gallery)?.link as HTMLElement | null | undefined
+        return link?.isConnected ? link : null
+      },
       ...pick(opts.mount, gallery),
     })
     const entry: Live = { viewer, handle, signature, link: null }
@@ -149,7 +164,7 @@ export function bind(opts: BindOptions = {}): BindHandle {
     if (e.defaultPrevented || e.button !== 0) return
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
     const link = (e.target as Element | null)?.closest?.(selector)
-    if (!link) return
+    if (!link || link.closest('.gallerist')) return
     const ready = ensure(link.getAttribute('data-gallerist') ?? '')
     const at = ready?.positions.get(link)
     if (!ready || !at) return // no source: leave the element alone
@@ -161,10 +176,15 @@ export function bind(opts: BindOptions = {}): BindHandle {
 
   return {
     open(gallery, at) {
-      ensure(gallery ?? '')?.entry.viewer.open(at ?? { g: 0, i: 0 })
+      if (destroyed) return
+      const ready = ensure(gallery ?? '')
+      if (!ready) return
+      ready.entry.link = null // not opened from a link: focus goes back where it was
+      ready.entry.viewer.open(at ?? { g: 0, i: 0 })
     },
     viewer: (gallery = '') => live.get(gallery)?.viewer,
     destroy() {
+      destroyed = true
       root.removeEventListener('click', onClick)
       for (const { handle, viewer } of live.values()) {
         handle.destroy()
