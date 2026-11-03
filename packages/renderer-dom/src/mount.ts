@@ -693,6 +693,21 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.overlayItem = undefined
       }
     }
+    // Warm the cache for the images a step within the group lands on (spec §11: the slides above
+    // cover the neighbouring groups, showing their first item). Not mounted, so nothing to tear down.
+    const items = col.groups[cur.g]?.items ?? []
+    for (let d = -preload.behind; d <= preload.ahead; d++) {
+      const it = d ? items[cur.i + d] : undefined
+      const s = it?.type === 'image' ? it.source : undefined
+      if (!s || !(typeof s === 'string' || 'src' in s)) continue
+      const img = new Image()
+      if (typeof s === 'string') img.src = s
+      else {
+        img.sizes = s.sizes ?? ''
+        img.srcset = s.srcset ?? ''
+        img.src = s.src
+      }
+    }
   }
   // Guard against re-entrancy: emitting load/loaded updates state.loaded, whose store
   // notification re-enters sync()/renderWindow while we're mid-iteration over `mounted`.

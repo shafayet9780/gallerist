@@ -2,7 +2,9 @@
 
 Windowed thumbnail rail for [Gallerist](https://github.com/shafayet9780/gallerist#readme). One card per group along the primary (←/→)
 axis; the active multi-item group expands into its item thumbs along the secondary (↑/↓) axis.
-Windowed + lazy, so 10k-item galleries stay bounded (≤ ~200 live nodes).
+Windowed + lazy: the rail draws what fits in it plus 3 cards on each side and follows its own scroll,
+so a 10k-group gallery keeps about 20 cards in the document. One group's item stack draws all its
+items; for a single huge group use `flat`, which is windowed by item.
 
 Three display modes via `groupDisplay`: **`stacked`** (default — collapsed group cards, with a peek
 flyout to preview a group without navigating in) and **`flat`** (every image side-by-side, each
@@ -51,7 +53,7 @@ mount(viewer)
 
 ```ts
 thumbnails({
-  overscan: 24,            // cards rendered each side of the cursor (windowing bound)
+  overscan: 8,             // optional: a fixed number of cards each side (default: measured)
   itemAxis: 'vertical',    // 'vertical' (default) | 'horizontal' — layout of the active group's items
   groupDisplay: 'stacked', // 'stacked' (default) | 'flat' | 'index'
   expandActive: true,      // auto-expand the active group's item panel (stacked); toggle with `e`
@@ -60,7 +62,7 @@ thumbnails({
 
 | Option         | Type                         | Default     | Notes |
 |----------------|------------------------------|-------------|-------|
-| `overscan`     | `number`                     | `24`        | Live cards ≈ `2·overscan + 1` (group cards in `stacked`, item cards in `flat`). |
+| `overscan`     | `number`                     | measured    | Cards drawn each side of the middle of the rail; scrolling draws the ones it reaches. By default what fits plus 3 each side (8 each side before the rail has a layout). Group cards in `stacked`/`index`, item cards in `flat`. |
 | `itemAxis`     | `'vertical' \| 'horizontal'` | `'vertical'`| `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. Ignored in `flat`. |
 | `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, bracketed per group. |
 | `expandActive` | `boolean`                    | `true`      | `stacked` and `index`. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |

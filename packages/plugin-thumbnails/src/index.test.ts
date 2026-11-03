@@ -5,6 +5,7 @@ import { getInternals } from '@gallerist/core/internal'
 import { mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { thumbnails } from './index'
+import { keepPlace, measureRun, middleOf, spanAround } from './strip'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
 const collection = (): Collection => ({
@@ -245,7 +246,7 @@ describe('plugin-thumbnails', () => {
     const v = open(big)
     for (let i = 0; i < 400; i++) v.goTo(i) // walk the whole collection
     // windowed rail stays bounded even though every group was visited once
-    expect(document.querySelectorAll('.gallerist-thumb').length).toBeLessThanOrEqual(49)
+    expect(document.querySelectorAll('.gallerist-thumb').length).toBeLessThanOrEqual(17)
   })
 
   it('windows the rail: a 10k-group collection stays bounded to the window', () => {
@@ -253,8 +254,8 @@ describe('plugin-thumbnails', () => {
       groups: Array.from({ length: 10_000 }, (_, i) => ({ id: `g${i}`, items: [item(`it${i}`)] })),
     }
     open(big)
-    // default overscan 24 → at most 2*24+1 group thumbs live; tight bound catches a windowing regression
-    expect(document.querySelectorAll('.gallerist-thumb').length).toBeLessThanOrEqual(49)
+    // no layout to measure (happy-dom) → 8 cards each side of the cursor; tight bound catches a regression
+    expect(document.querySelectorAll('.gallerist-thumb').length).toBeLessThanOrEqual(17)
   })
 })
 
@@ -799,5 +800,228 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
       expect(document.querySelector('.gallerist-thumbs-aside')).toBeNull()
     })
+  })
+})
+
+describe('plugin-thumbnails — windowing (U17)', () => {
+  // A laid-out rail: 1000px wide, cards 90px wide every 100px in DOM order, scrolled by scrollLeft.
+  const RAIL_W = 1000
+  let rail: HTMLElement
+  const layOut = () => {
+    rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+    Object.defineProperty(rail, 'clientWidth', { configurable: true, value: RAIL_W })
+    const real = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const box = (left: number, width: number) =>
+        ({ left, right: left + width, top: 0, bottom: 80, width, height: 80 }) as DOMRect
+      if (this === rail) return box(0, RAIL_W)
+      if (this.parentElement === rail) {
+        return box([...rail.children].indexOf(this) * 100 - rail.scrollLeft, 90)
+      }
+      return real.call(this)
+    })
+  }
+  const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
+  const scrollTo = async (x: number) => {
+    rail.scrollLeft = x
+    rail.dispatchEvent(new Event('scroll'))
+    await frame()
+  }
+  const drawn = () =>
+    [...document.querySelectorAll<HTMLElement>('.gallerist-thumbs > .gallerist-thumb')].map((c) =>
+      Number(c.dataset.group?.slice(1)),
+    )
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, k) => a + k)
+  const many = (n: number, per = 1): Collection => ({
+    groups: Array.from({ length: n }, (_, g) => ({
+      id: `g${g}`,
+      items: Array.from({ length: per }, (_, i) => item(`g${g}i${i}`)),
+    })),
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  it('draws what fits in the rail plus 3 cards each side, once it can measure', async () => {
+    open(many(2000))
+    expect(drawn()).toEqual(range(0, 16)) // no layout yet: 8 each side, kept full at the start
+    layOut()
+    await scrollTo(0)
+    // 1000 / 100 → 10 cards, +1 part-shown: 11 fit; the middle one is g5 → 6 + 3 each side of it
+    expect(drawn()).toEqual(range(0, 18))
+  })
+
+  it('follows the rail scroll, inserting and removing only the cards that cross the edges', async () => {
+    open(many(2000))
+    layOut()
+    await scrollTo(0)
+    const kept = document.querySelector('.gallerist-thumb[data-group="g10"]')
+    const mo = new MutationObserver(() => {})
+    mo.observe(rail, { childList: true })
+    await scrollTo(1000) // g10..g20 now show: the middle is g15
+    const recs = mo.takeRecords()
+    mo.disconnect()
+    expect(drawn()).toEqual(range(6, 24))
+    expect(document.querySelector('.gallerist-thumb[data-group="g10"]')).toBe(kept)
+    const removed = recs.flatMap((r) => [...r.removedNodes])
+    const added = recs.flatMap((r) => [...r.addedNodes])
+    expect(removed.length).toBe(6) // g0..g5, nothing taken out and put back
+    expect(added.length).toBe(6) // g19..g24
+    // six cards went before the ones on screen: the offset follows, so g10 stays where it was
+    expect(rail.scrollLeft).toBe(400)
+    expect(kept?.getBoundingClientRect().left).toBe(0)
+  })
+
+  it('a cursor outside the drawn run re-centres it there', () => {
+    const v = open(many(2000))
+    v.goTo(1500)
+    const cards = drawn()
+    expect(cards).toContain(1500)
+    expect(cards.length).toBeLessThanOrEqual(17)
+    expect(
+      document.querySelector('.gallerist-thumb[data-active]')?.getAttribute('data-group'),
+    ).toBe('g1500')
+  })
+
+  it('a re-drawn active card gets its active state back', async () => {
+    open(many(2000))
+    layOut()
+    await scrollTo(0)
+    await scrollTo(3000) // g0 leaves the run
+    expect(drawn()).not.toContain(0)
+    for (let k = 0; k < 4; k++) await scrollTo(0) // each pass draws more before, and the offset follows
+    expect(drawn()).toEqual(range(0, 18))
+    const g0 = document.querySelector('.gallerist-thumb[data-group="g0"]')
+    expect(g0?.hasAttribute('data-active')).toBe(true)
+    expect(g0?.getAttribute('aria-selected')).toBe('true')
+    expect(document.querySelectorAll('.gallerist-thumb[data-active]').length).toBe(1)
+  })
+
+  it('a focused card scrolled out of the run hands focus to the viewer', async () => {
+    open(many(2000))
+    layOut()
+    await scrollTo(0)
+    ;(document.querySelector('.gallerist-thumb[data-group="g1"]') as HTMLElement).focus()
+    await scrollTo(3000)
+    expect(document.activeElement).toBe(document.querySelector('.gallerist'))
+  })
+
+  it('an item step writes the active state of two thumbs, however long the group', () => {
+    const v = open(many(1, 500))
+    const writes: Element[] = []
+    const mo = new MutationObserver(() => {})
+    mo.observe(document.body, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-active', 'aria-selected', 'aria-current'],
+    })
+    v.nextItem()
+    for (const r of mo.takeRecords()) {
+      if ((r.target as Element).closest('.gallerist-thumbs-region, .gallerist-thumbs-aside'))
+        writes.push(r.target as Element)
+    }
+    mo.disconnect()
+    const ids = [...new Set(writes)].map((el) => (el as HTMLElement).dataset.item)
+    expect(ids).toEqual(['g0i0', 'g0i1'])
+    expect(writes.length).toBe(4) // data-active + aria-selected on each
+  })
+
+  it('a group step moves the active state from one card to the other', () => {
+    const v = open(many(2000))
+    v.next()
+    const active = document.querySelectorAll('.gallerist-thumbs [data-active]')
+    expect([...active].map((el) => el.getAttribute('data-group'))).toEqual(['g1'])
+    expect(
+      document.querySelector('.gallerist-thumb[data-group="g0"]')?.getAttribute('aria-selected'),
+    ).toBe('false')
+  })
+
+  it('index: the active section keeps its items through a scroll, and gets them back', async () => {
+    const v = createViewer({
+      collection: many(2000, 3),
+      plugins: [thumbnails({ groupDisplay: 'index' })],
+    })
+    mount(v)
+    v.open({ g: 30, i: 0 })
+    layOut()
+    const sections = () =>
+      [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-section')].map((c) =>
+        Number(c.dataset.group?.slice(1)),
+      )
+    const row = document.querySelector('.gallerist-thumb-items') as HTMLElement
+    const button = row.querySelector('button') as HTMLElement
+    button.focus()
+    await scrollTo(0) // the run moves, g30 stays in it: its items aren't touched, the focus stays
+    expect(sections()).toEqual(range(18, 36))
+    expect(document.activeElement).toBe(button)
+    for (let k = 0; k < 6 && sections().includes(30); k++) await scrollTo(3000)
+    expect(row.isConnected).toBe(false) // left with its section
+    for (let k = 0; k < 10 && !sections().includes(30); k++) await scrollTo(0)
+    const g30 = document.querySelector('.gallerist-thumb-section[data-group="g30"]')
+    expect(row.parentNode).toBe(g30)
+    expect(row.querySelectorAll('.gallerist-thumb-item').length).toBe(3)
+  })
+
+  it('flat: follows the rail scroll too, in item cards', async () => {
+    const v = createViewer({
+      collection: many(1, 3000),
+      plugins: [thumbnails({ groupDisplay: 'flat' })],
+    })
+    mount(v)
+    v.open()
+    const items = () =>
+      [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-item')].map((b) =>
+        Number(b.dataset.item?.split('i')[1]),
+      )
+    expect(items()).toEqual(range(0, 16))
+    v.goTo(0, 1000)
+    expect(items()).toEqual(range(992, 1008))
+  })
+})
+
+describe('strip helpers', () => {
+  const at = (left: number, top = 0) =>
+    ({
+      getBoundingClientRect: () =>
+        ({ left, top, right: left + 50, bottom: top + 50, width: 50, height: 50 }) as DOMRect,
+    }) as Element
+
+  it('spanAround keeps the window full at either end', () => {
+    expect(spanAround(50, 100, 3, 3)).toEqual([47, 53])
+    expect(spanAround(1, 100, 3, 3)).toEqual([0, 6])
+    expect(spanAround(99, 100, 3, 3)).toEqual([93, 99])
+    expect(spanAround(2, 4, 3, 3)).toEqual([0, 3])
+  })
+
+  it('measureRun reads the axis and the smallest step', () => {
+    expect(measureRun([at(0), at(60), at(200), at(260)])).toEqual({ axis: 'x', stride: 60 })
+    expect(measureRun([at(0, 0), at(0, 70), at(0, 140)])).toEqual({ axis: 'y', stride: 70 })
+    expect(measureRun([at(0), at(0)])).toBeNull() // no layout
+    expect(measureRun([at(0)])).toBeNull()
+  })
+
+  it('middleOf finds the card under the middle of the scroller', () => {
+    const scroller = at(0)
+    scroller.getBoundingClientRect = () => ({ left: 0, right: 300, top: 0, bottom: 50 }) as DOMRect
+    expect(middleOf(scroller, [at(0), at(100), at(200)], 'x')).toBe(1) // 100..150 reaches the middle
+    expect(middleOf(scroller, [at(-500)], 'x')).toBe(0)
+  })
+
+  it('keepPlace scrolls by however far the reference moved', () => {
+    const scroller = document.createElement('div')
+    let left = 100
+    const ref = document.createElement('span')
+    scroller.appendChild(ref)
+    document.body.appendChild(scroller)
+    ref.getBoundingClientRect = () => ({ left, top: 0 }) as DOMRect
+    keepPlace(scroller, ref, 'x', () => {
+      left = 340
+    })
+    expect(scroller.scrollLeft).toBe(240)
+    keepPlace(scroller, ref, null, () => {}) // no axis measured yet: nothing to correct
+    expect(scroller.scrollLeft).toBe(240)
   })
 })

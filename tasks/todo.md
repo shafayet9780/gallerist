@@ -190,4 +190,24 @@ commit). Decisions driven by a UX interview (UX-A … UX-J).
 - [x] **U16** docs: CHANGELOG v0.2.0, thumbnails README, `docs/PRESETS.md`, ADR 0001, this checklist
 
 ## Phase F — hardening + ship
-- [ ] **U17** axe + perf (zero rebuild on item nav, <200 nodes @10k) + size re-check + e2e; tag `v0.2.0`
+- [x] **U17** axe + perf (zero rebuild on item nav, <200 nodes @10k) + size re-check + e2e (`fix/u17-perf`). The
+  "tag `v0.2.0`" part is obsolete: nothing was published, the first release is 0.3.0. `e2e/tests/perf.spec.ts` is
+  now a count-based gate in the e2e suite (elements, nodes created/moved, attribute writes; never timings).
+  Viewer elements after nav (chromium; webkit counts match), before → after:
+
+  | Config @ shape | Before | After |
+  |---|---|---|
+  | default @ 2000×5 / 5000×2 | 283 / 274 | 179 / 170 |
+  | reviewer @ 2000×5 / 5000×2 | 470 / 458 | 274 / 262 |
+  | tour @ 2000×5 / 5000×2 | 32,447 / 50,435 | 233 / 221 |
+  | grid (cells open) @ 1×10k: grid's own | 20,003 | 166 |
+  | grid after closing @ 2000×5 | 446 | 186 |
+  | flat @ 5000×2 | 237 | 153 |
+  | item step attribute writes @ 1×10k | 10,017 | 17 |
+  | group step nodes re-appended | 38 | 3 |
+  | grid cells: elements recreated per step while open @ 1×10k | 20,003 | 1 |
+  | tour @ 5000×2 open: click→open / longest task (chromium) | 1,090 ms / 662 ms | 336 ms / none |
+  | reviewer @ 1×10k item step, script+layout / to frame: webkit; chromium | 664 ms / 2.7 s; 19 / 76 ms | 64 ms / 256 ms; 15 / 66 ms |
+
+  Still open: one huge group's item stack (stacked, index) draws every item (20k–30k elements at 1×10k; the gate
+  reports it, `PERF_GATE=1` asserts it); reviewer and tour draw more per card and are gated at <300 / <260.

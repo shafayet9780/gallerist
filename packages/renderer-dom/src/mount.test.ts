@@ -1511,3 +1511,47 @@ describe('groupAxis and arrowLabels', () => {
     )
   })
 })
+
+describe('mount — preloading within a group (U17)', () => {
+  const warmed: string[] = []
+  const stubImage = () => {
+    warmed.length = 0
+    const Real = window.Image
+    vi.stubGlobal(
+      'Image',
+      class extends Real {
+        override set src(v: string) {
+          warmed.push(v)
+        }
+      },
+    )
+  }
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('warms the images a step within the group lands on, not other media', () => {
+    stubImage()
+    const v = createViewer({
+      collection: {
+        groups: [
+          {
+            id: 'g0',
+            items: [
+              item('p0'),
+              item('p1'),
+              { id: 'clip', type: 'video', source: 'clip.mp4' },
+              { id: 'p3', type: 'image', source: { src: 'p3.jpg', srcset: 'p3-2x.jpg 2x' } },
+              item('p4'),
+            ],
+          },
+        ],
+      },
+    })
+    mount(v)
+    v.open({ g: 0, i: 1 })
+    // behind 1 (p0); ahead 2: the video is skipped, p3 is warmed with its srcset
+    expect(warmed).toContain('p0.jpg')
+    expect(warmed).toContain('p3.jpg')
+    expect(warmed).not.toContain('clip.mp4')
+    expect(warmed).not.toContain('p1.jpg') // the current item is mounted, not warmed
+  })
+})

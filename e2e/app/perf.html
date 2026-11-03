@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gallerist e2e — perf</title>
+    <script>
+      // Collect long tasks from the first moment (e2e/tests/perf.spec.ts slices them per phase).
+      window.__longtasks = []
+      try {
+        new PerformanceObserver((list) => {
+          for (const e of list.getEntries())
+            window.__longtasks.push({ start: e.startTime, duration: e.duration })
+        }).observe({ type: 'longtask', buffered: true })
+        window.__longtaskSupported = true
+      } catch {
+        window.__longtaskSupported = false
+      }
+    </script>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+      }
+      #open {
+        margin: 24px;
+        padding: 10px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="open" type="button">Open viewer</button>
+    <script type="module" src="/perf.ts"></script>
+  </body>
+</html>
