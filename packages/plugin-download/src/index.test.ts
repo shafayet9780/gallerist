@@ -242,6 +242,36 @@ describe('plugin-download', () => {
     ])
   })
 
+  it('judges the origin the way the anchor resolves it: <base href>, about:srcdoc', async () => {
+    const seen: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      seen.push(this.target)
+    })
+    // a <base> pointing at another origin makes a relative URL cross-origin
+    const base = document.createElement('base')
+    base.href = 'https://cdn.test/'
+    document.head.append(base)
+    try {
+      await downloadItem(item('b', 'pics/b.jpg'))
+    } finally {
+      base.remove()
+    }
+    // an about:srcdoc frame: location.href can't resolve a relative URL and location.origin is
+    // "null" (the document's own origin is the parent's); the download neither throws nor counts
+    // as cross-origin
+    const own = location.origin
+    vi.stubGlobal('location', { href: 'about:srcdoc', protocol: 'about:', origin: 'null' })
+    vi.stubGlobal('origin', own)
+    try {
+      await expect(downloadItem(item('c', 'pics/c.jpg'))).resolves.toBeUndefined()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    expect(seen).toEqual(['_blank', ''])
+  })
+
   it('a click calls downloadUrl once and saves what it returned', async () => {
     const hrefs: string[] = []
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (

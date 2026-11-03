@@ -8,32 +8,34 @@ import type { ArrowLayout, GroupAxis, ItemIndicator, RailPlacement } from './mou
 export type PresetName = 'filmstrip' | 'immersive' | 'reviewer' | 'contact' | 'editorial' | 'tour'
 
 // A type alias, not an interface, so it is a core `PresetDefaults` (the region context's `preset`).
+// Read-only through and through: the built-in presets are frozen, so a write fails at compile time
+// rather than throwing (strict mode) or being ignored at run time.
 export type ResolvedPreset = {
   /** data-* attributes the renderer sets on the root (drives the theme). */
-  rootAttrs: Record<string, string>
+  readonly rootAttrs: Readonly<Record<string, string>>
   /** default arrow placement (overridable by an explicit mount option). */
-  arrows: ArrowLayout
+  readonly arrows: ArrowLayout
   /** default chrome auto-hide-on-idle (overridable). */
-  autoHide: boolean
+  readonly autoHide: boolean
   /** default thumbnail rail placement (overridable). */
-  rail: RailPlacement
+  readonly rail: RailPlacement
   /** thumbnails() defaults: the plugin applies them to the options it wasn't given. */
-  thumbnails: {
+  readonly thumbnails: Readonly<{
     itemAxis: 'vertical' | 'horizontal'
     groupDisplay?: 'stacked' | 'flat' | 'index'
     timeline?: boolean
     numberItems?: boolean
-  }
+  }>
   /** turn on the zoom navigator by default (overridable). */
-  navigator?: boolean
+  readonly navigator?: boolean
   /** frame the media (overridable). */
-  frame?: boolean
+  readonly frame?: boolean
   /** default item indicator (overridable). */
-  itemIndicator?: ItemIndicator
+  readonly itemIndicator?: ItemIndicator
   /** which arrow keys and on-screen arrows move between groups, if not the rail's own (overridable). */
-  groupAxis?: GroupAxis
+  readonly groupAxis?: GroupAxis
   /** name the group arrows after the group they go to (overridable). */
-  arrowLabels?: boolean
+  readonly arrowLabels?: boolean
 }
 
 const PRESETS: Record<PresetName, ResolvedPreset> = {

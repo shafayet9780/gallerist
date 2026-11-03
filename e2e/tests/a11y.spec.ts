@@ -137,6 +137,12 @@ for (const [look, scroller] of [
     await viewerSettled(page)
     await expect(page.locator('.gallerist-caption .fixture-caption')).toBeVisible()
     const band = page.locator(scroller)
+    // the band's ResizeObserver has run (it runs within the frame after layout), and the band fits:
+    // otherwise the checks below would pass before the band was ever judged
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+    )
+    expect(await band.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true)
     await expect(band).not.toHaveAttribute('tabindex', /.*/)
     await expect(band).not.toHaveAttribute('role', /.*/)
   })

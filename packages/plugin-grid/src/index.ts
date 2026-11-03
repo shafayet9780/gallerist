@@ -188,7 +188,7 @@ export function grid(opts: GridOptions = {}): Plugin {
     }
 
     const buildSection = (group: Group, g: number, cur: Cursor): HTMLElement => {
-      const name = group.caption ?? t.group(g + 1)
+      const name = typeof group.caption === 'string' ? group.caption : t.group(g + 1)
       const section = document.createElement('section')
       section.className = 'gallerist-grid-section'
       section.setAttribute('aria-label', name)
@@ -282,14 +282,15 @@ export function grid(opts: GridOptions = {}): Plugin {
       first = to
     }
 
-    // Draw `span` more units past either end of the run; false when there are none. Units added
-    // above what's on screen would push it down: the scroll offset follows.
-    const extend = (atStart: boolean): boolean => {
+    // Draw `by` more units past either end of the run; false when there are none. Units added
+    // above what's on screen would push it down: the scroll offset follows. `by` 0 at the start
+    // only realigns the run to a row (drawn before layout, the columns weren't known).
+    const extend = (atStart: boolean, by = span): boolean => {
       const col = viewer.getCollection()
       if (!root || !open || col !== lastCol) return false
       const to = atStart
-        ? rowStart(Math.max(0, first - span))
-        : Math.min(unitCount(col) - 1, last + span)
+        ? rowStart(Math.max(0, first - by))
+        : Math.min(unitCount(col) - 1, last + by)
       if (to === (atStart ? first : last)) return false
       const cur = viewer.getState().cursor
       if (atStart) {
@@ -408,6 +409,8 @@ export function grid(opts: GridOptions = {}): Plugin {
         if (typeof IntersectionObserver !== 'undefined') {
           edges = new IntersectionObserver(
             (entries) => {
+              // laid out by now: a run drawn before its columns resolved starts on a row again
+              extend(true, 0)
               for (const e of entries) {
                 // still near after drawing more: observing again reports it again
                 if (e.isIntersecting && extend(e.target === head)) {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolvePreset } from './presets'
+import { type ResolvedPreset, resolvePreset } from './presets'
 
 describe('resolvePreset', () => {
   it('filmstrip: bottom rail, side pill arrows, persistent chrome', () => {
@@ -62,6 +62,16 @@ describe('resolvePreset', () => {
         ;(p.thumbnails as { numberItems?: boolean }).numberItems = false
       }).toThrow(TypeError)
     }
+    // …and typed read-only, so such a write fails at compile time (typecheck covers this file)
+    const write = (p: ResolvedPreset) => {
+      // @ts-expect-error a preset is read-only
+      p.autoHide = true
+      // @ts-expect-error its thumbnails defaults too
+      p.thumbnails.numberItems = false
+      // @ts-expect-error and its root attributes
+      p.rootAttrs['data-x'] = 'y'
+    }
+    expect(typeof write).toBe('function')
   })
 
   it('falls back to filmstrip for an unknown name (and warns)', () => {

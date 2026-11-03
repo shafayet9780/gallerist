@@ -71,6 +71,12 @@ await downloadItems(items, { zip: true, zipName: 'review.zip', downloadUrl })
 | `downloadUrl` | as for the plugin |
 | `signal` | an `AbortSignal` that cancels the fetches |
 
+Without `zip`, each item is saved through its own link, one after another. Same-origin (and `blob:`)
+URLs all save. Cross-origin URLs each open a new tab, and only the first comes straight from the click:
+the rest open after awaits, without user activation, so a popup blocker usually stops them. For several
+cross-origin files, use `zip: true` (it needs CORS) or a `downloadUrl` that points at your own origin
+(a proxy).
+
 Zip mode fetches every file (so cross-origin URLs need CORS), skips the ones that fail, and saves
 nothing when none succeeded. It loads [`client-zip`](https://github.com/Touffy/client-zip), a
 dependency of this package, with a dynamic `import()`, so it costs nothing until the first zip; if

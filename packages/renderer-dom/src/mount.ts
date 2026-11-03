@@ -270,7 +270,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     !arrowLabelsOpt || !controls || vertical || linear || arrows !== 'pill-right'
       ? null
       : arrowLabelsOpt === true
-        ? (group) => group.caption
+        ? (group) => str(group.caption)
         : arrowLabelsOpt
   // Default to the viewer's resolved loop so linear traversal and the slide window agree; an
   // explicit mount({ loop }) still overrides for the rare case they should differ (review #2).
@@ -411,10 +411,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   capLabel.textContent = ui.caption
   const capScroll = placard ? regionHosts.caption : caption
   const fitCaption = () => {
-    const set =
-      regionHosts.caption.hasChildNodes() && capScroll.scrollHeight > capScroll.clientHeight
-        ? 'setAttribute'
-        : 'removeAttribute'
+    const on =
+      regionHosts.caption.hasChildNodes() && capScroll.scrollHeight > capScroll.clientHeight + 1
+    // a band that stops scrolling while focused hands focus back to the viewer (else it falls to
+    // <body> and the keyboard goes dead)
+    if (!on && document.activeElement === capScroll) root.focus({ preventScroll: true })
+    const set = on ? 'setAttribute' : 'removeAttribute'
     capScroll[set]('tabindex', '0')
     capScroll[set]('role', 'region')
     capScroll[set]('aria-labelledby', capLabel.id)
@@ -882,8 +884,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const multi = !linear && itemCount > 1
     if (itemNav) setHiddenKeepingFocus(itemNav, !multi)
     if (title) {
-      title.textContent = group?.caption ?? ''
-      title.hidden = !group?.caption
+      title.textContent = str(group?.caption)
+      title.hidden = !title.textContent
     }
     if (arrowLabel) {
       const nameAt = (step: number) => {
@@ -1096,7 +1098,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // (a host form keeping Escape for itself).
     if (isEditableTarget(e.target) && e.key !== 'Escape') return
     // a focused caption band scrolls with ↑/↓/Home/End rather than navigating
-    if (e.target === capScroll && /^(Arrow(Up|Down)|Home|End)$/.test(e.key)) return
+    if (
+      e.target === capScroll &&
+      capScroll.hasAttribute('tabindex') &&
+      /^(Arrow(Up|Down)|Home|End)$/.test(e.key)
+    )
+      return
     // Focus trap: cycle Tab within the dialog so focus can't escape to the inert page (C5).
     if (e.key === 'Tab' && overlay) {
       const tabbables = focusableWithin(root)

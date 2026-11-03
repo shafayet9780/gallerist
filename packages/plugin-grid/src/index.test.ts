@@ -137,6 +137,14 @@ describe('plugin-grid', () => {
       return v
     }
 
+    it('a group caption that is not a string names the section by number', () => {
+      const odd = { id: 'c', render: () => 'x' } as unknown as string
+      openSections({ groups: [{ id: 'g0', caption: odd, items: [item('a0')] }] })
+      const section = document.querySelector('.gallerist-grid-section')
+      expect(section?.getAttribute('aria-label')).toBe('Group 1')
+      expect(section?.textContent).not.toContain('[object Object]')
+    })
+
     it('startOpen shows one card per group on opening at the first item', () => {
       openSections()
       expect(gridEl().style.display).not.toBe('none')
@@ -406,6 +414,21 @@ describe('plugin-grid', () => {
       expect(inColumns()).toBe(true)
       // 12 cells, 3 rows, went above what was on screen: the offset follows
       expect(gridEl().scrollTop - scrolled).toBe(300)
+    })
+
+    it('cells: a run drawn before layout starts on a row once the columns resolve', () => {
+      stubIO()
+      stubLayout()
+      cols = 0 // not laid out yet: the grid gives back no column list
+      openWith(oneGroup(10_000), { overscan: 10 }, { g: 0, i: 5003 })
+      expect(firstIndex()).toBe(4993) // 1 column assumed: no row to start on
+      cols = 4
+      near(edges()[1] as Element) // the first observer callback, at the tail
+      expect(firstIndex()).toBe(4992)
+      expect(inColumns()).toBe(true)
+      near(edges()[0] as Element) // growing upward then keeps every cell in its column
+      expect(firstIndex()).toBe(4980)
+      expect(inColumns()).toBe(true)
     })
 
     it('cells: across groups each block starts on a row; a new column count realigns', () => {

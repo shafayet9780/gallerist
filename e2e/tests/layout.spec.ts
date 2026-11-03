@@ -199,7 +199,9 @@ async function railSettled(page: Page) {
       ].join()
     }
     let last = snap()
-    for (let still = 0, n = 0; still < 2 && n < 120; n++) {
+    let still = 0
+    for (let n = 0; still < 2; n++) {
+      if (n === 120) throw new Error(`rail did not settle in 120 frames (${last})`)
       await frame()
       const now = snap()
       still = now === last ? still + 1 : 0

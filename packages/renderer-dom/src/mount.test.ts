@@ -883,6 +883,26 @@ describe('mount — chrome structure (M15)', () => {
     expect([cap.hidden, cap.textContent]).toEqual([false, ''])
   })
 
+  it('ignores a group caption that is not a string (title, arrow labels)', () => {
+    const odd = { id: 'c', render: () => 'x' } as unknown as string
+    const v = createViewer({
+      collection: {
+        groups: [
+          { id: 'g0', caption: odd, items: [{ id: 'a0', type: 'image', source: 'a0.jpg' }] },
+          { id: 'g1', caption: odd, items: [{ id: 'b0', type: 'image', source: 'b0.jpg' }] },
+        ],
+      },
+    })
+    mount(v, { arrowLabels: true, arrows: 'pill-right' })
+    v.open()
+    const title = document.querySelector('.gallerist-title') as HTMLElement
+    expect([title.hidden, title.textContent]).toEqual([true, ''])
+    expect(document.querySelector('.gallerist')?.textContent).not.toContain('[object Object]')
+    expect(document.querySelector('.gallerist-next')?.getAttribute('aria-label')).not.toContain(
+      'object',
+    )
+  })
+
   it('shows zoom reset only while zoomed in', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
@@ -1488,10 +1508,21 @@ describe('mount — modal accessibility (WS-3)', () => {
         expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
         band.dispatchEvent(key({ key: 'ArrowRight', cancelable: true })) // ← / → still navigate
         expect(v.getState().cursor.g).toBe(1)
-        content = 80 // fits again
+        expect(document.activeElement).toBe(band)
+        content = 101 // a sub-pixel overflow is not a scroller
         resize()
+        // fits again while focused (a shorter caption, a taller viewport): focus goes back to the
+        // viewer rather than falling to <body>, and the keys navigate again
         for (const a of ['tabindex', 'role', 'aria-labelledby'])
           expect(band.hasAttribute(a), a).toBe(false)
+        expect(document.activeElement).toBe(root)
+        root.dispatchEvent(key({ key: 'ArrowLeft', cancelable: true }))
+        expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+        root.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+        expect(v.getState().cursor).toEqual({ g: 0, i: 1 })
+        // a key still aimed at the band (no longer a scroller) navigates rather than being swallowed
+        band.dispatchEvent(key({ key: 'ArrowUp', cancelable: true }))
+        expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
       } finally {
         vi.unstubAllGlobals()
       }

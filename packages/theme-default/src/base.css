@@ -934,6 +934,11 @@
   max-height: 100%;
   overflow-y: auto;
 }
+/* a band that scrolls takes focus (renderer: tabindex while it overflows): ring it inside its box */
+:is(.gallerist-caption, .gallerist-region-caption)[tabindex]:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: -2px;
+}
 
 /* ── arrows and the item navigator, over the stage (inside main) ────────────────── */
 .gallerist-controls > .gallerist-prev,

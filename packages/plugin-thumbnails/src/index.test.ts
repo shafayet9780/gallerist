@@ -1120,6 +1120,19 @@ describe('plugin-thumbnails — windowing (U17)', () => {
     ).toBe('false')
   })
 
+  it('index: a group caption that is not a string names the row by number', () => {
+    const odd = { id: 'c', render: () => 'x' } as unknown as string
+    const v = createViewer({
+      collection: { groups: [{ id: 'g0', caption: odd, items: [item('a0'), item('a1')] }] },
+      plugins: [thumbnails({ groupDisplay: 'index' })],
+    })
+    mount(v)
+    v.open()
+    const row = document.querySelector('.gallerist-thumb-row')
+    expect(row?.getAttribute('aria-label')).toContain('Group 1')
+    expect(document.querySelector('.gallerist-thumbs')?.innerHTML).not.toContain('object Object')
+  })
+
   it('index: the active section keeps its items through a scroll, and gets them back', async () => {
     const v = createViewer({
       collection: many(2000, 3),
@@ -1173,16 +1186,17 @@ describe('plugin-thumbnails — windowing (U17)', () => {
     expect(thumb?.getAttribute('aria-setsize')).toBe('2')
   })
 
-  it('flat: item cards are placed in the flattened sequence', () => {
+  it('flat: item cards are placed within their group (the role=group they sit in)', () => {
     const v = createViewer({
-      collection: many(3000),
+      collection: many(3000, 3),
       plugins: [thumbnails({ groupDisplay: 'flat' })],
     })
     mount(v)
-    v.open({ g: 1200, i: 0 })
-    const thumb = document.querySelector('.gallerist-thumb-item[data-item="g1200i0"]')
-    expect(thumb?.getAttribute('aria-posinset')).toBe('1201')
-    expect(thumb?.getAttribute('aria-setsize')).toBe('3000')
+    v.open({ g: 1200, i: 1 })
+    const thumb = document.querySelector('.gallerist-thumb-item[data-item="g1200i1"]')
+    expect(thumb?.closest('[role="group"]')?.getAttribute('data-group')).toBe('g1200')
+    expect(thumb?.getAttribute('aria-posinset')).toBe('2') // "Item 2, 2 of 3", not "…, 3602 of 9000"
+    expect(thumb?.getAttribute('aria-setsize')).toBe('3')
   })
 
   it('a numeric overscan below what fits is raised to it, so the rail never shows gaps', async () => {
@@ -1409,6 +1423,30 @@ describe('strip helpers', () => {
     rail.style.overflowX = 'hidden'
     rail.style.overflowY = 'auto'
     expect(axisOf(rail)).toBe('y')
+    // a block / grid box that scrolls both ways: the way its content overflows, else its longer side
+    rail.style.overflowX = 'auto'
+    const box = (sw: number, cw: number, sh: number, ch: number) => {
+      for (const [k, v] of Object.entries({
+        scrollWidth: sw,
+        clientWidth: cw,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }))
+        Object.defineProperty(rail, k, { get: () => v, configurable: true })
+    }
+    box(120, 100, 900, 300)
+    expect(axisOf(rail)).toBe('y')
+    box(900, 300, 120, 100)
+    expect(axisOf(rail)).toBe('x')
+    box(400, 400, 400, 400)
+    expect(axisOf(rail)).toBe('x') // fits, as wide as tall: a row
+    box(80, 80, 400, 400)
+    expect(axisOf(rail)).toBe('y') // fits, taller than wide
+    // a flex row (the theme's bottom rail: overflow-x auto, which makes overflow-y auto too) runs
+    // along x whatever its box
+    rail.style.display = 'flex'
+    box(80, 80, 900, 400)
+    expect(axisOf(rail)).toBe('x')
   })
 
   it('middleOf finds the card under the middle of the scroller, in any order', () => {

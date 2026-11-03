@@ -346,18 +346,12 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           })
         : null
 
-    // `pos`/`size`: where the thumb sits in its list (1-based), which may be drawn only in part
-    const buildItemButton = (
-      item: Item,
-      gIndex: number,
-      iIndex: number,
-      pos = iIndex + 1,
-      size = viewer.getCollection().groups[gIndex]?.items.length ?? 0,
-    ): HTMLButtonElement => {
+    // placed within its group (1-based), which may be drawn only in part
+    const buildItemButton = (item: Item, gIndex: number, iIndex: number): HTMLButtonElement => {
       const btn = thumbButton(t.item(iIndex + 1), 'gallerist-thumb-item', () =>
         viewer.goTo(gIndex, iIndex),
       )
-      setPos(btn, pos, size)
+      setPos(btn, iIndex + 1, viewer.getCollection().groups[gIndex]?.items.length ?? 0)
       btn.dataset.item = item.id
       btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
       if (o.numberItems) {
@@ -438,7 +432,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // ── stacked mode ─────────────────────────────────────────────────────────
     // ── index mode ───────────────────────────────────────────────────────────
     const buildIndexRow = (group: Group, gIndex: number): HTMLButtonElement => {
-      const name = group.caption ?? t.group(gIndex + 1)
+      const name = captionOf(group) ?? t.group(gIndex + 1)
       const subtitle = metaSubtitle(group)
       const count = group.items.length
       const label = t.section(name, subtitle, count)
@@ -789,7 +783,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
         let ib = itemBtns.get(e.itemId)
         if (!ib) {
-          ib = buildItemButton(item, e.g, e.i, fi + 1, flat.length)
+          ib = buildItemButton(item, e.g, e.i) // placed within its group, like the item column
           itemBtns.set(e.itemId, ib)
         }
         place(row, ib, prevBtn)

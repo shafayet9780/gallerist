@@ -24,14 +24,23 @@ const far = (r: DOMRect, axis: Axis) => (axis === 'x' ? r.right : r.bottom)
 /**
  * Which way `scroller` runs its cards: down a column (a side rail, a flex column, or a box that only
  * scrolls vertically), else along a row. Read from the scroller, not from the cards, which can sit
- * side by side inside a vertical rail (a flat rail's group rows).
+ * side by side inside a vertical rail (a flat rail's group rows). A flex row runs along x. A block or
+ * grid box that scrolls both ways (or neither) runs the way its content overflows most, else along
+ * its longer side.
  */
 export function axisOf(scroller: Element): Axis {
   const s = getComputedStyle(scroller)
-  return /column/.test(s.flexDirection) ||
-    (/hidden|clip/.test(s.overflowX) && /auto|scroll/.test(s.overflowY))
-    ? 'y'
-    : 'x'
+  if (/column/.test(s.flexDirection)) return 'y'
+  const scrollsX = /auto|scroll/.test(s.overflowX)
+  const scrollsY = /auto|scroll/.test(s.overflowY)
+  if (scrollsY && /hidden|clip/.test(s.overflowX)) return 'y'
+  // a flex row runs along x, even though overflow-x: auto computes overflow-y to auto as well
+  if (/flex/.test(s.display)) return 'x'
+  if (scrollsX !== scrollsY) return scrollsY ? 'y' : 'x'
+  const { scrollWidth: sw, clientWidth: cw, scrollHeight: sh, clientHeight: ch } = scroller
+  const overX = Math.max(0, sw - cw)
+  const overY = Math.max(0, sh - ch)
+  return overY > overX || (overY === overX && ch > cw) ? 'y' : 'x'
 }
 
 /**

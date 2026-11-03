@@ -28,6 +28,25 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   skin took ~660 ms there; now ~65 ms.
 
 ### Fixed
+- **renderer-dom**: a focused caption band that stops scrolling (a shorter caption after ←/→, a taller
+  viewport, the captions plugin removed) hands focus back to the viewer instead of dropping it to
+  `<body>`, and ↑/↓/Home/End aimed at a band that no longer scrolls navigate again. A sub-pixel overflow
+  doesn't count as scrolling. The theme rings a focused band (`--gallerist-focus`, inset).
+- **plugin-download**: whether a URL is cross-origin is judged the way the link resolves it (against
+  `document.baseURI`, so a `<base href>` counts) and against the document's origin: in an
+  `about:srcdoc` frame a relative URL no longer throws (no download, an unhandled rejection), and a
+  relative URL that a `<base>` sends to another origin opens in a new tab instead of navigating the
+  host page away.
+- **renderer-dom, plugin-thumbnails, plugin-grid**: a group caption that isn't a string counts as
+  none (the group title, arrow labels, index rows, overview sections), as item captions already did.
+- **plugin-thumbnails**: in a `flat` rail, item thumbs give their place within their group
+  (`aria-posinset` / `aria-setsize`), like the item column, not in the whole flattened list ("Item 2,
+  57 of 10000" inside "Group 29"). A block or grid rail that scrolls both ways takes its axis from
+  the way its content overflows (else its longer side).
+- **plugin-grid**: a run drawn before the grid had a layout (its columns unknown) is realigned to a
+  row on the first scroll check, so growing it upward no longer shifts every cell sideways once.
+- **renderer-dom**: `ResolvedPreset` is typed read-only (and its `rootAttrs` / `thumbnails`), matching
+  the frozen built-in presets.
 - **plugin-thumbnails**: mounting a viewer again with another preset (`h = mount(v, { preset:
   'reviewer' }); h.destroy(); mount(v, { preset: 'editorial' })`, or none, then `tour`) kept the first
   mount's rail (its timeline and aside stack under the new layout); the rail is rebuilt for each mount.

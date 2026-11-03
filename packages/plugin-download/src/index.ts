@@ -45,11 +45,18 @@ export function filenameOf(item: Item, url?: string | null): string {
   return sanitizeName(base?.includes('.') ? base : item.id)
 }
 
-// A blob: URL is this document's own; anything else compares its origin with the page's.
+// A blob: URL is this document's own; anything else compares its origin with the document's.
+// Resolved like the anchor resolves it (against document.baseURI, so a <base href> counts), and
+// compared with the document's origin (globalThis.origin): location.origin is "null" in an
+// about:srcdoc frame, whose relative URLs would also throw against location.href.
 const crossOrigin = (url: string): boolean => {
-  if (typeof location === 'undefined') return false
-  const u = new URL(url, location.href)
-  return u.protocol !== 'blob:' && u.origin !== location.origin
+  if (typeof document === 'undefined') return false
+  try {
+    const u = new URL(url, document.baseURI)
+    return u.protocol !== 'blob:' && u.origin !== (globalThis.origin || location.origin)
+  } catch {
+    return false
+  }
 }
 
 function anchorDownload(url: string, filename: string): void {
