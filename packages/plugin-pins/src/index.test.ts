@@ -984,6 +984,18 @@ describe('plugin-pins', () => {
       save().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
       plugin.open(null, { focus: true })
       ring(false)
+      // a host shortcut (Ctrl+K) after a key: open(id, { focus: true }) rings; after a pointer: not
+      for (const [before, on] of [
+        [key('Tab'), true],
+        [new PointerEvent('pointerdown', { bubbles: true }), false],
+      ] as const) {
+        plugin.open(null)
+        document.body.dispatchEvent(before)
+        document.body.dispatchEvent(held('k', 'ctrlKey'))
+        plugin.open('p1', { focus: true })
+        expect(document.activeElement).toBe(cards()[0])
+        ring(on)
+      }
     })
 
     it('open(id) before the plugin first joins a viewer opens that card on the first paint', async () => {
@@ -997,6 +1009,34 @@ describe('plugin-pins', () => {
         document.querySelector('[data-pin="p2"] .gallerist-pin-card')?.hasAttribute('hidden'),
       ).toBe(false)
       expect(markers()[1]?.getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('a pointer down before the first paint does not cancel a pending open(id)', async () => {
+      // a deep link opens a pin, then the click that creates the viewer
+      const plugin = pins()
+      plugin.open('p2')
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      const v = createViewer({ collection: collection(), plugins: [plugin] })
+      mount(v)
+      v.open()
+      await flush()
+      expect(
+        document.querySelector('[data-pin="p2"] .gallerist-pin-card')?.hasAttribute('hidden'),
+      ).toBe(false)
+      // a closed overlay viewer: open(id), then the click that opens it again
+      v.close()
+      await flush()
+      plugin.open('p1')
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      v.open()
+      await flush()
+      expect(
+        document.querySelector('[data-pin="p1"] .gallerist-pin-card')?.hasAttribute('hidden'),
+      ).toBe(false)
+      expect(markers()[0]?.getAttribute('aria-expanded')).toBe('true')
+      // once drawn, a pointer down outside closes it
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      expect(markers()[0]?.getAttribute('aria-expanded')).toBe('false')
     })
   })
 
@@ -1245,6 +1285,29 @@ describe('plugin-pins', () => {
       expect(reached).toHaveBeenCalledTimes(2) // a pinch zooms the image
       wheel(card, { deltaY: 40 })
       expect(reached).toHaveBeenCalledTimes(3) // beside the textarea: nothing scrolls, it zooms
+    })
+
+    it('a wheel over a scroller in a web component’s shadow tree scrolls it', () => {
+      // (a host's <sl-textarea>; the ShadowRoot on the path never counts. happy-dom doesn't retarget
+      // e.target to the custom element as a browser does: pins.spec.ts covers that)
+      const field = document.createElement('x-field')
+      const text = document.createElement('textarea')
+      Object.defineProperties(text, { scrollHeight: { value: 300 }, clientHeight: { value: 60 } })
+      field.attachShadow({ mode: 'open' }).append(text)
+      open({ renderCard: () => field })
+      const stage = document.querySelector('.gallerist-stage') as HTMLElement
+      const reached = vi.fn()
+      stage.addEventListener('wheel', reached)
+      const wheel = (el: Element) =>
+        el.dispatchEvent(
+          new WheelEvent('wheel', { bubbles: true, composed: true, cancelable: true, deltaY: 40 }),
+        )
+      layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 120) }, 100)
+      expect(openCard().tabIndex).toBe(-1) // the card itself fits
+      wheel(text)
+      expect(reached).not.toHaveBeenCalled() // the shadow textarea scrolls
+      wheel(field)
+      expect(reached).toHaveBeenCalledTimes(1) // the custom element itself doesn't: the image zooms
     })
 
     it('never under a band floated over the stage (immersive: the inset controls box)', () => {

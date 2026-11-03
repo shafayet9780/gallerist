@@ -1,6 +1,6 @@
 // Pins fixture (e2e/tests/pins.spec.ts): one landscape item with three pins and one portrait item
-// (for the contained zoom bounds). Query: skin, scheme, preset, presentation, card, bg (the landscape
-// image's colour), dir.
+// (for the contained zoom bounds). Query: skin, scheme, preset, presentation, card (h: card=empty's
+// height), bg (the landscape image's colour), dir.
 import { type Collection, createViewer } from '@gallerist/core'
 import { type Pin, type PinPresentation, pins } from '@gallerist/plugin-pins'
 import { type ColorScheme, type PresetName, mount } from '@gallerist/renderer-dom'
@@ -129,16 +129,20 @@ const draftCard = draft
     }
   : {}
 // card=note: a short host card that is only a textarea whose text overflows it (it scrolls, the card
-// doesn't)
+// doesn't); card=shadow: the same textarea inside a web component's shadow root (as <sl-textarea>)
 const noteCard =
-  p.get('card') === 'note'
+  p.get('card') === 'note' || p.get('card') === 'shadow'
     ? {
         renderCard: () => {
           const text = document.createElement('textarea')
           text.setAttribute('aria-label', 'Note')
           text.style.cssText = 'display:block;box-sizing:border-box;width:200px;height:64px'
           text.value = Array.from({ length: 30 }, (_, k) => `Line ${k + 1}`).join('\n')
-          return text
+          if (p.get('card') === 'note') return text
+          const field = document.createElement('x-field')
+          field.style.display = 'block'
+          field.attachShadow({ mode: 'open' }).append(text)
+          return field
         },
       }
     : {}
@@ -167,7 +171,20 @@ const fragCard =
         },
       }
     : {}
+// card=empty: a host card with no contents yet (or `h` px of them), as one filled later
+const emptyCard =
+  p.get('card') === 'empty'
+    ? {
+        renderCard: () => {
+          const div = document.createElement('div')
+          div.className = 'host-card'
+          div.style.height = `${Number(p.get('h') ?? 0)}px`
+          return div
+        },
+      }
+    : {}
 const plugin = pins({
+  ...emptyCard,
   ...formCard,
   ...draftCard,
   ...noteCard,

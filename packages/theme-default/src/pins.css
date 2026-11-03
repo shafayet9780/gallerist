@@ -94,6 +94,10 @@
   max-width: min(280px, 70vw);
   padding: 12px;
   padding-inline: 14px 32px; /* the close button's room */
+  /* room for × however little the contents are (it reaches 20px into the content box: 28 - 8), so
+     an empty card never scrolls: 1 + 12 + 20 + 12 + 1 (border, padding, ×). Shorter, × overflowed
+     it, and the fade's 12px flipped it back each frame (tabindex and fade flickered). */
+  min-height: 46px;
   border: 1px solid var(--gallerist-hairline);
   border-radius: var(--gallerist-radius);
   background: var(--gallerist-pin-card-bg);
@@ -209,7 +213,9 @@
      held there as it scrolls (sticky insets count from the card's content box, inside its 12px
      padding). It takes no room: it fills the inline-end padding but its last 4px, and its block
      margins cancel its height, so the contents start at the top and a host's first block keeps its
-     own top margin (a positive one collapses with the -20px: 20 - 20 + m). It starts where the
+     own top margin (a positive one collapses with the -20px: 20 - 20 + m). A negative one collapses
+     with it too, the more negative winning, so the block starts at min(0, 20 + m): -10px has no
+     effect, -30px lifts it 10px. It starts where the
      content box ends: Chromium counts an in-flow box from its start at least, plus the end padding,
      in what scrolls, so one starting further in made every card scroll 4px sideways. */
   position: sticky;

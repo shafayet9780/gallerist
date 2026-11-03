@@ -69,7 +69,12 @@
 - **plugin-pins (fixed)**: `open()` from a callback run by `destroy()` (say `onCardRemove`) opens
   nothing. It left a document listener attached past destroy, and a plugin moved to a new viewer
   opened that card on the first paint. An `open(id)` before the plugin first joins a viewer still
-  waits and opens that card on the first paint.
+  waits and opens that card on the first paint, and a click before then (say the one that creates
+  the viewer, or reopens a closed overlay viewer) no longer cancels it.
+- **theme (fixed)**: an open card with no contents (a pin with nothing to show, a host card filled
+  later) or only a few pixels of them is tall enough for its close button (`min-height: 46px`), so it
+  doesn't scroll. The button overflowed it, and the scroll fade then flipped the card in and out of
+  scrolling every frame: the fade flickered and the card dropped in and out of the tab order.
 - **plugin-pins, theme (fixed)**: a card lays out its contents in normal block flow again. As a flex
   column it stacked a host fragment's inline siblings, stretched its buttons, links and inputs to
   the card's width and stopped paragraph margins collapsing. The close button is now first in the
@@ -78,11 +83,14 @@
   more (Chromium counted the close button 4px past the content box: a classic scrollbar showed).
 - **plugin-pins (fixed)**: a wheel over a host's textarea or list that scrolls, in a card that
   doesn't, zoomed the image instead of scrolling it (the stage cancels the wheel): a card keeps a
-  wheel when anything from the target up to the card scrolls on the wheel's axis. A pinch there
+  wheel when anything from the target up to the card scrolls on the wheel's axis, also inside a web
+  component's open shadow root (an `<sl-textarea>`: the walk follows the composed path). A pinch there
   still zooms the image. A host's textarea or select pans vertically on touch rather than letting a
   pinch zoom the page. A card that shrinks to within the fade's 12px of the room stops scrolling.
-- **plugin-pins**: the focus ring's input tracking ignores keydowns with meta, ctrl or alt held (a
-  shortcut, or ctrl held for a pinch) and counts a click without a pointer (assistive tech) as a key.
+- **plugin-pins**: the focus ring's input tracking leaves keydowns with meta, ctrl or alt held (a
+  shortcut, or ctrl held for a pinch) out of it, so a host shortcut (Ctrl+K → `open(id, { focus:
+  true })`) rings after a key and not after a pointer, and counts a click without a pointer
+  (assistive tech) as a key.
   No frame is scheduled for a zoom with no card open, and `destroy()` cancels a pending one; with no
   free width at all a card is 0px wide, not a negative `max-width`.
 - **renderer-dom, theme (fixed, docked)**: review fixes for `arrows: 'docked'`: the caption comes

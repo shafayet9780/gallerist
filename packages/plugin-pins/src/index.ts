@@ -385,14 +385,17 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     queueMicrotask(() => rescue(id, card))
   }
   // the last input was a key, not a pointer, seen on the document in capture while the plugin is in
-  // a viewer: a keydown without meta, ctrl or alt (not a shortcut, nor ctrl held for a pinch), or a
-  // click without a pointer (`detail` 0: a key on a button, or assistive tech activating it); a
-  // pointerdown or a pointer's click is not
+  // a viewer: a keydown without meta, ctrl or alt, or a click without a pointer (`detail` 0: a key on
+  // a button, or assistive tech activating it); a pointerdown or a pointer's click is not. A keydown
+  // with one of them (a shortcut, ctrl held for a pinch) leaves it as it was: a host's Ctrl+K that
+  // calls open(id, { focus: true }) after a key rings, after a pointer doesn't
   let kbd = false
   const modality = (e: Event) => {
     const k = e as KeyboardEvent
     kbd =
-      e.type === 'keydown' ? !(k.metaKey || k.ctrlKey || k.altKey) : e.type === 'click' && !k.detail
+      e.type === 'keydown'
+        ? kbd || !(k.metaKey || k.ctrlKey || k.altKey)
+        : e.type === 'click' && !k.detail
   }
   const inputs = ['keydown', 'pointerdown', 'click']
 
@@ -492,9 +495,11 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     }
   }
 
+  // no card on screen (open(id) waiting for its pin's first paint, or for a closed overlay viewer
+  // to open again): nothing to click outside of, so the click that opens the viewer keeps it
   const onOutside = (e: Event) => {
     const target = e.target as Node | null
-    if (target && live().some((r) => r.el.contains(target))) return
+    if (!shown?.el.isConnected || (target && live().some((r) => r.el.contains(target)))) return
     setOpen(null)
   }
 
@@ -629,17 +634,18 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     // nothing that scrolls, zooms the image as anywhere on the stage, whose handler keeps it from
     // zooming the page.
     card.addEventListener('pointerdown', (e) => e.stopPropagation())
+    // The walk follows the event's composed path, so a scroller inside a web component's (open)
+    // shadow tree counts; a ShadowRoot on the path has no scroll sizes, and never does.
     card.addEventListener('wheel', (e) => {
-      for (
-        let el: Element | null | false = e.target as Element;
-        el && !e.ctrlKey;
-        el = el !== card && el.parentElement
-      )
-        if (
-          (e.deltaY && el.scrollHeight > el.clientHeight + 1) ||
-          (e.deltaX && el.scrollWidth > el.clientWidth + 1)
-        )
-          return e.stopPropagation()
+      if (!e.ctrlKey)
+        for (const el of e.composedPath() as Element[]) {
+          if (
+            (e.deltaY && el.scrollHeight > el.clientHeight + 1) ||
+            (e.deltaX && el.scrollWidth > el.clientWidth + 1)
+          )
+            return e.stopPropagation()
+          if (el === card) return
+        }
     })
     card.addEventListener('focusin', () => {
       focusedCard = card
@@ -669,23 +675,21 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
 
   // ── toolbar ────────────────────────────────────────────────────────────────
   const toolbar = () => {
-    const wrap = document.createDocumentFragment()
+    const host = make('div', 'gallerist-pins-tools')
     if (opts.toggle !== false) {
       const btn = button('gallerist-pins-toggle', t.toggle, ICONS.pin)
       btn.setAttribute('aria-pressed', String(visible))
       btn.addEventListener('click', flip)
       toggleBtn = btn
-      wrap.appendChild(btn)
+      host.appendChild(btn)
     }
     if (opts.onPlace) {
       const add = button('gallerist-pin-add', t.add, ICONS.comment)
       add.setAttribute('aria-pressed', 'false')
       addBtn = add
       add.addEventListener('click', place)
-      wrap.appendChild(add)
+      host.appendChild(add)
     }
-    const host = make('div', 'gallerist-pins-tools')
-    host.appendChild(wrap)
     // capture the viewer root once mounted (placing listens on it; announcements go to its live region)
     queueMicrotask(() => {
       root = host.closest<HTMLElement>('.gallerist') ?? root

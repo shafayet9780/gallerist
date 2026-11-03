@@ -441,26 +441,29 @@ test('a card keeps touches from panning or zooming the page (touch-action)', asy
 
 // A short card whose host textarea scrolls: a wheel over the textarea scrolls it (the stage, which
 // cancels the wheel and zooms, doesn't get it); a pinch (ctrl+wheel) there still zooms the image.
-test('a wheel over a scrolling textarea in a short card scrolls it; a pinch zooms the image', async ({
-  page,
-}) => {
-  await ready(page, 'card=note&presentation=comment')
-  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
-  const card = page.locator('[data-pin="a"] .gallerist-pin-card')
-  await expect(card).toHaveAttribute('tabindex', '-1') // the card fits: only the textarea scrolls
-  const note = card.getByLabel('Note')
-  const b = await note.boundingBox()
-  if (!b) throw new Error('no textarea box')
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
-  await page.mouse.wheel(0, 120)
-  await expect.poll(() => note.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
-  await page.waitForTimeout(300) // past the stage's wheel commit
-  expect((await zoomState(page)).scale).toBe(1)
-  await page.keyboard.down('Control')
-  await page.mouse.wheel(0, -120)
-  await page.keyboard.up('Control')
-  await expect.poll(async () => (await zoomState(page)).scale).toBeGreaterThan(1)
-})
+// Also inside a web component's shadow root, where the card sees the wheel retargeted to the host.
+for (const kind of ['note', 'shadow']) {
+  test(`a wheel over a scrolling textarea in a short card scrolls it; a pinch zooms the image (${kind})`, async ({
+    page,
+  }) => {
+    await ready(page, `card=${kind}&presentation=comment`)
+    await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+    const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+    await expect(card).toHaveAttribute('tabindex', '-1') // the card fits: only the textarea scrolls
+    const note = card.getByLabel('Note')
+    const b = await note.boundingBox()
+    if (!b) throw new Error('no textarea box')
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+    await page.mouse.wheel(0, 120)
+    await expect.poll(() => note.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+    await page.waitForTimeout(300) // past the stage's wheel commit
+    expect((await zoomState(page)).scale).toBe(1)
+    await page.keyboard.down('Control')
+    await page.mouse.wheel(0, -120)
+    await page.keyboard.up('Control')
+    await expect.poll(async () => (await zoomState(page)).scale).toBeGreaterThan(1)
+  })
+}
 
 // A host card returned unwrapped (a DocumentFragment) lays out as it would on the page: inline
 // siblings share a line, a button keeps its own width, a first paragraph keeps its top margin. The
@@ -537,6 +540,39 @@ for (const dir of ['ltr', 'rtl']) {
     }
   })
 }
+
+// An empty card (a host's, filled later; a default card for a pin with nothing to show), or one with
+// a few px of contents: × fits inside it, so it never scrolls. Before, × overflowed it, the fade's
+// 12px then read as nothing to scroll, and each flip resized the card: the observer placed it again
+// every frame, the fade flickered and the card dropped in and out of the tab order.
+test('an empty card stays still: its tabindex and fade hold, it is not placed again', async ({
+  page,
+}) => {
+  for (const h of [0, 6]) {
+    await ready(page, `card=empty&h=${h}&presentation=comment`)
+    await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+    const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+    await expect(card).toBeVisible()
+    const seen = await card.evaluate(async (el) => {
+      const frame = () => new Promise((r) => requestAnimationFrame(r))
+      for (let k = 0; k < 3; k++) await frame()
+      // placeCard writes the card's style and tabindex: any write while nothing changes is a loop
+      let writes = 0
+      const watch = new MutationObserver((list) => {
+        writes += list.length
+      })
+      watch.observe(el, { attributes: true, attributeFilter: ['style', 'tabindex'] })
+      const states = new Set<string>()
+      for (let k = 0; k < 12; k++) {
+        await frame()
+        states.add(`${el.getAttribute('tabindex')} ${getComputedStyle(el, '::after').content}`)
+      }
+      watch.disconnect()
+      return { writes, states: [...states], over: el.scrollHeight - el.clientHeight }
+    })
+    expect(seen, `h=${h}`).toEqual({ writes: 0, states: ['-1 none'], over: 0 })
+  }
+})
 
 // Forced colours (Windows High Contrast): the box-shadow bands are dropped, the ring's outline stays;
 // a scrolling card's fade (a gradient) is not drawn.

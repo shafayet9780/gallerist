@@ -64,7 +64,10 @@ The returned plugin also has `refresh()` (re-read pins you changed in place), `s
 `open(id | null, { focus })`: `focus: true` moves focus into the card as it opens (once its pin is
 painted, if it isn't yet, unless focus moved elsewhere meanwhile), or to the pin as it closes. An
 `open(id)` before the plugin has joined a viewer waits and opens on the first paint; after `destroy()`
-it does nothing.
+it does nothing. Until the card is drawn, a click elsewhere doesn't cancel it (the click that creates
+or opens the viewer). An overlay viewer moves focus into itself as it opens, which counts as focus
+having moved: an `open(id, { focus: true })` made before `viewer.open()` may open the card without
+focusing it. To focus the card, call it once the viewer is open.
 
 Use one `pins()` per viewer: the plugin keeps the open card, its listeners and its viewer in the
 instance, so two live viewers sharing one would close each other's cards. Each gallery gets its own
