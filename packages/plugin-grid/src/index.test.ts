@@ -203,6 +203,18 @@ describe('plugin-grid', () => {
       expect(document.activeElement).toBe(document.querySelector('.gallerist'))
     })
 
+    it('opening the overview from the docked item navigator keeps focus inside the viewer', () => {
+      const v = createViewer({ collection: named(), plugins: [grid({ layout: 'sections' })] })
+      mount(v, { arrows: 'docked' })
+      v.open() // g0 has two items: the navigator shows, a root grid item outside the controls
+      const nav = document.querySelector('.gallerist > .gallerist-itemnav') as HTMLElement
+      expect(nav.hidden).toBe(false)
+      const down = nav.querySelector('.gallerist-item-next') as HTMLButtonElement
+      down.focus()
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      expect(document.activeElement).toBe(document.querySelector('.gallerist'))
+    })
+
     it('draws the sections near the current one (4 each side, or overscan)', () => {
       const many: Collection = {
         groups: Array.from({ length: 20 }, (_, i) => ({ id: `g${i}`, items: [item(`m${i}`)] })),

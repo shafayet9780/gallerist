@@ -55,6 +55,23 @@ test('the overview opens first, hides the stage controls, and Start enters the t
   expect((await cursor(page)).g).toBe(1)
 })
 
+// docked arrows (reviewer): the item navigator is a root grid item, outside the stage's controls,
+// so the overview hides it as well; focus on it stays in the viewer
+test('the overview hides a docked item navigator, and focus on it stays in the viewer', async ({
+  page,
+}) => {
+  await page.goto('/layout.html?preset=reviewer&g=1&overview=1')
+  const nav = page.locator('.gallerist > .gallerist-itemnav')
+  await expect(nav).toBeVisible()
+  await nav.locator('.gallerist-item-next').focus()
+  await page.keyboard.press('g')
+  await expect(page.locator('.gallerist-grid-start')).toBeVisible()
+  await expect(nav).toBeHidden()
+  expect(await page.evaluate(() => !!document.activeElement?.closest('.gallerist'))).toBe(true)
+  await page.keyboard.press('g')
+  await expect(nav).toBeVisible()
+})
+
 test('an overview cell opens that item', async ({ page }) => {
   await page.goto('/layout.html?preset=tour&captions=1&g=0&overview=1')
   await page.locator('.gallerist-grid-cell[data-item="g1i2"]').click()

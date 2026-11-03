@@ -70,6 +70,13 @@ const CONFIGS: Record<string, string> = {
   'docked-rail-hidden': 'arrows=docked&rail=hidden&captions=1',
   'reviewer-wide': 'preset=reviewer&wide=1&custom=short',
   'reviewer-large-group': 'preset=reviewer&g=5&captions=1',
+  // docked where the caption isn't a row under the stage: immersive (the stage's corner) and
+  // editorial without a placard (the end of the caption column); one group (no group arrows, no
+  // gutters); linear (no navigator, no room kept for it)
+  'docked-immersive': 'preset=immersive&arrows=docked&captions=1&railopen=1',
+  'docked-editorial': 'preset=editorial&arrows=docked&indicator=pills&captions=1',
+  'docked-one-group': 'arrows=docked&groups=1&g=0&captions=1',
+  'docked-linear': 'preset=reviewer&linear=1&captions=1',
 }
 
 // every configuration runs in every skin: skins set tokens (sizes included), so each needs the sweep
@@ -470,6 +477,8 @@ test.describe('reviewer: nothing over the media', () => {
           'g=1&custom=short&wide=1', // a panorama fills the stage's width: the arrows' gutters
           'g=5&captions=1&dir=rtl',
           'g=1&custom=short&rail=hidden', // no item column: the navigator ends the caption row
+          'g=1&captions=1&rail=left', // a side rail: a vertical group axis, both arrows at the end
+          'g=1&custom=short&rail=right',
         ]) {
           test(`${skin} ${look}`, async ({ page }) => {
             await page.goto(`/layout.html?preset=reviewer&skin=${skin}&${look}`)
@@ -484,9 +493,15 @@ test.describe('reviewer: nothing over the media', () => {
                 page.locator('.gallerist-content[data-gallerist-current] .gallerist-media-image'),
               ).toHaveAttribute('data-gallerist-loaded', '')
               if (!look.includes('rail=hidden')) await railSettled(page)
-              // the item's own entrance (a skin's slide or fade) has ended
+              // the item's own entrance (a skin's slide or fade) has ended; an endless animation (a
+              // loading shimmer, say) never finishes, so it isn't waited for
               await page.evaluate(() =>
-                Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))),
+                Promise.all(
+                  document
+                    .getAnimations()
+                    .filter((a) => a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY)
+                    .map((a) => a.finished.catch(() => null)),
+                ),
               )
               const media = await paintedMedia(page)
               if (!media) {
@@ -546,6 +561,83 @@ test.describe('reviewer: nothing over the media', () => {
     await page.keyboard.press('t') // collapse the rail: the item column goes with it
     await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-rail', 'collapsed')
     await expect.poll(async () => (await where()).inCaptionRow).toBe(true)
+  })
+
+  test('Tab reads the caption band, then the navigator that ends its row', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'Tab order is DOM order; runs once (chromium)')
+    // a tall caption renderer's band scrolls, so it takes focus
+    await page.goto('/layout.html?preset=reviewer&skin=console&g=1&custom=tall&rail=hidden')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    const band = page.locator('.gallerist-caption[tabindex="0"]')
+    await band.focus()
+    await page.keyboard.press('Tab')
+    await expect(page.locator('.gallerist-item-prev')).toBeFocused()
+  })
+
+  test('one group: no group arrows, and the stage takes their gutters', async ({ page }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console&groups=1&g=0&captions=1')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    await expect(page.locator('.gallerist-prev')).toBeHidden()
+    await expect(page.locator('.gallerist-next')).toBeHidden()
+    const [stage, main] = await Promise.all(
+      ['.gallerist-stage', '.gallerist-main'].map((s) => page.locator(s).boundingBox()),
+    )
+    expect(stage?.width).toBe(main?.width)
+  })
+
+  test('linear: the item column keeps no room for a navigator that never shows', async ({
+    page,
+  }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console&linear=1&captions=1')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    await railSettled(page)
+    await expect(page.locator('.gallerist-region-aside .gallerist-thumb-items')).toBeVisible()
+    await expect(page.locator('.gallerist-itemnav')).toBeHidden()
+    await expect(page.locator('.gallerist-region-aside')).toHaveCSS('padding-top', '0px')
+  })
+
+  test('the docked navigator is a box in every skin, never a pill', async ({ page }) => {
+    for (const skin of SKINS) {
+      await page.goto(`/layout.html?preset=reviewer&skin=${skin}&g=1&captions=1&rail=hidden`)
+      const nav = page.locator('.gallerist-itemnav')
+      await expect(nav).toBeVisible()
+      const { radius, h } = await nav.evaluate((n) => ({
+        radius: Number.parseFloat(getComputedStyle(n).borderTopLeftRadius),
+        h: n.getBoundingClientRect().height,
+      }))
+      expect(radius, skin).toBeLessThanOrEqual(h / 4)
+    }
+  })
+
+  test('docked in other presets: editorial without a placard, immersive', async ({ page }) => {
+    const box = (sel: string) =>
+      page.evaluate((s) => document.querySelector(s)?.getBoundingClientRect().toJSON(), sel)
+    // editorial: the navigator ends the caption column beside the work, under the caption
+    await page.goto('/layout.html?preset=editorial&arrows=docked&indicator=pills&g=1&captions=1')
+    await expect(page.locator('.gallerist-itemnav')).toBeVisible()
+    await railSettled(page)
+    let nav = await box('.gallerist-itemnav')
+    const stage = await box('.gallerist-stage')
+    const caption = await box('.gallerist-caption')
+    expect(nav.left).toBeGreaterThanOrEqual(stage.right)
+    expect(nav.top).toBeGreaterThanOrEqual(caption.bottom)
+    expect(nav.bottom).toBeLessThanOrEqual(stage.bottom + 0.5)
+    // immersive: the stage runs under every band; the navigator takes its bottom inline-end corner,
+    // clear of the bar and the caption band, which keeps its full width
+    await page.goto('/layout.html?preset=immersive&arrows=docked&g=1&captions=1&railopen=1')
+    await expect(page.locator('.gallerist-itemnav')).toBeVisible()
+    await railSettled(page)
+    nav = await box('.gallerist-itemnav')
+    const [bar, band, main] = await Promise.all(
+      ['.gallerist-bar', '.gallerist-caption', '.gallerist-main'].map(box),
+    )
+    expect(nav.top).toBeGreaterThanOrEqual(bar.bottom)
+    expect(nav.bottom).toBeLessThanOrEqual(band.top + 0.5)
+    expect(nav.right).toBeLessThanOrEqual(main.right)
+    expect(band.width).toBeCloseTo(main.width, 0)
   })
 })
 

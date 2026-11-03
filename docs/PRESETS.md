@@ -109,7 +109,15 @@ The ←/→ group arrows stay on the side edges; the option places the **item na
   rail's vertical item stack, over 600px wide, rail expanded), otherwise at the end of the caption
   row, beside a text caption or a designed one (`plugin-captions`, `<Gallerist.Caption>`), which make
   room for it. It shows the count rather than pills or dots. While any group has several items it
-  keeps its room on a one-item group, so neither the stage nor the item column moves.
+  keeps its room on a one-item group, so neither the stage nor the item column moves (not in
+  `linear` mode, which has no navigator). A one-group collection has no group arrows and no
+  gutters (in `linear` mode the arrows walk the items, so they stay). Keyboard order follows the
+  layout: the caption band, then the navigator, then the item column it heads. One exception, by
+  design: the zoom minimap (the `reviewer`'s zoom navigator) still sits in the stage's corner over
+  the media; it shows only while zoomed in and is the zoom tool itself. With other presets:
+  `editorial` without a placard ends its caption column with the navigator, under the caption;
+  `immersive`, whose stage runs under every band, puts it in the stage's bottom inline-end corner
+  above the caption band, as `corner-br` does, so there it sits over the media.
 
 The position inside the navigator follows `itemIndicator` (`mount` option / `<Gallerist itemIndicator>`):
 `pills` (default — numbered pills up to 8 items, then `n / N`), `dots` (plain dots plus the `n / N`

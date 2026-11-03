@@ -73,7 +73,7 @@
 .gallerist-pin-card {
   position: absolute;
   z-index: 1;
-  box-sizing: border-box; /* the renderer's max-width is the room beside the pin, padding included */
+  box-sizing: border-box; /* the plugin's max-width / max-height are the room in the stage, padding included */
   width: max-content;
   max-width: min(280px, 70vw);
   padding: 12px 36px 12px 14px;
@@ -86,6 +86,8 @@
   font: 400 13px / 1.4 var(--gallerist-font);
   text-align: start;
   cursor: auto;
+  overflow: auto; /* a card taller than the room scrolls */
+  overscroll-behavior: contain;
 }
 .gallerist-pin-card[hidden] {
   display: none;
@@ -152,7 +154,8 @@
   text-underline-offset: 3px;
 }
 .gallerist-pin-link:focus-visible,
-.gallerist-pin-close:focus-visible {
+.gallerist-pin-close:focus-visible,
+.gallerist-pin-card:focus-visible {
   outline: 2px solid var(--gallerist-focus);
   outline-offset: 2px;
 }

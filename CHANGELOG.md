@@ -27,6 +27,42 @@
 - **plugin-pins (fixed)**: a pin opens on the current item only (a neighbour's slide can carry the
   same id), painting a neighbour's slide no longer closes the open card, and a closed overlay
   viewer's pins still open after it reopens.
+- **plugin-pins (changed)**: `onCardRemove` and `onOpenChange` run once the change has settled, in
+  order, also when one calls back into the plugin: `open(B)` from `onCardRemove` now reports B's
+  opening after the change that led to it, so the last event names the open pin. A callback that
+  throws is reported (`reportError`, else `console.error`, like core's event handlers) and the rest
+  still run; before, it propagated to whatever opened or closed the card.
+- **plugin-pins (fixed)**: a `renderCard` that throws gets the default card for that pin and the
+  error is reported, instead of leaving the plugin half-switched (the old card's node never handed
+  back, the new card open with only a close button, no `onOpenChange`). Returning the same node
+  again (one cached per pin) is supported: a redraw that gets it back no longer hands the live node
+  to `onCardRemove`.
+- **plugin-pins (fixed)**: a repaint's deferred reopen no longer reopens a card closed in the same
+  task, or adds listeners after the plugin was destroyed; `destroy()` forgets the viewer root, so the
+  same instance in a new viewer listens on the new one. `open(id, { focus: true })` for a pin not
+  painted yet leaves focus alone if the user moved it meanwhile. In an inline viewer, focus on
+  `<body>` is no longer pulled into the viewer when the host changes the item while a card is open
+  (only focus that was in the card, or anywhere in an open overlay viewer, is rescued). One `pins()`
+  per viewer is documented.
+- **plugin-pins (fixed)**: a card stays inside the stage on both axes. It was only sized across, so on
+  a landscape phone (a 159px stage, a 194px host card) it ran past the stage's bottom or opened up
+  under the toolbar, out of reach. It now opens level with its pin, slides along it to fit, is never
+  taller than the room (the stage less any band floated over it), and scrolls past that, joining the
+  tab order so the keys scroll it (↑ ↓ Home End Page Up/Down on the focused card don't navigate). It
+  is re-placed as a host's contents resize, and a wheel over it scrolls it instead of zooming.
+- **plugin-pins (fixed)**: when the host drops a pin as its card closes (an empty draft, removed in
+  `onOpenChange` with `refresh()`), the repaint a frame later took the pin focus had gone to and left
+  focus on `<body>`. A repaint that drops the focused pin now moves focus on to its marker if it is
+  back, else the add-pin button, else the viewer.
+- **plugin-pins**: focus the plugin moves after a key (Escape, or from a control showing the focus
+  ring) asks for the ring (`focusVisible`; Chromium and Firefox). After a click it is left to the
+  browser, which by convention shows none.
+- **renderer-dom, theme (fixed, docked)**: review fixes for `arrows: 'docked'`: the caption comes
+  before the navigator in DOM and tab order; placements for immersive and editorial; a box radius;
+  aside header room only with several items and not linear; the overview (`grid({ layout:
+  'sections' })`) hides the navigator too; and a new root attribute, `data-gallerist-one-group`,
+  drops the group arrows and their gutters on a one-group collection (not in linear mode), handing a
+  focused arrow's focus to the viewer.
 
 ### Performance (U17)
 Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-based regression gate.

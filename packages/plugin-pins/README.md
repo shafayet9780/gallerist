@@ -62,15 +62,27 @@ The default card links only to `http:`, `https:`, `mailto:` and `tel:` URLs, and
 
 The returned plugin also has `refresh()` (re-read pins you changed in place), `setVisible(bool)` and
 `open(id | null, { focus })`: `focus: true` moves focus into the card as it opens (once its pin is
-painted, if it isn't yet), or to the pin as it closes. Escape closes an open card (or cancels placing)
+painted, if it isn't yet, unless focus moved elsewhere meanwhile), or to the pin as it closes.
+
+Use one `pins()` per viewer: the plugin keeps the open card, its listeners and its viewer in the
+instance, so two live viewers sharing one would close each other's cards. Each gallery gets its own
+`pins({...})`; the same instance can move to a new viewer once the old one is destroyed (a React remount). Escape closes an open card (or cancels placing)
 without closing the viewer, wherever focus is; a field in a `renderCard` card keeps Escape for itself
 by calling `event.preventDefault()` in its own `keydown` handler. A card opens toward the side of the
-stage with more room. While placing, a pan or a click beside the image keeps the mode armed; a click
+stage with more room and stays inside the stage on both axes: level with its pin when it fits, else
+slid along it, never under a band floated over the stage (immersive), and never taller than the room;
+a taller card scrolls (it then joins the tab order, and ↑ ↓ Home End Page Up/Down scroll it rather
+than navigate). It is placed again as its contents resize, so a host may render into it late. While
+placing, a pan or a click beside the image keeps the mode armed; a click
 outside the stage cancels it.
 
 Focus never falls to `<body>` (where the next Escape would close the viewer): when a card closes or is
 redrawn while focus is inside it, focus goes to its pin if that is still on the current item, else to
-the "Add a comment" button, else to the viewer.
+the "Add a comment" button, else to the viewer. Focus already on `<body>` is moved too in an open overlay
+viewer, but not in an inline one, where it may have come from a control of your page. The same holds when a
+repaint drops the pin that has focus (you removed it, say an empty draft in `onOpenChange` followed by
+`refresh()`): focus moves on once the repaint is done. Focus moved after a key (Escape, or from a
+control showing the focus ring) asks for the ring (`focusVisible`); after a click the browser decides.
 
 ```ts
 const commentPins = pins({
@@ -107,24 +119,39 @@ card is redrawn (`refresh()`, new data for its item), and the node it returned i
 `onCardRemove` once it has left the card: the card closed (its pin, Escape, `open()`, another pin, a
 click outside), moved to another item, its pin left the data, the redraw replaced it, or the plugin or
 viewer was destroyed. Exactly once per node, so a portal or root can follow it. Return an element (a
-`DocumentFragment` empties as it is inserted). A portal keeps the card in your React tree (context,
-state, event handlers):
+`DocumentFragment` empties as it is inserted).
+
+- Returning the same node again is supported (say, one cached per pin): a redraw that gets it back
+  doesn't hand it to `onCardRemove`; it is handed back when it really leaves, once each time it does.
+- If `renderCard` throws, that pin gets the default card and the error is reported (`reportError`, so
+  `window.onerror`; else `console.error`) once the card has opened. The same goes for a callback that
+  throws: the rest still run.
+- `onCardRemove` and `onOpenChange` run after the change has settled, in order. Calling `open()` or
+  `refresh()` from them is fine (its own events follow); from `renderCard` it isn't.
+
+A portal keeps the card in your React tree (context, state, event handlers). Give each node its own
+key (a counter, not `pin.id`: a redraw briefly has two nodes for the same pin):
 
 ```tsx
+import type { Collection } from '@gallerist/core'
 import { type Pin, pins } from '@gallerist/plugin-pins'
 import { Gallerist } from '@gallerist/react'
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-function ReviewPins({ onSave }: { onSave: (pin: Pin, text: string) => void }) {
-  const [cards, setCards] = useState<Array<{ pin: Pin; node: HTMLElement }>>([])
+type Card = { key: number; pin: Pin; node: HTMLElement }
+let nextKey = 0
+
+function ReviewPins(props: { collection: Collection; onSave: (pin: Pin, text: string) => void }) {
+  const { collection, onSave } = props
+  const [cards, setCards] = useState<Card[]>([])
   const plugin = useMemo(
     () =>
       pins({
         presentation: 'comment',
         renderCard: (pin) => {
           const node = document.createElement('div')
-          setCards((list) => [...list, { pin, node }])
+          setCards((list) => [...list, { key: ++nextKey, pin, node }])
           return node
         },
         onCardRemove: (_pin, node) => setCards((list) => list.filter((c) => c.node !== node)),
@@ -134,7 +161,9 @@ function ReviewPins({ onSave }: { onSave: (pin: Pin, text: string) => void }) {
   return (
     <>
       <Gallerist collection={collection} plugins={[plugin]} preset="reviewer" skin="console" />
-      {cards.map(({ pin, node }) => createPortal(<CommentForm pin={pin} onSave={onSave} />, node))}
+      {cards.map(({ key, pin, node }) =>
+        createPortal(<CommentForm pin={pin} onSave={onSave} />, node, String(key)),
+      )}
     </>
   )
 }

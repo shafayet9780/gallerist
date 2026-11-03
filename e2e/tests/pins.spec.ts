@@ -244,3 +244,109 @@ test('a zoomed portrait pans only to its own edges, never into the letterbox (M1
   expect(box.w).toBeGreaterThan(stage.width)
   expect(Math.abs(box.x - stage.x)).toBeLessThan(1.5) // the image's left edge stops at the stage's
 })
+
+// Apploye's landscape phone (844×390): a host card taller than the stage ran past its bottom, or
+// opened up under the toolbar. It stays inside the stage and scrolls; its last button is reachable.
+test('a tall host card on a landscape phone stays inside the stage; its last button works', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'runs once (chromium)')
+  await page.setViewportSize({ width: 844, height: 390 })
+  await ready(page, 'card=draft&presentation=comment')
+  for (const id of ['a', 'b', 'c']) {
+    await page.locator(`[data-pin="${id}"] .gallerist-pin-marker`).click()
+    const card = page.locator(`[data-pin="${id}"] .gallerist-pin-card`)
+    await expect(card).toBeVisible()
+    const c = await card.boundingBox()
+    const s = await page.locator('.gallerist-stage').boundingBox()
+    if (!c || !s) throw new Error('missing box')
+    expect(c.y, id).toBeGreaterThanOrEqual(s.y - 1)
+    expect(c.y + c.height, id).toBeLessThanOrEqual(s.y + s.height + 1)
+    expect(c.x, id).toBeGreaterThanOrEqual(s.x - 1)
+    expect(c.x + c.width, id).toBeLessThanOrEqual(s.x + s.width + 1)
+    // taller than the room: it scrolls, and is in the tab order so the keys can scroll it
+    expect(await card.evaluate((el) => el.scrollHeight > el.clientHeight + 1), id).toBe(true)
+    await expect(card).toHaveAttribute('tabindex', '0')
+    // the last button: scrolled into view inside the card (not spilling out of it), and it takes
+    // the click (nothing over it)
+    const discard = card.getByRole('button', { name: 'Discard' })
+    await discard.scrollIntoViewIfNeeded()
+    const b = await discard.boundingBox()
+    if (!b) throw new Error('no button box')
+    expect(b.y, id).toBeGreaterThanOrEqual(c.y)
+    expect(b.y + b.height, id).toBeLessThanOrEqual(c.y + c.height)
+    await discard.click()
+    await expect(card).toBeHidden()
+  }
+})
+
+// The host drops an empty draft when its card closes (onOpenChange + refresh()); the repaint takes
+// its pin a frame after the card's focus went there. Focus goes on to the add button, not <body>.
+test('an empty draft the host drops: focus on the add button; Escape keeps the viewer', async ({
+  page,
+}) => {
+  await ready(page, 'card=draft&presentation=comment')
+  const add = page.locator('.gallerist-pin-add')
+  const place = async () => {
+    await add.click()
+    const box = await imageBox(page)
+    await page.mouse.click(box.x + box.w * 0.6, box.y + box.h * 0.4)
+    await expect(page.locator('.gallerist-pin[data-open] textarea')).toBeVisible()
+  }
+  const settled = () =>
+    page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+  await place()
+  await page.locator('.gallerist-pin[data-open] .gallerist-pin-close').click()
+  await expect(page.locator('[data-pin="n1"]')).toHaveCount(0)
+  await settled()
+  await expect(add).toBeFocused()
+  // Escape from the draft's field: the card closes (the draft with it), not the viewer
+  await place()
+  await page.locator('.gallerist-pin[data-open] textarea').focus()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('[data-pin="n2"]')).toHaveCount(0)
+  await settled()
+  await expect(add).toBeFocused()
+  await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+})
+
+// focus the plugin moves after a key shows the focus ring (focusVisible); after a click it doesn't
+test('focus moved after a key shows the ring; after a click it does not', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'focusVisible: Chromium and Firefox')
+  await ready(page, 'card=draft&presentation=comment')
+  const marker = page.locator('[data-pin="a"] .gallerist-pin-marker')
+  const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+  const ring = () => marker.evaluate((el) => el.matches(':focus-visible'))
+  await marker.click()
+  await card.getByLabel('Comment').click()
+  await page.keyboard.press('Escape')
+  await expect(card).toBeHidden()
+  await expect(marker).toBeFocused()
+  expect(await ring()).toBe(true)
+  await marker.click()
+  await card.locator('.gallerist-pin-close').click()
+  await expect(card).toBeHidden()
+  await expect(marker).toBeFocused()
+  expect(await ring()).toBe(false)
+  // Escape after a click on the card itself (no ring there): a key, so the pin shows the ring
+  await marker.click()
+  const at = await card.boundingBox()
+  if (!at) throw new Error('no card box')
+  await page.mouse.click(at.x + at.width - 6, at.y + at.height - 6)
+  await page.keyboard.press('Escape')
+  await expect(card).toBeHidden()
+  await expect(marker).toBeFocused()
+  expect(await ring()).toBe(true)
+  // saved from the keyboard: the redraw puts focus on the pin, with the ring
+  await marker.click()
+  await card.getByLabel('Comment').fill('Looks good')
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Enter')
+  await expect(card.getByLabel('Comment')).toHaveValue('Looks good')
+  await expect(marker).toBeFocused()
+  expect(await ring()).toBe(true)
+})

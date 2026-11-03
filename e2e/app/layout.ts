@@ -44,8 +44,11 @@ const cap = (s: string, g: number, i: number) => {
   return undefined
 }
 const palette = ['#c0392b', '#2980b9', '#27ae60', '#f39c12', '#8e44ad', '#16a085', '#d35400']
-// 12 groups with mixed sizes: singles, small multi-item groups, and one large group (> 8 items)
+// 12 groups with mixed sizes: singles, small multi-item groups, and one large group (> 8 items).
+// groups=N: only the first N groups · one=1: every group a single item (no item axis anywhere)
 const sizes = [1, 3, 2, 1, 5, 12, 1, 4, 2, 1, 3, 2]
+  .slice(0, Number(p.get('groups')) || undefined)
+  .map((n) => (p.get('one') === '1' ? 1 : n))
 const collection: Collection = {
   meta: { title: 'Fixture house' },
   groups: sizes.map((n, g) => ({

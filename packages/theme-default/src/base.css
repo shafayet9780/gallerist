@@ -1524,9 +1524,10 @@
   .gallerist-items-toggle {
   display: none; /* chips don't expand their items */
 }
-/* an overview (`grid({ layout: 'sections' })`) is a whole screen: nothing stays over it */
+/* an overview (`grid({ layout: 'sections' })`) is a whole screen: nothing stays over or beside it
+   (a docked item navigator is a root grid item, outside the controls box) */
 .gallerist:has(.gallerist-grid[data-layout="sections"][aria-hidden="false"])
-  :is(.gallerist-controls, .gallerist-caption) {
+  :is(.gallerist-controls, .gallerist-caption, .gallerist-itemnav) {
   display: none;
 }
 
@@ -1971,7 +1972,9 @@
    the root, the count over ↑ ↓: a header on the aside item column while that shows, else at the
    end of the caption row, which makes room for it. While any group has several items it keeps its
    room on a one-item group, so the stage and the item column hold still. Last in the file, so it
-   wins over the arrow layouts and the touch chip above. */
+   wins over the arrow layouts and the touch chip above. Where no row or column beside the stage is
+   free (immersive) it falls back to the stage's corner; the zoom minimap stays over the media (it
+   shows only while zoomed, and is the zoom tool itself). */
 .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
   inset-inline: calc(var(--gallerist-arrow-size) + 24px);
 }
@@ -1982,6 +1985,15 @@
   .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
     inset-inline: 0;
   }
+}
+/* one group (and no linear walk): the group arrows have nowhere to go, so they and their gutters go */
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-one-group]:not([data-gallerist-linear])
+  .gallerist-stage {
+  inset-inline: 0;
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-one-group]:not([data-gallerist-linear])
+  :is(.gallerist-prev, .gallerist-next) {
+  display: none;
 }
 .gallerist[data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
   > .gallerist-itemnav {
@@ -1996,6 +2008,7 @@
   inline-size: var(--gallerist-dock-w);
   block-size: var(--gallerist-dock-h);
   margin: 4px 12px;
+  border-radius: min(var(--gallerist-itemnav-radius), var(--gallerist-radius)); /* a box, not a pill */
   flex-flow: row wrap;
   place-content: center;
   gap: 2px 4px;
@@ -2032,13 +2045,30 @@
   .gallerist-region-thumbnails {
   min-height: auto;
 }
-/* the item column shows (a stacked rail's items beside the stage): the navigator heads it */
 @media (min-width: 601px) {
+  /* editorial without a placard: the caption is a column beside the work; the navigator ends it */
+  .gallerist:where(
+      [data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"]
+    )[data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
+    > .gallerist-itemnav {
+    align-self: end;
+    justify-self: start;
+  }
+  .gallerist:where(
+      [data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"]
+    )[data-gallerist-arrows="docked"][data-gallerist-multi]:not([data-gallerist-linear]):has(
+      > .gallerist-itemnav
+    )
+    > .gallerist-caption {
+    margin: 0 0 calc(var(--gallerist-dock-h) + 8px);
+  }
+  /* the item column shows (a stacked rail's items beside the stage): the navigator heads it */
   .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-rail="collapsed"]):has(
       > .gallerist-region-aside .gallerist-thumb-items
     )
     > .gallerist-itemnav {
     grid-area: aside;
+    align-self: start;
     justify-self: stretch;
     inline-size: auto;
     min-inline-size: var(--gallerist-dock-w);
@@ -2046,9 +2076,10 @@
     margin-block: 8px 0;
     margin-inline: 0 8px;
   }
-  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-rail="collapsed"]):has(
-      > .gallerist-region-aside .gallerist-thumb-items
-    )
+  .gallerist[data-gallerist-arrows="docked"][data-gallerist-multi]:not(
+      [data-gallerist-linear],
+      [data-gallerist-rail="collapsed"]
+    ):has(> .gallerist-region-aside .gallerist-thumb-items)
     > .gallerist-region-aside {
     padding-block-start: calc(var(--gallerist-dock-h) + 8px);
   }
@@ -2056,6 +2087,22 @@
       > .gallerist-region-aside .gallerist-thumb-items
     )
     > .gallerist-caption {
-    margin-inline-end: 0;
+    margin: 0;
   }
+}
+/* immersive: the stage runs under every band, so nothing beside it is free; the navigator takes the
+   stage's bottom inline-end corner, above the caption band (as `corner-br`) */
+.gallerist[data-gallerist-preset="immersive"][data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
+  > .gallerist-itemnav {
+  grid-area: main;
+  align-self: end;
+  justify-self: end;
+  inline-size: var(--gallerist-dock-w);
+  margin: 12px;
+}
+.gallerist[data-gallerist-preset="immersive"][data-gallerist-arrows="docked"][data-gallerist-multi]:has(
+    > .gallerist-itemnav
+  )
+  > .gallerist-caption {
+  margin: 0;
 }

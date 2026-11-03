@@ -84,13 +84,58 @@ const formCard =
         onCardRemove: (pin: Pin) => removed.push(pin.id),
       }
     : {}
+// card=draft: a review app's comment draft: a host card taller than a landscape phone's stage (a
+// textarea, Save, Discard); a placed pin opens with focus, and one still without a body when its
+// card closes is dropped (onOpenChange by ctx.previous, then refresh(), as the README shows)
+const draft = p.get('card') === 'draft'
+const pinsOf = () => (collection.groups[0]?.items[0]?.meta as { pins: Pin[] }).pins
+const draftCard = draft
+  ? {
+      renderCard: (pin: Pin) => {
+        const form = document.createElement('form')
+        form.className = 'host-card'
+        const text = document.createElement('textarea')
+        text.setAttribute('aria-label', 'Comment')
+        text.style.cssText = 'display:block;box-sizing:border-box;width:220px;height:300px'
+        text.value = pin.body ?? ''
+        const button = (label: string, run: () => void) => {
+          const b = document.createElement('button')
+          b.type = 'button'
+          b.textContent = label
+          b.addEventListener('click', run)
+          form.append(b)
+        }
+        form.append(text)
+        button('Save', () => {
+          const list = pinsOf()
+          const at = list.findIndex((q) => q.id === pin.id)
+          list[at] = { ...pin, body: text.value }
+          plugin.refresh()
+        })
+        button('Discard', () => plugin.open(null, { focus: true }))
+        return form
+      },
+      onOpenChange: (_pin: Pin | null, { previous }: { previous: Pin | null }) => {
+        if (!previous?.id.startsWith('n') || previous.body) return
+        const list = pinsOf()
+        list.splice(
+          list.findIndex((q) => q.id === previous.id),
+          1,
+        )
+        plugin.refresh()
+      },
+    }
+  : {}
 const plugin = pins({
   ...formCard,
+  ...draftCard,
   presentation: (p.get('presentation') ?? 'tag') as PinPresentation,
   onPlace: (at, { item }) => {
     placed.push(at)
-    ;(item.meta as { pins: Pin[] }).pins.push({ id: `n${placed.length}`, ...at, label: 'New' })
+    const id = `n${placed.length}`
+    ;(item.meta as { pins: Pin[] }).pins.push({ id, ...at, label: 'New' })
     plugin.refresh()
+    if (draft) plugin.open(id, { focus: true })
   },
 })
 const viewer = createViewer({ collection, plugins: [plugin] })

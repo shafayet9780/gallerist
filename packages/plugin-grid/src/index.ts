@@ -377,11 +377,13 @@ export function grid(opts: GridOptions = {}): Plugin {
     const setOpen = (v: boolean) => {
       // hiding the focused control would drop focus to <body>, where the viewer's keys don't reach
       if (!v && root?.contains(document.activeElement)) rescue()
-      // an overview hides the stage's controls (theme): same rescue for a control focused there
+      // an overview hides the stage's controls, caption and a docked item navigator (theme): same
+      // rescue for a control focused there
       if (v && sections) {
         const active = document.activeElement
         if (root?.closest('.gallerist')?.contains(active)) {
-          if (active?.closest('.gallerist-controls, .gallerist-caption')) rescue()
+          if (active?.closest('.gallerist-controls, .gallerist-caption, .gallerist-itemnav'))
+            rescue()
         }
       }
       open = v

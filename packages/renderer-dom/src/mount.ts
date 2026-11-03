@@ -536,9 +536,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     controlsBox = el('div', 'gallerist-controls')
     controlsBox.append(prev, next)
     // a placard carries the item navigator in the caption, under the label; docked, it is a grid
-    // item of its own (the theme puts it on the aside column or the caption row, off the media)
+    // item of its own (the theme puts it on the aside column or the caption row, off the media),
+    // after the caption it ends and before the item column it heads (tab order follows)
     if (placard) caption.appendChild(itemNav)
-    else if (arrows === 'docked') main.after(itemNav)
+    else if (arrows === 'docked') main.after(caption, itemNav)
     else controlsBox.appendChild(itemNav)
     if (showNavigator) {
       // a pointer aid only (keyboard users zoom and pan with the keys), so hidden from AT
@@ -876,11 +877,22 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       // Reserve the caption track for the whole collection when any item has a text caption, so
       // moving between captioned and uncaptioned items never resizes the stage.
       anyCaption = col.groups.some((grp) => grp.items.some((it) => str(it.caption)))
-      // likewise the docked item navigator's room, while any group has several items
+      // likewise the docked item navigator's room, while any group has several items; one group
+      // leaves the docked group arrows nowhere to go (the theme drops them and their gutters)
       root.toggleAttribute(
         'data-gallerist-multi',
         col.groups.some((grp) => grp.items.length > 1),
       )
+      const one = col.groups.length < 2
+      // a focused docked group arrow goes with the second group: focus to the root, not <body>
+      if (
+        one &&
+        arrows === 'docked' &&
+        !linear &&
+        [prevArrow, nextArrow].includes(document.activeElement as HTMLElement)
+      )
+        root.focus({ preventScroll: true })
+      root.toggleAttribute('data-gallerist-one-group', one)
     }
     chromeCol = col
     chromeG = cur.g

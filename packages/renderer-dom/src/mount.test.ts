@@ -204,10 +204,25 @@ describe('mount — chrome + keyboard', () => {
     const root = document.querySelector('.gallerist') as HTMLElement
     const nav = document.querySelector('.gallerist-itemnav') as HTMLElement
     expect(root.getAttribute('data-gallerist-arrows')).toBe('docked')
-    // a root child right after the stage's area (tab order: group arrows, item navigator, aside)
+    // a root child after the caption it ends and before the item column it heads; DOM order is tab
+    // order: the stage's group arrows, the caption band, the navigator, the item column
     expect(nav.parentElement).toBe(root)
-    expect(nav.previousElementSibling?.classList.contains('gallerist-main')).toBe(true)
+    const caption = root.querySelector('.gallerist-caption') as HTMLElement
+    expect(caption.previousElementSibling?.classList.contains('gallerist-main')).toBe(true)
+    expect(nav.previousElementSibling).toBe(caption)
     expect(nav.nextElementSibling?.classList.contains('gallerist-region-aside')).toBe(true)
+    const tabOrder = [
+      '.gallerist-prev',
+      '.gallerist-next',
+      '.gallerist-caption',
+      '.gallerist-item-prev',
+      '.gallerist-item-next',
+      '.gallerist-region-aside',
+    ].map((sel) => root.querySelector(sel) as HTMLElement)
+    for (let k = 1; k < tabOrder.length; k++) {
+      const [a, b] = [tabOrder[k - 1] as HTMLElement, tabOrder[k] as HTMLElement]
+      expect(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
     // nothing of it is inside the main area over the stage; the group arrows still are
     const controls = document.querySelector('.gallerist-controls') as HTMLElement
     expect(controls.querySelector('.gallerist-item-prev, .gallerist-position')).toBeNull()
@@ -218,6 +233,48 @@ describe('mount — chrome + keyboard', () => {
     expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
     v.goTo(0, 0) // a one-item group hides it, as in the other layouts
     expect(nav.hidden).toBe(true)
+  })
+
+  it('other arrow layouts keep the caption after the aside', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'corner-br' })
+    v.open({ g: 1 })
+    const caption = document.querySelector('.gallerist-caption') as HTMLElement
+    expect(caption.previousElementSibling?.classList.contains('gallerist-region-aside')).toBe(true)
+  })
+
+  it('flags a one-group collection (docked drops the group arrows and their gutters)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'docked' })
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.hasAttribute('data-gallerist-one-group')).toBe(false)
+    v.setCollection({ groups: [{ id: 'g0', items: [item('a0'), item('a1')] }] })
+    expect(root.hasAttribute('data-gallerist-one-group')).toBe(true)
+    expect(root.hasAttribute('data-gallerist-multi')).toBe(true)
+    v.setCollection(collection())
+    expect(root.hasAttribute('data-gallerist-one-group')).toBe(false)
+  })
+
+  it('a focused docked group arrow the collection drops to one group hands focus to the root', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'docked' })
+    v.open({ g: 1 })
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const next = document.querySelector('.gallerist-next') as HTMLButtonElement
+    next.focus()
+    v.setCollection({ groups: [{ id: 'g0', items: [item('a0'), item('a1')] }] })
+    expect(root.hasAttribute('data-gallerist-one-group')).toBe(true)
+    expect(document.activeElement).toBe(root) // the theme hides the arrow: not <body>
+    // linear mode keeps its arrows (they walk the items): focus stays
+    document.body.innerHTML = ''
+    const w = createViewer({ collection: collection() })
+    mount(w, { arrows: 'docked', linear: true })
+    w.open({ g: 1 })
+    const arrow = document.querySelector('.gallerist-next') as HTMLButtonElement
+    arrow.focus()
+    w.setCollection({ groups: [{ id: 'g0', items: [item('a0'), item('a1')] }] })
+    expect(document.activeElement).toBe(arrow)
   })
 
   it('docked arrows with the reviewer preset; a placard still holds the navigator', () => {
