@@ -143,70 +143,51 @@ export interface PinCardOptions {
   strings?: Partial<PinsStrings>
 }
 
+// an element with a class
+const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string) => {
+  const node = document.createElement(tag)
+  if (cls) node.className = cls
+  return node
+}
+
 /**
  * The card contents `pins()` draws for a pin by default, for a `renderCard` that wraps or extends
  * them (text is set as text, never parsed as HTML).
  */
 export function defaultPinCard(pin: Pin, opts: PinCardOptions = {}): DocumentFragment {
-  const presentation = opts.presentation ?? 'tag'
   const t: PinsStrings = { ...DEFAULT_PINS_STRINGS, ...opts.strings }
   const frag = document.createDocumentFragment()
-  const line = (cls: string, text: string | undefined, tag = 'div') => {
-    if (!text) return
-    const node = document.createElement(tag)
-    node.className = cls
-    node.textContent = text
-    frag.appendChild(node)
+  // an element of class `cls` in `to`, holding `text` (set as text)
+  const add = (
+    cls: string,
+    text?: string,
+    tag: 'div' | 'span' | 'p' | 'ol' | 'li' | 'a' = 'div',
+    to: Node = frag,
+  ) => {
+    const node = make(tag, cls)
+    if (text) node.textContent = text
+    return to.appendChild(node)
   }
-  if (presentation === 'comment') {
-    const head = document.createElement('div')
-    head.className = 'gallerist-pin-head'
-    if (pin.label) {
-      const who = document.createElement('span')
-      who.className = 'gallerist-pin-title'
-      who.textContent = pin.label
-      head.appendChild(who)
-    }
-    if (pin.meta) {
-      const when = document.createElement('span')
-      when.className = 'gallerist-pin-meta'
-      when.textContent = pin.meta
-      head.appendChild(when)
-    }
-    if (pin.resolved) {
-      const badge = document.createElement('span')
-      badge.className = 'gallerist-pin-badge'
-      badge.textContent = t.resolved
-      head.appendChild(badge)
-    }
-    frag.appendChild(head)
+  // ... none without text
+  const line = (cls: string, text?: string | false, tag?: 'span' | 'p', to?: Node) =>
+    text && add(cls, text, tag, to)
+  // a comment's head: who, when, and a resolved badge
+  const head = (to: Node, who?: string, when?: string, badge?: string | false) => {
+    const h = add('gallerist-pin-head', '', 'div', to)
+    line('gallerist-pin-title', who, 'span', h)
+    line('gallerist-pin-meta', when, 'span', h)
+    line('gallerist-pin-badge', badge, 'span', h)
+  }
+  if (opts.presentation === 'comment') {
+    head(frag, pin.label, pin.meta, pin.resolved && t.resolved)
     line('gallerist-pin-body', pin.body, 'p')
     if (pin.replies?.length) {
-      const list = document.createElement('ol')
-      list.className = 'gallerist-pin-replies'
+      const list = add('gallerist-pin-replies', '', 'ol')
       for (const reply of pin.replies) {
-        const li = document.createElement('li')
-        const h = document.createElement('div')
-        h.className = 'gallerist-pin-head'
-        if (reply.author) {
-          const who = document.createElement('span')
-          who.className = 'gallerist-pin-title'
-          who.textContent = reply.author
-          h.appendChild(who)
-        }
-        if (reply.meta) {
-          const when = document.createElement('span')
-          when.className = 'gallerist-pin-meta'
-          when.textContent = reply.meta
-          h.appendChild(when)
-        }
-        const p = document.createElement('p')
-        p.className = 'gallerist-pin-body'
-        p.textContent = reply.body
-        li.append(h, p)
-        list.appendChild(li)
+        const li = add('', '', 'li', list)
+        head(li, reply.author, reply.meta)
+        add('gallerist-pin-body', reply.body, 'p', li)
       }
-      frag.appendChild(list)
     }
   } else {
     line('gallerist-pin-title', pin.label)
@@ -214,14 +195,18 @@ export function defaultPinCard(pin: Pin, opts: PinCardOptions = {}): DocumentFra
     line('gallerist-pin-body', pin.body, 'p')
   }
   const href = pin.href && safeLink(pin.href)
-  if (href) {
-    const a = document.createElement('a')
-    a.className = 'gallerist-pin-link'
-    a.href = href
-    a.textContent = pin.linkLabel ?? t.open
-    frag.appendChild(a)
-  }
+  if (href)
+    (add('gallerist-pin-link', pin.linkLabel ?? t.open, 'a') as HTMLAnchorElement).href = href
   return frag
+}
+
+// a toolbar or pin button: no form submit, its class and accessible name, an icon
+const button = (cls: string, label: string, icon = '') => {
+  const b = make('button', cls)
+  b.type = 'button'
+  b.setAttribute('aria-label', label)
+  b.innerHTML = icon
+  return b
 }
 
 // Security: pin data can come from users (comments) or a CMS, so the card links only to http(s),
@@ -236,6 +221,8 @@ interface Rendered {
   marker: HTMLButtonElement
   card: HTMLElement
   ctx: PinContext
+  /** the card's close button, its first child (contents follow it) */
+  x: HTMLButtonElement
   /** what fills the card while it is open: the node `renderCard` returned, `null` for the default
    *  card; `undefined` while empty */
   content?: Node | null
@@ -251,7 +238,8 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   const read = opts.pins ?? defaultPins
   const t: PinsStrings = { ...DEFAULT_PINS_STRINGS, ...opts.strings }
   let visible = opts.visible ?? true
-  let bound: ViewerApi | null = null
+  // the viewer the plugin is in; `undefined` until it first joins one, `null` once it has left
+  let bound: ViewerApi | null | undefined
   let root: HTMLElement | null = null
   let toggleBtn: HTMLButtonElement | null = null
   let addBtn: HTMLButtonElement | null = null
@@ -295,7 +283,7 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     const toLeft = m.left - left > right - m.right
     const card = r.card
     const st = card.style
-    st.maxWidth = `${Math.min(280, right - left, Math.max(120, (toLeft ? m.left - left : right - m.right) - 4))}px`
+    st.maxWidth = `${Math.max(0, Math.min(280, right - left, Math.max(120, (toLeft ? m.left - left : right - m.right) - 4)))}px`
     const w = card.offsetWidth
     const x = Math.max(left, Math.min(toLeft ? m.left - 4 - w : m.right + 4, right - w))
     st.left = `${x - at.left}px`
@@ -303,7 +291,9 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       bottom = n.top - 8
     st.maxHeight = `${Math.max(60, bottom - top)}px`
     st.top = `${Math.max(top, Math.min(m.top, bottom - card.offsetHeight)) - at.top}px`
-    card.tabIndex = card.scrollHeight > card.clientHeight + 1 ? 0 : -1
+    // it scrolls: in the tab order. While it does, the fade (pins.css) adds 12px below its contents,
+    // which don't count: a card that shrinks to fit stops scrolling over nothing (tabIndex 0 or -1)
+    card.tabIndex = card.scrollHeight - 12 * (1 + card.tabIndex) > card.clientHeight + 1 ? 0 : -1
   }
   // placed again a frame after a zoom or pan (the pin has moved, its card offset hasn't) or a resize
   // of the card or its contents: not from inside the observer's delivery, where placeCard's own
@@ -350,13 +340,13 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       })
     }
     r.content = node
-    r.card.prepend(node ?? defaultPinCard(r.pin, { presentation, strings: t }))
+    r.card.append(node ?? defaultPinCard(r.pin, { presentation, strings: t })) // after ×
   }
   const empty = (r: Rendered) => {
     const node = r.content
     if (node === undefined) return
     r.content = undefined
-    r.card.replaceChildren(r.card.lastChild as Node) // keep the close button
+    r.card.replaceChildren(r.x) // keep the close button
     if (node && !leaving.has(node)) {
       leaving.add(node)
       calls.push(() => {
@@ -394,12 +384,17 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     rescue(id, force ? document : card)
     queueMicrotask(() => rescue(id, card))
   }
-  // the last input was a key (keydown), not a pointer (pointerdown), seen on the document in capture
-  // while the plugin is in a viewer; a keyboard click (no pointer: `detail` 0) on × counts as a key
+  // the last input was a key, not a pointer, seen on the document in capture while the plugin is in
+  // a viewer: a keydown without meta, ctrl or alt (not a shortcut, nor ctrl held for a pinch), or a
+  // click without a pointer (`detail` 0: a key on a button, or assistive tech activating it); a
+  // pointerdown or a pointer's click is not
   let kbd = false
   const modality = (e: Event) => {
-    kbd = e.type === 'keydown'
+    const k = e as KeyboardEvent
+    kbd =
+      e.type === 'keydown' ? !(k.metaKey || k.ctrlKey || k.altKey) : e.type === 'click' && !k.detail
   }
+  const inputs = ['keydown', 'pointerdown', 'click']
 
   // `openId` is the pin asked for; `shown` the one whose card is on screen. They differ while a pin
   // asked for by `open(id)` hasn't been painted yet (it opens when it is).
@@ -429,8 +424,9 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   }
   const change = (asked: string | null, focus: boolean) => {
     // nothing opens once the plugin has left its viewer (open() from a callback run by destroy): no
-    // listeners left behind, and no card a later viewer would open on its first paint
-    const id = bound ? asked : null
+    // listeners left behind, and no card a later viewer would open on its first paint. Before it
+    // first joins one, the id waits: the card opens when its pin is first painted
+    const id = bound !== null ? asked : null
     if (id !== openId) want = null
     if (focus && id) want = { from: document.activeElement }
     openId = id
@@ -542,6 +538,8 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     root.addEventListener('keydown', onPlaceKey, true)
     announce(t.placing)
   }
+  const place = () => (placing ? stopPlacing() : startPlacing())
+  const flip = () => setVisible(!visible)
   const onPlaceKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return
     e.stopPropagation() // cancel placing, don't close the viewer
@@ -599,52 +597,49 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
 
   // ── one pin: a marker button and its card ─────────────────────────────────────
   const renderPin = (pin: Pin, n: number, ctx: PinContext): HTMLElement => {
-    const el = document.createElement('div')
-    el.className = 'gallerist-pin'
+    const el = make('div', 'gallerist-pin')
     el.dataset.presentation = presentation
     el.dataset.pin = pin.id
     if (pin.resolved) el.setAttribute('data-resolved', '')
     el.hidden = !visible
 
     const cardId = `gallerist-pin-${instance}-${pin.id}`
-    const marker = document.createElement('button')
-    marker.type = 'button'
-    marker.className = 'gallerist-pin-marker'
-    marker.setAttribute('aria-label', t.pin(n, pin.label))
+    const marker = button('gallerist-pin-marker', t.pin(n, pin.label))
     marker.setAttribute('aria-expanded', 'false')
     marker.setAttribute('aria-controls', cardId)
-    const dot = document.createElement('span')
-    dot.className = 'gallerist-pin-dot'
+    const dot = make('span', 'gallerist-pin-dot')
     dot.setAttribute('aria-hidden', 'true')
     if (presentation !== 'tag') dot.textContent = String(n)
     marker.appendChild(dot)
 
-    const card = document.createElement('div')
-    card.className = 'gallerist-pin-card'
+    const card = make('div', 'gallerist-pin-card')
     card.id = cardId
     card.hidden = true
     card.setAttribute('role', 'group')
     card.setAttribute('aria-label', t.pin(n, pin.label))
     card.tabIndex = -1 // open(id, { focus: true }) lands here; the contents are drawn on open
-    const close = document.createElement('button')
-    close.type = 'button'
-    close.className = 'gallerist-pin-close'
-    close.setAttribute('aria-label', t.close)
-    close.innerHTML = ICONS.close
-    close.addEventListener('click', (e) => {
-      kbd = !e.detail
-      setOpen(null, true)
-    })
-    card.appendChild(close)
+    const close = button('gallerist-pin-close', t.close, ICONS.close)
+    close.addEventListener('click', () => setOpen(null, true))
+    card.appendChild(close) // first: in reading and tab order before the contents, as it is drawn
 
     marker.addEventListener('click', () => setOpen(openId === pin.id ? null : pin.id))
     // a click inside a card must not reach the stage (no swipe, no close-on-backdrop); nor a wheel
-    // over a card that scrolls (in the tab order then), which scrolls it rather than zooming the
-    // image. A pinch (ctrl+wheel), or a wheel over a card that doesn't scroll, zooms the image as
-    // anywhere on the stage, whose handler keeps it from zooming the page.
+    // over something in it that scrolls on the wheel's axis (the card, or a host's textarea or list
+    // in it), which scrolls that rather than zooming the image. A pinch (ctrl+wheel), or a wheel over
+    // nothing that scrolls, zooms the image as anywhere on the stage, whose handler keeps it from
+    // zooming the page.
     card.addEventListener('pointerdown', (e) => e.stopPropagation())
     card.addEventListener('wheel', (e) => {
-      if (!card.tabIndex && !e.ctrlKey) e.stopPropagation()
+      for (
+        let el: Element | null | false = e.target as Element;
+        el && !e.ctrlKey;
+        el = el !== card && el.parentElement
+      )
+        if (
+          (e.deltaY && el.scrollHeight > el.clientHeight + 1) ||
+          (e.deltaX && el.scrollWidth > el.clientWidth + 1)
+        )
+          return e.stopPropagation()
     })
     card.addEventListener('focusin', () => {
       focusedCard = card
@@ -665,11 +660,10 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       if (e.key !== 'Escape' || e.defaultPrevented || openId !== pin.id) return
       e.preventDefault()
       e.stopPropagation()
-      kbd = true
       setOpen(null, true)
     })
     el.append(marker, card)
-    rendered.push({ pin, el, marker, card, ctx })
+    rendered.push({ pin, el, marker, card, ctx, x: close })
     return el
   }
 
@@ -677,29 +671,20 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   const toolbar = () => {
     const wrap = document.createDocumentFragment()
     if (opts.toggle !== false) {
-      const btn = document.createElement('button')
-      btn.type = 'button'
-      btn.className = 'gallerist-pins-toggle'
-      btn.setAttribute('aria-label', t.toggle)
+      const btn = button('gallerist-pins-toggle', t.toggle, ICONS.pin)
       btn.setAttribute('aria-pressed', String(visible))
-      btn.innerHTML = ICONS.pin
-      btn.addEventListener('click', () => setVisible(!visible))
+      btn.addEventListener('click', flip)
       toggleBtn = btn
       wrap.appendChild(btn)
     }
     if (opts.onPlace) {
-      const add = document.createElement('button')
-      add.type = 'button'
-      add.className = 'gallerist-pin-add'
-      add.setAttribute('aria-label', t.add)
+      const add = button('gallerist-pin-add', t.add, ICONS.comment)
       add.setAttribute('aria-pressed', 'false')
-      add.innerHTML = ICONS.comment
       addBtn = add
-      add.addEventListener('click', () => (placing ? stopPlacing() : startPlacing()))
+      add.addEventListener('click', place)
       wrap.appendChild(add)
     }
-    const host = document.createElement('div')
-    host.className = 'gallerist-pins-tools'
+    const host = make('div', 'gallerist-pins-tools')
     host.appendChild(wrap)
     // capture the viewer root once mounted (placing listens on it; announcements go to its live region)
     queueMicrotask(() => {
@@ -742,19 +727,18 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     return {
       name: 'pins',
       init() {
-        // close any open card when the item changes; place it again after a zoom or pan; follow the
-        // last input (a key or a pointer) for the focus ring
+        // close any open card when the item changes; place an open one again after a zoom or pan;
+        // follow the last input (a key or a pointer) for the focus ring
         const offs = [
           viewer.on('afterItem', () => setOpen(null)),
           viewer.on('afterSlide', () => setOpen(null)),
-          viewer.on('zoom', replace),
+          viewer.on('zoom', () => shown && replace()),
         ]
-        for (const type of ['keydown', 'pointerdown'])
-          document.addEventListener(type, modality, true)
+        for (const type of inputs) document.addEventListener(type, modality, true)
         cleanup = () => {
           for (const off of offs) off()
-          for (const type of ['keydown', 'pointerdown'])
-            document.removeEventListener(type, modality, true)
+          for (const type of inputs) document.removeEventListener(type, modality, true)
+          cancelAnimationFrame(frame)
         }
       },
       destroy() {
@@ -767,14 +751,9 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       },
       overlays,
       keymap: {
-        p: () => setVisible(!visible),
-        P: () => setVisible(!visible),
-        ...(opts.onPlace
-          ? {
-              c: () => (placing ? stopPlacing() : startPlacing()),
-              C: () => (placing ? stopPlacing() : startPlacing()),
-            }
-          : {}),
+        p: flip,
+        P: flip,
+        ...(opts.onPlace ? { c: place, C: place } : {}),
       },
       regions:
         opts.toggle !== false || opts.onPlace

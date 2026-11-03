@@ -68,7 +68,23 @@
   matches `:focus-visible`).
 - **plugin-pins (fixed)**: `open()` from a callback run by `destroy()` (say `onCardRemove`) opens
   nothing. It left a document listener attached past destroy, and a plugin moved to a new viewer
-  opened that card on the first paint.
+  opened that card on the first paint. An `open(id)` before the plugin first joins a viewer still
+  waits and opens that card on the first paint.
+- **plugin-pins, theme (fixed)**: a card lays out its contents in normal block flow again. As a flex
+  column it stacked a host fragment's inline siblings, stretched its buttons, links and inputs to
+  the card's width and stopped paragraph margins collapsing. The close button is now first in the
+  card (so reading and tab order match what is drawn), sticky at its top inline-end corner, taking
+  no room, and above positioned host contents (as is the scroll fade). No card scrolls sideways any
+  more (Chromium counted the close button 4px past the content box: a classic scrollbar showed).
+- **plugin-pins (fixed)**: a wheel over a host's textarea or list that scrolls, in a card that
+  doesn't, zoomed the image instead of scrolling it (the stage cancels the wheel): a card keeps a
+  wheel when anything from the target up to the card scrolls on the wheel's axis. A pinch there
+  still zooms the image. A host's textarea or select pans vertically on touch rather than letting a
+  pinch zoom the page. A card that shrinks to within the fade's 12px of the room stops scrolling.
+- **plugin-pins**: the focus ring's input tracking ignores keydowns with meta, ctrl or alt held (a
+  shortcut, or ctrl held for a pinch) and counts a click without a pointer (assistive tech) as a key.
+  No frame is scheduled for a zoom with no card open, and `destroy()` cancels a pending one; with no
+  free width at all a card is 0px wide, not a negative `max-width`.
 - **renderer-dom, theme (fixed, docked)**: review fixes for `arrows: 'docked'`: the caption comes
   before the navigator in DOM and tab order; placements for immersive and editorial; a box radius;
   aside header room only with several items and not linear; the overview (`grid({ layout:
@@ -103,15 +119,21 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 
 ### Fixed
 - **theme**: a focused pin's ring could vanish on the image under it (Console's near-white ring on a
-  light screenshot measured 1.08:1). The ring over media is now two-tone: the focus colour banded
-  inside and out by a new `--gallerist-focus-halo` token (the skin's ground, dark where the focus
-  colour is light and light where it is dark), so one of the two reaches 3:1 against white and black
-  media in every skin and scheme (lowest best case 6.56:1). A scrolling pin card's ring, which also
-  falls on the image, gets the same band. Chrome on the viewer's own background is unchanged.
+  light screenshot measured 1.08:1). The ring over media is now banded whatever the skin, scheme or
+  accent (technique C40): 3px of a new `--gallerist-focus-halo` token (black) and 3px of white around
+  the pin, then the focus colour. Black and white are 21:1 apart, so one of them reaches 3:1 (at least
+  4.58:1) against any media; measured on Chromium and WebKit, the weakest case is 5.32:1 on mid-grey
+  (`#808080`), 21:1 on white and black. A first version banded the focus colour with the skin's
+  ground, which left mid-grey media under 3:1 in Gallery light and Console light (about 5.9:1 apart).
+  An override of `--gallerist-focus-halo` must be opaque and keep 9:1 against white. A scrolling pin
+  card's ring, which also falls on the image, gets the same bands. In forced colours the ring keeps
+  its outline (the bands are box-shadows, which forced colours drop). Chrome on the viewer's own
+  background is unchanged. (WCAG 2.2: contrast is 1.4.11 Non-text Contrast, and 2.4.13 Focus
+  Appearance at AAA; the 81b8d66 commit message cites 2.4.11, which is Focus Not Obscured.)
 - **theme**: a pin card that scrolls now shows that there's more below (a touch screen has no
   scrollbar): its contents fade out at its bottom edge until the end of the scroll, where the fade
   rests below the last control (it never takes a tap). A control focused near the bottom scrolls
-  clear of the fade (`scroll-padding`).
+  clear of the fade (`scroll-padding`). Not drawn in forced colours.
 - **renderer-dom**: a focused caption band that stops scrolling (a shorter caption after ←/→, a taller
   viewport, the captions plugin removed) hands focus back to the viewer instead of dropping it to
   `<body>`, and ↑/↓/Home/End aimed at a band that no longer scrolls navigate again. A sub-pixel overflow

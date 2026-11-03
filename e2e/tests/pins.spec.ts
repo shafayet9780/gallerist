@@ -29,7 +29,7 @@ const imageBox = (page: Page) =>
 const dotOf = async (page: Page, id: string) => {
   const r = await page.locator(`[data-pin="${id}"] .gallerist-pin-dot`).boundingBox()
   if (!r) throw new Error(`pin ${id} not visible`)
-  return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, w: r.width }
+  return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, w: r.width, h: r.height }
 }
 const zoomState = (page: Page) =>
   page.evaluate(
@@ -427,6 +427,137 @@ test('a card keeps touches from panning or zooming the page (touch-action)', asy
   await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
   await expect(page.locator('[data-pin="a"] .gallerist-pin-card')).toHaveAttribute('tabindex', '0')
   expect(await touch('a')).toBe('pan-y')
+  // a host's textarea is a scroll container of its own: a vertical pan, never a page pinch-zoom
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await ready(page, 'card=note&presentation=comment')
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  expect(
+    await page
+      .locator('[data-pin="a"] .gallerist-pin-card')
+      .getByLabel('Note')
+      .evaluate((el) => getComputedStyle(el).touchAction),
+  ).toBe('pan-y')
+})
+
+// A short card whose host textarea scrolls: a wheel over the textarea scrolls it (the stage, which
+// cancels the wheel and zooms, doesn't get it); a pinch (ctrl+wheel) there still zooms the image.
+test('a wheel over a scrolling textarea in a short card scrolls it; a pinch zooms the image', async ({
+  page,
+}) => {
+  await ready(page, 'card=note&presentation=comment')
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+  await expect(card).toHaveAttribute('tabindex', '-1') // the card fits: only the textarea scrolls
+  const note = card.getByLabel('Note')
+  const b = await note.boundingBox()
+  if (!b) throw new Error('no textarea box')
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+  await page.mouse.wheel(0, 120)
+  await expect.poll(() => note.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  await page.waitForTimeout(300) // past the stage's wheel commit
+  expect((await zoomState(page)).scale).toBe(1)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -120)
+  await page.keyboard.up('Control')
+  await expect.poll(async () => (await zoomState(page)).scale).toBeGreaterThan(1)
+})
+
+// A host card returned unwrapped (a DocumentFragment) lays out as it would on the page: inline
+// siblings share a line, a button keeps its own width, a first paragraph keeps its top margin. The
+// close button comes first (DOM, reading and tab order match what is drawn) and stays on top of a
+// positioned host element under it.
+test('a host fragment lays out as on the page; the close button is first and on top', async ({
+  page,
+}) => {
+  await ready(page, 'card=frag&presentation=comment')
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+  await expect(card).toBeVisible()
+  const box = async (sel: string, n = 0) => {
+    const r = await card.locator(sel).nth(n).boundingBox()
+    if (!r) throw new Error(`no box for ${sel}`)
+    return r
+  }
+  const [one, two, go] = [await box('.inline'), await box('.inline', 1), await box('button', 1)]
+  // one line: the three overlap vertically, in order
+  expect(Math.max(one.y, two.y, go.y)).toBeLessThan(
+    Math.min(one.y + one.height, two.y + two.height, go.y + go.height),
+  )
+  expect(one.x < two.x && two.x < go.x).toBe(true)
+  const inner = await card.evaluate((el) => {
+    const s = getComputedStyle(el)
+    return el.clientWidth - Number.parseFloat(s.paddingLeft) - Number.parseFloat(s.paddingRight)
+  })
+  expect(go.width).toBeLessThan(inner / 2) // not stretched to the card's width
+  // the lead's top margin is its own (the close button's -20px cancels its own height)
+  const lead = await card.locator('.lead').evaluate((el) => {
+    const c = el.parentElement as HTMLElement
+    const s = getComputedStyle(c)
+    return {
+      top: el.getBoundingClientRect().top - c.getBoundingClientRect().top,
+      want:
+        c.clientTop +
+        Number.parseFloat(s.paddingTop) +
+        Number.parseFloat(getComputedStyle(el).marginTop),
+    }
+  })
+  expect(Math.abs(lead.top - lead.want)).toBeLessThan(0.5)
+  expect(await card.evaluate((el) => el.firstElementChild?.className)).toBe('gallerist-pin-close')
+  // the positioned lead runs under ×: × still paints on top and takes the click
+  const close = await box('.gallerist-pin-close')
+  const hit = await page.evaluate(
+    ({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.gallerist-pin-close'),
+    { x: close.x + close.width / 2, y: close.y + close.height / 2 },
+  )
+  expect(hit).toBe(true)
+  await page.mouse.click(close.x + close.width / 2, close.y + close.height / 2)
+  await expect(card).toBeHidden()
+})
+
+// No card scrolls sideways (the close button sat 4px past its content box): short and tall, a host
+// fragment, LTR and RTL. A classic scrollbar would show, and the 4px could flip the card's tabindex.
+for (const dir of ['ltr', 'rtl']) {
+  test(`a card doesn't scroll sideways (${dir})`, async ({ page }) => {
+    for (const [query, size] of [
+      ['presentation=tag', { width: 1280, height: 720 }],
+      ['card=frag&presentation=comment', { width: 1280, height: 720 }],
+      ['card=note&presentation=comment', { width: 1280, height: 720 }],
+      ['card=draft&presentation=comment', { width: 844, height: 390 }],
+    ] as const) {
+      await page.setViewportSize(size)
+      await ready(page, `${query}&dir=${dir}`)
+      for (const id of ['a', 'b']) {
+        await page.locator(`[data-pin="${id}"] .gallerist-pin-marker`).click()
+        const card = page.locator(`[data-pin="${id}"] .gallerist-pin-card`)
+        await expect(card).toBeVisible()
+        const [sw, cw] = await card.evaluate((el) => [el.scrollWidth, el.clientWidth])
+        expect(sw, `${query} ${id}`).toBeLessThanOrEqual(cw as number)
+        await page.keyboard.press('Escape') // a tall card can cover the next pin
+      }
+    }
+  })
+}
+
+// Forced colours (Windows High Contrast): the box-shadow bands are dropped, the ring's outline stays;
+// a scrolling card's fade (a gradient) is not drawn.
+test('forced colours: the pin keeps its focus outline; no fade on a scrolling card', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'forced-colors emulation is Chromium-only')
+  await page.emulateMedia({ forcedColors: 'active' })
+  await page.setViewportSize({ width: 844, height: 390 })
+  await ready(page, 'card=draft&presentation=comment')
+  const marker = page.locator('[data-pin="b"] .gallerist-pin-marker')
+  await marker.focus()
+  const ring = await marker
+    .locator('.gallerist-pin-dot')
+    .evaluate((el) => [getComputedStyle(el).outlineStyle, getComputedStyle(el).outlineWidth])
+  expect(ring).toEqual(['solid', '2px'])
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+  await expect(card).toHaveAttribute('tabindex', '0')
+  expect(await card.evaluate((el) => getComputedStyle(el, '::after').display)).toBe('none')
 })
 
 // The close button stays at the card's top inline-end corner as a tall card scrolls, and works there.
@@ -495,11 +626,24 @@ const contrast = (a: [number, number, number], b: [number, number, number]) => {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-// A pin sits on the image, so its focus ring needs 3:1 against whatever is under it (WCAG 2.4.11,
-// 1.4.11): the skin's focus colour alone vanishes on media of its own lightness (Console's #f5f6f7
-// ring on a light screenshot, Apploye). On a white and on a black image, in every skin and scheme,
-// for both presentations, a band of the ring at least 2px wide reaches 3:1 against the image
-// (sampled on screen, along the row through the dot's centre).
+// A pin sits on the image, so its focus ring needs 3:1 against whatever is under it (WCAG 2.2 1.4.11
+// Non-text Contrast; 2.4.13 Focus Appearance at AAA): the skin's focus colour alone vanishes on media
+// of its own lightness (Console's #f5f6f7 ring on a light screenshot, Apploye). For white, black and
+// mid-grey media and media of the skin's own focus colour, in every skin and scheme, for both
+// presentations: the pixels focus changes (a screenshot before and after) hold a solid band at least
+// 2px wide at 3:1 or more against the media, on each side of the dot (rays right, left, down and up,
+// each sampled on 5 neighbouring lines, so a fractional position or an anti-aliased edge can't decide
+// it). The dot's own static ring doesn't count: it doesn't change. Every case is checked and every
+// failure listed.
+const rgbOf = (page: Page, color: string) =>
+  page.evaluate((c) => {
+    const el = document.createElement('i')
+    el.style.color = c
+    document.body.append(el)
+    const m = getComputedStyle(el).color.match(/\d+/g)?.map(Number) ?? []
+    el.remove()
+    return m.slice(0, 3) as [number, number, number]
+  }, color)
 for (const look of [
   'skin=gallery',
   'skin=gallery&scheme=light',
@@ -508,32 +652,65 @@ for (const look of [
   'skin=editorial',
   'skin=editorial&scheme=dark',
 ]) {
-  test(`a focused pin's ring stands out on white and on black media (${look})`, async ({
-    page,
-  }) => {
-    for (const bg of ['white', 'black']) {
+  test(`a focused pin's ring stands out on any media (${look})`, async ({ page }) => {
+    await ready(page, look)
+    const focus = await page
+      .locator('.gallerist')
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--gallerist-focus').trim())
+    const failures: string[] = []
+    for (const bg of ['white', 'black', '#808080', '#a0a0a0', focus]) {
       for (const presentation of ['tag', 'comment']) {
-        const at = `${look} ${bg} ${presentation}`
-        await ready(page, `${look}&bg=${bg}&presentation=${presentation}`)
+        const at = `${bg === focus ? `focus ${focus}` : bg} ${presentation}`
+        await ready(page, `${look}&bg=${encodeURIComponent(bg)}&presentation=${presentation}`)
         const marker = page.locator('[data-pin="b"] .gallerist-pin-marker')
-        await marker.focus()
-        expect(await marker.evaluate((el) => el.matches(':focus-visible')), at).toBe(true)
         const dot = await dotOf(page, 'b')
-        const x0 = Math.round(dot.cx + dot.w / 2)
-        const [row] = await pixels(page, { x: x0, y: Math.round(dot.cy), width: 32, height: 1 })
-        if (!row) throw new Error('no pixels')
-        const media = row[row.length - 1] as [number, number, number]
-        expect(contrast(media, bg === 'white' ? [255, 255, 255] : [0, 0, 0]), at).toBeLessThan(1.1)
-        // the longest run of pixels at 3:1 or more within 12px of the dot's edge
-        let run = 0
-        let best = 0
-        for (const px of row.slice(0, 12)) {
-          run = contrast(px, media) >= 3 ? run + 1 : 0
-          best = Math.max(best, run)
+        const pad = 20
+        const clip = {
+          x: Math.floor(dot.cx - dot.w / 2 - pad),
+          y: Math.floor(dot.cy - dot.h / 2 - pad),
+          width: Math.ceil(dot.w + 2 * pad),
+          height: Math.ceil(dot.h + 2 * pad),
         }
-        expect(best, at).toBeGreaterThanOrEqual(2)
+        const off = await pixels(page, clip)
+        await marker.focus()
+        if (!(await marker.evaluate((el) => el.matches(':focus-visible'))))
+          failures.push(`${at}: no :focus-visible`)
+        const on = await pixels(page, clip)
+        // the media: the clip's corner, 20px out from the dot's box (past its drop shadow)
+        const media = off[0]?.[0] as [number, number, number]
+        const expected = await rgbOf(page, bg)
+        if (contrast(media, expected) >= 1.1) failures.push(`${at}: media is ${media}`)
+        const cx = dot.cx - clip.x
+        const cy = dot.cy - clip.y
+        for (const [dx, dy, half] of [
+          [1, 0, dot.w / 2],
+          [-1, 0, dot.w / 2],
+          [0, 1, dot.h / 2],
+          [0, -1, dot.h / 2],
+        ] as const) {
+          // the longest solid run on any of the 5 lines: changed by focus and at 3:1 against the media
+          let best = 0
+          for (let o = -2; o <= 2; o++) {
+            let run = 0
+            for (let t = Math.floor(half) - 2; t <= Math.ceil(half) + 14; t++) {
+              const x = Math.floor(cx + dx * t + dy * o)
+              const y = Math.floor(cy + dy * t + dx * o)
+              const p = on[y]?.[x]
+              const q = off[y]?.[x]
+              const solid =
+                !!p &&
+                !!q &&
+                Math.max(...p.map((v, k) => Math.abs(v - (q[k] as number)))) > 16 &&
+                contrast(p, media) >= 3
+              run = solid ? run + 1 : 0
+              best = Math.max(best, run)
+            }
+          }
+          if (best < 2) failures.push(`${at}: ${dx},${dy} band ${best}px`)
+        }
       }
     }
+    expect(failures).toEqual([])
   })
 }
 

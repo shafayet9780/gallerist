@@ -199,7 +199,7 @@ describe('plugin-pins', () => {
     markers()[0]?.click()
     expect(renderCard).toHaveBeenCalledTimes(1)
     expect(cards()[0]?.querySelector('strong')?.textContent).toBe('custom p1')
-    expect(cards()[0]?.lastElementChild?.className).toBe('gallerist-pin-close')
+    expect(cards()[0]?.firstElementChild?.className).toBe('gallerist-pin-close') // first: read and tabbed to first, as drawn
   })
 
   it('renderCard returning null keeps the default card for that pin', () => {
@@ -953,6 +953,51 @@ describe('plugin-pins', () => {
       expect(document.activeElement).toBe(markers()[0])
       ring(false)
     })
+
+    it('a key with meta, ctrl or alt held is no keyboard move; a click without a pointer is one', () => {
+      const { plugin } = open({ renderCard: host([]) })
+      const focus = vi.spyOn(HTMLElement.prototype, 'focus')
+      const ring = (on: boolean) =>
+        expect(focus).toHaveBeenLastCalledWith({ preventScroll: true, focusVisible: on })
+      const input = () => document.querySelector('.host-card input') as HTMLInputElement
+      const save = () => document.querySelector('.host-card .save') as HTMLElement
+      // (set the modifier on the event: happy-dom may drop it from the init)
+      const held = (k: string, mod: 'metaKey' | 'ctrlKey' | 'altKey') =>
+        Object.defineProperty(key(k), mod, { value: true })
+      for (const mod of ['metaKey', 'ctrlKey', 'altKey'] as const) {
+        markers()[0]?.click()
+        input().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+        input().dispatchEvent(held(mod === 'ctrlKey' ? 'Control' : 'c', mod)) // a shortcut, a pinch
+        plugin.open(null, { focus: true })
+        expect(document.activeElement).toBe(markers()[0])
+        ring(false)
+      }
+      // a click with no pointer (assistive tech activating a host control, no keydown): the ring
+      markers()[0]?.click()
+      input().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      save().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }))
+      plugin.open(null, { focus: true })
+      ring(true)
+      // the same control clicked with a pointer: none
+      markers()[0]?.click()
+      save().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      save().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+      plugin.open(null, { focus: true })
+      ring(false)
+    })
+
+    it('open(id) before the plugin first joins a viewer opens that card on the first paint', async () => {
+      const plugin = pins()
+      plugin.open('p2')
+      const v = createViewer({ collection: collection(), plugins: [plugin] })
+      mount(v)
+      v.open()
+      await flush()
+      expect(
+        document.querySelector('[data-pin="p2"] .gallerist-pin-card')?.hasAttribute('hidden'),
+      ).toBe(false)
+      expect(markers()[1]?.getAttribute('aria-expanded')).toBe('true')
+    })
   })
 
   describe('card placement (on screen)', () => {
@@ -1052,6 +1097,10 @@ describe('plugin-pins', () => {
       const again = openCard()
       expect(again.style.maxWidth).toBe('104px')
       expect(again.style.left).toBe(`${8 - 30}px`)
+      markers()[0]?.click()
+      // no room at all (a 10px stage less its 8px margins): none, not a negative width
+      layout({ 'gallerist-stage': rect(0, 0, 10, 400), ...pinAt(0, 100) }, 100)
+      expect(openCard().style.maxWidth).toBe('0px')
     })
 
     it('placed again a frame after a zoom or pan moves its pin', async () => {
@@ -1065,6 +1114,23 @@ describe('plugin-pins', () => {
       expect(card.style.top).toBe('0px') // not inside the zoom event: a frame later
       await new Promise((r) => requestAnimationFrame(r))
       expect(card.style.top).toBe(`${342 - 420}px`)
+    })
+
+    it('a scrolling card whose contents shrink to within the fade below them stops scrolling', async () => {
+      const { v } = open()
+      const at = { 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 120) }
+      layout(at, 900)
+      const card = openCard()
+      expect(card.tabIndex).toBe(0)
+      // the room is 384px (400 less 8 each side); the contents now 382px, plus the fade's 12px
+      layout(at, 394)
+      v.zoomTo(2)
+      await new Promise((r) => requestAnimationFrame(r))
+      expect(card.tabIndex).toBe(-1) // nothing to scroll to but the fade
+      // out of the tab order (no fade), 10px over the room still scrolls
+      v.zoomTo(1)
+      await new Promise((r) => requestAnimationFrame(r))
+      expect(card.tabIndex).toBe(0)
     })
 
     it('a resize of the card is placed a frame later, not inside the observer (no loop error)', async () => {
@@ -1145,6 +1211,40 @@ describe('plugin-pins', () => {
       expect(reached).toHaveBeenCalledTimes(1) // it scrolls the card
       wheel(tall, true)
       expect(reached).toHaveBeenCalledTimes(2) // a pinch zooms the image, not the page
+    })
+
+    it('a wheel over a host scroller in a short card scrolls it, on its own axis; a pinch zooms', () => {
+      const text = document.createElement('textarea')
+      // (no layout in happy-dom) its text overflows it downwards, not sideways
+      Object.defineProperties(text, {
+        scrollHeight: { value: 300 },
+        clientHeight: { value: 60 },
+        scrollWidth: { value: 200 },
+        clientWidth: { value: 200 },
+      })
+      open({ renderCard: () => text })
+      const stage = document.querySelector('.gallerist-stage') as HTMLElement
+      const reached = vi.fn()
+      stage.addEventListener('wheel', reached)
+      const wheel = (el: Element, init: WheelEventInit, ctrlKey = false) =>
+        el.dispatchEvent(
+          Object.defineProperty(
+            new WheelEvent('wheel', { bubbles: true, cancelable: true, ...init }),
+            'ctrlKey',
+            { value: ctrlKey },
+          ),
+        )
+      layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 120) }, 100)
+      const card = openCard()
+      expect(card.tabIndex).toBe(-1) // the card itself fits
+      wheel(text, { deltaY: 40 })
+      expect(reached).not.toHaveBeenCalled() // the textarea scrolls
+      wheel(text, { deltaX: 40 })
+      expect(reached).toHaveBeenCalledTimes(1) // it doesn't scroll sideways: the image zooms
+      wheel(text, { deltaY: 40 }, true)
+      expect(reached).toHaveBeenCalledTimes(2) // a pinch zooms the image
+      wheel(card, { deltaY: 40 })
+      expect(reached).toHaveBeenCalledTimes(3) // beside the textarea: nothing scrolls, it zooms
     })
 
     it('never under a band floated over the stage (immersive: the inset controls box)', () => {

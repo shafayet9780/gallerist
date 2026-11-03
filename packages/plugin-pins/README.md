@@ -62,7 +62,9 @@ The default card links only to `http:`, `https:`, `mailto:` and `tel:` URLs, and
 
 The returned plugin also has `refresh()` (re-read pins you changed in place), `setVisible(bool)` and
 `open(id | null, { focus })`: `focus: true` moves focus into the card as it opens (once its pin is
-painted, if it isn't yet, unless focus moved elsewhere meanwhile), or to the pin as it closes.
+painted, if it isn't yet, unless focus moved elsewhere meanwhile), or to the pin as it closes. An
+`open(id)` before the plugin has joined a viewer waits and opens on the first paint; after `destroy()`
+it does nothing.
 
 Use one `pins()` per viewer: the plugin keeps the open card, its listeners and its viewer in the
 instance, so two live viewers sharing one would close each other's cards. Each gallery gets its own
@@ -74,8 +76,12 @@ it fits, else slid along it (across too, over the pin, when the room beside it i
 under a band floated over the stage (immersive) or the docked item navigator, and never wider or
 taller than the room. A taller card scrolls: it then joins the tab order, ↑ ↓ Home End Page Up/Down
 scroll it rather than navigate, a wheel over it scrolls it, and its close button stays in view. A
-wheel over a card that doesn't scroll, or a pinch (ctrl+wheel) over any card, zooms the image as
-anywhere on the stage, and a touch in a card never pans or zooms the page. A card is placed again
+wheel over something in a card that scrolls on the wheel's axis (the card, or a textarea or list of
+yours in it) scrolls that; over anything else, or a pinch (ctrl+wheel) anywhere on a card, it zooms
+the image as anywhere on the stage. A touch in a card never pans or zooms the page (a textarea or
+select of yours pans vertically). The card lays out its contents in normal block flow, as your page
+would (a fragment's inline siblings share a line, a button keeps its width); the close button comes
+first in it, in reading and tab order too. A card is placed again
 after a zoom or pan and as its contents resize, so a host may render into it late. While placing, a
 pan or a click beside the image keeps the mode armed; a click outside the stage cancels it.
 
@@ -85,8 +91,9 @@ the "Add a comment" button, else to the viewer. Focus already on `<body>` is mov
 viewer, but not in an inline one, where it may have come from a control of your page. The same holds when a
 repaint drops the pin that has focus (you removed it, say an empty draft in `onOpenChange` followed by
 `refresh()`): focus moves on once the repaint is done. Focus the plugin moves shows the focus ring
-when the input that led to it was a key (Escape, Enter on ×), and not after a pointer
-(`focusVisible: true` / `false`; a browser without the option decides for itself).
+when the input that led to it was a key (Escape, Enter on ×; not a shortcut with meta, ctrl or alt) or
+a click without a pointer (assistive tech), and not after a pointer (`focusVisible: true` / `false`; a
+browser without the option decides for itself).
 
 ```ts
 const commentPins = pins({

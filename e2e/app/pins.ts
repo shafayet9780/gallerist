@@ -128,9 +128,50 @@ const draftCard = draft
       },
     }
   : {}
+// card=note: a short host card that is only a textarea whose text overflows it (it scrolls, the card
+// doesn't)
+const noteCard =
+  p.get('card') === 'note'
+    ? {
+        renderCard: () => {
+          const text = document.createElement('textarea')
+          text.setAttribute('aria-label', 'Note')
+          text.style.cssText = 'display:block;box-sizing:border-box;width:200px;height:64px'
+          text.value = Array.from({ length: 30 }, (_, k) => `Line ${k + 1}`).join('\n')
+          return text
+        },
+      }
+    : {}
+// card=frag: a host card returned as a DocumentFragment, unwrapped: a full-bleed lead paragraph
+// (positioned, under the close button), then inline siblings and a button directly in the card
+const fragCard =
+  p.get('card') === 'frag'
+    ? {
+        renderCard: () => {
+          const frag = document.createDocumentFragment()
+          const lead = document.createElement('p')
+          lead.className = 'lead'
+          lead.style.cssText = 'position:relative;margin-inline-end:-32px'
+          lead.textContent = 'A lead paragraph, wider than the line below it.'
+          const span = (text: string) => {
+            const s = document.createElement('span')
+            s.className = 'inline'
+            s.textContent = text
+            return s
+          }
+          const go = document.createElement('button')
+          go.type = 'button'
+          go.textContent = 'Go'
+          frag.append(lead, span('One'), ' ', span('Two'), ' ', go)
+          return frag
+        },
+      }
+    : {}
 const plugin = pins({
   ...formCard,
   ...draftCard,
+  ...noteCard,
+  ...fragCard,
   presentation: (p.get('presentation') ?? 'tag') as PinPresentation,
   onPlace: (at, { item }) => {
     placed.push(at)
