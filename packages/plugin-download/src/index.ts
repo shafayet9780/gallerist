@@ -50,6 +50,13 @@ export function filenameOf(item: Item, url?: string | null): string {
   return sanitizeName(base?.includes('.') ? base : item.id)
 }
 
+// A blob: URL is this document's own; anything else compares its origin with the page's.
+const crossOrigin = (url: string): boolean => {
+  if (typeof location === 'undefined') return false
+  const u = new URL(url, location.href)
+  return u.protocol !== 'blob:' && u.origin !== location.origin
+}
+
 function anchorDownload(url: string, filename: string): void {
   const safe = safeHref(url)
   if (!safe) return // reject javascript:/data:/file: — never click an unsafe scheme
@@ -57,6 +64,9 @@ function anchorDownload(url: string, filename: string): void {
   a.href = safe
   a.download = filename
   a.rel = 'noopener'
+  // Browsers ignore `download` on a cross-origin URL and follow the link instead: open it in a new
+  // tab so the host page isn't navigated away.
+  if (crossOrigin(safe)) a.target = '_blank'
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -147,9 +157,9 @@ export interface DownloadOptions {
 }
 
 // Whether the item has something safe to save, known without loading: a loader source resolves on
-// click, so it counts as downloadable until then.
-const downloadable = (item: Item, downloadUrl?: DownloadUrl): boolean => {
-  const custom = downloadUrl?.(item)
+// click, so it counts as downloadable until then. Takes `downloadUrl(item)`'s result, so a click
+// calls the host's function once.
+const downloadable = (item: Item, custom: string | null | undefined): boolean => {
   if (custom !== undefined) return !!custom && !!safeHref(custom)
   const { source } = item
   if (typeof source === 'string') return !!safeHref(source)
@@ -166,7 +176,9 @@ export function download(opts: DownloadOptions = {}): Plugin {
     }
     const run = () => {
       const item = current()
-      if (item && downloadable(item, opts.downloadUrl)) void downloadItem(item, opts.downloadUrl)
+      if (!item) return
+      const custom = opts.downloadUrl?.(item)
+      if (downloadable(item, custom)) void downloadItem(item, () => custom)
     }
     let btn: HTMLButtonElement | null = null
     let shown: Item | undefined | null = null
@@ -176,7 +188,8 @@ export function download(opts: DownloadOptions = {}): Plugin {
       const item = current()
       if (!btn || item === shown) return
       shown = item
-      btn.setAttribute('aria-disabled', String(!(item && downloadable(item, opts.downloadUrl))))
+      const ok = !!item && downloadable(item, opts.downloadUrl?.(item))
+      btn.setAttribute('aria-disabled', String(!ok))
     }
     let off: (() => void) | undefined
     return {

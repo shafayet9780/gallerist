@@ -455,6 +455,73 @@ describe('portal bridge', () => {
       expect(region().textContent).toBe('g2:c@0')
     })
 
+    it('open goes { g: 1 } → true → false → { g: 1 }: opens there, stays put, closes, reopens there', () => {
+      const ref = createRef<ViewerApi>()
+      const { rerender } = render(<Gallerist ref={ref} collection={three} open={{ g: 1 }} />)
+      expect(ref.current?.getState().cursor).toEqual({ g: 1, i: 0 })
+      act(() => ref.current?.next())
+      rerender(<Gallerist ref={ref} collection={three} open />)
+      expect(ref.current?.getState().phase).not.toMatch(/clos/)
+      expect(ref.current?.getState().cursor).toEqual({ g: 2, i: 0 }) // true keeps the position
+      rerender(<Gallerist ref={ref} collection={three} open={false} />)
+      expect(ref.current?.getState().phase).toBe('closed')
+      rerender(<Gallerist ref={ref} collection={three} open={{ g: 1 }} />)
+      expect(ref.current?.getState().phase).not.toMatch(/clos/)
+      expect(ref.current?.getState().cursor).toEqual({ g: 1, i: 0 })
+    })
+
+    it('Gallerist.Caption under StrictMode mounts once and follows navigation', () => {
+      const ref = createRef<ViewerApi>()
+      render(
+        <StrictMode>
+          <Gallerist ref={ref} collection={three} open>
+            <Gallerist.Caption>{({ item }) => <b className="cap">{item.id}</b>}</Gallerist.Caption>
+          </Gallerist>
+        </StrictMode>,
+      )
+      const region = () => document.querySelector('.gallerist-region-caption') as HTMLElement
+      expect(document.querySelectorAll('.gallerist-region-caption')).toHaveLength(1)
+      expect(region().children).toHaveLength(1) // one portal host after the double effects
+      expect(document.querySelectorAll('.cap')).toHaveLength(1)
+      expect(region().textContent).toBe('a')
+      act(() => ref.current?.next())
+      expect(region().children).toHaveLength(1)
+      expect(document.querySelectorAll('.cap')).toHaveLength(1)
+      expect(region().textContent).toBe('b')
+    })
+
+    it('Gallerist.Caption shows the text caption in the theme span for false; an object caption is none', () => {
+      const ref = createRef<ViewerApi>()
+      const legacy: Collection = {
+        groups: [
+          {
+            id: 'g0',
+            items: [
+              { id: 'a', type: 'image', source: 'a.jpg', caption: 'Text a' },
+              // untyped data still carrying an old object-shaped caption
+              {
+                id: 'o',
+                type: 'image',
+                source: 'o.jpg',
+                caption: { text: 'x' } as unknown as string,
+              },
+            ],
+          },
+        ],
+      }
+      render(
+        <Gallerist ref={ref} collection={legacy} open>
+          <Gallerist.Caption>{({ item }) => item.id === 'zzz'}</Gallerist.Caption>
+        </Gallerist>,
+      )
+      const region = () => document.querySelector('.gallerist-region-caption') as HTMLElement
+      expect(region().querySelector('span.gallerist-caption-text')?.textContent).toBe('Text a')
+      expect(() => act(() => ref.current?.nextItem())).not.toThrow()
+      expect(ref.current?.getState().cursor.i).toBe(1)
+      expect(region().textContent).toBe('')
+      expect(region().querySelector('.gallerist-caption-text')).toBeNull()
+    })
+
     it('removing Gallerist.Caption brings the text caption back', () => {
       const { rerender } = render(
         <Gallerist collection={three} open>

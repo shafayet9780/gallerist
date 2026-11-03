@@ -1,6 +1,6 @@
 // Region mounting (spec §13). The renderer exposes named region hosts; plugins inject Nodes.
 // toolbar/footer/aside are additive (many plugins contribute buttons or panels); thumbnails/stage/
-// backdrop are exclusive (one owner) — a second claim warns and the last wins.
+// backdrop/caption are exclusive (one owner) — a second claim warns and the last wins.
 
 import type { PluginInstance, RegionCtx, RegionName } from '@gallerist/core'
 

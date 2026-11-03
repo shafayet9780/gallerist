@@ -54,8 +54,11 @@ mount(viewer)
 | Return | Shows |
 |---|---|
 | a `Node` | the node, as is |
-| a `string` | the string as text (never parsed as HTML) |
-| `null` or `undefined` | the item's text `caption`, or nothing |
+| a `string` | the string as plain text (never parsed as HTML) |
+| `null` or `undefined` | the item's text `caption` in a `span.gallerist-caption-text` (the theme's caption font), or nothing |
+
+Return an element, or a fresh node on each call, rather than a cached `DocumentFragment`: a fragment
+empties itself when it is inserted, so a cached one shows nothing the second time.
 
 `ctx` is `{ viewer, cursor }`. The plugin also has `refresh()`, which renders the current caption again
 after you changed data that `render` reads in place. Zoom and pan don't call `render`.

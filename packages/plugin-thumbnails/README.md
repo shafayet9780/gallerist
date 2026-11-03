@@ -62,7 +62,7 @@ thumbnails({
 
 | Option         | Type                         | Default     | Notes |
 |----------------|------------------------------|-------------|-------|
-| `overscan`     | `number`                     | measured    | Cards drawn each side of the middle of the rail; scrolling draws the ones it reaches. By default what fits plus 3 each side (8 each side before the rail has a layout). Group cards in `stacked`/`index`, item cards in `flat`. |
+| `overscan`     | `number`                     | measured    | Cards drawn each side of the card in the middle of the rail; scrolling draws the ones it reaches. A jump past the drawn run first draws around the new current card, then the scroll that reveals it trims the run back to the middle. By default what fits plus 3 each side (8 each side before the rail has a layout); a number below half of what fits is raised to it. Group cards in `stacked`/`index`, item cards in `flat`. |
 | `itemAxis`     | `'vertical' \| 'horizontal'` | `'vertical'`| `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. Ignored in `flat`. |
 | `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, bracketed per group. |
 | `expandActive` | `boolean`                    | `true`      | `stacked` and `index`. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |

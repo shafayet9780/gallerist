@@ -15,7 +15,7 @@ of groups (a single group draws all its item thumbs unless you use the `flat` ra
 
 **Look elsewhere if** you have one flat strip of photos and already have a lightbox you like, if you need
 Vue or Svelte today (React and plain DOM only; Vue is planned for 0.4), or if you want a stories player.
-Bundle size is also a real cost: core + renderer is about 15.8 KB gzipped, more than the smallest flat
+Bundle size is also a real cost: core + renderer is about 16 KB gzipped, more than the smallest flat
 lightboxes.
 
 ## Quick start

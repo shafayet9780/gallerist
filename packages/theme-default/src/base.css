@@ -570,7 +570,7 @@
   box-shadow: var(--gallerist-item-ring);
 }
 /* each item contains its own layout and paint (it clips anyway): scrolling a long group's stack then
-   doesn't make WebKit revisit every item (~0.7 s a step at 10k items, ~0.1 s with this) */
+   doesn't make WebKit revisit every item (~0.66 s a step at 10k items, ~65 ms with this) */
 .gallerist-thumb-items[data-axis="vertical"] > .gallerist-thumb-item {
   contain: layout paint;
 }

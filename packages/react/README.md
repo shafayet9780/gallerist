@@ -50,7 +50,18 @@ const [at, setAt] = useState<{ g: number; i?: number } | false>(false)
 
 A new position while the viewer is open moves the cursor. The position is applied when it changes,
 not enforced: the user can navigate away from it, and an inline `open={{ g: 3 }}` re-rendered with the
-same value doesn't pull them back.
+same value doesn't pull them back. `open` is compared by value (`g` and `i`), so setting the same
+`{ g, i }` again does nothing; to jump back to it, call `ref.current.open({ g, i })`. Going from a
+position to `true` keeps the viewer where it is.
+
+### Escape
+
+The viewer listens for Escape on its own root and closes, unless a handler that ran first called
+`event.preventDefault()`. A dialog or popover you open over the viewer should handle Escape itself:
+if it is rendered inside the viewer (`<Gallerist.Overlay>`, `<Gallerist.Region>`), call
+`preventDefault()` on the Escape that closes it, or the viewer closes too. A dialog library that
+listens on `document` in the capture phase sees Escape before the viewer does; it keeps the viewer
+open only if it calls `preventDefault()` (or `stopPropagation()`) on the key it handles.
 
 ### The imperative handle
 
@@ -100,7 +111,8 @@ interface Shot {
 </Gallerist>
 ```
 
-Returning `null` shows the item's text `caption` (or nothing). The band grows with what you render
+Returning `null`, `undefined`, `true` or `false` shows the item's text `caption` (or nothing), in a
+`span.gallerist-caption-text` so it keeps the theme's caption font. The band grows with what you render
 (the stage gives up the room), from the height of a two-line text caption up to 40% of the viewport
 (less if the stage would drop below 36% of the viewer), then it scrolls. Its text is the viewer's
 accessible description (`aria-describedby`); the announcement on navigation stays the position plus

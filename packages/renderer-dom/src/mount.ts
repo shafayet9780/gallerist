@@ -14,7 +14,7 @@ import type {
   ZoomState,
 } from '@gallerist/core'
 import { clampPanToBox, clampScale, getInternals } from '@gallerist/core/internal'
-import { imageAdapter } from './adapters/image'
+import { imageAdapter, mountImage } from './adapters/image'
 import { type Accent, type ColorScheme, type Skin, applyAppearance } from './appearance'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
@@ -152,6 +152,9 @@ interface SlideRec {
 /** A plain URL for a media source (loader and tiled sources have none). */
 const sourceUrl = (source: MediaSource | undefined): string | null =>
   typeof source === 'string' ? source : source && 'src' in source ? source.src : null
+
+/** A text caption, or '' for anything else (untyped data may still hold an old caption object). */
+const str = (x: unknown): string => (typeof x === 'string' ? x : '')
 
 let mounts = 0 // ids for the caption, which describes the viewer (aria-describedby)
 
@@ -403,16 +406,18 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   regionHosts.caption.id = `${cid}r`
   caption.append(captionText, regionHosts.caption)
   caption.hidden = true
-  root.setAttribute('aria-describedby', `${cid} ${cid}r`)
   let anyCaption = false
   const syncCaption = () => {
     const own = regionHosts.caption.hasChildNodes()
     const { g, i } = viewer.getState().cursor
     // the text caption (the theme clamps it), unless a caption region replaces it
-    captionText.textContent = own ? '' : (viewer.getCollection().groups[g]?.items[i]?.caption ?? '')
+    captionText.textContent = own ? '' : str(viewer.getCollection().groups[g]?.items[i]?.caption)
     // a placard is always up: it holds the item navigator as well as the caption
-    caption.hidden = !(own || (controls && (anyCaption || placard)))
+    const hide = !(own || (controls && (anyCaption || placard)))
+    caption.hidden = hide
     caption.toggleAttribute('data-gallerist-custom', own)
+    // described by the caption only while it shows (hidden text would still be read out)
+    root[hide ? 'removeAttribute' : 'setAttribute']('aria-describedby', `${cid} ${cid}r`)
   }
   root.append(
     regionHosts.backdrop,
@@ -711,21 +716,46 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.overlayItem = undefined
       }
     }
-    // Warm the cache for the images a step within the group lands on (spec §11: the slides above
-    // cover the neighbouring groups, showing their first item). Not mounted, so nothing to tear down.
+    // Warm the cache for the images `preload.ahead/behind` steps within the group land on (spec §11:
+    // the slides above cover the neighbouring groups, showing their first item). Only items the
+    // built-in image adapter would mount; low priority, and only once the current media is ready,
+    // so they don't compete with it. Ones no longer wanted are cancelled.
     const items = col.groups[cur.g]?.items ?? []
+    const want = new Map<string, Item>()
     for (let d = -preload.behind; d <= preload.ahead; d++) {
       const it = d ? items[cur.i + d] : undefined
-      const s = it?.type === 'image' ? it.source : undefined
-      if (!s || !(typeof s === 'string' || 'src' in s)) continue
-      const img = new Image()
-      if (typeof s === 'string') img.src = s
-      else {
-        img.sizes = s.sizes ?? ''
-        img.srcset = s.srcset ?? ''
-        img.src = s.src
+      if (it && sourceUrl(it.source) && pickAdapter(it.type, it)?.mount === mountImage)
+        want.set(it.id, it)
+    }
+    for (const [id, img] of warm) if (!want.has(id)) unwarm(id, img)
+    const run = ++warmRun
+    const start = () => {
+      if (run !== warmRun) return // the cursor moved on: a newer render owns the warm set
+      for (const [id, it] of want) {
+        const s = it.source as { srcset?: string; sizes?: string } // a string has neither
+        if (!warm.has(id)) {
+          warm.set(
+            id,
+            Object.assign(new Image(), {
+              fetchPriority: 'low',
+              sizes: s.sizes ?? '',
+              srcset: s.srcset ?? '',
+              src: sourceUrl(it.source),
+            }),
+          )
+        }
       }
     }
+    const ready = mounted.get(col.groups[cur.g]?.id ?? '')?.media?.ready
+    if (ready) ready.then(start, start)
+    else start()
+  }
+  // in-group warmers by item id; cancelling one drops its request
+  const warm = new Map<string, HTMLImageElement>()
+  let warmRun = 0
+  const unwarm = (id: string, img: HTMLImageElement) => {
+    img.srcset = img.src = ''
+    warm.delete(id)
   }
   // Guard against re-entrancy: emitting load/loaded updates state.loaded, whose store
   // notification re-enters sync()/renderWindow while we're mid-iteration over `mounted`.
@@ -819,7 +849,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (col !== chromeCol) {
       // Reserve the caption track for the whole collection when any item has a text caption, so
       // moving between captioned and uncaptioned items never resizes the stage.
-      anyCaption = col.groups.some((grp) => grp.items.some((it) => it.caption))
+      anyCaption = col.groups.some((grp) => grp.items.some((it) => str(it.caption)))
     }
     chromeCol = col
     chromeG = cur.g
@@ -1389,6 +1419,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       root.removeEventListener('keydown', onKey)
       for (const rec of mounted.values()) teardownSlide(rec)
       mounted.clear()
+      warmRun++
+      for (const [id, img] of warm) unwarm(id, img)
       detach()
       if (!overlay) root.remove()
     },

@@ -15,13 +15,48 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   elements and blocked the main thread for 662 ms on open; now 221 and no long task. A move inside the
   open cells moves the selection instead of redrawing them (20,003 elements recreated per step at one
   10k-item group, now 1).
-- **renderer-dom**: the images one step away within the current group are fetched ahead (`preload`
-  ahead/behind), as the spec always said; the slide window already covered neighbouring groups.
+- **renderer-dom**: the images `preload.ahead` / `preload.behind` steps away within the current group
+  (default 2 ahead, 1 behind) are fetched ahead, as the spec always said; the slide window already
+  covered neighbouring groups. They start once the current item's media is ready, at low fetch
+  priority, are cancelled when a move leaves them behind or the viewer is destroyed, and cover only
+  items the built-in image adapter would mount (a custom adapter loads its own).
+- **plugin-grid**: the drawn run starts on a row, and scrolling up draws whole rows above it, so the
+  cells on screen keep their columns (a run of 40 into a grid of 3 or 7 columns shifted every
+  visible cell sideways); the same in the `sections` overview.
 - **theme**: each thumb in the vertical item stack contains its own layout and paint, so scrolling a
   long stack doesn't make WebKit revisit every item: an item step in a 10k-item group with the Console
   skin took ~660 ms there; now ~65 ms.
 
 ### Fixed
+- **plugin-thumbnails**: a right-to-left rail follows its scroll; it read the first card (the
+  rightmost) as the one in the middle and folded the drawn run back to the start, leaving what showed
+  empty. The rail reads which way it runs from its scroller rather than from two cards, so a `flat`
+  rail on a side rail (cards side by side in a vertical rail) measures down the rail and no longer
+  scrolls sideways; a line holding several cards counts them all.
+- **plugin-thumbnails**: a numeric `overscan` below half the cards that fit is raised to that, so the
+  rail never draws with gaps.
+- **plugin-thumbnails, plugin-grid**: focus on a thumb or cell that a redraw takes away (new data via
+  `setCollection`, a jump past the drawn run, the item column rebuilt for a new group) moves to the
+  grid's new current cell or to the viewer, not to `<body>` where the keys don't reach.
+- **plugin-thumbnails, plugin-grid**: the drawn cards, item thumbs and cells carry `aria-setsize` /
+  `aria-posinset`, so a screen reader gives each its place in the whole list, not in the drawn part.
+- **plugin-pins**: a form in a pin card can keep Escape with `preventDefault()`, as GETTING-STARTED
+  says; the card used to close first. Otherwise Escape inside the card closes the card (focus back on
+  its pin) and leaves the viewer open.
+- **renderer-dom, plugin-captions, react**: a caption that isn't a string (an old `OverlaySpec`
+  caption in untyped JSON or CDN data) counts as none: no "[object Object]" in the caption bar, no
+  object handed to the host, no React error from `<Gallerist.Caption>`.
+- **renderer-dom**: the viewer is described by its caption (`aria-describedby`) only while the caption
+  bar shows, so hidden text isn't read out.
+- **plugin-captions, react**: the item's text caption, shown when `render` / `<Gallerist.Caption>`
+  returns nothing, sits in a `span.gallerist-caption-text`, so it keeps the theme's caption font.
+  `<Gallerist.Caption>` treats `true` / `false` like `null`.
+- **plugin-download**: a cross-origin `downloadUrl` opens in a new tab (`target="_blank"`,
+  `rel="noopener"`; browsers ignore `download` there) instead of navigating the host page away, and
+  `downloadUrl(item)` is called once per click.
+- **build**: `pnpm check:dist` also fails when a packed package lacks a file its `package.json`
+  points at (`main`, `types`, every `exports` target, the theme's CSS, the CDN build), skips folders in
+  `packages/` without a `package.json`, and runs in the release workflow before publishing.
 - **plugin-thumbnails, plugin-grid**: moving the cursor no longer scrolls the page around an inline
   viewer; only the viewer's own panels scroll.
 - **plugin-thumbnails**: a viewer opening on a far group now scrolls the rail to it.
@@ -98,7 +133,10 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   DOM renderer never drew. Designed captions come from `@gallerist/plugin-captions` or
   `<Gallerist.Caption>`, so item data stays JSON.
 - **plugin-thumbnails**: `overscan` is unset by default (the rail measures itself; it was 24) and
-  counts cards on each side of the middle of the rail rather than of the cursor.
+  counts cards on each side of the card in the middle of the rail rather than of the cursor. A jump
+  past the drawn run first draws around the new current card (wide enough for it to land at either
+  edge of the rail), and the scroll that reveals it trims the run back to the middle. A number below
+  half the cards that fit is raised to that.
 - **plugin-grid**: `overscan` counts cells (default 40) or sections (default 4) on each side of the
   current one, drawn when the grid opens; it used to count groups (default 12) and, for `sections`,
   bound the overview, which otherwise drew every group.

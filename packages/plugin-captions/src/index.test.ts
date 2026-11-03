@@ -90,11 +90,27 @@ describe('plugin-captions', () => {
     mount(viewer)
     viewer.open()
     expect(region().textContent).toBe('Text a')
+    // the fallback keeps the theme's caption type; an explicit string stays plain text
+    expect(region().querySelector('span.gallerist-caption-text')?.textContent).toBe('Text a')
     viewer.nextItem() // b: no text caption
     expect(region().textContent).toBe('')
     expect(bar().hidden).toBe(false) // the band stays, so the stage doesn't jump
     viewer.next()
     expect(region().textContent).toBe('Custom c')
+    expect(region().querySelector('span')).toBeNull()
+  })
+
+  it('treats a non-string caption from untyped data as no caption', () => {
+    const col = collection()
+    const a = col.groups[0]?.items[0] as Item
+    ;(a as { caption: unknown }).caption = { text: 'old overlay-style caption' }
+    const viewer = createViewer({ collection: col, plugins: [captions({ render: () => null })] })
+    mount(viewer)
+    viewer.open()
+    expect(region().textContent).toBe('')
+    expect(region().querySelector('.gallerist-caption-text')).toBeNull()
+    viewer.next()
+    expect(region().textContent).toBe('Text c')
   })
 
   it('shows the caption bar for a collection without text captions', () => {

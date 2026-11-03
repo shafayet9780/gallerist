@@ -268,7 +268,10 @@ describe('plugin-grid', () => {
     const oneGroup = (n: number): Collection => ({
       groups: [{ id: 'g0', items: Array.from({ length: n }, (_, i) => item(`x${i}`)) }],
     })
-    afterEach(() => vi.unstubAllGlobals())
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    })
 
     it('cells: one 10k-item group draws 40 cells each side of the current one', () => {
       const v = open(oneGroup(10_000))
@@ -337,6 +340,153 @@ describe('plugin-grid', () => {
       for (let k = 0; k < 10; k++) near(tail)
       for (let k = 0; k < 10; k++) near(head)
       expect(names()).toEqual(Array.from({ length: 50 }, (_, k) => `Group ${k + 1}`))
+    })
+
+    // happy-dom lays nothing out: the grids report `cols` columns, a cell's top is its row's
+    let cols = 4
+    const stubLayout = () => {
+      cols = 4
+      const real = window.getComputedStyle.bind(window)
+      vi.stubGlobal('getComputedStyle', (el: Element, p?: string | null) =>
+        el.matches('.gallerist-grid-cells, .gallerist-grid-sections')
+          ? ({ gridTemplateColumns: Array(cols).fill('100px').join(' ') } as CSSStyleDeclaration)
+          : real(el, p),
+      )
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: HTMLElement,
+      ) {
+        const k = this.parentElement ? [...this.parentElement.children].indexOf(this) : 0
+        const top = this.matches('.gallerist-grid-cell') ? Math.floor(k / cols) * 100 : 0
+        return { top, bottom: top + 100, left: 0, right: 0, width: 0, height: 100 } as DOMRect
+      })
+    }
+    const openWith = (
+      col: Collection,
+      opts: Parameters<typeof grid>[0],
+      at: { g: number; i: number },
+    ) => {
+      const v = createViewer({ collection: col, plugins: [grid(opts)] })
+      mount(v)
+      v.open(at)
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      return v
+    }
+    // every drawn cell sits in its own column: its place in its block, mod cols, is its index's
+    const inColumns = () =>
+      [...gridEl().querySelectorAll('.gallerist-grid-cells')].every((b) =>
+        [...b.children].every(
+          (c, k) => (Number(c.getAttribute('aria-posinset')) - 1) % cols === k % cols,
+        ),
+      )
+    const firstIndex = () =>
+      Number(gridEl().querySelector('.gallerist-grid-cell')?.getAttribute('aria-posinset')) - 1
+
+    it('cells: the run starts on a row, and grows at the start by whole rows', () => {
+      stubIO()
+      stubLayout()
+      openWith(oneGroup(10_000), { overscan: 10 }, { g: 0, i: 5003 }) // 4993..5013
+      expect(firstIndex()).toBe(4992)
+      expect(gridEl().querySelector('[data-active]')?.getAttribute('data-item')).toBe('x5003')
+      expect(inColumns()).toBe(true)
+      const scrolled = gridEl().scrollTop
+      near(edges()[0] as Element) // from 4982, down to its row: 4980
+      expect(firstIndex()).toBe(4980)
+      expect(inColumns()).toBe(true)
+      // 12 cells, 3 rows, went above what was on screen: the offset follows
+      expect(gridEl().scrollTop - scrolled).toBe(300)
+    })
+
+    it('cells: across groups each block starts on a row; a new column count realigns', () => {
+      stubIO()
+      stubLayout()
+      const groups = Array.from({ length: 100 }, (_, g) => ({
+        id: `g${g}`,
+        items: Array.from({ length: 7 }, (_, i) => item(`x${g}_${i}`)),
+      }))
+      openWith({ groups }, { overscan: 9 }, { g: 50, i: 5 }) // units 346..364: g49 #3 → #0
+      expect(gridEl().querySelector('.gallerist-grid-cell')?.getAttribute('data-item')).toBe(
+        'x49_0',
+      )
+      expect(inColumns()).toBe(true)
+      near(edges()[0] as Element) // unit 334: g47 #5 → #4
+      expect(gridEl().querySelector('.gallerist-grid-cell')?.getAttribute('data-item')).toBe(
+        'x47_4',
+      )
+      expect(inColumns()).toBe(true)
+      cols = 3 // a resize
+      near(edges()[0] as Element) // unit 322: g46 #0
+      near(edges()[0] as Element) // unit 312: g44 #4 → #3
+      expect(gridEl().querySelector('.gallerist-grid-cell')?.getAttribute('data-item')).toBe(
+        'x44_3',
+      )
+      expect(inColumns()).toBe(true)
+    })
+
+    it('sections: the run starts on a row, and grows at the start by whole rows', () => {
+      stubIO()
+      stubLayout()
+      cols = 3
+      const groups = Array.from({ length: 50 }, (_, g) => ({ id: `g${g}`, items: [item(`m${g}`)] }))
+      openWith({ groups }, { layout: 'sections' }, { g: 20, i: 0 }) // 16..24 → 15..24
+      const firstName = () =>
+        gridEl().querySelector('.gallerist-grid-section')?.getAttribute('aria-label')
+      expect(firstName()).toBe('Group 16')
+      expect(gridEl().querySelectorAll('.gallerist-grid-section').length).toBe(10)
+      near(edges()[0] as Element) // from 11, down to its row: 9
+      expect(firstName()).toBe('Group 10')
+    })
+
+    it('focus on a cell moves to the new current cell when the grid redraws', () => {
+      const v = open()
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      const old = gridEl().querySelector('[data-active]') as HTMLButtonElement
+      old.focus()
+      v.setCollection({ groups: [...collection().groups, { id: 'g2', items: [item('c0')] }] })
+      const now = gridEl().querySelector('[data-active]')
+      expect(now).not.toBe(old)
+      expect(now?.getAttribute('data-item')).toBe('a0')
+      expect(document.activeElement).toBe(now)
+
+      document.body.innerHTML = ''
+      const w = open(oneGroup(10_000))
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      ;(gridEl().querySelector('[data-active]') as HTMLButtonElement).focus()
+      w.goTo(0, 9000) // outside the drawn run
+      expect(document.activeElement?.getAttribute('data-item')).toBe('x9000')
+    })
+
+    it('focus falls back to the viewer when the redraw has no current cell', () => {
+      const long = (): Collection => oneGroup(30) // a card shows 9: item 20 is counted, not drawn
+      const v = openWith(long(), { layout: 'sections' }, { g: 0, i: 20 })
+      ;(gridEl().querySelector('.gallerist-grid-cell') as HTMLButtonElement).focus()
+      v.setCollection(long())
+      expect(gridEl().querySelectorAll('.gallerist-grid-cell').length).toBe(9)
+      expect(document.activeElement).toBe(document.querySelector('.gallerist'))
+    })
+
+    it('cells carry their place in the whole group (aria-setsize / aria-posinset)', () => {
+      open()
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      const at = (c: Element) => [c.getAttribute('aria-posinset'), c.getAttribute('aria-setsize')]
+      expect([...gridEl().querySelectorAll('.gallerist-grid-cell')].map(at)).toEqual([
+        ['1', '2'],
+        ['2', '2'],
+        ['1', '1'],
+      ])
+      document.body.innerHTML = ''
+      const v = open(oneGroup(10_000))
+      v.goTo(0, 5000)
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      const cells = gridEl().querySelectorAll('.gallerist-grid-cell')
+      expect(at(cells[0] as Element)).toEqual(['4961', '10000'])
+      expect(at(cells[80] as Element)).toEqual(['5041', '10000'])
+    })
+
+    it('a sections card, all of whose cells are drawn, leaves them to the browser', () => {
+      openWith(oneGroup(30), { layout: 'sections' }, { g: 0, i: 0 })
+      const cell = gridEl().querySelector('.gallerist-grid-cell')
+      expect(cell?.hasAttribute('aria-setsize')).toBe(false)
+      expect(cell?.hasAttribute('aria-posinset')).toBe(false)
     })
 
     it('closing drops what it drew; re-opening draws it again', () => {

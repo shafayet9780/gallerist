@@ -51,8 +51,8 @@ nothing; the state follows the item as you navigate. The button stays focusable,
 out of the viewer. A source with a `loader` counts as downloadable; it resolves on click.
 
 The browser saves through a link with the `download` attribute, which it honours for same-origin URLs
-only. A cross-origin URL opens instead of saving unless its server sends
-`Content-Disposition: attachment`.
+only. A cross-origin URL opens in a new tab instead of saving (the host page stays where it is) unless
+its server sends `Content-Disposition: attachment`.
 
 ## Several items and zips
 

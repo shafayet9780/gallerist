@@ -19,37 +19,66 @@ export function spanAround(
 }
 
 const edge = (r: DOMRect, axis: Axis) => (axis === 'x' ? r.left : r.top)
+const far = (r: DOMRect, axis: Axis) => (axis === 'x' ? r.right : r.bottom)
 
 /**
- * Which way a run of cards flows, and the smallest step between neighbours, in px. The smallest so an
- * expanded card (an index row with its items open) doesn't make the rail look emptier than it is.
- * `null` without layout (detached, `display: none`, or no layout engine at all).
+ * Which way `scroller` runs its cards: down a column (a side rail, a flex column, or a box that only
+ * scrolls vertically), else along a row. Read from the scroller, not from the cards, which can sit
+ * side by side inside a vertical rail (a flat rail's group rows).
  */
-export function measureRun(hosts: Element[]): { axis: Axis; stride: number } | null {
-  let axis: Axis | null = null
+export function axisOf(scroller: Element): Axis {
+  const s = getComputedStyle(scroller)
+  return /column/.test(s.flexDirection) ||
+    (/hidden|clip/.test(s.overflowX) && /auto|scroll/.test(s.overflowY))
+    ? 'y'
+    : 'x'
+}
+
+/**
+ * How far apart neighbouring cards sit along `axis` (the smallest step, in px, so an expanded card,
+ * an index row with its items open, doesn't make the rail look emptier than it is), and the most
+ * cards that share one step (cards side by side across the axis). `null` without layout (detached,
+ * `display: none`, or no layout engine at all).
+ */
+export function measureRun(
+  hosts: Element[],
+  axis: Axis,
+): { stride: number; perLine: number } | null {
   let stride = Number.POSITIVE_INFINITY
+  let perLine = 1
+  let line = 1
   let prev = hosts[0]?.getBoundingClientRect()
   for (let k = 1; prev && k < hosts.length; k++) {
     const r = (hosts[k] as Element).getBoundingClientRect()
-    const dx = Math.abs(r.left - prev.left)
-    const dy = Math.abs(r.top - prev.top)
-    if (!axis && dx + dy > 0.5) axis = dx >= dy ? 'x' : 'y'
-    const d = axis === 'y' ? dy : dx
-    if (axis && d > 0.5) stride = Math.min(stride, d)
+    const d = Math.abs(edge(r, axis) - edge(prev, axis))
+    if (d > 0.5) {
+      stride = Math.min(stride, d)
+      line = 1
+    } else perLine = Math.max(perLine, ++line)
     prev = r
   }
-  return axis && stride < Number.POSITIVE_INFINITY ? { axis, stride } : null
+  return stride < Number.POSITIVE_INFINITY ? { stride, perLine } : null
 }
 
-/** Position (in `hosts`) of the card under the middle of `scroller` along `axis`. */
+/**
+ * Position (in `hosts`) of the card under the middle of `scroller` along `axis`, or the one whose
+ * centre is nearest it. Any order: in a right-to-left rail the first card is the rightmost.
+ */
 export function middleOf(scroller: Element, hosts: Element[], axis: Axis): number {
   const box = scroller.getBoundingClientRect()
-  const mid = axis === 'x' ? (box.left + box.right) / 2 : (box.top + box.bottom) / 2
+  const mid = (edge(box, axis) + far(box, axis)) / 2
+  let best = 0
+  let gap = Number.POSITIVE_INFINITY
   for (let k = 0; k < hosts.length; k++) {
     const r = (hosts[k] as Element).getBoundingClientRect()
-    if ((axis === 'x' ? r.right : r.bottom) >= mid) return k
+    if (edge(r, axis) <= mid && far(r, axis) >= mid) return k
+    const d = Math.abs((edge(r, axis) + far(r, axis)) / 2 - mid)
+    if (d < gap) {
+      gap = d
+      best = k
+    }
   }
-  return hosts.length - 1
+  return best
 }
 
 /**

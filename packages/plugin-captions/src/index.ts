@@ -14,9 +14,13 @@ export interface CaptionContext {
 
 export interface CaptionsOptions<GM = unknown, IM = unknown> {
   /**
-   * The caption for the current item. A Node is shown as is; a string is set as text (never parsed
-   * as HTML); `null` (or `undefined`) shows the item's text `caption`, or nothing without one.
+   * The caption for the current item. A Node is shown as is; a string is set as plain text (never
+   * parsed as HTML); `null` (or `undefined`) shows the item's text `caption` in a
+   * `span.gallerist-caption-text` (the theme's caption type), or nothing without one.
    * Called when the current item or the collection changes, and on `refresh()`.
+   *
+   * Return an Element, or a fresh node each call, not a cached DocumentFragment: a fragment empties
+   * itself when inserted, so the second time it paints nothing.
    */
   render: (
     item: Item<IM>,
@@ -29,6 +33,17 @@ export interface CaptionsOptions<GM = unknown, IM = unknown> {
 export interface CaptionsPlugin extends Plugin {
   /** render the current caption again (after the host changed data that `render` reads) */
   refresh(): void
+}
+
+// The item's own text caption, styled like the bar's text. Untyped data (JSON, a CDN page) can still
+// carry an old object-shaped caption: anything but a string is no caption.
+const text = (item: Item): HTMLElement | null => {
+  const caption: unknown = item.caption
+  if (typeof caption !== 'string' || !caption) return null
+  const span = document.createElement('span')
+  span.className = 'gallerist-caption-text'
+  span.textContent = caption
+  return span
 }
 
 export function captions<GM = unknown, IM = unknown>(
@@ -54,8 +69,7 @@ export function captions<GM = unknown, IM = unknown>(
       const group = collection.groups[g] as Group<GM, IM> | undefined
       const item = group?.items[i]
       let out: Node | string | null | undefined = null
-      if (group && item)
-        out = opts.render(item, group, { viewer, cursor: { g, i } }) ?? item.caption
+      if (group && item) out = opts.render(item, group, { viewer, cursor: { g, i } }) ?? text(item)
       if (out == null || typeof out === 'string') host.textContent = out ?? ''
       else if (host.firstChild !== out || host.childNodes.length > 1) host.replaceChildren(out)
     }

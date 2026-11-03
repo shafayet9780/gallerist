@@ -388,7 +388,10 @@ function Region(props: GalleristRegionProps): ReactNode {
 }
 
 export interface GalleristCaptionProps<GM = unknown, IM = unknown> {
-  /** the caption for the current item; `null` or `undefined` shows its text `caption` */
+  /**
+   * the caption for the current item; `null`, `undefined`, `true` or `false` shows its text
+   * `caption` (in a `span.gallerist-caption-text`, the theme's caption type)
+   */
   children: (current: {
     item: Item<IM>
     group: Group<GM, IM>
@@ -404,7 +407,19 @@ export interface GalleristCaptionProps<GM = unknown, IM = unknown> {
 function Caption<GM = unknown, IM = unknown>(props: GalleristCaptionProps<GM, IM>): ReactNode {
   const { item, group, cursor } = useCurrentItem<GM, IM>()
   const out = item && group ? props.children({ item, group, cursor }) : null
-  return <Region name="caption">{out ?? item?.caption ?? null}</Region>
+  return (
+    <Region name="caption">
+      {out == null || typeof out === 'boolean' ? text(item?.caption) : out}
+    </Region>
+  )
+}
+
+// The item's own text caption, styled like the bar's text. Untyped data (JSON, a CDN page) can still
+// carry an old object-shaped caption, which React would throw on: anything but a string is none.
+function text(caption: unknown): ReactNode {
+  return typeof caption === 'string' && caption ? (
+    <span className="gallerist-caption-text">{caption}</span>
+  ) : null
 }
 
 export const Gallerist = Object.assign(GalleristBase, { Overlay, Region, Caption })

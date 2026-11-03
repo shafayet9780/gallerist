@@ -258,9 +258,12 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   }
 
   // While a card is open, Escape closes it (not the viewer), wherever focus is in the viewer: some
-  // browsers don't focus a clicked button, and `open(id)` leaves focus where it was.
+  // browsers don't focus a clicked button, and `open(id)` leaves focus where it was. An Escape from
+  // inside the card is left to the card's own (bubble) listener, so a host form in the card sees it
+  // first and can keep it with preventDefault().
   const onOpenKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape' || !openId) return
+    if (shown && e.target instanceof Node && shown.card.contains(e.target)) return
     e.stopPropagation()
     setOpen(null, true)
   }
@@ -448,6 +451,14 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     marker.addEventListener('click', () => setOpen(openId === pin.id ? null : pin.id))
     // a click inside a card must not reach the stage (no swipe, no close-on-backdrop)
     card.addEventListener('pointerdown', (e) => e.stopPropagation())
+    // Escape from inside the card closes the card, unless a host handler in it kept the key
+    // (preventDefault); then it goes no further, so the viewer stays open
+    card.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || openId !== pin.id) return
+      e.preventDefault()
+      e.stopPropagation()
+      setOpen(null, true)
+    })
     el.append(marker, card)
     rendered.push({ pin, el, marker, card, ctx })
     return el

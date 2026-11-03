@@ -30,7 +30,7 @@ import type {
   ViewerApi,
 } from '@gallerist/core'
 import { ICONS } from '@gallerist/core/internal'
-import { type Axis, keepPlace, measureRun, middleOf, spanAround } from './strip'
+import { type Axis, axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
 
 /** Cards drawn beyond the visible ones on each side, so a step or a short scroll lands on drawn cards. */
 const MARGIN = 3
@@ -39,10 +39,13 @@ const FALLBACK = 8
 
 export interface ThumbnailsOptions {
   /**
-   * Cards drawn on each side of the middle of the rail; scrolling the rail draws the ones it reaches.
-   * By default the rail measures itself and draws what fits plus 3 cards on each side (8 on each
-   * side before it has a layout to measure). A number fixes the bound. Group cards, or item cards
-   * in `flat` mode.
+   * Cards drawn on each side of the card in the middle of the rail; scrolling the rail draws the ones
+   * it reaches. A jump to a card outside the drawn run first draws around that card (wide enough for
+   * it to land at either edge of the rail), and the scroll that reveals it trims the run back to the
+   * middle. By default the rail measures itself and draws what fits plus 3 cards on each side (8 on
+   * each side before it has a layout to measure). A number fixes the bound, but never below what
+   * fits (half the visible cards each side), so the rail is never drawn with gaps. Group cards, or
+   * item cards in `flat` mode.
    */
   overscan?: number
   /**
@@ -149,7 +152,7 @@ function lazyImg(src: string | null, observer: IntersectionObserver | null): HTM
 }
 
 /** Display caption string, if one was explicitly provided (no `alt` fallback — UX-G). */
-function captionOf(x: { caption?: string | { id: string } }): string | undefined {
+function captionOf(x: { caption?: unknown }): string | undefined {
   return typeof x.caption === 'string' ? x.caption : undefined
 }
 
@@ -175,6 +178,12 @@ function setActiveAttr(el: HTMLElement, active: boolean): void {
   // index rows are plain buttons (their list holds a listbox of items, which can't nest in another)
   if (el.getAttribute('role') === 'option') el.setAttribute('aria-selected', String(active))
   else toggleAriaCurrent(el, active)
+}
+
+/** Place a listbox option in its whole list: the rail draws only a run of it. */
+function setPos(el: HTMLElement, pos: number, size: number): void {
+  el.setAttribute('aria-posinset', String(pos))
+  el.setAttribute('aria-setsize', String(size))
 }
 
 function toggleAttr(el: HTMLElement, name: string, on: boolean): void {
@@ -320,10 +329,18 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           })
         : null
 
-    const buildItemButton = (item: Item, gIndex: number, iIndex: number): HTMLButtonElement => {
+    // `pos`/`size`: where the thumb sits in its list (1-based), which may be drawn only in part
+    const buildItemButton = (
+      item: Item,
+      gIndex: number,
+      iIndex: number,
+      pos = iIndex + 1,
+      size = viewer.getCollection().groups[gIndex]?.items.length ?? 0,
+    ): HTMLButtonElement => {
       const btn = thumbButton(t.item(iIndex + 1), 'gallerist-thumb-item', () =>
         viewer.goTo(gIndex, iIndex),
       )
+      setPos(btn, pos, size)
       btn.dataset.item = item.id
       btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
       if (o.numberItems) {
@@ -447,6 +464,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         () => viewer.goTo(gIndex),
       )
       btn.dataset.group = group.id
+      setPos(btn, gIndex + 1, viewer.getCollection().groups.length)
       const cover = groupThumb(group)
       coverUrls.set(group.id, cover)
       btn.appendChild(lazyImg(cover, observer))
@@ -511,6 +529,17 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const drop = (el: Element) => {
       el.remove()
       for (const img of el.querySelectorAll('img')) observer?.unobserve(img)
+    }
+
+    // Run `redraw`; a focused thumb it took out of the document hands focus to the viewer, so the
+    // keys keep working (focus would fall to <body>).
+    const keepFocus = (redraw: () => void) => {
+      const focused = document.activeElement
+      const viewerEl = regionEl?.closest<HTMLElement>('.gallerist')
+      redraw()
+      if (focused instanceof HTMLElement && !focused.isConnected) {
+        viewerEl?.focus({ preventScroll: true })
+      }
     }
 
     // Put `node` right after `prev` (or first in `parent`), unless it already is there: cards that stay
@@ -649,7 +678,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const syncPanel = () => {
       const col = viewer.getCollection()
       const cur = viewer.getState().cursor
-      rebuildItemColumn(col.groups[cur.g], cur.g)
+      keepFocus(() => rebuildItemColumn(col.groups[cur.g], cur.g))
       applyActive(col, cur.g, cur.i)
     }
 
@@ -742,7 +771,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
         let ib = itemBtns.get(e.itemId)
         if (!ib) {
-          ib = buildItemButton(item, e.g, e.i)
+          ib = buildItemButton(item, e.g, e.i, fi + 1, flat.length)
           itemBtns.set(e.itemId, ib)
         }
         place(row, ib, prevBtn)
@@ -821,36 +850,39 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (!root || (start === winStart && end === winEnd)) return
       const shared = Math.max(start, winStart)
       const ref = shared <= Math.min(end, winEnd) ? hostAt(col, shared) : undefined
-      const focused = document.activeElement
       // a section's items live in its row: lift them out when that row leaves the run, and put them
       // back when it's drawn again (left alone otherwise, so a focused item keeps its focus)
       const g = viewer.getState().cursor.g
       const active = isIndex && itemRow ? col.groups[g] : undefined
-      keepPlace(root, ref, axis, () => {
-        if (active && (g < start || g > end)) itemRow?.remove()
-        if (isFlat) rebuildRailFlat(col, start, end)
-        else rebuildRail(col, start, end)
-        const host = active ? cardHost.get(active.id) : undefined
-        if (host && itemRow && itemRow.parentNode !== host) host.appendChild(itemRow)
-      })
+      const scroller = root
+      keepFocus(() =>
+        keepPlace(scroller, ref, axis, () => {
+          if (active && (g < start || g > end)) itemRow?.remove()
+          if (isFlat) rebuildRailFlat(col, start, end)
+          else rebuildRail(col, start, end)
+          const host = active ? cardHost.get(active.id) : undefined
+          if (host && itemRow && itemRow.parentNode !== host) host.appendChild(itemRow)
+        }),
+      )
       winStart = start
       winEnd = end
-      // a focused card scrolled out of the run: keep the keys working (focus would fall to <body>)
-      if (focused instanceof HTMLElement && !focused.isConnected) {
-        regionEl?.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
-      }
     }
 
-    // How many cards fit in the rail, and which way it runs; false while it has no layout.
+    // Which way the rail runs, and how many cards fit in it; false while it has no layout.
     const measure = (col: ReturnType<ViewerApi['getCollection']>) => {
       if (!root) return false
-      const run = measureRun(drawnHosts(col))
-      const extent = run && (run.axis === 'x' ? root.clientWidth : root.clientHeight)
+      const along = axisOf(root)
+      const run = measureRun(drawnHosts(col), along)
+      const extent = run && (along === 'x' ? root.clientWidth : root.clientHeight)
       if (!run || !extent) return false
-      axis = run.axis
-      perView = Math.ceil(extent / run.stride) + 1 // a part-shown card at each end
+      axis = along
+      // a part-shown line at each end; a line can hold several cards (a flat rail's group rows)
+      perView = (Math.ceil(extent / run.stride) + 1) * run.perLine
       return true
     }
+    // cards each side: `overscan`, but never fewer than `least` (a measured rail would show gaps)
+    const sideOf = (least: number, fallback: number) =>
+      perView ? Math.max(o.overscan ?? fallback, least) : (o.overscan ?? fallback)
 
     // Re-centre the run on the middle of the rail (after a scroll, a resize, or opening).
     const rewindow = () => {
@@ -859,7 +891,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (col !== lastCol || !measure(col)) return
       const hosts = drawnHosts(col)
       const middle = winStart + middleOf(root, hosts, axis as Axis)
-      const side = o.overscan ?? Math.ceil(perView / 2) + MARGIN
+      const half = Math.ceil(perView / 2)
+      const side = sideOf(half, half + MARGIN)
       setWindow(col, ...spanAround(middle, seqLength(col), side, side))
       const cur = viewer.getState().cursor
       markActive(col, cur.g, cur.i) // a re-drawn active card gets its state back
@@ -901,7 +934,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
       const colChanged = col !== lastCol
       if (colChanged) {
-        resetAll()
+        keepFocus(resetAll) // new data: every thumb is drawn afresh
         collectionHasMulti = col.groups.some((g) => g.items.length > 1)
       }
 
@@ -912,14 +945,14 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // scroll that follows trims it to the middle of the rail (rewindow).
       const at = isFlat ? (flatPos.get(`${cur.g}:${cur.i}`) ?? 0) : cur.g
       if (colChanged || at < winStart || at > winEnd) {
-        const side = o.overscan ?? (perView ? perView + MARGIN : FALLBACK)
+        const side = sideOf(perView, perView ? perView + MARGIN : FALLBACK)
         setWindow(col, ...spanAround(at, seqLength(col), side, side))
       }
       if (!isFlat) {
         const activeGroup = col.groups[cur.g]
         const activeGroupId = activeGroup?.id ?? null
         if (colChanged || activeGroupId !== lastActiveGroupId) {
-          rebuildItemColumn(activeGroup, cur.g)
+          keepFocus(() => rebuildItemColumn(activeGroup, cur.g)) // a focused item thumb goes with it
           lastActiveGroupId = activeGroupId
         }
         if (peekGroupId && peekGroupId === activeGroupId) closePeek() // navigated into the peeked group

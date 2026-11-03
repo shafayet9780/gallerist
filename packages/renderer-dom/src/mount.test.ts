@@ -1399,13 +1399,53 @@ describe('mount — modal accessibility (WS-3)', () => {
     v.nextItem()
     expect(describe()).toBe('')
     // ids are unique per viewer
-    const w = createViewer({ collection: collection() })
+    const w = createViewer({
+      collection: { groups: [{ id: 'g0', items: [{ ...item('b0'), caption: 'Back view' }] }] },
+    })
     mount(w)
     w.open()
     const roots = document.querySelectorAll('.gallerist')
+    expect(roots[1]?.getAttribute('aria-describedby')).toBeTruthy()
     expect(roots[1]?.getAttribute('aria-describedby')).not.toBe(
       root.getAttribute('aria-describedby'),
     )
+  })
+
+  it('is described by the caption only while the caption bar shows', () => {
+    const captioned = {
+      groups: [{ id: 'g0', items: [{ ...item('a0'), caption: 'Front view' }] }],
+    }
+    const v = createViewer({ collection: captioned })
+    mount(v, { controls: false }) // no chrome: the caption bar stays hidden
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(document.querySelector('.gallerist-caption')?.hasAttribute('hidden')).toBe(true)
+    expect(root.hasAttribute('aria-describedby')).toBe(false)
+    // nor without any caption in the collection
+    const w = createViewer({ collection: collection() })
+    mount(w)
+    w.open()
+    expect(document.querySelectorAll('.gallerist')[1]?.hasAttribute('aria-describedby')).toBe(false)
+  })
+
+  it('ignores a caption that is not a string (untyped data with an old caption object)', () => {
+    const v = createViewer({
+      collection: {
+        groups: [
+          {
+            id: 'g0',
+            items: [
+              { ...item('a0'), caption: { id: 'c', render: () => 'x' } as unknown as string },
+            ],
+          },
+        ],
+      },
+    })
+    mount(v)
+    v.open()
+    const bar = document.querySelector('.gallerist-caption') as HTMLElement
+    expect(bar.textContent).not.toContain('[object Object]')
+    expect(bar.hidden).toBe(true) // no text caption anywhere: no band reserved for one
   })
 
   it('announces the current item description in the live region (S-UX4)', () => {
@@ -1565,45 +1605,107 @@ describe('groupAxis and arrowLabels', () => {
 })
 
 describe('mount — preloading within a group (U17)', () => {
-  const warmed: string[] = []
+  // Image stub: records each warmer and every src it is given (nothing is fetched in happy-dom)
+  let warmers: Array<{ img: HTMLImageElement; srcs: string[] }> = []
   const stubImage = () => {
-    warmed.length = 0
+    warmers = []
     const Real = window.Image
     vi.stubGlobal(
       'Image',
       class extends Real {
+        rec = { img: this as HTMLImageElement, srcs: [] as string[] }
+        constructor() {
+          super()
+          warmers.push(this.rec)
+        }
         override set src(v: string) {
-          warmed.push(v)
+          this.rec.srcs.push(v)
         }
       },
     )
   }
-  afterEach(() => vi.unstubAllGlobals())
-
-  it('warms the images a step within the group lands on, not other media', () => {
-    stubImage()
-    const v = createViewer({
-      collection: {
-        groups: [
-          {
-            id: 'g0',
-            items: [
-              item('p0'),
-              item('p1'),
-              { id: 'clip', type: 'video', source: 'clip.mp4' },
-              { id: 'p3', type: 'image', source: { src: 'p3.jpg', srcset: 'p3-2x.jpg 2x' } },
-              item('p4'),
-            ],
-          },
+  const warmed = () => warmers.map((w) => w.srcs[0])
+  const group = (): Collection => ({
+    groups: [
+      {
+        id: 'g0',
+        items: [
+          item('p0'),
+          item('p1'),
+          { id: 'clip', type: 'video', source: 'clip.mp4' },
+          { id: 'p3', type: 'image', source: { src: 'p3.jpg', srcset: 'p3-2x.jpg 2x' } },
+          item('p4'),
         ],
       },
-    })
+    ],
+  })
+  // the current image finished loading: its adapter's `ready` settles
+  const loadCurrent = () =>
+    document
+      .querySelector('.gallerist-slide[data-gallerist-current] img')
+      ?.dispatchEvent(new Event('load'))
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('warms the images a step within the group lands on, once the current one is ready', async () => {
+    stubImage()
+    const v = createViewer({ collection: group() })
     mount(v)
     v.open({ g: 0, i: 1 })
+    expect(warmers).toEqual([]) // nothing competes with the image on screen
+    loadCurrent()
     // behind 1 (p0); ahead 2: the video is skipped, p3 is warmed with its srcset
-    expect(warmed).toContain('p0.jpg')
-    expect(warmed).toContain('p3.jpg')
-    expect(warmed).not.toContain('clip.mp4')
-    expect(warmed).not.toContain('p1.jpg') // the current item is mounted, not warmed
+    await vi.waitFor(() => expect(warmed()).toEqual(['p0.jpg', 'p3.jpg']))
+    const p3 = warmers[1]?.img
+    expect(p3?.srcset).toBe('p3-2x.jpg 2x')
+    expect(p3?.fetchPriority).toBe('low')
+  })
+
+  it('cancels the warmers a move leaves behind, and keeps the ones still wanted', async () => {
+    stubImage()
+    const v = createViewer({ collection: group() })
+    mount(v)
+    v.open({ g: 0, i: 1 })
+    loadCurrent()
+    await vi.waitFor(() => expect(warmers.length).toBe(2))
+    v.goTo(0, 4) // wants p3 (behind) only
+    const [p0, p3] = warmers
+    expect(p0?.srcs.at(-1)).toBe('') // its request is dropped
+    expect(p3?.srcs).toEqual(['p3.jpg'])
+    loadCurrent()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(warmers.length).toBe(2) // p3 isn't fetched twice
+  })
+
+  it('leaves items a custom adapter mounts alone', async () => {
+    stubImage()
+    const v = createViewer({ collection: group() })
+    const custom = {
+      type: 'image',
+      mount: (_item: Item, slot: HTMLElement) => {
+        const node = document.createElement('div')
+        slot.appendChild(node)
+        return {
+          element: node,
+          ready: Promise.resolve(),
+          supportsZoom: false,
+          destroy: () => node.remove(),
+        }
+      },
+    }
+    mount(v, { adapters: [custom] })
+    v.open({ g: 0, i: 1 })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(warmers).toEqual([])
+  })
+
+  it('destroying the viewer cancels warmers in flight', async () => {
+    stubImage()
+    const v = createViewer({ collection: group() })
+    const handle = mount(v)
+    v.open({ g: 0, i: 1 })
+    loadCurrent()
+    await vi.waitFor(() => expect(warmers.length).toBe(2))
+    handle.destroy()
+    expect(warmers.map((w) => w.srcs.at(-1))).toEqual(['', ''])
   })
 })

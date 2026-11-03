@@ -213,6 +213,42 @@ describe('plugin-download', () => {
     expect(hrefs[1]).toBe('c.jpg')
   })
 
+  it('opens a cross-origin URL in a new tab (download is ignored there); same-origin stays put', async () => {
+    const seen: { href: string; target: string; rel: string }[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      seen.push({ href: this.getAttribute('href') ?? '', target: this.target, rel: this.rel })
+    })
+    await downloadItem(item('a', 'https://cdn.test/a.png'))
+    await downloadItem(item('b', 'pics/b.jpg'))
+    await downloadItem(item('c', `${location.origin}/c.jpg`))
+    expect(seen).toEqual([
+      { href: 'https://cdn.test/a.png', target: '_blank', rel: 'noopener' },
+      { href: 'pics/b.jpg', target: '', rel: 'noopener' },
+      { href: `${location.origin}/c.jpg`, target: '', rel: 'noopener' },
+    ])
+  })
+
+  it('a click calls downloadUrl once and saves what it returned', async () => {
+    const hrefs: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      hrefs.push(this.getAttribute('href') ?? '')
+    })
+    let n = 0
+    const downloadUrl = vi.fn(() => `full-${++n}.png`) // a fresh value per call
+    const v = createViewer({ collection: collection(), plugins: [download({ downloadUrl })] })
+    mount(v)
+    v.open()
+    downloadUrl.mockClear()
+    btn().click()
+    await tick()
+    expect(downloadUrl).toHaveBeenCalledOnce()
+    expect(hrefs).toEqual([`full-${n}.png`])
+  })
+
   it('resolveDownloadUrl rejects an unsafe downloadUrl', async () => {
     expect(await resolveDownloadUrl(item('a'), () => 'javascript:alert(1)')).toBeNull()
     expect(await resolveDownloadUrl(item('a'), () => null)).toBeNull()

@@ -39,6 +39,9 @@ afterEach(() => {
 })
 
 const key = (k: string) => new KeyboardEvent('keydown', { key: k, bubbles: true })
+// a real keydown is cancelable: preventDefault() only sticks on one
+const cancelableKey = (k: string) =>
+  new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })
 const flush = () => new Promise((r) => setTimeout(r, 0))
 
 const open = (opts: PinsOptions = {}, col = collection()) => {
@@ -304,6 +307,39 @@ describe('plugin-pins', () => {
       expect(v.getState().phase).not.toMatch(/clos/)
       root.dispatchEvent(key('Escape')) // with no card open, Escape is the viewer's again
       expect(v.getState().phase).toMatch(/clos/)
+    })
+
+    it('a form in a card can keep Escape with preventDefault(): card and viewer stay open', () => {
+      const { v } = open({
+        renderCard: () => {
+          const input = document.createElement('input')
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') e.preventDefault()
+          })
+          return input
+        },
+      })
+      markers()[0]?.click()
+      const input = cards()[0]?.querySelector('input') as HTMLInputElement
+      input.focus()
+      input.dispatchEvent(cancelableKey('Escape'))
+      expect(cards()[0]?.hidden).toBe(false)
+      expect(document.activeElement).toBe(input)
+      expect(v.getState().phase).not.toMatch(/clos/)
+    })
+
+    it('Escape in a card form that does not keep it closes the card, not the viewer', () => {
+      const { v } = open({ renderCard: () => document.createElement('input') })
+      const [m1] = markers()
+      m1?.click()
+      const input = cards()[0]?.querySelector('input') as HTMLInputElement
+      input.focus()
+      const esc = cancelableKey('Escape')
+      input.dispatchEvent(esc)
+      expect(esc.defaultPrevented).toBe(true) // marked handled for anything listening later
+      expect(cards()[0]?.hidden).toBe(true)
+      expect(document.activeElement).toBe(m1)
+      expect(v.getState().phase).not.toMatch(/clos/)
     })
 
     it('hiding pins while one has focus hands focus to the toggle', async () => {

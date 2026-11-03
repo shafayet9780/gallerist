@@ -117,6 +117,7 @@ download, fullscreen and pins plugins. Each plugin exports its defaults (`DEFAUL
 ## Forms inside the viewer
 
 Keys typed into a text field inside the viewer (a comment box in a pin card, a caption's input) stay
-with the field, except Escape, which closes the viewer from anywhere. To keep Escape for your form
-(clear the field, cancel a draft), call `event.preventDefault()` in your own `keydown` handler; the
-viewer leaves an Escape that was already handled alone.
+with the field, except Escape, which closes the viewer from anywhere (in a pin card it closes the
+card and leaves the viewer open). To keep Escape for your form (clear the field, cancel a draft),
+call `event.preventDefault()` in your own `keydown` handler; the viewer leaves an Escape that was
+already handled alone.
