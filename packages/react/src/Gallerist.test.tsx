@@ -32,7 +32,7 @@ describe('<Gallerist>', () => {
     )
     const root = document.querySelector('.gallerist') as HTMLElement
     expect(root.getAttribute('data-gallerist-preset')).toBe('reviewer')
-    expect(root.getAttribute('data-gallerist-arrows')).toBe('corner-br') // reviewer default
+    expect(root.getAttribute('data-gallerist-arrows')).toBe('docked') // reviewer default
     expect(root.getAttribute('data-gallerist-skin')).toBe('console')
     expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
     expect(root.hasAttribute('data-gallerist-scheme')).toBe(false) // the skin's own default

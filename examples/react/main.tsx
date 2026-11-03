@@ -115,7 +115,7 @@ const ACCENTS: Record<SkinName, string[]> = {
   console: ['amber', 'cyan', 'vermilion'],
 }
 const SCHEMES: SchemeOpt[] = ['', 'dark', 'light', 'auto']
-const ARROWS: ArrowLayout[] = ['pill-right', 'corner-br', 'dpad', 'split']
+const ARROWS: ArrowLayout[] = ['pill-right', 'corner-br', 'dpad', 'split', 'docked']
 const RAILS: RailPlacement[] = ['bottom', 'left', 'right', 'hidden']
 const MEMORIES: ItemMemory[] = ['reset', 'preserve', 'clamp']
 const GROUP_DISPLAYS: GroupDisplay[] = ['stacked', 'flat', 'index']

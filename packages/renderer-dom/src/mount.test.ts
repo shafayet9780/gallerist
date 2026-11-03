@@ -194,7 +194,53 @@ describe('mount — chrome + keyboard', () => {
     v.open()
     const root = document.querySelector('.gallerist') as HTMLElement
     expect(root.getAttribute('data-gallerist-preset')).toBe('reviewer')
-    expect(root.getAttribute('data-gallerist-arrows')).toBe('corner-br') // reviewer default
+    expect(root.getAttribute('data-gallerist-arrows')).toBe('docked') // reviewer default
+  })
+
+  it('docked arrows: the item navigator is a grid item of the root, off the stage', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'docked' })
+    v.open({ g: 1 })
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const nav = document.querySelector('.gallerist-itemnav') as HTMLElement
+    expect(root.getAttribute('data-gallerist-arrows')).toBe('docked')
+    // a root child right after the stage's area (tab order: group arrows, item navigator, aside)
+    expect(nav.parentElement).toBe(root)
+    expect(nav.previousElementSibling?.classList.contains('gallerist-main')).toBe(true)
+    expect(nav.nextElementSibling?.classList.contains('gallerist-region-aside')).toBe(true)
+    // nothing of it is inside the main area over the stage; the group arrows still are
+    const controls = document.querySelector('.gallerist-controls') as HTMLElement
+    expect(controls.querySelector('.gallerist-item-prev, .gallerist-position')).toBeNull()
+    expect(controls.querySelector('.gallerist-prev')).not.toBeNull()
+    expect(nav.hidden).toBe(false)
+    expect(nav.querySelector('.gallerist-position-text')?.textContent).toBe('1 / 3')
+    ;(nav.querySelector('.gallerist-item-next') as HTMLButtonElement).click()
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    v.goTo(0, 0) // a one-item group hides it, as in the other layouts
+    expect(nav.hidden).toBe(true)
+  })
+
+  it('docked arrows with the reviewer preset; a placard still holds the navigator', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { preset: 'reviewer' })
+    v.open({ g: 1 })
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(document.querySelector('.gallerist-itemnav')?.parentElement).toBe(root)
+    v.destroy()
+    document.body.innerHTML = ''
+    const w = createViewer({ collection: collection() })
+    mount(w, { arrows: 'docked', itemIndicator: 'placard' })
+    w.open({ g: 1 })
+    expect(document.querySelector('.gallerist-itemnav')?.parentElement?.className).toBe(
+      'gallerist-caption',
+    )
+  })
+
+  it('without controls there is no docked navigator', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'docked', controls: false })
+    v.open({ g: 1 })
+    expect(document.querySelector('.gallerist-itemnav')).toBeNull()
   })
 
   it('an explicit arrows option overrides the preset default', () => {

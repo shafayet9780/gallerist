@@ -20,6 +20,9 @@
     --gallerist-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
     --gallerist-index-w: 280px; /* a section index (`groupDisplay: 'index'`) in a side rail */
     --gallerist-rail-w: 130px; /* vertical (left/right) rail width */
+    /* the docked item navigator (`arrows: 'docked'`): the count over ↑ ↓ */
+    --gallerist-dock-w: calc(2 * var(--gallerist-target) + 16px);
+    --gallerist-dock-h: calc(var(--gallerist-target) + 30px);
     --gallerist-speed: 300ms;
 
     /* motion (spec §27.2) — bezier approximations of the named springs */
@@ -87,7 +90,7 @@
 /* ── layout (base): the root is a grid of areas ───────────────────────────────
    bar / main / aside / caption / footer / rail. Persistent chrome gets its own track, so it takes
    space instead of covering the stage and pieces can't collide; only the arrows and the item
-   navigator sit over the stage, inside `main`. Rail position and presets swap the template, never
+   navigator sit over the stage, inside `main` (`arrows: 'docked'` takes both off it, at the end). Rail position and presets swap the template, never
    the DOM. Grid columns follow the inline direction, so RTL mirrors the whole layout. */
 .gallerist {
   display: grid;
@@ -1959,5 +1962,100 @@
     .gallerist-thumb-section
     > .gallerist-thumb-items {
     display: none;
+  }
+}
+
+/* ── docked controls (`arrows: 'docked'`, the reviewer preset): nothing over the media ─────────
+   Review needs every pixel, corners included. The group arrows sit in gutters the stage leaves at
+   its sides (none on touch, where swipes stand in for them). The item navigator is a grid item of
+   the root, the count over ↑ ↓: a header on the aside item column while that shows, else at the
+   end of the caption row, which makes room for it. While any group has several items it keeps its
+   room on a one-item group, so the stage and the item column hold still. Last in the file, so it
+   wins over the arrow layouts and the touch chip above. */
+.gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
+  inset-inline: calc(var(--gallerist-arrow-size) + 24px);
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-axis="vertical"] .gallerist-stage {
+  inset-inline-start: 0; /* both group arrows stack at the inline end */
+}
+@media (pointer: coarse) {
+  .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
+    inset-inline: 0;
+  }
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
+  > .gallerist-itemnav {
+  grid-area: caption;
+  align-self: start;
+  justify-self: end;
+  position: relative;
+  z-index: 3;
+  inset: auto;
+  transform: none;
+  box-sizing: border-box;
+  inline-size: var(--gallerist-dock-w);
+  block-size: var(--gallerist-dock-h);
+  margin: 4px 12px;
+  flex-flow: row wrap;
+  place-content: center;
+  gap: 2px 4px;
+  padding: 4px;
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-multi]:not([data-gallerist-linear])
+  > .gallerist-itemnav[hidden] {
+  display: flex;
+  visibility: hidden;
+}
+.gallerist[data-gallerist-arrows="docked"] > .gallerist-itemnav .gallerist-position {
+  order: -1;
+  flex-basis: 100%;
+  justify-content: center;
+  padding: 0;
+}
+.gallerist[data-gallerist-arrows="docked"]
+  > .gallerist-itemnav
+  :is(.gallerist-pill, .gallerist-dot) {
+  display: none;
+}
+.gallerist[data-gallerist-arrows="docked"] > .gallerist-itemnav .gallerist-position-text {
+  display: inline;
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-multi]:not([data-gallerist-linear]):has(
+    > .gallerist-itemnav
+  )
+  > .gallerist-caption {
+  margin-inline-end: calc(var(--gallerist-dock-w) + 12px);
+}
+/* the navigator sets a floor under the caption row; a bottom rail keeps its full height beside it
+   (a tall caption band scrolls instead of pushing the strip off a small screen) */
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-orientation="horizontal"]
+  .gallerist-region-thumbnails {
+  min-height: auto;
+}
+/* the item column shows (a stacked rail's items beside the stage): the navigator heads it */
+@media (min-width: 601px) {
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-rail="collapsed"]):has(
+      > .gallerist-region-aside .gallerist-thumb-items
+    )
+    > .gallerist-itemnav {
+    grid-area: aside;
+    justify-self: stretch;
+    inline-size: auto;
+    min-inline-size: var(--gallerist-dock-w);
+    contain: inline-size; /* as wide as the column, which it doesn't widen past its own minimum */
+    margin-block: 8px 0;
+    margin-inline: 0 8px;
+  }
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-rail="collapsed"]):has(
+      > .gallerist-region-aside .gallerist-thumb-items
+    )
+    > .gallerist-region-aside {
+    padding-block-start: calc(var(--gallerist-dock-h) + 8px);
+  }
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-rail="collapsed"]):has(
+      > .gallerist-region-aside .gallerist-thumb-items
+    )
+    > .gallerist-caption {
+    margin-inline-end: 0;
   }
 }

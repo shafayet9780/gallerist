@@ -58,10 +58,11 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     navigator: false,
   },
   // time-series reviewer: a bottom timeline rail (a time over each group, from group.meta.time),
-  // numbered items, a corner arrow cluster and the zoom navigator.
+  // numbered items, the zoom navigator, and no control over the media (review needs every pixel):
+  // docked arrows, the item navigator on the item column or the caption row.
   reviewer: {
     rootAttrs: { 'data-gallerist-preset': 'reviewer' },
-    arrows: 'corner-br',
+    arrows: 'docked',
     autoHide: false,
     rail: 'bottom',
     thumbnails: { itemAxis: 'vertical', timeline: true, numberItems: true },

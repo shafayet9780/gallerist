@@ -18,9 +18,9 @@ describe('resolvePreset', () => {
     expect(p.rootAttrs['data-gallerist-preset']).toBe('immersive')
   })
 
-  it('reviewer: bottom timeline rail + corner arrows', () => {
+  it('reviewer: bottom timeline rail + docked arrows (nothing over the media)', () => {
     const p = resolvePreset('reviewer')
-    expect(p.arrows).toBe('corner-br')
+    expect(p.arrows).toBe('docked')
     expect(p.rail).toBe('bottom')
     expect(p.rootAttrs['data-gallerist-preset']).toBe('reviewer')
     expect(p.thumbnails).toMatchObject({ timeline: true, numberItems: true })

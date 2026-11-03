@@ -11,7 +11,7 @@ distinct layout.
 | Preset      | Rail     | Arrows      | Auto-hide | For |
 |-------------|----------|-------------|-----------|-----|
 | `filmstrip` | `bottom` | `pill-right`| no        | Classic lightbox, persistent chrome (default). |
-| `reviewer`  | `bottom` | `corner-br` | no        | Time-series review: a timeline rail (a time over each group from `group.meta.time`), numbered items, the zoom navigator. Pairs with `skin: 'console'`. |
+| `reviewer`  | `bottom` | `docked`    | no        | Time-series review: a timeline rail (a time over each group from `group.meta.time`), numbered items, the zoom navigator, and no control over the media (`arrows: 'docked'`). Pairs with `skin: 'console'`. |
 | `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
 | `contact`   | `right`  | `pill-right`| no        | Browse-heavy; vertical rail on the right (pairs with `plugin-grid`). |
 | `editorial` | `bottom` | `pill-right`| no        | A gallery wall: the work framed with room around it (`frame`), a placard beside it holding the caption and the item navigator (`itemIndicator: 'placard'`), numbered items inline in the rail. Pairs with `skin: 'editorial'`. With a side rail the placard becomes the caption band under the stage. |
@@ -102,13 +102,23 @@ The ←/→ group arrows stay on the side edges; the option places the **item na
 - `corner-br` — a horizontal cluster in the bottom inline-end corner.
 - `dpad` — a keyboard-arrow cluster in the bottom inline-end corner: ↑ on top, ← ↓ → along the bottom.
 - `split` — ↑ at top-centre with the position under it, ↓ at bottom-centre.
+- `docked` (the `reviewer` preset) — nothing over the media, for review that needs every pixel,
+  corners included. The group arrows sit in gutters the stage leaves at its sides (on touch, where
+  swipes stand in for them, the stage takes the full width). The navigator leaves the stage: the
+  `n / N` count over ↑ ↓, as a header on the `aside` item column while that shows (a `stacked`
+  rail's vertical item stack, over 600px wide, rail expanded), otherwise at the end of the caption
+  row, beside a text caption or a designed one (`plugin-captions`, `<Gallerist.Caption>`), which make
+  room for it. It shows the count rather than pills or dots. While any group has several items it
+  keeps its room on a one-item group, so neither the stage nor the item column moves.
 
 The position inside the navigator follows `itemIndicator` (`mount` option / `<Gallerist itemIndicator>`):
 `pills` (default — numbered pills up to 8 items, then `n / N`), `dots` (plain dots plus the `n / N`
 count, up to 12 items), or `counter` (always `n / N`).
 
 On a touch screen the on-image arrows are visually hidden (swipes navigate; screen readers still
-reach them) and the navigator shows only the `n / N` position, at the bottom centre of the stage.
+reach them) and the navigator shows only the `n / N` position, at the bottom centre of the stage
+(`docked`: where it docks, with its ↑ ↓). A group arrow focused from a keyboard on a touch screen
+comes back over the stage edge while it has focus, `docked` included.
 
 ## Layout areas, rail collapse & idle auto-hide
 

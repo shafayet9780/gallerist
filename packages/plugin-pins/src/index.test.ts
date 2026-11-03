@@ -194,15 +194,19 @@ describe('plugin-pins', () => {
     expect(markers().map((m) => m.getAttribute('aria-label'))).toEqual(['1. Q'])
   })
 
-  it('renderCard replaces the card contents', () => {
-    open({
-      renderCard: (p) => {
-        const el = document.createElement('strong')
-        el.textContent = `custom ${p.id}`
-        return el
-      },
+  it('renderCard replaces the card contents, drawn when the card opens', () => {
+    const renderCard = vi.fn((p: Pin) => {
+      const el = document.createElement('strong')
+      el.textContent = `custom ${p.id}`
+      return el
     })
+    open({ renderCard })
+    expect(renderCard).not.toHaveBeenCalled() // a closed card is empty (but its close button)
+    expect(cards()[0]?.childElementCount).toBe(1)
+    markers()[0]?.click()
+    expect(renderCard).toHaveBeenCalledTimes(1)
     expect(cards()[0]?.querySelector('strong')?.textContent).toBe('custom p1')
+    expect(cards()[0]?.lastElementChild?.className).toBe('gallerist-pin-close')
   })
 
   it('renderCard returning null keeps the default card for that pin', () => {
@@ -215,8 +219,11 @@ describe('plugin-pins', () => {
       },
     })
     const [first, second] = cards()
+    markers()[0]?.click()
     expect(first?.querySelector('.gallerist-pin-title')?.textContent).toBe('Sofa')
     expect(first?.querySelector('.gallerist-pin-link')?.getAttribute('href')).toBe('/sofa')
+    markers()[1]?.click()
+    expect(first?.childElementCount).toBe(1) // closed: emptied
     expect(second?.querySelector('strong')?.textContent).toBe('custom p2')
     expect(second?.querySelector('.gallerist-pin-title')).toBeNull()
   })
@@ -235,6 +242,7 @@ describe('plugin-pins', () => {
       pins: () => [pin('c1', 0.5, 0.5, { label: 'Ana', body: 'Cut off', resolved: true })],
       renderCard: extra,
     })
+    markers()[0]?.click()
     const card = cards()[0] as HTMLElement
     expect(card.querySelector('.wrapped .gallerist-pin-title')?.textContent).toBe('Ana')
     expect(card.querySelector('.wrapped .gallerist-pin-body')?.textContent).toBe('Cut off')
@@ -282,6 +290,7 @@ describe('plugin-pins', () => {
 
   it('a pin with an unsafe href renders through the plugin without a link', () => {
     open({ pins: () => [pin('x', 0.5, 0.5, { label: 'Bad', href: 'javascript:alert(1)' })] })
+    markers()[0]?.click()
     expect(cards()[0]?.querySelector('a')).toBeNull()
     expect(cards()[0]?.querySelector('.gallerist-pin-title')?.textContent).toBe('Bad')
   })
@@ -299,6 +308,7 @@ describe('plugin-pins', () => {
         }),
       ],
     })
+    markers()[0]?.click()
     const card = cards()[0] as HTMLElement
     expect(card.querySelector('.gallerist-pin-title')?.textContent).toBe('Ana')
     expect(card.querySelector('.gallerist-pin-badge')?.textContent).toBe('Resolved')
@@ -454,6 +464,186 @@ describe('plugin-pins', () => {
       expect(document.querySelector('.gallerist-pin-add')).toBeNull()
       const inst = pins({})(v as ViewerApi)
       expect(inst.keymap?.c).toBeUndefined()
+    })
+  })
+
+  describe('card lifecycle (host-rendered cards)', () => {
+    const frame = () => new Promise((r) => requestAnimationFrame(r))
+    // a host card: a form whose Save rewrites the pin in place and redraws, as a host would
+    const host = (made: Array<{ pin: string; node: Node }>, onSave?: () => void) => {
+      return (p: Pin) => {
+        if (p.id === 'p2') return null // the default card
+        const form = document.createElement('form')
+        form.className = 'host-card'
+        const input = document.createElement('input')
+        const save = document.createElement('button')
+        save.type = 'button'
+        save.className = 'save'
+        save.addEventListener('click', () => onSave?.())
+        form.append(input, save)
+        made.push({ pin: p.id, node: form })
+        return form
+      }
+    }
+
+    it('onCardRemove: once per returned node, on close, redraw, navigation and destroy', async () => {
+      const made: Array<{ pin: string; node: Node }> = []
+      const dropped: Array<{ pin: string; node: Node; inCard: boolean }> = []
+      const { v, plugin } = open({
+        renderCard: host(made),
+        onCardRemove: (p, node) =>
+          dropped.push({ pin: p.id, node, inCard: !!(node as Element).closest?.('.gallerist') }),
+      })
+      const card = () =>
+        document.querySelector('[data-pin="p1"] .gallerist-pin-card') as HTMLElement
+      markers()[0]?.click() // open p1
+      expect(made).toHaveLength(1)
+      markers()[0]?.click() // closed by its pin
+      expect(dropped.map((d) => d.node)).toEqual([made[0]?.node])
+      plugin.open('p1')
+      v.refresh() // a redraw: a new node, the old one dropped
+      await frame()
+      await flush()
+      expect(made).toHaveLength(3)
+      expect(dropped.map((d) => d.node)).toEqual([made[0]?.node, made[1]?.node])
+      expect(card().hidden).toBe(false)
+      expect(card().contains(made[2]?.node as Node)).toBe(true)
+      markers()[1]?.click() // another pin (a default card) replaces it
+      expect(dropped).toHaveLength(3)
+      markers()[1]?.click() // closing a default card reports nothing
+      expect(dropped).toHaveLength(3)
+      plugin.open('p1')
+      card().dispatchEvent(key('Escape')) // Escape
+      expect(dropped).toHaveLength(4)
+      plugin.open('p1')
+      v.nextItem() // navigation away
+      expect(dropped).toHaveLength(5)
+      v.prevItem()
+      plugin.open('p1')
+      v.destroy() // the viewer (and the plugin with it)
+      expect(dropped).toHaveLength(6)
+      // every node made was dropped exactly once, in order, for its own pin, off the page
+      expect(dropped.map((d) => d.node)).toEqual(made.map((m) => m.node))
+      expect(dropped.map((d) => d.pin)).toEqual(made.map((m) => m.pin))
+      expect(dropped.every((d) => !d.inCard)).toBe(true)
+    })
+
+    it('save → redraw → focus on the pin → Escape closes the card, not the viewer', async () => {
+      const made: Array<{ pin: string; node: Node }> = []
+      const col = collection()
+      const onSave = () => {
+        const list = (col.groups[0]?.items[0]?.meta as { pins: Pin[] }).pins
+        list[0] = { ...(list[0] as Pin), body: 'saved' }
+        r.plugin.refresh()
+      }
+      const onCardRemove = vi.fn()
+      const r = open({ renderCard: host(made, onSave), onCardRemove }, col)
+      markers()[0]?.click()
+      const save = document.querySelector('.host-card .save') as HTMLButtonElement
+      save.focus()
+      save.click()
+      await frame()
+      await flush()
+      expect(onCardRemove).toHaveBeenCalledTimes(1)
+      const marker = document.querySelector('[data-pin="p1"] .gallerist-pin-marker')
+      expect(document.activeElement).toBe(marker)
+      const card = document.querySelector('[data-pin="p1"] .gallerist-pin-card') as HTMLElement
+      expect(card.hidden).toBe(false) // still open, redrawn
+      document.activeElement?.dispatchEvent(key('Escape'))
+      expect(card.hidden).toBe(true)
+      expect(document.activeElement).toBe(marker)
+      expect(r.v.getState().phase).not.toMatch(/clos/)
+      document.activeElement?.dispatchEvent(key('Escape')) // no card open: the viewer's again
+      expect(r.v.getState().phase).toMatch(/clos/)
+    })
+
+    it('focus in a card whose pin leaves the data goes to the add button, never <body>', async () => {
+      const col = collection()
+      const r = open({ renderCard: host([]), onPlace: () => {} }, col)
+      await flush()
+      markers()[0]?.click()
+      ;(document.querySelector('.host-card input') as HTMLInputElement).focus()
+      ;(col.groups[0]?.items[0]?.meta as { pins: Pin[] }).pins.shift() // p1 is gone
+      r.plugin.refresh()
+      await frame()
+      await flush()
+      expect(document.querySelector('[data-pin="p1"]')).toBeNull()
+      expect(document.activeElement?.className).toBe('gallerist-pin-add')
+    })
+
+    it('focus in a card goes to the viewer when its item changes (no add button)', async () => {
+      const { v } = open({ renderCard: host([]) })
+      markers()[0]?.click()
+      ;(document.querySelector('.host-card input') as HTMLInputElement).focus()
+      v.nextItem()
+      await flush()
+      expect(document.activeElement).toBe(document.querySelector('.gallerist'))
+    })
+
+    it('a card closed from the host while focus is inside hands focus to its pin', () => {
+      const { plugin } = open({ renderCard: host([]) })
+      const [m1] = markers()
+      m1?.click()
+      ;(document.querySelector('.host-card input') as HTMLInputElement).focus()
+      plugin.open(null)
+      expect(document.activeElement).toBe(m1)
+    })
+
+    it('open(id, { focus: true }) focuses the card; open(null, { focus: true }) its pin', async () => {
+      const col = collection()
+      const { plugin } = open({}, col)
+      const root = document.querySelector('.gallerist') as HTMLElement
+      root.focus()
+      plugin.open('p2')
+      expect(document.activeElement).toBe(root) // no focus asked for: it stays
+      plugin.open('p1', { focus: true })
+      expect(document.activeElement).toBe(cards()[0])
+      plugin.open(null, { focus: true })
+      expect(document.activeElement).toBe(markers()[0])
+      // a pin not painted yet takes focus once it is
+      ;(col.groups[0]?.items[0]?.meta as { pins: Pin[] }).pins.push(pin('p9', 0.4, 0.4))
+      plugin.refresh()
+      plugin.open('p9', { focus: true })
+      await frame()
+      await flush()
+      expect(document.activeElement).toBe(
+        document.querySelector('[data-pin="p9"] .gallerist-pin-card'),
+      )
+    })
+
+    it('pins still open after the overlay viewer closes and reopens', async () => {
+      const { v, plugin } = open()
+      v.close()
+      await flush()
+      expect(document.querySelector('.gallerist')).toBeNull()
+      plugin.setVisible(true) // anything the plugin does while the viewer is out of the document
+      plugin.open(null)
+      v.open()
+      await flush()
+      markers()[0]?.click()
+      expect(cards()[0]?.hidden).toBe(false)
+    })
+
+    it('onOpenChange reports the pin that closed as ctx.previous', () => {
+      const onOpenChange = vi.fn()
+      open({ onOpenChange })
+      const [m1, m2] = markers()
+      m1?.click()
+      expect(onOpenChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: 'p1' }),
+        expect.objectContaining({ previous: null, item: expect.objectContaining({ id: 'a' }) }),
+      )
+      m2?.click()
+      expect(onOpenChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: 'p2' }),
+        expect.objectContaining({ previous: expect.objectContaining({ id: 'p1' }) }),
+      )
+      m2?.click()
+      expect(onOpenChange).toHaveBeenLastCalledWith(
+        null,
+        expect.objectContaining({ previous: expect.objectContaining({ id: 'p2' }) }),
+      )
+      expect(onOpenChange).toHaveBeenCalledTimes(3)
     })
   })
 })

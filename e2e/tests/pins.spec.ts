@@ -161,6 +161,38 @@ test('Escape closes an open card, not the viewer, wherever focus is', async ({ p
   await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
 })
 
+// a host card (renderCard): saving redraws it; focus lands on its pin, not <body>, so the next
+// Escape closes the card and not the viewer; each node the host rendered is handed back once
+test('a host card: save redraws, focus on its pin, Escape closes the card, not the viewer', async ({
+  page,
+}) => {
+  await page.goto('/pins.html?card=form&presentation=comment')
+  await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+  const marker = page.locator('[data-pin="a"] .gallerist-pin-marker')
+  const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+  const removed = () => page.evaluate(() => (window as unknown as { removed: string[] }).removed)
+  await marker.click()
+  await card.getByLabel('Comment').fill('Looks good')
+  await card.getByRole('button', { name: 'Save' }).click()
+  await expect(card.getByLabel('Comment')).toHaveValue('Looks good') // redrawn from the new data
+  await expect(marker).toBeFocused()
+  await expect(card).toBeVisible()
+  expect(await removed()).toEqual(['a'])
+  await page.keyboard.press('Escape')
+  await expect(card).toBeHidden()
+  await expect(marker).toBeFocused()
+  await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+  expect(await removed()).toEqual(['a', 'a'])
+  // focus in a card when the item changes (its pin is gone from view) goes to the add-pin button
+  await marker.click()
+  await card.getByLabel('Comment').focus()
+  await page.evaluate(() =>
+    (window as unknown as { viewer: { nextItem(): void } }).viewer.nextItem(),
+  )
+  await expect(page.locator('.gallerist-pin-add')).toBeFocused()
+  expect(await removed()).toEqual(['a', 'a', 'a'])
+})
+
 test('on a small screen a card opens toward the room and stays inside the stage', async ({
   page,
   browserName,

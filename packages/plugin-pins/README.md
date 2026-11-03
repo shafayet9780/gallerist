@@ -54,16 +54,23 @@ The default card links only to `http:`, `https:`, `mailto:` and `tel:` URLs, and
 | `pins(item, group)` | `item.meta.pins` | where pins come from |
 | `visible` | `true` | start shown; the toolbar toggle and `p` flip it |
 | `toggle` | `true` | add the show/hide button to the toolbar |
-| `renderCard(pin, ctx)` | — | replace the card's contents; return `null` to keep the default card for that pin |
-| `onOpenChange(pin \| null, ctx)` | — | a card opened or closed |
+| `renderCard(pin, ctx)` | — | replace the card's contents; return `null` to keep the default card for that pin. Called when the card opens, and again when an open card is redrawn |
+| `onCardRemove(pin, node)` | — | a node `renderCard` returned left its card: unmount what you rendered there (once per node; never for default cards) |
+| `onOpenChange(pin \| null, ctx)` | — | a card opened (`pin`) or closed (`null`); `ctx.previous` is the pin whose card was open until then (the one that closed) |
 | `onPlace(at, ctx)` | — | turn on placing: the "Add a comment" button (or `c`) arms one click on the image, reported as `{ x, y }` in 0..1 |
 | `strings` | English | every label, for translation |
 
 The returned plugin also has `refresh()` (re-read pins you changed in place), `setVisible(bool)` and
-`open(id | null)`. Escape closes an open card (or cancels placing) without closing the viewer,
-wherever focus is; a field in a `renderCard` card keeps Escape for itself by calling
-`event.preventDefault()` in its own `keydown` handler. A card opens toward the side of the stage with more room. While placing, a pan
-or a click beside the image keeps the mode armed; a click outside the stage cancels it.
+`open(id | null, { focus })`: `focus: true` moves focus into the card as it opens (once its pin is
+painted, if it isn't yet), or to the pin as it closes. Escape closes an open card (or cancels placing)
+without closing the viewer, wherever focus is; a field in a `renderCard` card keeps Escape for itself
+by calling `event.preventDefault()` in its own `keydown` handler. A card opens toward the side of the
+stage with more room. While placing, a pan or a click beside the image keeps the mode armed; a click
+outside the stage cancels it.
+
+Focus never falls to `<body>` (where the next Escape would close the viewer): when a card closes or is
+redrawn while focus is inside it, focus goes to its pin if that is still on the current item, else to
+the "Add a comment" button, else to the viewer.
 
 ```ts
 const commentPins = pins({
@@ -92,6 +99,51 @@ pins({
   },
 })
 ```
+
+### Host-rendered cards (React)
+
+A card holds its contents only while it is open: `renderCard` runs as it opens, and again when an open
+card is redrawn (`refresh()`, new data for its item), and the node it returned is handed back to
+`onCardRemove` once it has left the card: the card closed (its pin, Escape, `open()`, another pin, a
+click outside), moved to another item, its pin left the data, the redraw replaced it, or the plugin or
+viewer was destroyed. Exactly once per node, so a portal or root can follow it. Return an element (a
+`DocumentFragment` empties as it is inserted). A portal keeps the card in your React tree (context,
+state, event handlers):
+
+```tsx
+import { type Pin, pins } from '@gallerist/plugin-pins'
+import { Gallerist } from '@gallerist/react'
+import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+function ReviewPins({ onSave }: { onSave: (pin: Pin, text: string) => void }) {
+  const [cards, setCards] = useState<Array<{ pin: Pin; node: HTMLElement }>>([])
+  const plugin = useMemo(
+    () =>
+      pins({
+        presentation: 'comment',
+        renderCard: (pin) => {
+          const node = document.createElement('div')
+          setCards((list) => [...list, { pin, node }])
+          return node
+        },
+        onCardRemove: (_pin, node) => setCards((list) => list.filter((c) => c.node !== node)),
+      }),
+    [],
+  )
+  return (
+    <>
+      <Gallerist collection={collection} plugins={[plugin]} preset="reviewer" skin="console" />
+      {cards.map(({ pin, node }) => createPortal(<CommentForm pin={pin} onSave={onSave} />, node))}
+    </>
+  )
+}
+```
+
+After saving, update your data and call `plugin.refresh()` (or pass a new collection): the card is
+redrawn from the new data, focus is on its pin, and Escape closes the card rather than the viewer.
+With a root per card instead of a portal: `createRoot(node).render(…)` in `renderCard`, and
+`root.unmount()` in `onCardRemove` (keep the roots in a `Map` by node).
 
 Pins take their colours from the skin (`--gallerist-pin-*`, the accent, the panel surface), so they
 match Gallery, Console and the light schemes. A live demo of all three presentations is in

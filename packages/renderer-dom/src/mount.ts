@@ -41,7 +41,9 @@ export interface MountOptions {
    * Placement of the within-group ↑/↓ arrows, surfaced as `data-gallerist-arrows` for the theme
    * (UX-D). `pill-right` (default): ←/→ on the side edges, ↑/↓ as a stacked pill at right-center.
    * `corner-br`: ↑/↓ paired bottom-right. `dpad`: all four clustered as a d-pad. `split`: legacy
-   * ↑/↓ top/bottom-center.
+   * ↑/↓ top/bottom-center. `docked` (the `reviewer` preset): nothing over the media — the group
+   * arrows sit in gutters beside the stage, and the item navigator (↑ · `n / N` · ↓) docks as a
+   * header on the aside item column when it shows, else at the end of the caption row.
    */
   arrows?: ArrowLayout
   /**
@@ -127,7 +129,7 @@ export interface MountOptions {
   returnFocus?: HTMLElement | (() => HTMLElement | null)
 }
 
-export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
+export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split' | 'docked'
 export type RailPlacement = 'bottom' | 'hidden' | 'left' | 'right'
 export type GroupAxis = 'horizontal' | 'vertical'
 
@@ -353,7 +355,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // The root is a grid of areas (theme base.css): bar / main / aside / caption / footer / rail. Every
   // piece of chrome lives in its own area, so persistent chrome takes space instead of covering the
   // stage and nothing can collide; only the arrows and the item navigator sit over the stage, inside
-  // `main`. Presets and rail positions change the grid template, never the DOM.
+  // `main` (`docked` moves the navigator out). Presets and rail positions change the grid template.
   const root = el('div', 'gallerist')
   root.setAttribute('data-gallerist-mode', overlay ? 'overlay' : 'inline')
   root.setAttribute('data-gallerist-arrows', arrows)
@@ -533,8 +535,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     itemNav.append(prevItem, position, nextItem)
     controlsBox = el('div', 'gallerist-controls')
     controlsBox.append(prev, next)
-    // a placard carries the item navigator in the caption, under the label
+    // a placard carries the item navigator in the caption, under the label; docked, it is a grid
+    // item of its own (the theme puts it on the aside column or the caption row, off the media)
     if (placard) caption.appendChild(itemNav)
+    else if (arrows === 'docked') main.after(itemNav)
     else controlsBox.appendChild(itemNav)
     if (showNavigator) {
       // a pointer aid only (keyboard users zoom and pan with the keys), so hidden from AT
@@ -872,6 +876,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       // Reserve the caption track for the whole collection when any item has a text caption, so
       // moving between captioned and uncaptioned items never resizes the stage.
       anyCaption = col.groups.some((grp) => grp.items.some((it) => str(it.caption)))
+      // likewise the docked item navigator's room, while any group has several items
+      root.toggleAttribute(
+        'data-gallerist-multi',
+        col.groups.some((grp) => grp.items.length > 1),
+      )
     }
     chromeCol = col
     chromeG = cur.g

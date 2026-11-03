@@ -2,6 +2,32 @@
 
 ## v0.3.0
 
+### Reviewer controls and pin cards (from the Apploye reviewer)
+- **renderer-dom, theme (breaking for `reviewer`)**: a new arrow layout, `arrows: 'docked'`, puts no
+  control over the media. The group arrows sit in gutters the stage leaves at its sides (none on
+  touch, where swipes stand in for them), and the item navigator leaves the stage: the `n / N` count
+  over ↑ ↓, as a header on the aside item column while that shows, otherwise at the end of the caption
+  row, which makes room for it beside a text caption or a designed one. It keeps its room on a
+  one-item group while any group has several items, so the stage holds still. The `reviewer` preset
+  uses it instead of `corner-br`, whose cluster covered the screenshot's bottom-right corner (where a
+  taskbar clock is) and, on a phone turned sideways, ~40% of the stage. On desktop the stage is
+  narrower by the gutters; a panorama no longer runs under the arrows. Other presets are unchanged.
+- **plugin-pins**: `onCardRemove(pin, node)` hands back each node `renderCard` returned once it has
+  left its card (the card closed, moved to another item, was redrawn, its pin left the data, the
+  plugin or viewer was destroyed), exactly once per node and never for default cards, so a host can
+  unmount a React portal or root. The README has a portal example.
+- **plugin-pins (changed)**: a card holds its contents only while open: `renderCard` runs when the
+  card opens and again when an open card is redrawn, not for every pin of every painted slide.
+- **plugin-pins**: `open(id, { focus: true })` moves focus into the card (once its pin is painted),
+  `open(null, { focus: true })` to the pin. `onOpenChange(pin, ctx)` gets `ctx.previous`, the pin
+  whose card was open until then (the one that closed); the context type is `PinOpenChange`.
+- **plugin-pins (fixed)**: focus inside a card that closes or is redrawn goes to its pin when that is
+  still on the current item, else the add-pin button, else the viewer, never `<body>` (the next Escape
+  closed the whole viewer). Only the close button and Escape did this before.
+- **plugin-pins (fixed)**: a pin opens on the current item only (a neighbour's slide can carry the
+  same id), painting a neighbour's slide no longer closes the open card, and a closed overlay
+  viewer's pins still open after it reopens.
+
 ### Performance (U17)
 Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-based regression gate.
 - **plugin-thumbnails**: a step writes the active state of the two thumbs that changed, not of every

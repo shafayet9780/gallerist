@@ -18,20 +18,22 @@ import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
 import '@gallerist/theme-default/editorial.css'
 
+const p = new URLSearchParams(location.search)
+// wide=1: a 3:1 panorama, which fills the stage's width at most sizes (the reviewer's gutters)
+const W = p.get('wide') === '1' ? 3200 : 1600
 const svg = (color: string, label: string) =>
   `data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1067"><rect width="100%" height="100%" fill="${color}"/><text x="40" y="120" fill="white" font-size="110">${label}</text></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="1067"><rect width="100%" height="100%" fill="${color}"/><text x="40" y="120" fill="white" font-size="110">${label}</text></svg>`,
   )}`
 const img = (id: string, c: string, caption?: string): Item => ({
   id,
   type: 'image',
   source: svg(c, id),
-  naturalSize: { w: 1600, h: 1067 },
+  naturalSize: { w: W, h: 1067 },
   alt: id,
   caption,
 })
 
-const p = new URLSearchParams(location.search)
 // captions=1: every group/item captioned · long: one very long item caption · mixed: only some
 const captionMode = p.get('captions')
 const LONG = 'A long caption that keeps going. '.repeat(30)

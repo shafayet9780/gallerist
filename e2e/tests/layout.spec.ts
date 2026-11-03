@@ -62,6 +62,14 @@ const CONFIGS: Record<string, string> = {
   'reviewer-custom-caption-tall': 'preset=reviewer&custom=tall',
   'editorial-custom-caption': 'preset=editorial&custom=short',
   'editorial-custom-caption-tall': 'preset=editorial&custom=tall',
+  // docked controls (the reviewer's layout): gutter arrows, the item navigator on the item column or
+  // at the end of the caption row
+  'arrows-docked': 'arrows=docked&captions=1',
+  'docked-no-plugins': 'arrows=docked&plugins=0&captions=1', // no item column: the caption row
+  'docked-rail-left': 'arrows=docked&rail=left',
+  'docked-rail-hidden': 'arrows=docked&rail=hidden&captions=1',
+  'reviewer-wide': 'preset=reviewer&wide=1&custom=short',
+  'reviewer-large-group': 'preset=reviewer&g=5&captions=1',
 }
 
 // every configuration runs in every skin: skins set tokens (sizes included), so each needs the sweep
@@ -413,6 +421,132 @@ test.describe('layout lint', () => {
         }
     })
   }
+})
+
+// The reviewer preset (`arrows: 'docked'`): review needs every pixel, so no chrome control sits
+// over the painted image, at any size, with or without a caption band, in every skin, both engines.
+test.describe('reviewer: nothing over the media', () => {
+  const SHOTS = {
+    desktop: VIEWPORTS.desktop,
+    phone: VIEWPORTS.phone,
+    landscape: VIEWPORTS.landscape,
+  }
+  // the painted image (object-fit: contain inside the media element), in viewport px
+  const paintedMedia = (page: Page) =>
+    page.evaluate(() => {
+      const img = document.querySelector<HTMLImageElement>(
+        '.gallerist-content[data-gallerist-current] .gallerist-media-image',
+      )
+      if (!img?.naturalWidth) return null
+      const r = img.getBoundingClientRect()
+      const s = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight)
+      const w = img.naturalWidth * s
+      const h = img.naturalHeight * s
+      return { x: r.x + (r.width - w) / 2, y: r.y + (r.height - h) / 2, w, h }
+    })
+  const CHROME = [
+    '.gallerist-bar',
+    '.gallerist-region-toolbar > *',
+    '.gallerist-prev',
+    '.gallerist-next',
+    '.gallerist-itemnav',
+    '.gallerist-item-prev',
+    '.gallerist-item-next',
+    '.gallerist-position',
+    '.gallerist-caption',
+    '.gallerist-thumbs',
+    '.gallerist-thumb-items',
+    '.gallerist-rail-handle',
+  ]
+  for (const [vpName, vp] of Object.entries(SHOTS)) {
+    test.describe(vpName, () => {
+      test.use(vp)
+      for (const skin of SKINS)
+        for (const look of [
+          'g=1',
+          'g=1&custom=short',
+          'g=1&custom=tall',
+          'g=1&captions=1',
+          'g=1&custom=short&wide=1', // a panorama fills the stage's width: the arrows' gutters
+          'g=5&captions=1&dir=rtl',
+          'g=1&custom=short&rail=hidden', // no item column: the navigator ends the caption row
+        ]) {
+          test(`${skin} ${look}`, async ({ page }) => {
+            await page.goto(`/layout.html?preset=reviewer&skin=${skin}&${look}`)
+            await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+            await expect(page.locator('.gallerist-itemnav')).toBeVisible()
+            await installClip(page)
+            const problems: string[] = []
+            // the first item, then the next one by its own ↓ (the item column and stage stay put)
+            for (const step of ['first', 'next']) {
+              if (step === 'next') await page.locator('.gallerist-item-next').click()
+              await expect(
+                page.locator('.gallerist-content[data-gallerist-current] .gallerist-media-image'),
+              ).toHaveAttribute('data-gallerist-loaded', '')
+              if (!look.includes('rail=hidden')) await railSettled(page)
+              // the item's own entrance (a skin's slide or fade) has ended
+              await page.evaluate(() =>
+                Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))),
+              )
+              const media = await paintedMedia(page)
+              if (!media) {
+                problems.push(`${step}: no painted media`)
+                continue
+              }
+              const box = { sel: 'media', label: 'media', ...media, fw: 0, fh: 0 }
+              for (const c of await measure(page, CHROME)) {
+                if (overlap(c, { ...box, button: false, inStage: true }))
+                  problems.push(`${step}: ${c.label} over the media`)
+              }
+            }
+            expect(problems, problems.join('\n')).toEqual([])
+          })
+        }
+    })
+  }
+
+  test('the stage keeps its size between one-item and several-item groups', async ({ page }) => {
+    for (const vp of [VIEWPORTS.desktop.viewport, VIEWPORTS.phone.viewport]) {
+      await page.setViewportSize(vp)
+      const sizes: string[] = []
+      for (const g of [0, 1, 5]) {
+        await page.goto(`/layout.html?preset=reviewer&skin=console&g=${g}`)
+        await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+        await railSettled(page)
+        const box = await page.locator('.gallerist-stage').boundingBox()
+        sizes.push(`${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)}`)
+      }
+      expect(new Set(sizes).size, `${vp.width}px: ${sizes.join(' / ')}`).toBe(1)
+    }
+  })
+
+  test('the item navigator heads the item column, and moves to the caption row without it', async ({
+    page,
+  }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console&g=1&custom=short')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    await railSettled(page)
+    const where = () =>
+      page.evaluate(() => {
+        const box = (sel: string) =>
+          document.querySelector(sel)?.getBoundingClientRect() ?? new DOMRect()
+        const nav = box('.gallerist-itemnav')
+        const items = box('.gallerist-region-aside .gallerist-thumb-items')
+        const caption = box('.gallerist-caption')
+        const stage = box('.gallerist-stage')
+        return {
+          aboveItems: nav.bottom <= items.top + 0.5 && nav.left >= items.left - 12,
+          inCaptionRow:
+            nav.top >= stage.bottom - 0.5 &&
+            nav.top < caption.bottom &&
+            nav.left >= caption.right - 0.5,
+        }
+      })
+    expect(await where()).toEqual({ aboveItems: true, inCaptionRow: false })
+    await page.keyboard.press('t') // collapse the rail: the item column goes with it
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-rail', 'collapsed')
+    await expect.poll(async () => (await where()).inCaptionRow).toBe(true)
+  })
 })
 
 test.describe('layout behaviour', () => {

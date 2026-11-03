@@ -58,7 +58,34 @@ const collection: Collection = {
   ],
 }
 const placed: Array<{ x: number; y: number }> = []
+// card=form: a host-rendered card, a form whose Save rewrites the pin and redraws (as an app saving a
+// comment would); `removed` counts the nodes handed back through onCardRemove
+const removed: string[] = []
+const formCard =
+  p.get('card') === 'form'
+    ? {
+        renderCard: (pin: Pin) => {
+          const form = document.createElement('form')
+          form.className = 'host-card'
+          const input = document.createElement('input')
+          input.setAttribute('aria-label', 'Comment')
+          input.value = pin.body ?? ''
+          const save = document.createElement('button')
+          save.type = 'button'
+          save.textContent = 'Save'
+          save.addEventListener('click', () => {
+            const list = collection.groups[0]?.items[0]?.meta as { pins: Pin[] }
+            list.pins = list.pins.map((q) => (q.id === pin.id ? { ...q, body: input.value } : q))
+            plugin.refresh()
+          })
+          form.append(input, save)
+          return form
+        },
+        onCardRemove: (pin: Pin) => removed.push(pin.id),
+      }
+    : {}
 const plugin = pins({
+  ...formCard,
   presentation: (p.get('presentation') ?? 'tag') as PinPresentation,
   onPlace: (at, { item }) => {
     placed.push(at)
@@ -74,4 +101,4 @@ mount(viewer, {
   autoHide: false,
 })
 viewer.open({ g: 0, i: Number(p.get('i') ?? 0) })
-Object.assign(window, { viewer, placed })
+Object.assign(window, { viewer, placed, removed })

@@ -44,6 +44,18 @@ export interface PinContext {
   item: Item
 }
 
+/** `onOpenChange`'s context: the pin's item, and the pin whose card was open before this change. */
+export interface PinOpenChange extends PinContext {
+  /** the pin whose card was open until now (the one that closed), or `null` if none was */
+  previous: Pin | null
+}
+
+/** Options for `open()`. */
+export interface PinOpenOptions {
+  /** move focus: into the card when it opens (once it is painted), to the pin when it closes */
+  focus?: boolean
+}
+
 export interface PinsStrings {
   /** the toolbar toggle's label */
   toggle: string
@@ -80,11 +92,24 @@ export interface PinsOptions {
   visible?: boolean
   /** add the show/hide toggle to the toolbar (default true) */
   toggle?: boolean
-  /** replace the card's contents for a pin; `null` (or `undefined`) keeps the default card
-   *  (`defaultPinCard`) for that pin */
+  /**
+   * Replace the card's contents for a pin; `null` (or `undefined`) keeps the default card
+   * (`defaultPinCard`) for that pin. Called each time the card opens, and again when an open card
+   * is redrawn (`refresh()`, new data); the card is empty while closed.
+   */
   renderCard?: (pin: Pin, ctx: PinContext) => Node | null | undefined
-  /** a pin's card opened (`pin`) or closed (`null`) */
-  onOpenChange?: (pin: Pin | null, ctx: PinContext) => void
+  /**
+   * A node `renderCard` returned was dropped: its card closed (by the user, `open()`, moving to
+   * another item, the pin leaving the data), was redrawn, or the plugin or viewer was destroyed.
+   * Called once per returned node, after it left the card, so a host can unmount what it rendered
+   * there (a React root or portal). Not called for the default card.
+   */
+  onCardRemove?: (pin: Pin, node: Node) => void
+  /**
+   * A pin's card opened (`pin`) or closed (`null`). `ctx.previous` is the pin whose card was open
+   * until now: the one that closed, also when another pin's card replaced it.
+   */
+  onOpenChange?: (pin: Pin | null, ctx: PinOpenChange) => void
   /**
    * Turns on placing: an "Add a comment" toolbar button (and the `c` key) arms a one-shot click on
    * the image, and this is called with the point in normalized image coordinates. Add the pin to
@@ -100,8 +125,9 @@ export interface PinsPlugin extends Plugin {
   refresh(): void
   /** show or hide all pins */
   setVisible(visible: boolean): void
-  /** open a pin's card on the current item by id; `null` closes it */
-  open(id: string | null): void
+  /** open a pin's card on the current item by id; `null` closes it. `{ focus: true }` moves focus
+   *  into the card (or, closing, to its pin). */
+  open(id: string | null, opts?: PinOpenOptions): void
 }
 
 /** What `defaultPinCard` draws: the presentation and the strings it uses (`open`, `resolved`). */
@@ -204,6 +230,9 @@ interface Rendered {
   marker: HTMLButtonElement
   card: HTMLElement
   ctx: PinContext
+  /** what fills the card while it is open: the node `renderCard` returned, `null` for the default
+   *  card; `undefined` while empty */
+  content?: Node | null
 }
 
 const defaultPins = (item: Item): readonly Pin[] | undefined =>
@@ -226,8 +255,9 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   let cleanup: (() => void) | undefined
   const instance = ++uid
 
+  // pins still in a viewer (a closed overlay viewer is out of the document, its pins still count)
   const live = () => {
-    rendered = rendered.filter((r) => r.el.isConnected)
+    rendered = rendered.filter((r) => r.el.closest('.gallerist'))
     return rendered
   }
   // the viewer root: captured from the toolbar, or from any painted pin (no toolbar)
@@ -261,27 +291,86 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   }
   let keyRoot: HTMLElement | null = null
 
+  // A card holds its contents only while open: drawn when it opens (or is redrawn), dropped when it
+  // closes, so a host's node is handed back exactly once (onCardRemove, once setOpen has settled).
+  const fill = (r: Rendered) => {
+    if (r.content !== undefined) return
+    r.content = opts.renderCard?.(r.pin, r.ctx) ?? null
+    r.card.prepend(r.content ?? defaultPinCard(r.pin, { presentation, strings: t }))
+  }
+  const empty = (r: Rendered, dropped: Array<[Pin, Node]>) => {
+    const node = r.content
+    if (node === undefined) return
+    r.content = undefined
+    r.card.replaceChildren(r.card.lastChild as Node) // keep the close button
+    if (node) dropped.push([r.pin, node])
+  }
+
+  // Focus leaving a card that closed, or whose nodes were dropped: to the pin's marker on the current
+  // item, else the add-pin button, else the viewer, never <body> (the next Escape would close the
+  // viewer). Again after the current task, as a repaint may drop the marker it went to (the pin is
+  // gone from the data). `force` moves it even from elsewhere in the viewer (Escape, close button).
+  const refocus = (id: string, card: HTMLElement, force: boolean) => {
+    const go = (f: boolean) => {
+      const a = document.activeElement
+      if (!f && a && a !== document.body && !card.contains(a)) return
+      const item = bound && currentCtx(bound)?.item
+      for (const to of [
+        ...live()
+          .filter((r) => r.pin.id === id && r.ctx.item === item)
+          .map((r) => r.marker),
+        addBtn,
+        viewerRoot(),
+      ]) {
+        to?.focus({ preventScroll: true })
+        if (to && document.activeElement === to) return
+      }
+    }
+    go(force)
+    queueMicrotask(() => go(false))
+  }
+
   // `openId` is the pin asked for; `shown` the one whose card is on screen. They differ while a pin
   // asked for by `open(id)` hasn't been painted yet (it opens when it is).
   let shown: Rendered | null = null
-  const setOpen = (id: string | null, focusMarker = false) => {
+  let wantFocus = false // open(id, { focus: true }) before the pin is painted
+  const setOpen = (id: string | null, focus = false) => {
+    if (id !== openId) wantFocus = false
+    if (focus && id) wantFocus = true
     openId = id
+    const prev = shown
+    const a = document.activeElement
+    // the pin on the current item (its neighbours' slides may carry the same id)
+    const item = bound && currentCtx(bound)?.item
+    // focus is in the card on its way out, or fell to <body> as its nodes were dropped or its slide
+    // stopped being the current one
+    const had =
+      !!prev &&
+      (prev.card.contains(a) ||
+        ((!a || a === document.body) && (prev.ctx.item !== item || !prev.el.closest('.gallerist'))))
     let opened: Rendered | null = null
+    const dropped: Array<[Pin, Node]> = []
     for (const r of live()) {
-      const isOpen = r.pin.id === id
+      const isOpen = !opened && r.pin.id === id && r.ctx.item === item
+      if (isOpen) opened = r
+      else empty(r, dropped)
       r.card.hidden = !isOpen
       r.marker.setAttribute('aria-expanded', String(isOpen))
       r.el.toggleAttribute('data-open', isOpen)
       // the open pin's overlay sits above its neighbours so its card isn't covered
       const host = r.el.parentElement
       if (host) host.style.zIndex = isOpen ? '30' : '20'
-      if (isOpen) opened = r
     }
-    if (opened) placeCard(opened)
-    if (focusMarker && shown && shown !== opened && shown.marker.isConnected) shown.marker.focus()
-    if (opened?.pin.id !== shown?.pin.id) {
-      const ctx = (opened ?? shown)?.ctx
-      if (ctx) opts.onOpenChange?.(opened ? opened.pin : null, ctx)
+    if (prev && prev !== opened) empty(prev, dropped) // also when a repaint took it off the page
+    if (opened) {
+      fill(opened)
+      placeCard(opened)
+    }
+    if (opened && wantFocus) {
+      wantFocus = false
+      opened.card.focus({ preventScroll: true })
+    } else if (bound && prev && prev !== opened && (had || (focus && !id))) {
+      refocus(prev.pin.id, prev.card, focus)
     }
     shown = opened
     keyRoot?.removeEventListener('keydown', onOpenKey, true)
@@ -292,6 +381,13 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       keyRoot?.addEventListener('keydown', onOpenKey, true)
     } else {
       document.removeEventListener('pointerdown', onOutside, true)
+    }
+    // the host hears about it last, so a call back into the plugin sees the settled state
+    for (const [pin, node] of dropped) opts.onCardRemove?.(pin, node)
+    if (opened?.pin.id !== prev?.pin.id) {
+      const ctx = (opened ?? prev)?.ctx
+      if (ctx)
+        opts.onOpenChange?.(opened ? opened.pin : null, { ...ctx, previous: prev?.pin ?? null })
     }
   }
 
@@ -429,9 +525,7 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     card.hidden = true
     card.setAttribute('role', 'group')
     card.setAttribute('aria-label', t.pin(n, pin.label))
-    card.appendChild(
-      opts.renderCard?.(pin, ctx) ?? defaultPinCard(pin, { presentation, strings: t }),
-    )
+    card.tabIndex = -1 // open(id, { focus: true }) lands here; the contents are drawn on open
     const close = document.createElement('button')
     close.type = 'button'
     close.className = 'gallerist-pin-close'
@@ -496,7 +590,9 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     const overlays = ({ group, item }: { group: Group; item: Item }): OverlaySpec[] => {
       const list = read(item, group) ?? []
       const ctx: PinContext = { viewer, group, item }
-      if (openId && !list.some((p) => p.id === openId)) setOpen(null) // its pin is gone
+      // its pin is gone from the current item (a neighbour's slide has its own pins)
+      if (openId && item === currentCtx(viewer)?.item && !list.some((p) => p.id === openId))
+        setOpen(null)
       return list.map((pin, k) => ({
         id: `pin:${pin.id}`,
         anchor: { kind: 'point', x: pin.x, y: pin.y, space: pin.space ?? 'normalized' },
@@ -525,9 +621,9 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       destroy() {
         cleanup?.()
         stopPlacing()
-        setOpen(null)
+        bound = null // no refocusing into a viewer on its way out
+        setOpen(null) // drops the open card's contents (onCardRemove)
         rendered = []
-        bound = null
       },
       overlays,
       keymap: {
@@ -552,6 +648,6 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   return Object.assign(factory, {
     refresh: () => bound?.refresh(),
     setVisible,
-    open: (id: string | null) => setOpen(id),
+    open: (id: string | null, o?: PinOpenOptions) => setOpen(id, !!o?.focus),
   })
 }
