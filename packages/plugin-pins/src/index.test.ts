@@ -92,13 +92,6 @@ describe('plugin-pins', () => {
     expect(cards()[1]?.hidden).toBe(true)
   })
 
-  it('opens the card away from the near edges', () => {
-    open()
-    const [a, b] = [...document.querySelectorAll<HTMLElement>('.gallerist-pin')]
-    expect([a?.dataset.side, a?.dataset.v]).toEqual(['right', 'down'])
-    expect([b?.dataset.side, b?.dataset.v]).toEqual(['left', 'up'])
-  })
-
   it('Escape closes the card and returns focus to its pin, without closing the viewer', () => {
     const { v } = open()
     const [m1] = markers()
@@ -786,6 +779,42 @@ describe('plugin-pins', () => {
       expect(document.activeElement).toBe(toggle)
     })
 
+    it('open() from a callback run by destroy opens nothing: no listener left, no card on reuse', async () => {
+      // document listeners the plugin holds, by function: added and not removed since
+      const held = new Map<unknown, string>()
+      const add = document.addEventListener.bind(document)
+      const remove = document.removeEventListener.bind(document)
+      vi.spyOn(document, 'addEventListener').mockImplementation((type, fn, o) => {
+        held.set(fn, type)
+        add(type, fn, o)
+      })
+      vi.spyOn(document, 'removeEventListener').mockImplementation((type, fn, o) => {
+        held.delete(fn)
+        remove(type, fn, o)
+      })
+      let dying = false
+      const changes: Array<string | null> = []
+      const plugin = pins({
+        renderCard: () => document.createElement('div'),
+        onCardRemove: () => dying && plugin.open('p2'),
+        onOpenChange: (p) => changes.push(p?.id ?? null),
+      })
+      const v1 = createViewer({ collection: collection(), plugins: [plugin] })
+      mount(v1)
+      v1.open()
+      plugin.open('p1')
+      dying = true
+      v1.destroy()
+      dying = false
+      expect([...held.values()].filter((t) => t === 'pointerdown' || t === 'keydown')).toEqual([])
+      const v2 = createViewer({ collection: collection(), plugins: [plugin] })
+      mount(v2)
+      v2.open()
+      await flush()
+      expect(cards().filter((c) => !c.hidden)).toEqual([]) // p2 doesn't open unprompted
+      expect(changes).toEqual(['p1', null])
+    })
+
     it('after destroy, the same plugin in a new viewer listens on the new viewer', () => {
       const plugin = pins({ toggle: false }) // no toolbar: the root comes from a painted pin
       const v1 = createViewer({ collection: collection(), plugins: [plugin] })
@@ -889,24 +918,40 @@ describe('plugin-pins', () => {
       expect(document.activeElement).toBe(document.querySelector('.gallerist'))
     })
 
-    it('a rescue after a key shows the focus ring (focusVisible); after a click it does not', () => {
-      open({ renderCard: host([]) })
+    it('focus moved after a key shows the ring (focusVisible: true); after a pointer it does not', () => {
+      const { plugin } = open({ renderCard: host([]) })
       const focus = vi.spyOn(HTMLElement.prototype, 'focus')
+      const ring = (on: boolean) =>
+        expect(focus).toHaveBeenLastCalledWith({ preventScroll: true, focusVisible: on })
+      const input = () => document.querySelector('.host-card input') as HTMLInputElement
+      const close = () =>
+        document.querySelector('[data-pin="p1"] .gallerist-pin-close') as HTMLElement
       markers()[0]?.click()
-      const input = document.querySelector('.host-card input') as HTMLInputElement
-      input.focus()
-      input.dispatchEvent(cancelableKey('Escape'))
+      input().focus()
+      input().dispatchEvent(cancelableKey('Escape'))
       expect(document.activeElement).toBe(markers()[0])
-      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true, focusVisible: true })
+      ring(true)
+      // × clicked with a pointer while the card's field has focus (a field always matches
+      // :focus-visible, and Safari doesn't focus a clicked button): no ring, not inferred from the field
       markers()[0]?.click()
-      // the close button clicked with a pointer (it doesn't match :focus-visible): left to the
-      // browser, which shows no ring after a click
-      const close = document.querySelector('[data-pin="p1"] .gallerist-pin-close') as HTMLElement
-      vi.spyOn(close, 'matches').mockReturnValue(false)
-      close.focus()
-      close.click()
+      input().focus()
+      close().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      close().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
       expect(document.activeElement).toBe(markers()[0])
-      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true, focusVisible: undefined })
+      ring(false)
+      // × from the keyboard (a click without a pointer, `detail` 0): the ring
+      markers()[0]?.click()
+      close().focus()
+      close().click()
+      expect(document.activeElement).toBe(markers()[0])
+      ring(true)
+      // a host control in the card that closes it (open(null, { focus: true })), clicked: no ring
+      markers()[0]?.click()
+      input().focus()
+      input().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      plugin.open(null, { focus: true })
+      expect(document.activeElement).toBe(markers()[0])
+      ring(false)
     })
   })
 
@@ -922,8 +967,9 @@ describe('plugin-pins', () => {
         x: left,
         y: top,
       }) as DOMRect
-    // a laid-out viewer: the boxes by class, and a card `h` px tall (its content) under max-height
-    const layout = (boxes: Record<string, DOMRect>, h: number) => {
+    // a laid-out viewer: the boxes by class, and a card `h` px tall and `w` px wide (its content)
+    // under max-height and max-width
+    const layout = (boxes: Record<string, DOMRect>, h: number, w = 200) => {
       vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
         this: Element,
       ) {
@@ -937,6 +983,11 @@ describe('plugin-pins', () => {
         this: HTMLElement,
       ) {
         return isCard(this) ? height(this) : 0
+      })
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+        this: HTMLElement,
+      ) {
+        return isCard(this) ? Math.min(w, Number.parseFloat(this.style.maxWidth) || w) : 0
       })
       for (const prop of ['clientHeight', 'scrollHeight'] as const)
         vi.spyOn(HTMLElement.prototype, prop, 'get').mockImplementation(function (
@@ -962,7 +1013,6 @@ describe('plugin-pins', () => {
       const card = openCard()
       expect(card.style.maxHeight).toBe('143px') // the stage less 8px each side
       expect(card.style.top).toBe(`${65 - 110}px`) // slid up to the stage's top (+8)
-      expect(card.style.bottom).toBe('auto')
       expect(card.tabIndex).toBe(0) // it scrolls: the keys can reach it
       // ↓ on the focused card scrolls it, it doesn't change the item
       card.focus()
@@ -978,14 +1028,123 @@ describe('plugin-pins', () => {
       const card = openCard()
       expect(card.style.top).toBe('0px') // level with the pin
       expect(card.tabIndex).toBe(-1)
-      expect(card.closest<HTMLElement>('.gallerist-pin')?.dataset.side).toBe('right')
+      expect(card.style.left).toBe('48px') // beside the pin (44px) on the right, 4px off
       markers()[0]?.click()
       // near the bottom: as low as fits (stage bottom 450 - 8 - 100 = 342)
       layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(700, 420) }, 100)
       const again = openCard()
       expect(again.style.top).toBe(`${342 - 420}px`)
-      expect(again.closest<HTMLElement>('.gallerist-pin')?.dataset.side).toBe('left') // more room
+      expect(again.style.left).toBe(`${-4 - 200}px`) // on the left: more room
       expect(again.style.maxWidth).toBe('280px')
+    })
+
+    it('a narrow stage: the card is as wide as the room and slides along to stay inside it', () => {
+      open()
+      // 200px wide: 62px left of the pin, 78px right of it (less the 8px margins), under the 120px floor
+      layout({ 'gallerist-stage': rect(0, 0, 200, 400), ...pinAt(70, 100) }, 100)
+      const card = openCard()
+      expect(card.style.maxWidth).toBe('120px')
+      // its right edge on the room's (200 - 8): 192 - 120 = 72, over the pin rather than past the stage
+      expect(card.style.left).toBe(`${72 - 70}px`)
+      markers()[0]?.click()
+      // narrower than the floor: the whole room (8..112), from its left edge
+      layout({ 'gallerist-stage': rect(0, 0, 120, 400), ...pinAt(30, 100) }, 100)
+      const again = openCard()
+      expect(again.style.maxWidth).toBe('104px')
+      expect(again.style.left).toBe(`${8 - 30}px`)
+    })
+
+    it('placed again a frame after a zoom or pan moves its pin', async () => {
+      const { v } = open()
+      layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 120) }, 100)
+      const card = openCard()
+      expect(card.style.top).toBe('0px')
+      // panned down: the pin near the stage's bottom; the card must slide up (450 - 8 - 100 = 342)
+      layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 420) }, 100)
+      v.zoomTo(2)
+      expect(card.style.top).toBe('0px') // not inside the zoom event: a frame later
+      await new Promise((r) => requestAnimationFrame(r))
+      expect(card.style.top).toBe(`${342 - 420}px`)
+    })
+
+    it('a resize of the card is placed a frame later, not inside the observer (no loop error)', async () => {
+      let notify: (() => void) | undefined
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(cb: () => void) {
+            notify ??= cb // the plugin's (created before the renderer's)
+          }
+          observe() {}
+          disconnect() {}
+        },
+      )
+      try {
+        open()
+        layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 120) }, 100)
+        const card = openCard()
+        layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 120) }, 380)
+        notify?.()
+        expect(card.style.top).toBe('0px') // nothing written during the delivery
+        await new Promise((r) => requestAnimationFrame(r))
+        expect(card.style.top).toBe(`${442 - 380 - 120}px`) // the taller card slid up from the bottom
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('never under the docked item navigator (immersive floats it over the stage corner)', () => {
+      const plugin = pins()
+      const v = createViewer({ collection: collection(), plugins: [plugin] })
+      mount(v, { arrows: 'docked' })
+      v.open()
+      expect(document.querySelector('.gallerist > .gallerist-itemnav')).not.toBeNull()
+      const boxes = {
+        'gallerist-stage': rect(0, 0, 844, 390),
+        'gallerist-itemnav': rect(700, 300, 132, 78),
+        ...pinAt(380, 300),
+      }
+      layout(boxes, 100, 300)
+      const card = openCard()
+      // to the right (412px of room against 372px), 428..708: over the navigator's columns, so the
+      // room ends above it (300 - 8) and the card slides up from level with its pin
+      expect(card.style.left).toBe('48px')
+      expect(card.style.maxHeight).toBe(`${292 - 8}px`)
+      expect(card.style.top).toBe(`${192 - 300}px`)
+      markers()[0]?.click()
+      // clear of its columns (on the left of a pin further right), the stage's bottom bounds it
+      layout({ ...boxes, ...pinAt(560, 300) }, 100, 300)
+      const again = openCard()
+      expect(again.style.top).toBe(`${382 - 100 - 300}px`)
+    })
+
+    it('a wheel over a card that scrolls scrolls it; over a short card, or a pinch, it zooms', () => {
+      open()
+      const stage = document.querySelector('.gallerist-stage') as HTMLElement
+      const reached = vi.fn()
+      stage.addEventListener('wheel', reached)
+      // (happy-dom's WheelEvent drops the modifier keys from its init: set ctrlKey on the event)
+      const wheel = (el: HTMLElement, ctrlKey = false) =>
+        el.dispatchEvent(
+          Object.defineProperty(
+            new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 40 }),
+            'ctrlKey',
+            { value: ctrlKey },
+          ),
+        )
+      layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 120) }, 100)
+      const short = openCard()
+      expect(short.tabIndex).toBe(-1)
+      wheel(short)
+      expect(reached).toHaveBeenCalledTimes(1) // the stage zooms the image
+      markers()[0]?.click()
+      layout({ 'gallerist-stage': rect(0, 50, 800, 400), ...pinAt(100, 120) }, 900)
+      const tall = openCard()
+      expect(tall.tabIndex).toBe(0)
+      wheel(tall)
+      expect(reached).toHaveBeenCalledTimes(1) // it scrolls the card
+      wheel(tall, true)
+      expect(reached).toHaveBeenCalledTimes(2) // a pinch zooms the image, not the page
     })
 
     it('never under a band floated over the stage (immersive: the inset controls box)', () => {

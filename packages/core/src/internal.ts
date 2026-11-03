@@ -8,6 +8,7 @@ export {
   type ViewerInternals,
   type ZoomBounds,
 } from './controller/internals'
+export { reportHandlerError } from './events/events'
 export { normalize } from './model/normalize'
 export { createStore, type Store } from './store/store'
 export {

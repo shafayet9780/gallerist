@@ -5,7 +5,7 @@
 // with any data source; the theme styles them from the skin's tokens.
 
 import type { Group, Item, OverlaySpec, Plugin, ViewerApi } from '@gallerist/core'
-import { ICONS, safeUrl } from '@gallerist/core/internal'
+import { ICONS, reportHandlerError, safeUrl } from '@gallerist/core/internal'
 
 export type PinPresentation = 'comment' | 'tag' | 'feature'
 
@@ -111,7 +111,9 @@ export interface PinsOptions {
   onCardRemove?: (pin: Pin, node: Node) => void
   /**
    * A pin's card opened (`pin`) or closed (`null`). `ctx.previous` is the pin whose card was open
-   * until now: the one that closed, also when another pin's card replaced it.
+   * until now: the one that closed, also when another pin's card replaced it. When a callback
+   * changes the card again (`open()`), an earlier call may describe a state already replaced: the
+   * last one is current.
    */
   onOpenChange?: (pin: Pin | null, ctx: PinOpenChange) => void
   /**
@@ -271,34 +273,47 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   }
 
   // The card stays inside the free stage (the stage less the bands immersive floats over it, by
-  // which the controls box is inset) on both axes: toward the side with more room, level with its
-  // pin if it fits, else slid along it, and at most as tall as the room (it scrolls past that, and
-  // joins the tab order so the keys scroll it). Decided from where the pin is on screen (zoom and
-  // pan included) when the card opens, and again as its contents resize (a host renders late).
+  // which the controls box is inset, 8px in from its edges) on both axes: beside its pin toward the
+  // side with more room, level with it, each slid along when it doesn't fit; at most as wide and as
+  // tall as the room (it scrolls past that, and joins the tab order so the keys scroll it); never
+  // under the docked item navigator (a root grid item: immersive floats it over the stage's corner).
+  // Decided from where the pin is on screen (zoom and pan included) when the card opens, and again
+  // after a zoom or pan, and as its contents resize (a host renders late).
   const placeCard = (r: Rendered) => {
     const box = (sel: string) => viewerRoot()?.querySelector(sel)?.getBoundingClientRect()
     const s = box('.gallerist-stage')
     if (!s?.width) return
     const c = box('.gallerist-controls')
     const k = c?.width ? c : s
+    const n = box('.gallerist > .gallerist-itemnav')
     const m = r.marker.getBoundingClientRect()
+    const at = r.el.getBoundingClientRect()
     const top = Math.max(s.top, k.top) + 8
-    const bottom = Math.min(s.bottom, k.bottom) - 8
-    const left = m.left - Math.max(s.left, k.left)
-    const right = Math.min(s.right, k.right) - m.right
+    let bottom = Math.min(s.bottom, k.bottom) - 8
+    const left = Math.max(s.left, k.left) + 8
+    const right = Math.min(s.right, k.right) - 8
+    const toLeft = m.left - left > right - m.right
     const card = r.card
     const st = card.style
-    r.el.dataset.side = left > right ? 'left' : 'right'
-    st.maxWidth = `${Math.max(120, Math.min(280, Math.max(left, right) - 12))}px`
+    st.maxWidth = `${Math.min(280, right - left, Math.max(120, (toLeft ? m.left - left : right - m.right) - 4))}px`
+    const w = card.offsetWidth
+    const x = Math.max(left, Math.min(toLeft ? m.left - 4 - w : m.right + 4, right - w))
+    st.left = `${x - at.left}px`
+    if (n?.width && n.top < bottom && n.bottom > top && x < n.right && x + w > n.left)
+      bottom = n.top - 8
     st.maxHeight = `${Math.max(60, bottom - top)}px`
-    st.bottom = 'auto'
-    st.top = `${Math.max(top, Math.min(m.top, bottom - card.offsetHeight)) - r.el.getBoundingClientRect().top}px`
+    st.top = `${Math.max(top, Math.min(m.top, bottom - card.offsetHeight)) - at.top}px`
     card.tabIndex = card.scrollHeight > card.clientHeight + 1 ? 0 : -1
   }
-  const fit =
-    typeof ResizeObserver === 'function'
-      ? new ResizeObserver(() => shown && placeCard(shown))
-      : null
+  // placed again a frame after a zoom or pan (the pin has moved, its card offset hasn't) or a resize
+  // of the card or its contents: not from inside the observer's delivery, where placeCard's own
+  // writes would resize what it observes again (a ResizeObserver loop error)
+  let frame = 0
+  const replace = () => {
+    cancelAnimationFrame(frame)
+    frame = requestAnimationFrame(() => shown && placeCard(shown))
+  }
+  const fit = typeof ResizeObserver === 'function' ? new ResizeObserver(replace) : null
 
   // While a card is open, Escape closes it (not the viewer), wherever focus is in the viewer: some
   // browsers don't focus a clicked button, and `open(id)` leaves focus where it was. An Escape from
@@ -308,7 +323,6 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     if (e.key !== 'Escape' || !openId) return
     if (shown && e.target instanceof Node && shown.card.contains(e.target)) return
     e.stopPropagation()
-    ring = true
     setOpen(null, true)
   }
   let keyRoot: HTMLElement | null = null
@@ -316,14 +330,9 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   // Host callbacks (onCardRemove, onOpenChange, a renderCard error) wait in `calls` until the
   // outermost setOpen has settled, then run in order, so a call back into the plugin (open() from
   // onCardRemove) sees the settled state and its own events come after the ones that led to it.
-  // A throw is reported (reportError, else console.error, as core's emitter does) and the rest run.
+  // A throw is reported (reportError, else console.error: core's emitter's reporter) and the rest run.
   const calls: Array<() => void> = []
   let depth = 0
-  const report = (e: unknown) => {
-    const r = (globalThis as { reportError?: (e: unknown) => void }).reportError
-    if (typeof r === 'function') r(e)
-    else console.error(e)
-  }
   // nodes handed to onCardRemove's queue and not delivered yet (each is delivered once)
   const leaving = new Set<Node>()
 
@@ -362,10 +371,10 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   // Focus leaving a card that closed, or whose nodes were dropped: to the pin's marker on the current
   // item, else the add-pin button, else the viewer, never <body> (the next Escape would close the
   // viewer). Moved if it is on <body> or inside `from` (`document`: from anywhere, as Escape or the
-  // close button do). After a key (Escape, or the focus it leaves showed the ring: a field always
-  // does) it asks for the ring (`focusVisible`: Chromium, Firefox; ignored elsewhere); otherwise,
-  // after a click, the browser decides, and by convention shows none.
-  const rescue = (id: string, from: Node | null, ring?: boolean) => {
+  // close button do). It shows the focus ring if the input that led here was a key, and not if it
+  // was a pointer (`focusVisible`; a browser without the option decides by its own heuristic). Not
+  // inferred from the element focus leaves (a text field always matches :focus-visible).
+  const rescue = (id: string, from: Node | null) => {
     const a = document.activeElement
     if (a && a !== document.body && !from?.contains(a)) return
     const item = bound && currentCtx(bound)?.item
@@ -376,29 +385,25 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       addBtn,
       viewerRoot(),
     ]) {
-      to?.focus({ preventScroll: true, focusVisible: ring || undefined } as FocusOptions)
+      to?.focus({ preventScroll: true, focusVisible: kbd } as FocusOptions)
       if (to && document.activeElement === to) return
     }
   }
   // again after the current task, as a repaint may drop the marker it went to (the pin is gone)
-  const refocus = (id: string, card: HTMLElement, force: boolean, ring: boolean) => {
-    rescue(id, force ? document : card, ring)
-    queueMicrotask(() => rescue(id, card, ring))
+  const refocus = (id: string, card: HTMLElement, force: boolean) => {
+    rescue(id, force ? document : card)
+    queueMicrotask(() => rescue(id, card))
   }
-  // whether an element shows the focus ring (false where `:focus-visible` isn't supported)
-  const ringed = (e: Element | null) => {
-    try {
-      return !!e?.matches(':focus-visible')
-    } catch {
-      return false
-    }
+  // the last input was a key (keydown), not a pointer (pointerdown), seen on the document in capture
+  // while the plugin is in a viewer; a keyboard click (no pointer: `detail` 0) on × counts as a key
+  let kbd = false
+  const modality = (e: Event) => {
+    kbd = e.type === 'keydown'
   }
 
   // `openId` is the pin asked for; `shown` the one whose card is on screen. They differ while a pin
   // asked for by `open(id)` hasn't been painted yet (it opens when it is).
   let shown: Rendered | null = null
-  // the change comes from a key (Escape): the focus it moves shows the ring
-  let ring = false
   // open(id, { focus: true }): where focus was when asked; the card takes it (now, or once its pin is
   // painted) unless the user moved it meanwhile: it is still there, fell to <body>, or what held it
   // was repainted away (the renderer hands focus to the new pin)
@@ -416,13 +421,16 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
           try {
             f()
           } catch (e) {
-            report(e)
+            reportHandlerError(e)
           }
           depth--
         }
     }
   }
-  const change = (id: string | null, focus: boolean) => {
+  const change = (asked: string | null, focus: boolean) => {
+    // nothing opens once the plugin has left its viewer (open() from a callback run by destroy): no
+    // listeners left behind, and no card a later viewer would open on its first paint
+    const id = bound ? asked : null
     if (id !== openId) want = null
     if (focus && id) want = { from: document.activeElement }
     openId = id
@@ -464,15 +472,11 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     if (opened && want) {
       const now = document.activeElement
       if (now === want.from || !now || now === document.body || !want.from?.isConnected)
-        opened.card.focus({
-          preventScroll: true,
-          focusVisible: ringed(now) || undefined,
-        } as FocusOptions)
+        opened.card.focus({ preventScroll: true, focusVisible: kbd } as FocusOptions)
       want = null
     } else if (bound && prev && prev !== opened && (had || (focus && !id))) {
-      refocus(prev.pin.id, prev.card, focus, ringed(a) || ring)
+      refocus(prev.pin.id, prev.card, focus)
     }
-    ring = false
     shown = opened
     keyRoot?.removeEventListener('keydown', onOpenKey, true)
     keyRoot = null
@@ -601,11 +605,6 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     el.dataset.pin = pin.id
     if (pin.resolved) el.setAttribute('data-resolved', '')
     el.hidden = !visible
-    // open the card away from the image's nearer edges
-    const nx = pin.space === 'natural' ? pin.x / (ctx.item.naturalSize?.w ?? Number.NaN) : pin.x
-    const ny = pin.space === 'natural' ? pin.y / (ctx.item.naturalSize?.h ?? Number.NaN) : pin.y
-    el.dataset.side = nx > 0.6 ? 'left' : 'right'
-    el.dataset.v = ny > 0.6 ? 'up' : 'down'
 
     const cardId = `gallerist-pin-${instance}-${pin.id}`
     const marker = document.createElement('button')
@@ -632,14 +631,21 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     close.className = 'gallerist-pin-close'
     close.setAttribute('aria-label', t.close)
     close.innerHTML = ICONS.close
-    close.addEventListener('click', () => setOpen(null, true))
+    close.addEventListener('click', (e) => {
+      kbd = !e.detail
+      setOpen(null, true)
+    })
     card.appendChild(close)
 
     marker.addEventListener('click', () => setOpen(openId === pin.id ? null : pin.id))
-    // a click inside a card must not reach the stage (no swipe, no close-on-backdrop), nor a wheel
-    // (it scrolls a tall card rather than zooming the image)
-    for (const type of ['pointerdown', 'wheel'])
-      card.addEventListener(type, (e) => e.stopPropagation())
+    // a click inside a card must not reach the stage (no swipe, no close-on-backdrop); nor a wheel
+    // over a card that scrolls (in the tab order then), which scrolls it rather than zooming the
+    // image. A pinch (ctrl+wheel), or a wheel over a card that doesn't scroll, zooms the image as
+    // anywhere on the stage, whose handler keeps it from zooming the page.
+    card.addEventListener('pointerdown', (e) => e.stopPropagation())
+    card.addEventListener('wheel', (e) => {
+      if (!card.tabIndex && !e.ctrlKey) e.stopPropagation()
+    })
     card.addEventListener('focusin', () => {
       focusedCard = card
     })
@@ -659,7 +665,7 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       if (e.key !== 'Escape' || e.defaultPrevented || openId !== pin.id) return
       e.preventDefault()
       e.stopPropagation()
-      ring = true
+      kbd = true
       setOpen(null, true)
     })
     el.append(marker, card)
@@ -711,10 +717,7 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
       // leaves focus on <body>: once it is done, focus goes where a closing card's would
       const a = document.activeElement
       const held = item === currentCtx(viewer)?.item && live().find((r) => r.el.contains(a))
-      if (held) {
-        const ring = ringed(a)
-        queueMicrotask(() => rescue(held.pin.id, null, ring))
-      }
+      if (held) queueMicrotask(() => rescue(held.pin.id, null))
       // its pin is gone from the current item (a neighbour's slide has its own pins)
       if (openId && item === currentCtx(viewer)?.item && !list.some((p) => p.id === openId))
         setOpen(null)
@@ -739,12 +742,19 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     return {
       name: 'pins',
       init() {
-        // close any open card when the item changes
-        const off = viewer.on('afterItem', () => setOpen(null))
-        const offSlide = viewer.on('afterSlide', () => setOpen(null))
+        // close any open card when the item changes; place it again after a zoom or pan; follow the
+        // last input (a key or a pointer) for the focus ring
+        const offs = [
+          viewer.on('afterItem', () => setOpen(null)),
+          viewer.on('afterSlide', () => setOpen(null)),
+          viewer.on('zoom', replace),
+        ]
+        for (const type of ['keydown', 'pointerdown'])
+          document.addEventListener(type, modality, true)
         cleanup = () => {
-          off()
-          offSlide()
+          for (const off of offs) off()
+          for (const type of ['keydown', 'pointerdown'])
+            document.removeEventListener(type, modality, true)
         }
       },
       destroy() {

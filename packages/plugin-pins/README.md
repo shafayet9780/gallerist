@@ -68,21 +68,25 @@ Use one `pins()` per viewer: the plugin keeps the open card, its listeners and i
 instance, so two live viewers sharing one would close each other's cards. Each gallery gets its own
 `pins({...})`; the same instance can move to a new viewer once the old one is destroyed (a React remount). Escape closes an open card (or cancels placing)
 without closing the viewer, wherever focus is; a field in a `renderCard` card keeps Escape for itself
-by calling `event.preventDefault()` in its own `keydown` handler. A card opens toward the side of the
-stage with more room and stays inside the stage on both axes: level with its pin when it fits, else
-slid along it, never under a band floated over the stage (immersive), and never taller than the room;
-a taller card scrolls (it then joins the tab order, and ↑ ↓ Home End Page Up/Down scroll it rather
-than navigate). It is placed again as its contents resize, so a host may render into it late. While
-placing, a pan or a click beside the image keeps the mode armed; a click
-outside the stage cancels it.
+by calling `event.preventDefault()` in its own `keydown` handler. A card opens beside its pin toward
+the side of the stage with more room and stays inside the stage on both axes: level with its pin when
+it fits, else slid along it (across too, over the pin, when the room beside it is narrow), never
+under a band floated over the stage (immersive) or the docked item navigator, and never wider or
+taller than the room. A taller card scrolls: it then joins the tab order, ↑ ↓ Home End Page Up/Down
+scroll it rather than navigate, a wheel over it scrolls it, and its close button stays in view. A
+wheel over a card that doesn't scroll, or a pinch (ctrl+wheel) over any card, zooms the image as
+anywhere on the stage, and a touch in a card never pans or zooms the page. A card is placed again
+after a zoom or pan and as its contents resize, so a host may render into it late. While placing, a
+pan or a click beside the image keeps the mode armed; a click outside the stage cancels it.
 
 Focus never falls to `<body>` (where the next Escape would close the viewer): when a card closes or is
 redrawn while focus is inside it, focus goes to its pin if that is still on the current item, else to
 the "Add a comment" button, else to the viewer. Focus already on `<body>` is moved too in an open overlay
 viewer, but not in an inline one, where it may have come from a control of your page. The same holds when a
 repaint drops the pin that has focus (you removed it, say an empty draft in `onOpenChange` followed by
-`refresh()`): focus moves on once the repaint is done. Focus moved after a key (Escape, or from a
-control showing the focus ring) asks for the ring (`focusVisible`); after a click the browser decides.
+`refresh()`): focus moves on once the repaint is done. Focus the plugin moves shows the focus ring
+when the input that led to it was a key (Escape, Enter on ×), and not after a pointer
+(`focusVisible: true` / `false`; a browser without the option decides for itself).
 
 ```ts
 const commentPins = pins({
@@ -127,7 +131,12 @@ viewer was destroyed. Exactly once per node, so a portal or root can follow it. 
   `window.onerror`; else `console.error`) once the card has opened. The same goes for a callback that
   throws: the rest still run.
 - `onCardRemove` and `onOpenChange` run after the change has settled, in order. Calling `open()` or
-  `refresh()` from them is fine (its own events follow); from `renderCard` it isn't.
+  `refresh()` from them is fine (its own events follow); from `renderCard` it isn't. So when one
+  does, an earlier `onOpenChange` may describe a state that a later change has already replaced:
+  the last one is current.
+- A callback that calls `viewer.destroy()` doesn't stop the ones queued after it: they still run,
+  with the destroyed viewer's `ctx`. Once the plugin has left its viewer, `open()` does nothing (no
+  card the next viewer would open unprompted).
 
 A portal keeps the card in your React tree (context, state, event handlers). Give each node its own
 key (a counter, not `pin.id`: a redraw briefly has two nodes for the same pin):

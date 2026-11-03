@@ -5,7 +5,8 @@
 
 /* ── pins (plugin-pins): points on the image that open a card ─────────────────────
    The overlay host is counter-scaled, so a pin keeps its screen size under zoom. The marker is a
-   44px hit area around a smaller dot; the card opens beside it, away from the image's near edges. */
+   44px hit area around a smaller dot; the card opens beside it, placed by the plugin (left, top,
+   max-width, max-height) inside the stage's free room. */
 .gallerist-pin {
   position: relative;
 }
@@ -72,11 +73,17 @@
 }
 .gallerist-pin-card {
   position: absolute;
+  top: 0;
+  left: calc(100% + 4px); /* until the plugin places it */
   z-index: 1;
+  /* a column, so the close button can come first (order) and stick to the top as it scrolls */
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box; /* the plugin's max-width / max-height are the room in the stage, padding included */
   width: max-content;
   max-width: min(280px, 70vw);
-  padding: 12px 36px 12px 14px;
+  padding: 12px;
+  padding-inline: 14px 36px; /* the close button's room */
   border: 1px solid var(--gallerist-hairline);
   border-radius: var(--gallerist-radius);
   background: var(--gallerist-pin-card-bg);
@@ -88,21 +95,19 @@
   cursor: auto;
   overflow: auto; /* a card taller than the room scrolls */
   overscroll-behavior: contain;
+  /* a scroll container: the stage's touch-action: none stops at it, so a touch in the card would
+     pan or pinch-zoom the page. None here (the card's own controls still take taps) ... */
+  touch-action: none;
+}
+/* ... and a vertical pan while it scrolls (the plugin puts it in the tab order then) */
+.gallerist-pin-card[tabindex="0"] {
+  touch-action: pan-y;
+}
+.gallerist-pin-card > * {
+  flex-shrink: 0; /* the card scrolls; its contents keep their height */
 }
 .gallerist-pin-card[hidden] {
   display: none;
-}
-.gallerist-pin[data-side="right"] .gallerist-pin-card {
-  left: calc(100% + 4px);
-}
-.gallerist-pin[data-side="left"] .gallerist-pin-card {
-  right: calc(100% + 4px);
-}
-.gallerist-pin[data-v="down"] .gallerist-pin-card {
-  top: 0;
-}
-.gallerist-pin[data-v="up"] .gallerist-pin-card {
-  bottom: 0;
 }
 .gallerist-pin-head {
   display: flex;
@@ -146,6 +151,7 @@
   gap: 8px;
 }
 .gallerist-pin-link {
+  align-self: flex-start;
   display: inline-block;
   margin-top: 8px;
   color: var(--gallerist-fg);
@@ -160,9 +166,15 @@
   outline-offset: 2px;
 }
 .gallerist-pin-close {
-  position: absolute;
-  top: 4px;
-  inset-inline-end: 4px;
+  /* first in the column, 4px from the card's top and inline-end corner, taking no room (the
+     padding is its room), and held there as the card scrolls (sticky insets count from the card's
+     content box, inside its 12px padding) */
+  position: sticky;
+  top: -8px;
+  order: -1;
+  align-self: flex-end;
+  margin-block: -8px -20px;
+  margin-inline-end: -32px;
   display: grid;
   place-items: center;
   width: 28px;
@@ -170,7 +182,7 @@
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: transparent;
+  background: var(--gallerist-pin-card-bg); /* contents scroll under it */
   color: var(--gallerist-fg-muted);
   cursor: pointer;
 }

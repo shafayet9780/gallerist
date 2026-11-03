@@ -311,12 +311,10 @@ test('an empty draft the host drops: focus on the add button; Escape keeps the v
   await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
 })
 
-// focus the plugin moves after a key shows the focus ring (focusVisible); after a click it doesn't
-test('focus moved after a key shows the ring; after a click it does not', async ({
-  page,
-  browserName,
-}) => {
-  test.skip(browserName !== 'chromium', 'focusVisible: Chromium and Firefox')
+// focus the plugin moves after a key shows the focus ring (focusVisible: true); after a click it
+// doesn't (false). Both engines here honour the option (a wrong value fails on either; checked by
+// flipping it), so this runs on both.
+test('focus moved after a key shows the ring; after a click it does not', async ({ page }) => {
   await ready(page, 'card=draft&presentation=comment')
   const marker = page.locator('[data-pin="a"] .gallerist-pin-marker')
   const card = page.locator('[data-pin="a"] .gallerist-pin-card')
@@ -332,6 +330,13 @@ test('focus moved after a key shows the ring; after a click it does not', async 
   await expect(card).toBeHidden()
   await expect(marker).toBeFocused()
   expect(await ring()).toBe(false)
+  // × clicked while the card's field has focus (a field always shows the ring): still a click
+  await marker.click()
+  await card.getByLabel('Comment').click()
+  await card.locator('.gallerist-pin-close').click()
+  await expect(card).toBeHidden()
+  await expect(marker).toBeFocused()
+  expect(await ring()).toBe(false)
   // Escape after a click on the card itself (no ring there): a key, so the pin shows the ring
   await marker.click()
   const at = await card.boundingBox()
@@ -341,12 +346,110 @@ test('focus moved after a key shows the ring; after a click it does not', async 
   await expect(card).toBeHidden()
   await expect(marker).toBeFocused()
   expect(await ring()).toBe(true)
-  // saved from the keyboard: the redraw puts focus on the pin, with the ring
+  // saved from the keyboard: the redraw puts focus on the pin, with the ring (Save focused by script:
+  // WebKit's Tab skips buttons by default)
   await marker.click()
   await card.getByLabel('Comment').fill('Looks good')
-  await page.keyboard.press('Tab')
+  await card.getByRole('button', { name: 'Save' }).focus()
   await page.keyboard.press('Enter')
   await expect(card.getByLabel('Comment')).toHaveValue('Looks good')
   await expect(marker).toBeFocused()
   expect(await ring()).toBe(true)
+})
+
+// A wheel over a card: a card that scrolls takes it (its contents scroll, the image doesn't zoom);
+// a short card, or a pinch (ctrl+wheel) over any card, zooms the image as over the stage, and the
+// stage keeps the page from zooming (the event is cancelled).
+test('a wheel over a card: a scrolling card scrolls, a short card or a pinch zooms the image', async ({
+  page,
+}) => {
+  const over = async (sel: string) => {
+    const b = await page.locator(sel).boundingBox()
+    if (!b) throw new Error(`no box for ${sel}`)
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+  }
+  // the last wheel event's defaultPrevented once dispatched (seen in capture: a scrolling card stops
+  // it from bubbling)
+  const cancelled = () =>
+    page.evaluate(() => (window as unknown as { lastWheel?: boolean }).lastWheel)
+  const watch = () =>
+    page.evaluate(() =>
+      window.addEventListener(
+        'wheel',
+        (e) =>
+          setTimeout(() => {
+            ;(window as unknown as { lastWheel?: boolean }).lastWheel = e.defaultPrevented
+          }),
+        true,
+      ),
+    )
+  // short (the default tag card): the wheel zooms the image
+  await ready(page)
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  const short = page.locator('[data-pin="a"] .gallerist-pin-card')
+  await expect(short).toHaveAttribute('tabindex', '-1')
+  await over('[data-pin="a"] .gallerist-pin-card')
+  await page.mouse.wheel(0, -200)
+  await expect.poll(async () => (await zoomState(page)).scale).toBeGreaterThan(1)
+  // tall (a host card taller than a landscape phone's stage): the wheel scrolls it
+  await page.setViewportSize({ width: 844, height: 390 })
+  await ready(page, 'card=draft&presentation=comment')
+  await watch()
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  const tall = page.locator('[data-pin="a"] .gallerist-pin-card')
+  await expect(tall).toHaveAttribute('tabindex', '0')
+  await over('[data-pin="a"] .gallerist-pin-card')
+  await page.mouse.wheel(0, 120)
+  await expect.poll(() => tall.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  await expect.poll(cancelled).toBe(false)
+  await page.waitForTimeout(300) // past the stage's wheel commit
+  expect((await zoomState(page)).scale).toBe(1)
+  // a pinch (ctrl+wheel) over it zooms the image, not the page
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -120)
+  await page.keyboard.up('Control')
+  await expect.poll(async () => (await zoomState(page)).scale).toBeGreaterThan(1)
+  await expect.poll(cancelled).toBe(true)
+})
+
+// A card is a scroll container, so the stage's touch-action: none stops at it: the card sets its own
+// (none; a vertical pan while it scrolls), so a touch in it never pans or pinch-zooms the page.
+test('a card keeps touches from panning or zooming the page (touch-action)', async ({ page }) => {
+  const touch = (id: string) =>
+    page
+      .locator(`[data-pin="${id}"] .gallerist-pin-card`)
+      .evaluate((el) => getComputedStyle(el).touchAction)
+  await ready(page)
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  expect(await touch('a')).toBe('none')
+  await page.setViewportSize({ width: 844, height: 390 })
+  await ready(page, 'card=draft&presentation=comment')
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  await expect(page.locator('[data-pin="a"] .gallerist-pin-card')).toHaveAttribute('tabindex', '0')
+  expect(await touch('a')).toBe('pan-y')
+})
+
+// The close button stays at the card's top inline-end corner as a tall card scrolls, and works there.
+test('a scrolled card keeps its close button in view', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 })
+  await ready(page, 'card=draft&presentation=comment')
+  await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+  const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+  const close = card.locator('.gallerist-pin-close')
+  const at = async () => {
+    const [c, b] = [await card.boundingBox(), await close.boundingBox()]
+    if (!c || !b) throw new Error('missing box')
+    return { top: b.y - c.y, end: c.x + c.width - (b.x + b.width) }
+  }
+  const before = await at()
+  expect(before.top).toBeGreaterThanOrEqual(2)
+  expect(before.top).toBeLessThanOrEqual(8)
+  expect(before.end).toBeLessThanOrEqual(8)
+  await card.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  await expect.poll(() => card.evaluate((el) => el.scrollTop)).toBeGreaterThan(20)
+  expect(await at()).toEqual(before)
+  await close.click()
+  await expect(card).toBeHidden()
 })

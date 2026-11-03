@@ -48,15 +48,27 @@
   a landscape phone (a 159px stage, a 194px host card) it ran past the stage's bottom or opened up
   under the toolbar, out of reach. It now opens level with its pin, slides along it to fit, is never
   taller than the room (the stage less any band floated over it), and scrolls past that, joining the
-  tab order so the keys scroll it (↑ ↓ Home End Page Up/Down on the focused card don't navigate). It
-  is re-placed as a host's contents resize, and a wheel over it scrolls it instead of zooming.
+  tab order so the keys scroll it (↑ ↓ Home End Page Up/Down on the focused card don't navigate), with
+  its close button held in view. Across, it is never wider than the room and slides along over its
+  pin when the room beside it is narrow (with less than ~130px its close button was clipped), and it
+  never opens under the docked item navigator (immersive floats that over the stage). It is placed
+  again after a zoom or pan and, a frame later (no ResizeObserver loop error), as a host's contents
+  resize. A wheel over a card that scrolls scrolls it; over a short card, or a pinch (ctrl+wheel)
+  over any card, it zooms the image as elsewhere on the stage (a card swallowed every wheel, so a
+  pinch over one zoomed the page in Chromium). A touch in a card no longer pans or pinch-zooms the
+  page: a card is a scroll container, which the stage's `touch-action: none` doesn't reach into, so
+  it sets its own (`none`; `pan-y` while it scrolls).
 - **plugin-pins (fixed)**: when the host drops a pin as its card closes (an empty draft, removed in
   `onOpenChange` with `refresh()`), the repaint a frame later took the pin focus had gone to and left
   focus on `<body>`. A repaint that drops the focused pin now moves focus on to its marker if it is
   back, else the add-pin button, else the viewer.
-- **plugin-pins**: focus the plugin moves after a key (Escape, or from a control showing the focus
-  ring) asks for the ring (`focusVisible`; Chromium and Firefox). After a click it is left to the
-  browser, which by convention shows none.
+- **plugin-pins**: focus the plugin moves shows the focus ring when the input that led to it was a key
+  (Escape, Enter on ×) and not after a pointer (`focusVisible: true` / `false`, from the last
+  keydown or pointerdown; it isn't inferred from the element focus leaves, as a text field always
+  matches `:focus-visible`).
+- **plugin-pins (fixed)**: `open()` from a callback run by `destroy()` (say `onCardRemove`) opens
+  nothing. It left a document listener attached past destroy, and a plugin moved to a new viewer
+  opened that card on the first paint.
 - **renderer-dom, theme (fixed, docked)**: review fixes for `arrows: 'docked'`: the caption comes
   before the navigator in DOM and tab order; placements for immersive and editorial; a box radius;
   aside header room only with several items and not linear; the overview (`grid({ layout:
