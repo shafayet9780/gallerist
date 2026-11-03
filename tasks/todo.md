@@ -136,6 +136,12 @@
 ## Release 0.4
 - [ ] Per-item `zoomable: false`: placeholder items (a "no screenshot" card) shouldn't zoom or show the navigator (from the Apploye integration)
 - [ ] Pins compose UI: a built-in draft card for a placed comment (text field, save / cancel), instead of each host building its own around `onPlace` (from the Apploye integration)
+- [ ] Pin cards open above/below the pin when the side room is narrow: at 390×844 a centred pin's card is 161px wide (113px content box), so Apploye's Discard/Save row starts outside the content box (from the Apploye integration, 447ea05)
+- [ ] Pin card background fully opaque: `--gallerist-pin-card-bg` is the panel colour, 97% opaque in Console, so the image shows faintly through a transparent host textarea (from the Apploye integration, 447ea05)
+- [ ] Pins budget: 3,996 of 4,000 B after the 0.3 review rounds. The compose UI above and the wheel-walk `overflow` check (+38 B, open since review 7) need it raised or trimmed first; owner's call
+- [ ] On touch, a keyboard-focused group arrow shows over the media (docked included); documented in PRESETS
+- [ ] Old thumbnails rail stays subscribed after a renderer unmount until the next mount or viewer destroy; needs a core region-unmount signal
+- [ ] Real-device pass before 0.4: iOS Safari and Android Chrome pinch/scroll on pin cards, Safari trackpad pinch (`gesture*` events) over the stage
 - [ ] **M22** Atlas: renderer `peek`, `plugin-atlas` (skyline minimap, map mode), first-run hint
 - [ ] **M23** Review plugins: triage, compare, then slideshow, rotate, share, info, timeline, filter, redaction
 - [ ] Vue adapter; release 0.4
