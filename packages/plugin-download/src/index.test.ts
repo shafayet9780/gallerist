@@ -8,6 +8,7 @@ import {
   downloadItem,
   downloadItems,
   filenameOf,
+  resolveDownloadUrl,
   safeHref,
   sanitizeName,
   urlOf,
@@ -131,5 +132,117 @@ describe('plugin-download', () => {
     ;(document.querySelector('.gallerist-download-btn') as HTMLButtonElement).click()
     await new Promise((r) => setTimeout(r, 0)) // run() resolves urlOf asynchronously
     expect(click).toHaveBeenCalled()
+  })
+
+  const btn = () => document.querySelector('.gallerist-download-btn') as HTMLButtonElement
+  const tick = () => new Promise((r) => setTimeout(r, 0))
+
+  it('disables the button for an item without a safe URL, per item on navigation', async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const col: Collection = {
+      groups: [
+        {
+          id: 'g0',
+          items: [
+            item('ok', 'ok.jpg'),
+            item('data', 'data:image/png;base64,AAAA'),
+            item('js', 'javascript:alert(1)'),
+            item('tiles', { tiles: { url: 'x.dzi' } as never }),
+            item('loader', { loader: async () => 'later.jpg' }),
+          ],
+        },
+      ],
+    }
+    const v = createViewer({ collection: col, plugins: [download()] })
+    mount(v)
+    v.open()
+    expect(btn().getAttribute('aria-disabled')).toBe('false')
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('true')
+    btn().click()
+    document
+      .querySelector('.gallerist')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }))
+    await tick()
+    expect(click).not.toHaveBeenCalled() // neither the button nor the key does anything
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('true')
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('true')
+    v.nextItem() // a loader resolves on click: enabled until then
+    expect(btn().getAttribute('aria-disabled')).toBe('false')
+    v.goTo(0, 0)
+    expect(btn().getAttribute('aria-disabled')).toBe('false')
+    expect(btn().disabled).toBe(false) // stays focusable
+  })
+
+  it('downloadUrl picks the file to save; null marks the item not downloadable', async () => {
+    const hrefs: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      hrefs.push(this.getAttribute('href') ?? '')
+    })
+    const col: Collection = {
+      groups: [
+        {
+          id: 'g0',
+          items: [
+            { ...item('a', 'a-small.jpg'), meta: { original: 'https://cdn.test/a-full.png' } },
+            { ...item('b', 'data:image/png;base64,AAAA'), meta: { original: null } },
+            item('c', 'c.jpg'),
+          ],
+        },
+      ],
+    }
+    const downloadUrl = (it: Item) =>
+      (it.meta as { original?: string | null } | undefined)?.original
+    const v = createViewer({ collection: col, plugins: [download({ downloadUrl })] })
+    mount(v)
+    v.open()
+    expect(btn().getAttribute('aria-disabled')).toBe('false')
+    btn().click()
+    await tick()
+    expect(hrefs).toEqual(['https://cdn.test/a-full.png'])
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('true') // null: not downloadable
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('false') // undefined: its source
+    btn().click()
+    await tick()
+    expect(hrefs[1]).toBe('c.jpg')
+  })
+
+  it('resolveDownloadUrl rejects an unsafe downloadUrl', async () => {
+    expect(await resolveDownloadUrl(item('a'), () => 'javascript:alert(1)')).toBeNull()
+    expect(await resolveDownloadUrl(item('a'), () => null)).toBeNull()
+    expect(await resolveDownloadUrl(item('a', 'a.jpg'), () => undefined)).toBe('a.jpg')
+  })
+
+  it('zip mode saves each item from downloadUrl', async () => {
+    const downloadZip = vi.fn((_entries: unknown) => ({ blob: async () => new Blob(['z']) }))
+    vi.doMock('client-zip', () => ({ downloadZip }))
+    const fetched: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        fetched.push(url)
+        return new Response('x')
+      }),
+    )
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const { downloadItems: di } = await import('./index')
+    await di([item('a'), item('b'), item('c')], {
+      zip: true,
+      downloadUrl: (it) => (it.id === 'b' ? null : `full/${it.id}.png`),
+    })
+    expect(fetched).toEqual(['full/a.png', 'full/c.png'])
+    expect(downloadZip.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({ name: 'a.png' }),
+      expect.objectContaining({ name: 'c.png' }),
+    ])
+    vi.unstubAllGlobals()
   })
 })

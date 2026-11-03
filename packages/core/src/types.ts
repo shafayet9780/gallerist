@@ -103,7 +103,9 @@ export interface Item<IM = unknown> {
   source: MediaSource
   thumb?: MediaSource
   alt?: string
-  caption?: string | OverlaySpec
+  /** a plain-text caption, shown in the caption bar. For a designed caption (markup, links, a
+   *  timestamp line) render one per viewer with `@gallerist/plugin-captions`; item data stays JSON. */
+  caption?: string
   /** enables zoom-from-origin & bounds without a load. */
   naturalSize?: { w: number; h: number }
   /** LQIP: data-URI or dominant color, painted instantly (decision P0-J, spec §27.7). */

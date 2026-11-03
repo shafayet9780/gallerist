@@ -81,7 +81,7 @@ Try every combination on the docs site's playground (`pnpm --filter @gallerist/s
 | `@gallerist/renderer-dom` | Default DOM renderer: windowed slides, image adapter, live gestures, image-space overlays, dialog a11y, chrome. The only ring that writes DOM. |
 | `@gallerist/theme-default` | Pure CSS driven by `--gallerist-*` tokens: a shared base plus skins (`gallery` default, `console`, `editorial`), each with accents and dark/light/auto schemes; distinct axis motion; reduced-motion safe. |
 | `@gallerist/react` | React adapter: `useGallerist()` hook, `<Gallerist>` component, `<Gallerist.Overlay>`/`<Gallerist.Region>` JSX portals. |
-| `@gallerist/plugin-*` | Tree-shakeable plugins: `fullscreen`, `hash`, `download`, `thumbnails` (grouped), `grid`, `pins` (comments, product tags, feature notes anchored to the image), `video`, `video-youtube`. |
+| `@gallerist/plugin-*` | Tree-shakeable plugins: `fullscreen`, `hash`, `download`, `thumbnails` (grouped), `grid`, `pins` (comments, product tags, feature notes anchored to the image), `captions` (designed captions, one render function per viewer), `video`, `video-youtube`. |
 
 ## Architecture
 

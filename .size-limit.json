@@ -34,7 +34,7 @@
   {
     "name": "@gallerist/react (gz)",
     "path": "packages/react/dist/index.js",
-    "import": "{ Gallerist, useGallerist }",
+    "import": "{ Gallerist, useGallerist, useCurrentItem }",
     "ignore": ["react", "react-dom", "@gallerist/core", "@gallerist/renderer-dom"],
     "limit": "3 kB",
     "gzip": true
@@ -45,6 +45,14 @@
     "import": "{ pins }",
     "ignore": ["@gallerist/core"],
     "limit": "4 kB",
+    "gzip": true
+  },
+  {
+    "name": "@gallerist/plugin-captions (gz)",
+    "path": "packages/plugin-captions/dist/index.js",
+    "import": "{ captions }",
+    "ignore": ["@gallerist/core"],
+    "limit": "1 kB",
     "gzip": true
   },
   {

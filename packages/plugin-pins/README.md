@@ -50,7 +50,7 @@ mount(viewer)
 | `pins(item, group)` | `item.meta.pins` | where pins come from |
 | `visible` | `true` | start shown; the toolbar toggle and `p` flip it |
 | `toggle` | `true` | add the show/hide button to the toolbar |
-| `renderCard(pin, ctx)` | — | replace the card's contents |
+| `renderCard(pin, ctx)` | — | replace the card's contents; return `null` to keep the default card for that pin |
 | `onOpenChange(pin \| null, ctx)` | — | a card opened or closed |
 | `onPlace(at, ctx)` | — | turn on placing: the "Add a comment" button (or `c`) arms one click on the image, reported as `{ x, y }` in 0..1 |
 | `strings` | English | every label, for translation |
@@ -66,6 +66,24 @@ const commentPins = pins({
   onPlace: (at, { item }) => {
     item.meta.pins.push({ id: crypto.randomUUID(), ...at, label: 'You', body: '' })
     commentPins.refresh()
+  },
+})
+```
+
+`renderCard` can replace some cards and keep the rest, or build on the default: `defaultPinCard(pin,
+{ presentation, strings })` returns the contents `pins()` draws (a `DocumentFragment`; text is set as
+text). Pass the same `presentation` as the plugin (default `tag`).
+
+```ts
+import { defaultPinCard, pins } from '@gallerist/plugin-pins'
+
+pins({
+  presentation: 'comment',
+  renderCard: (pin) => {
+    if (!pin.meta?.startsWith('v2')) return null // the default card
+    const card = document.createElement('div')
+    card.append(defaultPinCard(pin, { presentation: 'comment' }), versionBadge(pin))
+    return card
   },
 })
 ```

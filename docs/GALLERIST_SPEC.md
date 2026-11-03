@@ -125,7 +125,7 @@ interface Item<IM = unknown> {
   source: MediaSource;        // see §12
   thumb?: MediaSource;
   alt?: string;               // a11y
-  caption?: string | OverlaySpec;
+  caption?: string;           // plain text; designed captions are a per-viewer renderer (plugin-captions)
   naturalSize?: { w: number; h: number };  // enables zoom-from-origin without a load
   meta?: IM;
   overlays?: OverlaySpec[];   // item-level overlays
@@ -177,7 +177,7 @@ Default keyboard map (overridable, see §17):
 | `+` / `-` / wheel | zoom in / out |
 | `0` | reset zoom (fit) |
 | `Space` | toggle autoplay (if plugin) / next |
-| `Esc` | close |
+| `Esc` | close (from anywhere, including a text field, unless a handler before the viewer's called `preventDefault()` on it) |
 | `f` | fullscreen (if plugin) |
 | `Home`/`End` | first / last group |
 
@@ -478,7 +478,7 @@ interface PluginInstance {
   // hooks
   on?: Partial<EventMap>;
   // UI region injection (renderer provides named regions)
-  regions?: Partial<Record<RegionName, (ctx) => Node>>;  // 'toolbar'|'aside'|'footer'|'stage'|'thumbnails'|'backdrop'
+  regions?: Partial<Record<RegionName, (ctx) => Node>>;  // 'toolbar'|'aside'|'footer'|'caption'|'stage'|'thumbnails'|'backdrop'
   // extensions
   overlays?: OverlaySpec[];
   mediaAdapters?: MediaAdapter[];
@@ -508,7 +508,7 @@ Tree-shakeable, each its own package:
 | `plugin-share` | Social + custom share targets. |
 | `plugin-slideshow` | Autoplay with progress bar; stop-on-interaction. |
 | `plugin-rotate` | Rotate/flip (display transform). |
-| `plugin-captions` | Rich captions via overlay layer. |
+| `plugin-captions` | Designed captions: one render function per viewer, drawn into the caption region (item data keeps a text `caption`). |
 | `plugin-redaction` | Region overlays for privacy blur/redaction. |
 | `plugin-compare` | Two slides side-by-side or a before/after wipe (degenerate 2-item group). |
 | `plugin-triage` | Keyboard review mode (`j/k`, flag, delete) + bulk-select. |
@@ -554,7 +554,7 @@ Thin bindings over the headless store. Build order (locked): **vanilla → React
 - **Carousel + group semantics:** the sequence exposes the APG carousel pattern; the secondary axis exposes a group/listbox so SR users understand the nesting. `aria-roledescription` per layer.
 - **Live region:** an `aria-live="polite"` node announces transitions, including nesting: *"Group 3 of 40, screen 1 of 3."*
 - **Keyboard:** every action reachable; full map in §5; visible focus rings; overlays that are `interactive` are tab-reachable, decorative ones `aria-hidden`.
-- **Media:** `alt` per item required (lint warns if missing); captions linked via `aria-describedby`; video respects provider a11y.
+- **Media:** `alt` per item required (lint warns if missing); the caption (text, or a rendered caption's text content) is the viewer's description via `aria-describedby`; the live announcement is position + `alt`, never a rendered caption; video respects provider a11y.
 - **Motion / contrast:** `prefers-reduced-motion` → instant transitions, no auto-zoom; `prefers-contrast` honored by theme tokens.
 - **Target sizes:** controls ≥44px touch targets.
 - **Testing:** axe in CI on the example apps + manual SR passes (VoiceOver/NVDA) before each minor.

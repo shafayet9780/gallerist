@@ -72,6 +72,9 @@ importers:
       '@gallerist/core':
         specifier: workspace:*
         version: link:../core
+      '@gallerist/plugin-captions':
+        specifier: workspace:*
+        version: link:../plugin-captions
       '@gallerist/plugin-download':
         specifier: workspace:*
         version: link:../plugin-download
@@ -118,7 +121,7 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
-  packages/plugin-download:
+  packages/plugin-captions:
     devDependencies:
       '@gallerist/core':
         specifier: workspace:*
@@ -129,10 +132,22 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
-    optionalDependencies:
+
+  packages/plugin-download:
+    dependencies:
       client-zip:
-        specifier: 2.5.0
+        specifier: ^2.5.0
         version: 2.5.0
+    devDependencies:
+      '@gallerist/core':
+        specifier: workspace:*
+        version: link:../core
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
 
   packages/plugin-fullscreen:
     devDependencies:

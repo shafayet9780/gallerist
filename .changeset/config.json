@@ -9,6 +9,7 @@
       "@gallerist/react",
       "@gallerist/theme-default",
       "@gallerist/cdn",
+      "@gallerist/plugin-captions",
       "@gallerist/plugin-download",
       "@gallerist/plugin-fullscreen",
       "@gallerist/plugin-grid",

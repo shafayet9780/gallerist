@@ -30,9 +30,10 @@ export function myPlugin(opts?: MyOptions): Plugin {
 }
 ```
 
-`RegionName` = `'toolbar' | 'aside' | 'footer' | 'thumbnails' | 'stage' | 'backdrop'` (extensible). `toolbar`,
-`aside` and `footer` are **additive** (many plugins contribute); the others are **exclusive** (last-wins +
-dev warn).
+`RegionName` = `'toolbar' | 'aside' | 'footer' | 'caption' | 'thumbnails' | 'stage' | 'backdrop'`
+(extensible). `toolbar`, `aside` and `footer` are **additive** (many plugins contribute); the others are
+**exclusive** (last-wins + dev warn). A `caption` node replaces the caption bar's text and keeps the
+bar up for every item (`plugin-captions` is the reference).
 
 ## Patterns
 

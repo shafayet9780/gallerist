@@ -25,8 +25,35 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **plugin-thumbnails, plugin-grid**: moving the cursor no longer scrolls the page around an inline
   viewer; only the viewer's own panels scroll.
 - **plugin-thumbnails**: a viewer opening on a far group now scrolls the rail to it.
+- **theme (console)**: the backdrop is opaque (it was 98%), so the host page no longer shows through
+  on phones.
+- **plugin-download**: an item with nothing safe to save (no URL, or a `data:`, `javascript:` or
+  `file:` one) marks the button unavailable (`aria-disabled`, dimmed; it stays focusable) instead of a
+  click that does nothing, per item as you navigate. `client-zip` is a regular dependency (`^2.5.0`),
+  so an install without optional dependencies can't break a bundler on zip mode's `import()`.
+- **build**: source maps carry their sources (`sourcesContent`), since `src/` isn't published; they
+  pointed nowhere before. `pnpm check:dist` packs every package and fails on a leftover `workspace:`
+  range.
 
 ### Added
+- **plugin-captions** (new): designed captions, one `render(item, group, ctx)` per viewer, drawn into
+  the renderer's new `caption` region (the caption bar, the editorial placard, wherever the preset puts
+  it). A string is set as text; `null` shows the item's text caption. Re-renders on navigation and
+  collection changes, not on zoom; `refresh()`; cleans up on removal. In the CDN global as `captions`.
+- **renderer-dom**: the caption is the viewer's accessible description (`aria-describedby`); the
+  navigation announcement stays position + `alt`.
+- **react**: `<Gallerist.Caption>{({ item, group, cursor }) => …}</Gallerist.Caption>` (a portal into
+  the caption region), `useCurrentItem()` → `{ item, group, cursor }`, `open={{ g, i }}` to open at a
+  position (a new position while open moves the cursor), and the mount options `label`,
+  `returnFocus`, `preload` and `adapters`, which were dropped before.
+- **plugin-pins**: `renderCard` returning `null` keeps the default card for that pin; the default card
+  is exported as `defaultPinCard(pin, { presentation, strings })`.
+- **plugin-download**: `downloadUrl(item)`, the file to save (e.g. the full-resolution original), or
+  `null` for an item that can't be downloaded; zip mode honours it too.
+- **renderer-dom**: Escape still closes from anywhere, including a text field, but not when a handler
+  before the viewer's called `preventDefault()` on it, so a host form can keep Escape.
+- **docs**: real READMEs for plugin-download and plugin-fullscreen; the React README documents the
+  imperative ref, `open` positions, captions and hooks.
 - **renderer-dom (M21)**: `bind()` and `collectionFromLinks()`: open a viewer from `data-gallerist`
   links, with groups, captions and thumbnails read from attributes; links added later join in.
 - **cdn (M21)**: `@gallerist/cdn`, a one-file UMD build on a global `Gallerist`, for pages with no
@@ -46,6 +73,9 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **examples/tour**: a listing page using all of the above.
 
 ### Breaking
+- **core**: `Item.caption` is plain text (`string`); it no longer accepts an `OverlaySpec`, which the
+  DOM renderer never drew. Designed captions come from `@gallerist/plugin-captions` or
+  `<Gallerist.Caption>`, so item data stays JSON.
 - **plugin-thumbnails**: `overscan` is unset by default (the rail measures itself; it was 24) and
   counts cards on each side of the middle of the rail rather than of the cursor.
 - **plugin-grid**: `overscan` counts cells (default 40) or sections (default 4) on each side of the

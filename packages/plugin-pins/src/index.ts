@@ -80,8 +80,9 @@ export interface PinsOptions {
   visible?: boolean
   /** add the show/hide toggle to the toolbar (default true) */
   toggle?: boolean
-  /** replace the card's contents for a pin */
-  renderCard?: (pin: Pin, ctx: PinContext) => Node
+  /** replace the card's contents for a pin; `null` (or `undefined`) keeps the default card
+   *  (`defaultPinCard`) for that pin */
+  renderCard?: (pin: Pin, ctx: PinContext) => Node | null | undefined
   /** a pin's card opened (`pin`) or closed (`null`) */
   onOpenChange?: (pin: Pin | null, ctx: PinContext) => void
   /**
@@ -101,6 +102,93 @@ export interface PinsPlugin extends Plugin {
   setVisible(visible: boolean): void
   /** open a pin's card on the current item by id; `null` closes it */
   open(id: string | null): void
+}
+
+/** What `defaultPinCard` draws: the presentation and the strings it uses (`open`, `resolved`). */
+export interface PinCardOptions {
+  /** default `tag` */
+  presentation?: PinPresentation
+  strings?: Partial<PinsStrings>
+}
+
+/**
+ * The card contents `pins()` draws for a pin by default, for a `renderCard` that wraps or extends
+ * them (text is set as text, never parsed as HTML).
+ */
+export function defaultPinCard(pin: Pin, opts: PinCardOptions = {}): DocumentFragment {
+  const presentation = opts.presentation ?? 'tag'
+  const t: PinsStrings = { ...DEFAULT_PINS_STRINGS, ...opts.strings }
+  const frag = document.createDocumentFragment()
+  const line = (cls: string, text: string | undefined, tag = 'div') => {
+    if (!text) return
+    const node = document.createElement(tag)
+    node.className = cls
+    node.textContent = text
+    frag.appendChild(node)
+  }
+  if (presentation === 'comment') {
+    const head = document.createElement('div')
+    head.className = 'gallerist-pin-head'
+    if (pin.label) {
+      const who = document.createElement('span')
+      who.className = 'gallerist-pin-title'
+      who.textContent = pin.label
+      head.appendChild(who)
+    }
+    if (pin.meta) {
+      const when = document.createElement('span')
+      when.className = 'gallerist-pin-meta'
+      when.textContent = pin.meta
+      head.appendChild(when)
+    }
+    if (pin.resolved) {
+      const badge = document.createElement('span')
+      badge.className = 'gallerist-pin-badge'
+      badge.textContent = t.resolved
+      head.appendChild(badge)
+    }
+    frag.appendChild(head)
+    line('gallerist-pin-body', pin.body, 'p')
+    if (pin.replies?.length) {
+      const list = document.createElement('ol')
+      list.className = 'gallerist-pin-replies'
+      for (const reply of pin.replies) {
+        const li = document.createElement('li')
+        const h = document.createElement('div')
+        h.className = 'gallerist-pin-head'
+        if (reply.author) {
+          const who = document.createElement('span')
+          who.className = 'gallerist-pin-title'
+          who.textContent = reply.author
+          h.appendChild(who)
+        }
+        if (reply.meta) {
+          const when = document.createElement('span')
+          when.className = 'gallerist-pin-meta'
+          when.textContent = reply.meta
+          h.appendChild(when)
+        }
+        const p = document.createElement('p')
+        p.className = 'gallerist-pin-body'
+        p.textContent = reply.body
+        li.append(h, p)
+        list.appendChild(li)
+      }
+      frag.appendChild(list)
+    }
+  } else {
+    line('gallerist-pin-title', pin.label)
+    line('gallerist-pin-meta', pin.meta)
+    line('gallerist-pin-body', pin.body, 'p')
+  }
+  if (pin.href) {
+    const a = document.createElement('a')
+    a.className = 'gallerist-pin-link'
+    a.href = pin.href
+    a.textContent = pin.linkLabel ?? t.open
+    frag.appendChild(a)
+  }
+  return frag
 }
 
 interface Rendered {
@@ -331,7 +419,9 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     card.hidden = true
     card.setAttribute('role', 'group')
     card.setAttribute('aria-label', t.pin(n, pin.label))
-    card.appendChild(opts.renderCard ? opts.renderCard(pin, ctx) : cardBody(pin))
+    card.appendChild(
+      opts.renderCard?.(pin, ctx) ?? defaultPinCard(pin, { presentation, strings: t }),
+    )
     const close = document.createElement('button')
     close.type = 'button'
     close.className = 'gallerist-pin-close'
@@ -346,80 +436,6 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     el.append(marker, card)
     rendered.push({ pin, el, marker, card, ctx })
     return el
-  }
-
-  const cardBody = (pin: Pin): Node => {
-    const frag = document.createDocumentFragment()
-    const line = (cls: string, text: string | undefined, tag = 'div') => {
-      if (!text) return
-      const node = document.createElement(tag)
-      node.className = cls
-      node.textContent = text
-      frag.appendChild(node)
-    }
-    if (presentation === 'comment') {
-      const head = document.createElement('div')
-      head.className = 'gallerist-pin-head'
-      if (pin.label) {
-        const who = document.createElement('span')
-        who.className = 'gallerist-pin-title'
-        who.textContent = pin.label
-        head.appendChild(who)
-      }
-      if (pin.meta) {
-        const when = document.createElement('span')
-        when.className = 'gallerist-pin-meta'
-        when.textContent = pin.meta
-        head.appendChild(when)
-      }
-      if (pin.resolved) {
-        const badge = document.createElement('span')
-        badge.className = 'gallerist-pin-badge'
-        badge.textContent = t.resolved
-        head.appendChild(badge)
-      }
-      frag.appendChild(head)
-      line('gallerist-pin-body', pin.body, 'p')
-      if (pin.replies?.length) {
-        const list = document.createElement('ol')
-        list.className = 'gallerist-pin-replies'
-        for (const reply of pin.replies) {
-          const li = document.createElement('li')
-          const h = document.createElement('div')
-          h.className = 'gallerist-pin-head'
-          if (reply.author) {
-            const who = document.createElement('span')
-            who.className = 'gallerist-pin-title'
-            who.textContent = reply.author
-            h.appendChild(who)
-          }
-          if (reply.meta) {
-            const when = document.createElement('span')
-            when.className = 'gallerist-pin-meta'
-            when.textContent = reply.meta
-            h.appendChild(when)
-          }
-          const p = document.createElement('p')
-          p.className = 'gallerist-pin-body'
-          p.textContent = reply.body
-          li.append(h, p)
-          list.appendChild(li)
-        }
-        frag.appendChild(list)
-      }
-    } else {
-      line('gallerist-pin-title', pin.label)
-      line('gallerist-pin-meta', pin.meta)
-      line('gallerist-pin-body', pin.body, 'p')
-    }
-    if (pin.href) {
-      const a = document.createElement('a')
-      a.className = 'gallerist-pin-link'
-      a.href = pin.href
-      a.textContent = pin.linkLabel ?? t.open
-      frag.appendChild(a)
-    }
-    return frag
   }
 
   // ── toolbar ────────────────────────────────────────────────────────────────

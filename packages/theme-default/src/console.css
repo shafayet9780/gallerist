@@ -18,7 +18,7 @@
     color-scheme: dark;
     /* Graphite: flat, opaque bands; the media is the only thing with depth */
     --gallerist-bg: #0e0f11;
-    --gallerist-backdrop: rgb(14 15 17 / 0.98);
+    --gallerist-backdrop: rgb(14 15 17); /* opaque: a phone showed the page through */
     --gallerist-fg: #e6e8eb;
     --gallerist-fg-muted: #a3a9b1;
     --gallerist-chrome-bg: #16181b; /* surface 1: bands, panels, arrows */
@@ -126,7 +126,7 @@
   .gallerist[data-gallerist-skin="console"][data-gallerist-scheme="light"] {
     color-scheme: light;
     --gallerist-bg: #e9eaec;
-    --gallerist-backdrop: rgb(233 234 236 / 0.98);
+    --gallerist-backdrop: rgb(233 234 236);
     --gallerist-fg: #16181b;
     --gallerist-fg-muted: #4a5058;
     --gallerist-chrome-bg: #fff;
@@ -155,7 +155,7 @@
     .gallerist[data-gallerist-skin="console"][data-gallerist-scheme="auto"] {
       color-scheme: light;
       --gallerist-bg: #e9eaec;
-      --gallerist-backdrop: rgb(233 234 236 / 0.98);
+      --gallerist-backdrop: rgb(233 234 236);
       --gallerist-fg: #16181b;
       --gallerist-fg-muted: #4a5058;
       --gallerist-chrome-bg: #fff;

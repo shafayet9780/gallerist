@@ -1356,6 +1356,58 @@ describe('mount — modal accessibility (WS-3)', () => {
     expect(v.getState().phase).toBe('closed')
   })
 
+  it('keeps the viewer open on an Escape a host handler already took (defaultPrevented)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const input = document.createElement('input')
+    root.appendChild(input)
+    // a host form clears its field on Escape and keeps the viewer up
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') e.preventDefault()
+    })
+    input.focus()
+    input.dispatchEvent(key({ key: 'Escape', cancelable: true }))
+    expect(v.getState().phase).toBe('open')
+    // from a non-editable target too
+    const button = document.createElement('button')
+    root.appendChild(button)
+    button.addEventListener('keydown', (e) => e.preventDefault())
+    button.dispatchEvent(key({ key: 'Escape', cancelable: true }))
+    expect(v.getState().phase).toBe('open')
+    // an Escape nobody took still closes
+    root.dispatchEvent(key({ key: 'Escape', cancelable: true }))
+    expect(v.getState().phase).toBe('closed')
+  })
+
+  it('describes the viewer with the caption (aria-describedby)', () => {
+    const v = createViewer({
+      collection: {
+        groups: [{ id: 'g0', items: [{ ...item('a0'), caption: 'Front view' }, item('a1')] }],
+      },
+    })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const describe = () =>
+      (root.getAttribute('aria-describedby') ?? '')
+        .split(' ')
+        .map((id) => document.getElementById(id)?.textContent ?? '')
+        .join('')
+    expect(describe()).toBe('Front view')
+    v.nextItem()
+    expect(describe()).toBe('')
+    // ids are unique per viewer
+    const w = createViewer({ collection: collection() })
+    mount(w)
+    w.open()
+    const roots = document.querySelectorAll('.gallerist')
+    expect(roots[1]?.getAttribute('aria-describedby')).not.toBe(
+      root.getAttribute('aria-describedby'),
+    )
+  })
+
   it('announces the current item description in the live region (S-UX4)', () => {
     const v = createViewer({ collection: collection() }) // items carry alt = id
     mount(v)

@@ -153,6 +153,8 @@ interface SlideRec {
 const sourceUrl = (source: MediaSource | undefined): string | null =>
   typeof source === 'string' ? source : source && 'src' in source ? source.src : null
 
+let mounts = 0 // ids for the caption, which describes the viewer (aria-describedby)
+
 function el(tag: string, className?: string, attrs?: Record<string, string>): HTMLElement {
   const node = document.createElement(tag)
   if (className) node.className = className
@@ -391,11 +393,27 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     aside: el('div', 'gallerist-region gallerist-region-aside'),
     thumbnails: el('div', 'gallerist-region gallerist-region-thumbnails'),
     footer: el('div', 'gallerist-region gallerist-region-footer'),
+    caption: el('div', 'gallerist-region gallerist-region-caption'),
   }
+  // The caption bar holds the item's text caption, or a plugin's caption node in its region
+  // (plugin-captions), which then replaces the text. Either is the viewer's accessible description.
   const caption = el('div', 'gallerist-caption')
-  const captionText = el('span', 'gallerist-caption-text')
-  caption.appendChild(captionText)
+  const cid = `gallerist-caption-${++mounts}`
+  const captionText = el('span', 'gallerist-caption-text', { id: cid })
+  regionHosts.caption.id = `${cid}r`
+  caption.append(captionText, regionHosts.caption)
   caption.hidden = true
+  root.setAttribute('aria-describedby', `${cid} ${cid}r`)
+  let anyCaption = false
+  const syncCaption = () => {
+    const own = regionHosts.caption.hasChildNodes()
+    const { g, i } = viewer.getState().cursor
+    // the text caption (the theme clamps it), unless a caption region replaces it
+    captionText.textContent = own ? '' : (viewer.getCollection().groups[g]?.items[i]?.caption ?? '')
+    // a placard is always up: it holds the item navigator as well as the caption
+    caption.hidden = !(own || (controls && (anyCaption || placard)))
+    caption.toggleAttribute('data-gallerist-custom', own)
+  }
   root.append(
     regionHosts.backdrop,
     bar,
@@ -801,11 +819,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (col !== chromeCol) {
       // Reserve the caption track for the whole collection when any item has a text caption, so
       // moving between captioned and uncaptioned items never resizes the stage.
-      const anyCaption = col.groups.some((grp) =>
-        grp.items.some((it) => typeof it.caption === 'string'),
-      )
-      // a placard is always up: it holds the item navigator as well as the caption
-      caption.hidden = !(controls && (anyCaption || placard))
+      anyCaption = col.groups.some((grp) => grp.items.some((it) => it.caption))
     }
     chromeCol = col
     chromeG = cur.g
@@ -830,9 +844,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       setArrowLabel(prevArrow, nameAt(-1), ui.previous, ui.previousTo)
       setArrowLabel(nextArrow, nameAt(1), ui.next, ui.nextTo)
     }
-    // Text captions go in the caption bar (the theme clamps them); an OverlaySpec caption isn't
-    // rendered by the DOM renderer yet (planned with the captions plugin).
-    captionText.textContent = typeof item?.caption === 'string' ? item.caption : ''
+    syncCaption()
     // Announce the item's own description alongside the position so SR users hear what they
     // navigated to, not just the index (S-UX4).
     const desc = item?.alt ? ` — ${item.alt}` : ''
@@ -1030,7 +1042,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   const onKey = (e: KeyboardEvent) => {
     // Don't hijack typing inside an embedded control (overlay input/textarea/etc); Escape still
-    // closes from anywhere (I-UX2).
+    // closes from anywhere (I-UX2), unless a handler before ours called preventDefault() on it
+    // (a host form keeping Escape for itself).
     if (isEditableTarget(e.target) && e.key !== 'Escape') return
     // Focus trap: cycle Tab within the dialog so focus can't escape to the inert page (C5).
     if (e.key === 'Tab' && overlay) {
@@ -1064,7 +1077,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         break
       }
       case 'Escape':
-        viewer.close()
+        if (!e.defaultPrevented) viewer.close()
         break
       case '+':
       case '=':
@@ -1345,6 +1358,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (!hasRail) railHandle.remove()
     else if (thumbs.firstChild !== railHandle) thumbs.prepend(railHandle)
     if (!controls) bar.hidden = regionHosts.toolbar.childElementCount === 0
+    syncCaption()
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItem = undefined

@@ -41,6 +41,18 @@ and where a canvas and this plan disagree, the plan wins.
 | P2-J | Stories | `mode: 'stories'` in renderer-dom (portrait stage, progress segments, tap zones, auto-advance) plus a story-tray rail. Scheduled after 0.3, with an explicit go/no-go: ReelKit already ships a stories player. |
 | P2-K | Verification | A Playwright layout lint (`e2e/tests/layout.spec.ts`) sweeps configurations × desktop/phone × direction and fails on overlapping chrome, off-screen chrome, a covered stage, small touch targets or a text glyph instead of the shared icons. It measures geometry, so it is deterministic across macOS and Linux CI, unlike screenshot baselines. Skins add their configurations to it, alongside axe and an RTL pass per skin. |
 
+## Decisions from the first integration (Apploye, before publishing 0.3)
+
+| # | Decision | Choice |
+|---|---|---|
+| P2-L | Captions | A caption's design is per viewer, not per item: `Item.caption` is plain text (data stays JSON), and `@gallerist/plugin-captions` (`captions({ render })`) or React's `<Gallerist.Caption>` draws the current item's caption into a renderer `caption` region. Presets keep placing the bar. `render` returning `null` shows the text caption. The caption is the viewer's `aria-describedby`; the navigation announcement stays position + `alt`. |
+| P2-M | React surface | `useCurrentItem()`; `open` takes `{ g, i }` (applied on change, a new position while open moves the cursor); the mount options `label`, `returnFocus`, `preload`, `adapters` are props; the ref is the `ViewerApi`. React 18+ stays the floor. |
+| P2-N | Plugin escape hatches | Pins: `renderCard` returning `null` keeps the default card, which is exported (`defaultPinCard`). Download: `downloadUrl(item)` (full-resolution file, `null` = not downloadable); no safe URL marks the button unavailable per item; `client-zip` is a regular dependency. |
+| P2-O | Escape | Closes from anywhere (I-UX2), except when a handler before the viewer's called `preventDefault()`, so a host form can keep it. |
+| P2-P | Published output | Source maps carry their sources; `check:dist` packs every package and rejects a leftover `workspace:` range. Console's backdrop is opaque. |
+
+Backlog for 0.4 from the same pass: per-item `zoomable: false`, and a built-in pins compose UI.
+
 ## Architecture changes in the code
 
 - **Chrome regions.** One top bar region in fixed order: counter → title/caption → tools → close.

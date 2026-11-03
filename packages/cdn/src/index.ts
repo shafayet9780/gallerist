@@ -10,6 +10,7 @@ export {
   mount,
   resolvePreset,
 } from '@gallerist/renderer-dom'
+export { captions } from '@gallerist/plugin-captions'
 export { DEFAULT_DOWNLOAD_STRINGS, download, downloadGroup } from '@gallerist/plugin-download'
 export { DEFAULT_FULLSCREEN_STRINGS, fullscreen } from '@gallerist/plugin-fullscreen'
 export { DEFAULT_GRID_STRINGS, grid } from '@gallerist/plugin-grid'

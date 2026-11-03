@@ -99,9 +99,14 @@ reach them) and the navigator shows only the `n / N` position, at the bottom cen
 
 The viewer is a grid of areas: a **top bar** (counter → group title → plugin tools → zoom reset →
 close), the **stage**, an **`aside`** column at its inline end, a **caption** bar (the item's
-caption, shown only when it has one), a plugin **footer**, and the **rail**. Persistent chrome takes
-its own space instead of covering the image, so pieces can't collide. The `immersive` preset is the
-exception: the stage fills the viewer and the bar, caption and rail float over it.
+caption, shown only when the collection has one, or a designed caption from `plugin-captions` /
+`<Gallerist.Caption>`), a plugin **footer**, and the **rail**. Persistent chrome takes its own space
+instead of covering the image, so pieces can't collide. The `immersive` preset is the exception: the
+stage fills the viewer and the bar, caption and rail float over it.
+
+The stage gets what is left. A text caption is a fixed two-line band, but the `footer` region and a
+designed caption are as tall as their content, so the stage shrinks when they grow (and grows back
+when they shrink). Keep them a steady height if the image shouldn't move between items.
 
 - **Collapse the thumbnail rail** with the `t` key or the toggle button; tracked as
   `data-gallerist-rail="collapsed|expanded"`. The rail shrinks to its handle and the stage grows into

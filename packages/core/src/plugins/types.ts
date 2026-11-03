@@ -8,12 +8,14 @@ import type { Group, Item, MediaAdapter, OverlaySpec } from '../types'
  * Named UI slots the renderer exposes; plugins inject Nodes into them. `toolbar` sits in the top
  * bar, `aside` is a side column at the stage's inline end (item stack, info or filter panels),
  * `thumbnails` is the rail, `footer` a band above it; all of them take space rather than covering
- * the stage. `stage` and `backdrop` are layers over and under the media.
+ * the stage. `caption` replaces the caption bar's text with the plugin's node (one owner;
+ * `@gallerist/plugin-captions`). `stage` and `backdrop` are layers over and under the media.
  */
 export type RegionName =
   | 'toolbar'
   | 'aside'
   | 'footer'
+  | 'caption'
   | 'stage'
   | 'thumbnails'
   | 'backdrop'

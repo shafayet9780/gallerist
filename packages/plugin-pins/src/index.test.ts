@@ -3,7 +3,7 @@
 import { type Collection, type Item, type ViewerApi, createViewer } from '@gallerist/core'
 import { mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type Pin, type PinsOptions, pins } from './index'
+import { type Pin, type PinsOptions, defaultPinCard, pins } from './index'
 
 const pin = (id: string, x: number, y: number, extra: Partial<Pin> = {}): Pin => ({
   id,
@@ -200,6 +200,46 @@ describe('plugin-pins', () => {
       },
     })
     expect(cards()[0]?.querySelector('strong')?.textContent).toBe('custom p1')
+  })
+
+  it('renderCard returning null keeps the default card for that pin', () => {
+    open({
+      renderCard: (p) => {
+        if (p.id !== 'p2') return null
+        const el = document.createElement('strong')
+        el.textContent = 'custom p2'
+        return el
+      },
+    })
+    const [first, second] = cards()
+    expect(first?.querySelector('.gallerist-pin-title')?.textContent).toBe('Sofa')
+    expect(first?.querySelector('.gallerist-pin-link')?.getAttribute('href')).toBe('/sofa')
+    expect(second?.querySelector('strong')?.textContent).toBe('custom p2')
+    expect(second?.querySelector('.gallerist-pin-title')).toBeNull()
+  })
+
+  it('exports the default card builder for wrapping or extending', () => {
+    const extra = (p: Pin) => {
+      const wrap = document.createElement('div')
+      wrap.className = 'wrapped'
+      wrap.appendChild(
+        defaultPinCard(p, { presentation: 'comment', strings: { resolved: 'Done' } }),
+      )
+      return wrap
+    }
+    open({
+      presentation: 'comment',
+      pins: () => [pin('c1', 0.5, 0.5, { label: 'Ana', body: 'Cut off', resolved: true })],
+      renderCard: extra,
+    })
+    const card = cards()[0] as HTMLElement
+    expect(card.querySelector('.wrapped .gallerist-pin-title')?.textContent).toBe('Ana')
+    expect(card.querySelector('.wrapped .gallerist-pin-body')?.textContent).toBe('Cut off')
+    expect(card.querySelector('.wrapped .gallerist-pin-badge')?.textContent).toBe('Done')
+    // the default presentation is `tag`: no comment head, a link with the English label
+    const tag = defaultPinCard(pin('t', 0, 0, { label: 'Lamp', href: '/lamp' }))
+    expect(tag.querySelector('.gallerist-pin-head')).toBeNull()
+    expect(tag.querySelector('.gallerist-pin-link')?.textContent).toBe('View')
   })
 
   it('comment threads show the author, time, replies and a resolved badge', () => {

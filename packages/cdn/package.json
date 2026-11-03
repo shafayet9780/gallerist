@@ -20,6 +20,7 @@
   "devDependencies": {
     "@gallerist/core": "workspace:*",
     "@gallerist/renderer-dom": "workspace:*",
+    "@gallerist/plugin-captions": "workspace:*",
     "@gallerist/plugin-download": "workspace:*",
     "@gallerist/plugin-fullscreen": "workspace:*",
     "@gallerist/plugin-grid": "workspace:*",

@@ -805,6 +805,11 @@
 .gallerist-controls > button[hidden] {
   display: none;
 }
+/* a tool unavailable for this item (download without a safe URL): dimmed, still focusable */
+.gallerist-bar button[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 /* pressed (a toggle that is on) reads differently from focus: an accent fill vs a ring */
 .gallerist-bar button[aria-pressed="true"] {
   background: var(--gallerist-pressed-bg);
@@ -894,6 +899,24 @@
 .gallerist-caption-text {
   font-family: var(--gallerist-caption-font);
   font-style: var(--gallerist-caption-style);
+}
+/* a caption renderer (plugin-captions, React <Gallerist.Caption>) owns the band: it grows with its
+   content from the text band's height, and the stage gives up the room. A placard keeps its slot. */
+.gallerist:not([data-gallerist-indicator="placard"]) .gallerist-caption[data-gallerist-custom] {
+  display: block;
+  height: auto;
+  min-height: calc(2 * 1.4em + 16px);
+  max-height: 40vh;
+  overflow-y: auto;
+  -webkit-line-clamp: unset;
+  line-clamp: none;
+}
+.gallerist-caption[data-gallerist-custom] > .gallerist-caption-text {
+  display: none;
+}
+.gallerist-region-caption {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* ── arrows and the item navigator, over the stage (inside main) ────────────────── */
