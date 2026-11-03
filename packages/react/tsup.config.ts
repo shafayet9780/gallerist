@@ -16,6 +16,7 @@ export default defineConfig({
   tsconfig: 'tsconfig.build.json',
   esbuildOptions(options) {
     options.jsx = 'automatic'
-    options.sourcesContent = false
+    // self-contained maps: they carry their sources, since the package doesn't ship src/
+    options.sourcesContent = true
   },
 })

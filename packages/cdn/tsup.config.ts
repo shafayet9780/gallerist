@@ -21,7 +21,8 @@ export default defineConfig({
   footer: {
     js: 'typeof module==="object"&&module.exports?module.exports=Gallerist:typeof define==="function"&&define.amd&&define(function(){return Gallerist});',
   },
+  // self-contained maps: they carry their sources, since the package doesn't ship src/
   esbuildOptions(options) {
-    options.sourcesContent = false
+    options.sourcesContent = true
   },
 })

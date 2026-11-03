@@ -11,7 +11,8 @@ export default defineConfig({
   target: 'es2022',
   external: ['@gallerist/core', 'client-zip'],
   tsconfig: 'tsconfig.build.json',
+  // self-contained maps: they carry their sources, since the package doesn't ship src/
   esbuildOptions(options) {
-    options.sourcesContent = false
+    options.sourcesContent = true
   },
 })

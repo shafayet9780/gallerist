@@ -15,7 +15,8 @@ export default defineConfig({
   external: ['@gallerist/core'],
   tsconfig: 'tsconfig.build.json',
   define: { __GALLERIST_VERSION__: JSON.stringify(version) },
+  // self-contained maps: they carry their sources, since the package doesn't ship src/
   esbuildOptions(options) {
-    options.sourcesContent = false
+    options.sourcesContent = true
   },
 })
