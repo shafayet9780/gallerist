@@ -55,6 +55,13 @@ const CONFIGS: Record<string, string> = {
   'tour-long-caption': 'preset=tour&captions=long&g=1',
   'axis-vertical-bottom-rail': 'axis=vertical',
   'scheme-auto-light': 'scheme=auto&accent=mint&captions=1', // run with the system in light mode
+  // a caption renderer (plugin-captions) owns the band: one line, and far more than 40vh of text
+  'custom-caption': 'custom=short',
+  'custom-caption-tall': 'custom=tall',
+  'reviewer-custom-caption': 'preset=reviewer&custom=short',
+  'reviewer-custom-caption-tall': 'preset=reviewer&custom=tall',
+  'editorial-custom-caption': 'preset=editorial&custom=short',
+  'editorial-custom-caption-tall': 'preset=editorial&custom=tall',
 }
 
 // every configuration runs in every skin: skins set tokens (sizes included), so each needs the sweep
@@ -80,6 +87,7 @@ const ATOMS = [
   '.gallerist-item-next',
   '.gallerist-position',
   '.gallerist-caption-text', // the caption's text (a placard caption also holds the item navigator)
+  '.gallerist-captions', // a caption renderer's node, in place of the text
   '.gallerist-rail-toggle',
   '.gallerist-thumbs',
   '.gallerist-thumb-items:not(.gallerist-thumb-section > *)', // a section index holds its own, inside
@@ -458,6 +466,117 @@ test.describe('layout behaviour', () => {
       }
       expect(new Set(heights).size, heights.join(' / ')).toBe(1)
     })
+  }
+
+  // plugin-captions owns the caption band: from the two-line minimum it grows with its content up to
+  // 40vh (or until the stage is down to 36% of the viewer), then scrolls, and the stage gives up the
+  // room. Stage, caption band, rail and toolbar never overlap, in each preset with its paired skin,
+  // on a desktop and a phone.
+  for (const [preset, skin] of [
+    ['', 'gallery'],
+    ['preset=reviewer', 'console'],
+    ['preset=editorial', 'editorial'],
+  ] as const) {
+    for (const vp of [
+      { width: 1280, height: 800 },
+      { width: 390, height: 844 },
+    ]) {
+      test(`a custom caption band grows, then scrolls (${preset || 'default'}, ${skin}, ${vp.width}px)`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(vp)
+        const look = async (size: 'short' | 'tall') => {
+          await page.goto(`/layout.html?skin=${skin}&${preset}&custom=${size}&g=1`)
+          await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+          await expect(page.locator('.gallerist-caption .fixture-caption')).toBeVisible()
+          await page.waitForTimeout(150) // let the rail settle
+          return page.evaluate(() => {
+            const box = (sel: string) => {
+              const el = document.querySelector<HTMLElement>(sel)
+              if (!el?.checkVisibility()) return null
+              const r = el.getBoundingClientRect()
+              return r.width < 1 || r.height < 1
+                ? null
+                : { sel, x: r.x, y: r.y, w: r.width, h: r.height }
+            }
+            const caption = document.querySelector('.gallerist-caption') as HTMLElement
+            // the band, or the caption region inside a placard, is what scrolls
+            const scroller = [caption, ...caption.querySelectorAll<HTMLElement>('*')].find((el) =>
+              /auto|scroll/.test(getComputedStyle(el).overflowY),
+            )
+            let scrolled = 0
+            if (scroller) {
+              scroller.scrollTop = 100_000
+              scrolled = scroller.scrollTop
+              scroller.scrollTop = 0
+            }
+            return {
+              boxes: [
+                box('.gallerist-stage'),
+                box('.gallerist-caption'),
+                box('.gallerist-region-thumbnails'),
+                box('.gallerist-bar'),
+              ],
+              placard:
+                document.querySelector('.gallerist')?.getAttribute('data-gallerist-indicator') ===
+                'placard',
+              lineHeight: Number.parseFloat(getComputedStyle(caption).lineHeight),
+              fontSize: Number.parseFloat(getComputedStyle(caption).fontSize),
+              overflows: scroller ? scroller.scrollHeight > scroller.clientHeight + 1 : false,
+              scrolled,
+              vh: innerHeight,
+            }
+          })
+        }
+        const problems: string[] = []
+        const stageH: Record<string, number> = {}
+        for (const size of ['short', 'tall'] as const) {
+          const got = await look(size)
+          const [stage, caption, rail, bar] = got.boxes
+          if (!stage || !caption) {
+            problems.push(`${size}: no ${stage ? 'caption band' : 'stage'}`)
+            continue
+          }
+          stageH[size] = stage.h
+          const present = got.boxes.filter((b) => b !== null)
+          for (let a = 0; a < present.length; a++)
+            for (let b = a + 1; b < present.length; b++) {
+              const p = present[a] as NonNullable<(typeof present)[number]>
+              const q = present[b] as NonNullable<(typeof present)[number]>
+              const ox = Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x)
+              const oy = Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y)
+              if (ox > 1 && oy > 1) problems.push(`${size}: ${p.sel} overlaps ${q.sel}`)
+            }
+          if (!rail) problems.push(`${size}: no rail`)
+          if (!bar) problems.push(`${size}: no toolbar`)
+          if (stage.h < 120) problems.push(`${size}: stage crushed to ${Math.round(stage.h)}px`)
+          if (got.placard) {
+            // a placard keeps its slot: tall content scrolls inside it
+            if (size === 'tall' && !(got.overflows && got.scrolled > 0))
+              problems.push('tall: the placard does not scroll its caption')
+            continue
+          }
+          if (size === 'short') {
+            // the band keeps the two-line minimum and has nothing to scroll
+            if (caption.h < 2 * got.lineHeight)
+              problems.push(`short: band ${caption.h}px < 2 lines`)
+            if (got.overflows) problems.push('short: band scrolls')
+          } else {
+            if (caption.h > got.vh * 0.4 + 1)
+              problems.push(`tall: band ${Math.round(caption.h)}px > 40vh (${got.vh * 0.4}px)`)
+            // it grows to 40vh, unless the stage reached its floor (36% of the viewer) first
+            if (caption.h < got.vh * 0.4 - 1 && stage.h > got.vh * 0.36 + 2)
+              problems.push(`tall: band ${Math.round(caption.h)}px stopped short of 40vh`)
+            if (!(got.overflows && got.scrolled > 0)) problems.push('tall: band does not scroll')
+          }
+        }
+        // the stage gives up the room a growing band takes (a placard keeps its size)
+        const placard = (await look('short')).placard
+        if (!placard && !((stageH.tall ?? 0) < (stageH.short ?? 0) - 10))
+          problems.push(`stage did not shrink: ${stageH.short} -> ${stageH.tall}`)
+        expect(problems, problems.join('\n')).toEqual([])
+      })
+    }
   }
 
   test('editorial with a side rail keeps a stage', async ({ page }) => {

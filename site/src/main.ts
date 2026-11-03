@@ -11,7 +11,6 @@ import {
   type RendererHandle,
   type Skin,
   mount,
-  resolvePreset,
 } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
@@ -141,13 +140,13 @@ function snippet(s: Setup): string {
   if (s.scheme !== 'skin default') options.push(`scheme: '${s.scheme}'`)
   const extra = s.skin === 'gallery' ? '' : `import '@gallerist/theme-default/${s.skin}.css'\n`
   return `import { createViewer } from '@gallerist/core'
-import { mount, resolvePreset } from '@gallerist/renderer-dom'
+import { mount } from '@gallerist/renderer-dom'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import '@gallerist/theme-default/gallerist.css'
 ${extra}
 const viewer = createViewer({
   collection,
-  plugins: [thumbnails(resolvePreset('${s.preset}').thumbnails)],
+  plugins: [thumbnails()], // the preset sets the rail
 })
 mount(viewer, { ${options.join(', ')} })
 viewer.open()`
@@ -165,7 +164,7 @@ function render() {
     collection: makeCollection(),
     startAt: at,
     plugins: [
-      thumbnails(resolvePreset(state.preset).thumbnails),
+      thumbnails(),
       grid(state.preset === 'tour' ? { layout: 'sections', strings: { start: 'Start tour' } } : {}),
       pins({ presentation }),
       fullscreen(),

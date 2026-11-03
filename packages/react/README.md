@@ -29,6 +29,10 @@ update, such as a duplicate id, is logged and the current data kept), `on`, `ope
 `label`, `returnFocus`, `preload`, `adapters`, …) is read once; change the component's `key` to apply
 new values.
 
+`preset` sets the layout, the thumbnails rail included: `thumbnails()` in `plugins` takes the preset's
+rail options for any option you don't pass (`preset="reviewer"` gives the timeline and numbered items;
+`thumbnails({ timeline: false })` keeps the numbers and drops the timeline).
+
 `plugins`, `on` and render props are functions, so `<Gallerist>` is used from a client component. The
 build carries a `"use client"` banner, so a Next.js App Router page can import it from inside a client
 boundary (a file that starts with `"use client"`); a Server Component can't pass it those props.
@@ -97,7 +101,8 @@ interface Shot {
 ```
 
 Returning `null` shows the item's text `caption` (or nothing). The band grows with what you render
-(the stage gives up the room), from the height of a two-line text caption. Its text is the viewer's
+(the stage gives up the room), from the height of a two-line text caption up to 40% of the viewport
+(less if the stage would drop below 36% of the viewer), then it scrolls. Its text is the viewer's
 accessible description (`aria-describedby`); the announcement on navigation stays the position plus
 the item's `alt`, so put what a screen reader user needs in `alt`. Without React, use
 [`@gallerist/plugin-captions`](../plugin-captions/README.md).

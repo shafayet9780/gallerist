@@ -12,6 +12,7 @@ export { createViewer } from './controller/createViewer'
 export type {
   Plugin,
   PluginInstance,
+  PresetDefaults,
   RegionCtx,
   RegionName,
   TransitionStrategy,

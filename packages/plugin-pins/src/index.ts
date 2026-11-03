@@ -181,14 +181,29 @@ export function defaultPinCard(pin: Pin, opts: PinCardOptions = {}): DocumentFra
     line('gallerist-pin-meta', pin.meta)
     line('gallerist-pin-body', pin.body, 'p')
   }
-  if (pin.href) {
+  const href = pin.href && safeLink(pin.href)
+  if (href) {
     const a = document.createElement('a')
     a.className = 'gallerist-pin-link'
-    a.href = pin.href
+    a.href = href
     a.textContent = pin.linkLabel ?? t.open
     frag.appendChild(a)
   }
   return frag
+}
+
+// Security: pin data can come from users (comments) or a CMS, so the card links only to
+// http(s), mailto and relative URLs (which resolve to the page's own scheme); a `javascript:`,
+// `data:` or other scheme drops the link rather than becoming something to click. Same check as
+// plugin-download's safeHref.
+const LINK_SCHEMES = new Set(['http:', 'https:', 'mailto:'])
+function safeLink(url: string): string | null {
+  try {
+    const base = typeof location !== 'undefined' ? location.href : 'http://localhost/'
+    return LINK_SCHEMES.has(new URL(url, base).protocol) ? url : null
+  } catch {
+    return null
+  }
 }
 
 interface Rendered {

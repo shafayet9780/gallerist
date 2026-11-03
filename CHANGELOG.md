@@ -25,17 +25,35 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **plugin-thumbnails, plugin-grid**: moving the cursor no longer scrolls the page around an inline
   viewer; only the viewer's own panels scroll.
 - **plugin-thumbnails**: a viewer opening on a far group now scrolls the rail to it.
-- **theme (console)**: the backdrop is opaque (it was 98%), so the host page no longer shows through
-  on phones.
+- **theme**: every skin's backdrop is opaque (Gallery and Console were 98%, Editorial 99%), so the
+  host page no longer shows through on phones, in light and dark schemes. Drag-to-dismiss still fades
+  it to show the page.
+- **theme**: a caption renderer's content taller than a placard (editorial) scrolls inside the placard;
+  it was cut off. The placard keeps its slot, so the stage still doesn't move.
+- **theme**: a caption renderer's band stops growing where the stage would drop below 36% of the
+  viewer (a tall rail and bar on a phone, or the reviewer's timeline), and scrolls from there; it
+  used to take its full 40vh and leave the stage as little as 28%.
+- **plugin-pins**: the default card links only to `http:`, `https:`, `mailto:` and relative URLs; a
+  pin whose `href` is `javascript:`, `data:` or any other scheme gets no link (pin data can come from
+  users).
 - **plugin-download**: an item with nothing safe to save (no URL, or a `data:`, `javascript:` or
   `file:` one) marks the button unavailable (`aria-disabled`, dimmed; it stays focusable) instead of a
   click that does nothing, per item as you navigate. `client-zip` is a regular dependency (`^2.5.0`),
   so an install without optional dependencies can't break a bundler on zip mode's `import()`.
-- **build**: source maps carry their sources (`sourcesContent`), since `src/` isn't published; they
-  pointed nowhere before. `pnpm check:dist` packs every package and fails on a leftover `workspace:`
+- **build**: source maps carry their sources (`sourcesContent`) in every package, since `src/` isn't
+  published; they pointed nowhere before. `pnpm check:dist` packs every package and fails on a leftover `workspace:`
   range.
 
 ### Added
+- **renderer-dom, plugin-thumbnails**: presets configure the rail. `thumbnails()` takes the mounted
+  preset's `thumbnails` options for each option it wasn't given, and an explicit one wins, key by key:
+  `preset: 'reviewer'` alone now gives the timeline and numbered items, `tour` the section index,
+  `editorial` the numbered item row; React's `preset` prop too. No more
+  `thumbnails(resolvePreset(name).thumbnails)`. The rail settles its options when its region mounts,
+  so a `viewer.use(thumbnails())` after `mount()` follows the preset as well.
+- **core**: `RegionCtx.preset` (`PresetDefaults`), the renderer's mounted preset as defaults for
+  plugins, keyed by what they configure; core stays renderer-agnostic. The DOM renderer passes its
+  `ResolvedPreset` (now a type alias, so it fits).
 - **plugin-captions** (new): designed captions, one `render(item, group, ctx)` per viewer, drawn into
   the renderer's new `caption` region (the caption bar, the editorial placard, wherever the preset puts
   it). A string is set as text; `null` shows the item's text caption. Re-renders on navigation and
@@ -73,6 +91,9 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **examples/tour**: a listing page using all of the above.
 
 ### Breaking
+- **plugin-thumbnails**: under a preset, an option left unset follows the preset: `thumbnails()` with
+  `preset: 'reviewer'` now draws the timeline and numbered items it used to need spelling out. Pass
+  the option (e.g. `timeline: false`) to keep a plain rail.
 - **core**: `Item.caption` is plain text (`string`); it no longer accepts an `OverlaySpec`, which the
   DOM renderer never drew. Designed captions come from `@gallerist/plugin-captions` or
   `<Gallerist.Caption>`, so item data stays JSON.

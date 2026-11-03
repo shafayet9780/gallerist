@@ -2,7 +2,7 @@
 
 import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
-import { mount } from '@gallerist/renderer-dom'
+import { type PresetName, mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { thumbnails } from './index'
 import { keepPlace, measureRun, middleOf, spanAround } from './strip'
@@ -663,6 +663,92 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       (n) => n.textContent,
     )
     expect(nums).toEqual(['1', '2'])
+  })
+
+  describe('preset defaults (RegionCtx.preset)', () => {
+    const openPreset = (
+      preset: PresetName | undefined,
+      opts?: Parameters<typeof thumbnails>[0],
+      col = timed(),
+    ) => {
+      const v = createViewer({ collection: col, plugins: [thumbnails(opts)] })
+      mount(v, { preset })
+      v.open()
+      return v
+    }
+    const nums = () =>
+      [...document.querySelectorAll('.gallerist-thumb-items .gallerist-thumb-num')].map(
+        (n) => n.textContent,
+      )
+
+    it('thumbnails() takes the mounted preset’s rail: reviewer → timeline + numbered items', () => {
+      const v = openPreset('reviewer')
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+      expect(document.querySelector('.gallerist-thumb-time')?.textContent).toBe('09:00')
+      v.next()
+      expect(nums()).toEqual(['1', '2'])
+      // still a vertical stack in the aside column (the preset's itemAxis)
+      expect(
+        document
+          .querySelector('.gallerist-region-aside .gallerist-thumb-items')
+          ?.getAttribute('data-axis'),
+      ).toBe('vertical')
+    })
+
+    it('an explicit option wins per key; an undefined one still takes the preset', () => {
+      const v = openPreset('reviewer', { timeline: false, numberItems: undefined })
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+      v.next()
+      expect(nums()).toEqual(['1', '2'])
+    })
+
+    it('editorial puts the items in a numbered row in the rail, not the aside column', () => {
+      const v = openPreset('editorial')
+      v.next()
+      const row = document.querySelector('.gallerist-region-thumbnails .gallerist-thumb-items')
+      expect(row?.getAttribute('data-axis')).toBe('horizontal')
+      expect(nums()).toEqual(['1', '2'])
+      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+    })
+
+    it('tour makes the rail a section index', () => {
+      openPreset('tour')
+      expect(document.querySelector('.gallerist-thumbs')?.getAttribute('data-display')).toBe(
+        'index',
+      )
+      expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(3)
+      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+    })
+
+    it('explicit options can undo the preset’s layout (tour as a stacked vertical rail)', () => {
+      openPreset('tour', { groupDisplay: 'stacked', itemAxis: 'vertical' })
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-display')).toBe(false)
+      expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(0)
+    })
+
+    it('without a preset, and with filmstrip, the rail keeps its own defaults', () => {
+      for (const preset of [undefined, 'filmstrip'] as const) {
+        const v = openPreset(preset)
+        expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(
+          false,
+        )
+        v.next()
+        expect(nums()).toEqual([])
+        expect(
+          document.querySelector('.gallerist-region-aside .gallerist-thumb-items'),
+        ).not.toBeNull()
+        document.body.innerHTML = ''
+      }
+    })
+
+    it('a plugin added after mount takes the preset too', () => {
+      const v = createViewer({ collection: timed() })
+      mount(v, { preset: 'reviewer' })
+      v.use(thumbnails())
+      v.open()
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+    })
   })
 
   describe('scrolling', () => {

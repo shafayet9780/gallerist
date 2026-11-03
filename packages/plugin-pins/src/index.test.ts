@@ -242,6 +242,36 @@ describe('plugin-pins', () => {
     expect(tag.querySelector('.gallerist-pin-link')?.textContent).toBe('View')
   })
 
+  it('the default card links only to http(s), mailto and relative URLs', () => {
+    const link = (href: string) =>
+      defaultPinCard(pin('l', 0, 0, { label: 'Lamp', href }))
+        .querySelector('.gallerist-pin-link')
+        ?.getAttribute('href') ?? null
+    expect(link('https://shop.example/lamp')).toBe('https://shop.example/lamp')
+    expect(link('http://shop.example/lamp')).toBe('http://shop.example/lamp')
+    expect(link('mailto:sales@example.com')).toBe('mailto:sales@example.com')
+    expect(link('/lamp')).toBe('/lamp')
+    expect(link('lamp?id=2')).toBe('lamp?id=2')
+    expect(link('#lamp')).toBe('#lamp')
+    for (const bad of [
+      'javascript:alert(1)',
+      ' JavaScript:alert(1)',
+      'java\tscript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+      'file:///etc/passwd',
+      'blob:https://shop.example/1',
+    ]) {
+      expect(link(bad), bad).toBeNull()
+    }
+  })
+
+  it('a pin with an unsafe href renders through the plugin without a link', () => {
+    open({ pins: () => [pin('x', 0.5, 0.5, { label: 'Bad', href: 'javascript:alert(1)' })] })
+    expect(cards()[0]?.querySelector('a')).toBeNull()
+    expect(cards()[0]?.querySelector('.gallerist-pin-title')?.textContent).toBe('Bad')
+  })
+
   it('comment threads show the author, time, replies and a resolved badge', () => {
     open({
       presentation: 'comment',

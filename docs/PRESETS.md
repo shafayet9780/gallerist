@@ -20,20 +20,33 @@ distinct layout.
 ```tsx
 // React
 <Gallerist preset="reviewer" skin="console" collection={c}
-        plugins={[thumbnails({ ...resolvePreset('reviewer').thumbnails }), grid(), fullscreen()]} />
+        plugins={[thumbnails(), grid(), fullscreen()]} />
 ```
 
 ```ts
-// Vanilla — mount() applies the preset's rail/arrows/auto-hide + data-gallerist-preset.
+// Vanilla — mount() applies the preset's rail/arrows/auto-hide + data-gallerist-preset, and the
+// thumbnails rail takes the preset's options (reviewer: a timeline, numbered items).
+const viewer = createViewer({ collection, plugins: [thumbnails()] })
 mount(viewer, { preset: 'reviewer' })
-// thumbnails() options aren't owned by mount; apply them from the resolver:
-const { thumbnails: t } = resolvePreset('reviewer')
-createViewer({ collection, plugins: [thumbnails(t)] })
+// an option you pass wins, key by key; the rest still come from the preset
+createViewer({ collection, plugins: [thumbnails({ timeline: false })] })
 ```
 
 `resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails,
 navigator?, frame?, itemIndicator?, groupAxis?, arrowLabels? }`. Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide`/`navigator`/
 `frame`/`itemIndicator`/`groupAxis`/`arrowLabels` options always win over the preset.
+
+The renderer hands the resolved preset to every plugin region (`RegionCtx.preset`), and
+`thumbnails()` takes its `thumbnails` entry for each option it wasn't given (`undefined` counts as
+not given). The rail settles its options when its region mounts, so this also holds for a
+`viewer.use(thumbnails())` after `mount()`. Each preset's rail:
+
+| Preset      | `thumbnails` defaults |
+|-------------|-----------------------|
+| `filmstrip`, `immersive`, `contact` | `itemAxis: 'vertical'` (the plugin's own defaults) |
+| `reviewer`  | `itemAxis: 'vertical'`, `timeline: true`, `numberItems: true` |
+| `editorial` | `itemAxis: 'horizontal'`, `numberItems: true` |
+| `tour`      | `groupDisplay: 'index'`, `itemAxis: 'horizontal'`, `numberItems: true` |
 
 ## Rail placement (`data-gallerist-rail-pos`)
 
@@ -56,8 +69,8 @@ arrow's accessible name with `strings.previousTo` / `strings.nextTo`.
 ## Group display (`thumbnails({ groupDisplay })`)
 
 A `thumbnails()` option (not a preset/rail field), so set it on the plugin. Presets default to
-`stacked` (`tour` uses `index`); opt into `flat` explicitly, e.g. `thumbnails({ ...resolvePreset('contact').thumbnails,
-groupDisplay: 'flat' })`.
+`stacked` (`tour` uses `index`); opt into `flat` explicitly, e.g. `thumbnails({ groupDisplay: 'flat' })`
+(the preset's other rail options still apply).
 
 - `stacked` (default) — one collapsed card per group. Hover/focus a multi-item card to **peek** its
   items without navigating in (touch gets an expand affordance). The active group's items show as a

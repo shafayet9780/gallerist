@@ -49,7 +49,8 @@ and where a canvas and this plan disagree, the plan wins.
 | P2-M | React surface | `useCurrentItem()`; `open` takes `{ g, i }` (applied on change, a new position while open moves the cursor); the mount options `label`, `returnFocus`, `preload`, `adapters` are props; the ref is the `ViewerApi`. React 18+ stays the floor. |
 | P2-N | Plugin escape hatches | Pins: `renderCard` returning `null` keeps the default card, which is exported (`defaultPinCard`). Download: `downloadUrl(item)` (full-resolution file, `null` = not downloadable); no safe URL marks the button unavailable per item; `client-zip` is a regular dependency. |
 | P2-O | Escape | Closes from anywhere (I-UX2), except when a handler before the viewer's called `preventDefault()`, so a host form can keep it. |
-| P2-P | Published output | Source maps carry their sources; `check:dist` packs every package and rejects a leftover `workspace:` range. Console's backdrop is opaque. |
+| P2-P | Published output | Source maps carry their sources; `check:dist` packs every package and rejects a leftover `workspace:` range. Every skin's backdrop is opaque. |
+| P2-Q | Presets configure the rail (owner) | The renderer hands the resolved preset to plugin regions (`RegionCtx.preset`, typed in core as a generic `PresetDefaults` map so core stays renderer-agnostic); `thumbnails()` takes its `thumbnails` entry for each option it wasn't given, explicit options win per key. Presets stay layout-only (P2-A). The rail settles its options when its region mounts. |
 
 Backlog for 0.4 from the same pass: per-item `zoomable: false`, and a built-in pins compose UI.
 
@@ -125,6 +126,7 @@ first publish from waiting on Atlas and the review plugins.
 
 ## Still deferred from step 1
 
-A `RegionCtx` root handle for plugins, exporting gestures and overlay painting for custom renderers,
+A `RegionCtx` root handle for plugins (P2-Q added `preset` only; the rail still finds the root
+from its own node), exporting gestures and overlay painting for custom renderers,
 and holding navigation during open/close transitions. Revisit in M15 (the region work touches the
 first) or after 0.3.

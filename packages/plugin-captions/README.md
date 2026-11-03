@@ -62,8 +62,9 @@ after you changed data that `render` reads in place. Zoom and pan don't call `re
 
 While the plugin is mounted the caption bar is up for every item, so moving between items with and
 without a caption doesn't move the stage. The bar grows with your node (from the height of a two-line
-text caption, up to 40% of the viewport, then it scrolls) and the stage gives up the room; in a
-placard it keeps the placard's slot. Style your node with your own classes; the theme's caption tokens
+text caption, up to 40% of the viewport or until the stage is down to 36% of the viewer, then it
+scrolls) and the stage gives up the room; in a placard it keeps the placard's slot and scrolls
+inside it. Style your node with your own classes; the theme's caption tokens
 (`--gallerist-caption-size`, `--gallerist-fg`, …) are inherited.
 
 ## Accessibility

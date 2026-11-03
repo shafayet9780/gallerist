@@ -1,6 +1,7 @@
 // Layout-matrix fixture: every chrome configuration is set from the query string so the layout
 // lint (e2e/tests/layout.spec.ts) can sweep presets × arrow layouts × rails × direction × viewport.
-import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { type Collection, type Item, type Plugin, createViewer } from '@gallerist/core'
+import { captions } from '@gallerist/plugin-captions'
 import { download } from '@gallerist/plugin-download'
 import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
@@ -12,7 +13,6 @@ import {
   type PresetName,
   type RailPlacement,
   mount,
-  resolvePreset,
 } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
@@ -64,6 +64,31 @@ const collection: Collection = {
   })),
 }
 
+// custom=short|tall: a caption renderer (plugin-captions) owns the caption band. `short` is one line
+// (the band keeps its two-line minimum); `tall` is far more than 40vh of text, so the band stops
+// growing at 40vh and scrolls.
+const customMode = p.get('custom')
+const customCaption: Plugin[] = customMode
+  ? [
+      captions({
+        render: (item, _group, { cursor }) => {
+          const el = document.createElement('div')
+          el.className = 'fixture-caption'
+          const head = document.createElement('strong')
+          head.textContent = `09:${String(12 + cursor.g).padStart(2, '0')} · ${item.id}`
+          el.append(head)
+          const lines = customMode === 'tall' ? 60 : 0
+          for (let k = 0; k < lines; k++) {
+            const line = document.createElement('p')
+            line.textContent = `Activity line ${k + 1}: a note about what was on screen.`
+            el.append(line)
+          }
+          return el
+        },
+      }),
+    ]
+  : []
+
 if (p.get('dir') === 'rtl') document.documentElement.dir = 'rtl'
 const rail = (p.get('rail') ?? undefined) as RailPlacement | undefined
 const viewer = createViewer({
@@ -73,8 +98,8 @@ const viewer = createViewer({
     p.get('plugins') === '0'
       ? []
       : [
+          // the preset's rail options arrive through mount(); explicit ones win
           thumbnails({
-            ...(p.get('preset') ? resolvePreset(p.get('preset') as string).thumbnails : {}),
             ...(p.get('display') ? { groupDisplay: p.get('display') as 'flat' | 'index' } : {}),
             ...(p.get('items') ? { itemAxis: p.get('items') as 'vertical' | 'horizontal' } : {}),
           }),
@@ -85,6 +110,7 @@ const viewer = createViewer({
           ),
           fullscreen(),
           download(),
+          ...customCaption,
         ],
 })
 mount(viewer, {

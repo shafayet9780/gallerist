@@ -8,7 +8,7 @@ import {
 import { captions } from '@gallerist/plugin-captions'
 import { type Pin, pins } from '@gallerist/plugin-pins'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
-import { mount, resolvePreset } from '@gallerist/renderer-dom'
+import { mount } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
 
@@ -124,7 +124,8 @@ const viewer = createViewer({
   collection,
   loop: true,
   itemMemory: 'preserve',
-  plugins: [thumbnails(resolvePreset('reviewer').thumbnails), commentPins, screenCaption],
+  // the reviewer preset sets the rail: a timeline over the groups, numbered items
+  plugins: [thumbnails(), commentPins, screenCaption],
 })
 mount(viewer, { skin: 'console', preset: 'reviewer' })
 

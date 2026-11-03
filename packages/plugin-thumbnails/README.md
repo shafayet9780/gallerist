@@ -70,8 +70,12 @@ thumbnails({
 | `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 
-Presets configure these for you — see [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md). The rail's **position**
-(bottom/top/hidden) is a renderer option (`rail`), not a thumbnails option.
+Presets configure these for you: with `mount(viewer, { preset })` (or React's `preset` prop) every
+option you leave unset takes the preset's value, so `thumbnails()` under `preset: 'reviewer'` gets the
+timeline and numbered items; an option you pass wins, key by key (`undefined` counts as unset). The
+options settle when the rail mounts. See [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md)
+for each preset's values. The rail's **position** (bottom/top/hidden) is a renderer option (`rail`),
+not a thumbnails option.
 
 ## Data
 

@@ -21,9 +21,19 @@ export type RegionName =
   | 'backdrop'
   | (string & {})
 
+/**
+ * A renderer's mounted layout preset, as defaults for plugins keyed by what they configure. Core
+ * doesn't know the presets: the renderer supplies this (the DOM renderer passes its resolved
+ * preset, so `thumbnails` holds `@gallerist/plugin-thumbnails` options) and a plugin reads its own
+ * key as defaults under the options it was given.
+ */
+export type PresetDefaults = { readonly [key: string]: unknown }
+
 /** Passed to a region renderer; the viewer is the handle for state/actions/subscription. */
 export interface RegionCtx {
   viewer: ViewerApi
+  /** the mounted preset's layout defaults; undefined without a preset */
+  preset?: PresetDefaults
 }
 
 /** Pluggable transition seam (spec §10.4) — minimal in Phase 1; full API is future work. */

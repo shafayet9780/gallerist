@@ -92,7 +92,7 @@
 .gallerist {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto auto;
   grid-template-areas:
     "bar bar"
     "main aside"
@@ -103,7 +103,7 @@
 }
 .gallerist[data-gallerist-rail-pos="left"] {
   grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto;
   grid-template-areas:
     "bar bar bar"
     "rail main aside"
@@ -112,7 +112,7 @@
 }
 .gallerist[data-gallerist-rail-pos="right"] {
   grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto;
   grid-template-areas:
     "bar bar bar"
     "main aside rail"
@@ -141,12 +141,21 @@
    stack column if any. Side rails keep their own template, with the placard as the caption band. */
 .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"] {
   grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto;
   grid-template-areas:
     "bar bar bar"
     "main caption aside"
     "footer footer footer"
     "rail rail rail";
+}
+/* The stage's row never shrinks below the floor. 0 normally; while a caption renderer's band grows
+   (plugin-captions), 36% of the viewer, so the band stops there and scrolls rather than crushing the
+   stage (before its own 40vh cap when the rail and bar are tall, e.g. on a phone). */
+.gallerist {
+  --gallerist-stage-floor: 0px;
+}
+.gallerist:has(> .gallerist-caption[data-gallerist-custom]:not([hidden])) {
+  --gallerist-stage-floor: 36%;
 }
 /* modes (data-attribute, not a class — avoids colliding with .gallerist-overlay elements) */
 .gallerist[data-gallerist-mode="overlay"] {
@@ -917,6 +926,13 @@
 .gallerist-region-caption {
   flex: 1 1 auto;
   min-width: 0;
+}
+/* a placard keeps its slot (the stage doesn't move), so a caption taller than it scrolls inside
+   rather than being cut off */
+.gallerist[data-gallerist-indicator="placard"] .gallerist-region-caption {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 /* ── arrows and the item navigator, over the stage (inside main) ────────────────── */
@@ -1770,7 +1786,7 @@
   /* editorial: the placard drops under the work, as the caption band */
   .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"] {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto auto;
     grid-template-areas:
       "bar"
       "main"
@@ -1865,7 +1881,7 @@
   }
   .gallerist[data-gallerist-rail-pos]:has(.gallerist-thumbs[data-display="index"]) {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto auto;
     grid-template-areas:
       "bar"
       "main"

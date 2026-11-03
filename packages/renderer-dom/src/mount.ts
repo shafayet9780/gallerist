@@ -52,8 +52,8 @@ export interface MountOptions {
   autoHide?: boolean
   /**
    * Named layout preset (UX-E) — sets `data-gallerist-preset` and supplies defaults for `arrows` and
-   * `autoHide` (both still overridable by explicit options above). The preset's preferred
-   * thumbnails() options are exposed via `resolvePreset(name).thumbnails` for the host to apply.
+   * `autoHide` (both still overridable by explicit options above). Plugin regions get the preset
+   * too: thumbnails() takes `resolvePreset(name).thumbnails` for the options it wasn't given.
    */
   preset?: PresetName
   /**
@@ -247,7 +247,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const container = opts.container ?? null
   const controls = opts.controls ?? true
   const preload = opts.preload ?? { ahead: 2, behind: 1 }
-  const preset = opts.preset ? resolvePreset(opts.preset) : null
+  const preset = opts.preset ? resolvePreset(opts.preset) : undefined
   const arrows: ArrowLayout = opts.arrows ?? preset?.arrows ?? 'pill-right'
   const autoHide = opts.autoHide ?? preset?.autoHide ?? true
   const showNavigator = opts.navigator ?? preset?.navigator ?? false
@@ -1347,7 +1347,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const offRefresh = internals.onRefresh(onStageResize)
 
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
-  const mountPluginRegions = createRegionMounter(regionHosts, { viewer })
+  const mountPluginRegions = createRegionMounter(regionHosts, { viewer, preset })
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(internals.getPlugins())
     mountPluginRegions(internals.getPlugins())

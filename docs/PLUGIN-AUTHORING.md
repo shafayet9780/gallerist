@@ -35,6 +35,11 @@ export function myPlugin(opts?: MyOptions): Plugin {
 **exclusive** (last-wins + dev warn). A `caption` node replaces the caption bar's text and keeps the
 bar up for every item (`plugin-captions` is the reference).
 
+A region renderer gets `ctx = { viewer, preset? }`. `preset` is the renderer's mounted layout preset as
+`PresetDefaults`, a map keyed by what each entry configures (the DOM renderer passes `resolvePreset()`'s
+result; it's undefined without a preset). A plugin reads its own key as defaults under the options it
+was given: `plugin-thumbnails` takes `preset.thumbnails` and settles its layout when its region mounts.
+
 ## Patterns
 
 - **A toolbar button** (region + keymap), e.g. `plugin-fullscreen`:
@@ -45,9 +50,10 @@ bar up for every item (`plugin-captions` is the reference).
     regions: { toolbar: () => { const b = document.createElement('button'); b.onclick = toggle; return b } },
   }
   ```
-- **Live UI that tracks state** (e.g. the thumbnail rail): create your root in `init()`, subscribe
-  with `viewer.subscribe(render)`, return the same root from the region renderer, and unsubscribe in
-  `destroy()`. The region renderer is called once; you own updates.
+- **Live UI that tracks state** (e.g. the thumbnail rail): create your root in `init()` (or in the
+  region renderer, when it depends on `ctx.preset`), subscribe with `viewer.subscribe(render)`, return
+  the same root from the region renderer, and unsubscribe in `destroy()`. The region renderer is
+  called once; you own updates.
 - **A media type**: return a `mediaAdapters: [adapter]`. The adapter's `match(item)` selects it;
   `mount()` returns `MountedMedia` with `activate()`/`deactivate()` (called on slide enter/leave) and
   `destroy()`. See `plugin-video`.

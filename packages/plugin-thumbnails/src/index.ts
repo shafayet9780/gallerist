@@ -20,7 +20,15 @@
 // removed and the ones that entered are inserted in place (the rest stay put), with the scroll offset
 // corrected so nothing on screen moves. A cursor outside the run re-centres it on the cursor.
 
-import type { Group, Item, MediaSource, Plugin, PluginInstance, ViewerApi } from '@gallerist/core'
+import type {
+  Group,
+  Item,
+  MediaSource,
+  Plugin,
+  PluginInstance,
+  RegionCtx,
+  ViewerApi,
+} from '@gallerist/core'
 import { ICONS } from '@gallerist/core/internal'
 import { type Axis, keepPlace, measureRun, middleOf, spanAround } from './strip'
 
@@ -226,16 +234,32 @@ interface FlatEntry {
 export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
   return (viewer: ViewerApi) => {
     const t: ThumbnailsStrings = { ...DEFAULT_THUMBNAILS_STRINGS, ...opts.strings }
-    const groupDisplay = opts.groupDisplay ?? 'stacked'
-    const isIndex = groupDisplay === 'index'
-    const itemAxis = isIndex ? 'horizontal' : (opts.itemAxis ?? 'vertical')
-    const expandActive = opts.expandActive ?? true
-    const timeLabel =
-      groupDisplay === 'stacked' && opts.timeline
-        ? opts.timeline === true
-          ? metaTime
-          : opts.timeline
-        : null
+    // The options settle when the rail region mounts (configure): an option left unset takes the
+    // mounted preset's default (`RegionCtx.preset.thumbnails`, e.g. the reviewer's timeline), an
+    // explicit one wins. Until then they hold the explicit options alone.
+    let o: ThumbnailsOptions = opts
+    let groupDisplay: NonNullable<ThumbnailsOptions['groupDisplay']> = 'stacked'
+    let isIndex = false
+    let isFlat = false
+    let itemAxis: NonNullable<ThumbnailsOptions['itemAxis']> = 'vertical'
+    let timeLabel: ((group: Group, index: number) => string | undefined) | null = null
+    let panelOpen = true // whether the active group's item panel is shown (toggle: button / `e`)
+    const configure = (preset?: ThumbnailsOptions) => {
+      o = { ...preset }
+      for (const [k, v] of Object.entries(opts)) if (v !== undefined) Object.assign(o, { [k]: v })
+      groupDisplay = o.groupDisplay ?? 'stacked'
+      isIndex = groupDisplay === 'index'
+      isFlat = groupDisplay === 'flat'
+      itemAxis = isIndex ? 'horizontal' : (o.itemAxis ?? 'vertical')
+      timeLabel =
+        groupDisplay === 'stacked' && o.timeline
+          ? o.timeline === true
+            ? metaTime
+            : o.timeline
+          : null
+      panelOpen = o.expandActive ?? true
+    }
+    configure()
     // `regionEl` is the node handed to the renderer's `thumbnails` region; `root` (the scrollable
     // rail) lives inside it, and the floating panels (item column / peek) are siblings of `root`
     // inside `regionEl`. The renderer `replaceChildren()`s region hosts on every plugin-set change
@@ -248,7 +272,6 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // rather than covering it); a horizontal row stays inline in the rail region.
     let asideEl: HTMLElement | null = null
     let toolbarBtn: HTMLButtonElement | null = null
-    let panelOpen = expandActive // whether the active group's item panel is shown (toggle: button / `e`)
     let unsub: (() => void) | null = null
     let hoverCapable = true
 
@@ -303,7 +326,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       )
       btn.dataset.item = item.id
       btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
-      if (opts.numberItems) {
+      if (o.numberItems) {
         const num = document.createElement('span')
         num.className = 'gallerist-thumb-num'
         num.setAttribute('aria-hidden', 'true') // the label already says "Item n"
@@ -772,7 +795,6 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     // ── the drawn run ────────────────────────────────────────────────────────
-    const isFlat = groupDisplay === 'flat'
     const seqLength = (col: ReturnType<ViewerApi['getCollection']>) =>
       isFlat ? flat.length : col.groups.length
     // the node in the rail for position `idx` of the sequence, when drawn
@@ -837,7 +859,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (col !== lastCol || !measure(col)) return
       const hosts = drawnHosts(col)
       const middle = winStart + middleOf(root, hosts, axis as Axis)
-      const side = opts.overscan ?? Math.ceil(perView / 2) + MARGIN
+      const side = o.overscan ?? Math.ceil(perView / 2) + MARGIN
       setWindow(col, ...spanAround(middle, seqLength(col), side, side))
       const cur = viewer.getState().cursor
       markActive(col, cur.g, cur.i) // a re-drawn active card gets its state back
@@ -890,7 +912,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // scroll that follows trims it to the middle of the rail (rewindow).
       const at = isFlat ? (flatPos.get(`${cur.g}:${cur.i}`) ?? 0) : cur.g
       if (colChanged || at < winStart || at > winEnd) {
-        const side = opts.overscan ?? (perView ? perView + MARGIN : FALLBACK)
+        const side = o.overscan ?? (perView ? perView + MARGIN : FALLBACK)
         setWindow(col, ...spanAround(at, seqLength(col), side, side))
       }
       if (!isFlat) {
@@ -909,22 +931,74 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       lastI = cur.i
     }
 
-    const regions: PluginInstance['regions'] = {
-      thumbnails: () => regionEl ?? document.createElement('div'),
+    // Build the rail once its region mounts, with the mounted preset's defaults (configure). No DOM
+    // before then, so a viewer that is never mounted (server rendering) creates none.
+    let built = false
+    const build = (ctx: RegionCtx) => {
+      if (built) return
+      built = true
+      configure(ctx.preset?.thumbnails as ThumbnailsOptions | undefined)
+      regionEl = document.createElement('div')
+      regionEl.className = 'gallerist-thumbs-region'
+      root = document.createElement('div')
+      root.className = 'gallerist-thumbs'
+      root.setAttribute('role', isIndex ? 'group' : 'listbox')
+      root.setAttribute('aria-label', t.rail)
+      if (timeLabel) root.setAttribute('data-timeline', '')
+      regionEl.appendChild(root)
+      root.style.overflowAnchor = 'none' // keepPlace corrects the offset itself
+      root.addEventListener('scroll', scheduleRewindow, { passive: true })
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObs = new ResizeObserver(scheduleRewindow)
+        resizeObs.observe(root)
+      }
+      if (isFlat) {
+        root.dataset.display = 'flat'
+      } else {
+        if (isIndex) root.dataset.display = 'index'
+        if (itemAxis === 'vertical') {
+          asideEl = document.createElement('div')
+          asideEl.className = 'gallerist-thumbs-aside'
+        }
+        toolbarBtn = document.createElement('button')
+        toolbarBtn.type = 'button'
+        toolbarBtn.className = 'gallerist-items-toggle'
+        toolbarBtn.setAttribute('aria-label', t.toggleItems)
+        toolbarBtn.setAttribute('aria-pressed', String(panelOpen))
+        toolbarBtn.innerHTML = ICONS.itemStack
+        toolbarBtn.addEventListener('click', toggleActivePanel)
+      }
+      render()
+      unsub = viewer.subscribe(render)
     }
-    if (groupDisplay === 'stacked' && itemAxis === 'vertical') {
-      regions.aside = () => {
+
+    // Which regions to claim is decided now, before the preset is known: whatever the explicit
+    // options leave possible. A region the settled layout doesn't use gets an empty comment node.
+    const none = () => document.createComment('')
+    const regions: PluginInstance['regions'] = {
+      thumbnails: (ctx) => {
+        build(ctx)
+        return regionEl ?? document.createElement('div')
+      },
+    }
+    if ((opts.groupDisplay ?? 'stacked') === 'stacked' && opts.itemAxis !== 'horizontal') {
+      regions.aside = (ctx) => {
+        build(ctx)
+        if (!asideEl) return none() // the preset made the items a row (editorial) or an index (tour)
         // the renderer attaches asideEl right after this returns: move the stack in then
         queueMicrotask(() => {
           if (asideEl?.parentNode && itemRow && itemRow.parentNode !== asideEl) syncPanel()
         })
-        return asideEl ?? document.createElement('div')
+        return asideEl
       }
     }
     const keymap: PluginInstance['keymap'] = {}
     // the item panel + its toggle don't exist in flat mode (it lays every item out already).
-    if (groupDisplay !== 'flat') {
-      regions.toolbar = () => toolbarBtn ?? document.createElement('button')
+    if (opts.groupDisplay !== 'flat') {
+      regions.toolbar = (ctx) => {
+        build(ctx)
+        return toolbarBtn ?? none()
+      }
       keymap.e = () => toggleActivePanel()
       keymap.E = () => toggleActivePanel()
     }
@@ -933,38 +1007,6 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       name: 'thumbnails',
       init() {
         hoverCapable = canHover()
-        regionEl = document.createElement('div')
-        regionEl.className = 'gallerist-thumbs-region'
-        root = document.createElement('div')
-        root.className = 'gallerist-thumbs'
-        root.setAttribute('role', isIndex ? 'group' : 'listbox')
-        root.setAttribute('aria-label', t.rail)
-        if (timeLabel) root.setAttribute('data-timeline', '')
-        regionEl.appendChild(root)
-        root.style.overflowAnchor = 'none' // keepPlace corrects the offset itself
-        root.addEventListener('scroll', scheduleRewindow, { passive: true })
-        if (typeof ResizeObserver !== 'undefined') {
-          resizeObs = new ResizeObserver(scheduleRewindow)
-          resizeObs.observe(root)
-        }
-        if (groupDisplay === 'flat') {
-          root.dataset.display = 'flat'
-        } else {
-          if (isIndex) root.dataset.display = 'index'
-          if (itemAxis === 'vertical') {
-            asideEl = document.createElement('div')
-            asideEl.className = 'gallerist-thumbs-aside'
-          }
-          toolbarBtn = document.createElement('button')
-          toolbarBtn.type = 'button'
-          toolbarBtn.className = 'gallerist-items-toggle'
-          toolbarBtn.setAttribute('aria-label', t.toggleItems)
-          toolbarBtn.setAttribute('aria-pressed', String(panelOpen))
-          toolbarBtn.innerHTML = ICONS.itemStack
-          toolbarBtn.addEventListener('click', toggleActivePanel)
-        }
-        render()
-        unsub = viewer.subscribe(render)
       },
       destroy() {
         unsub?.()

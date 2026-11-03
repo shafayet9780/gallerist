@@ -1,7 +1,7 @@
 import { type Collection, type Group, createViewer } from '@gallerist/core'
 import { grid } from '@gallerist/plugin-grid'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
-import { mount, resolvePreset } from '@gallerist/renderer-dom'
+import { mount } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 
 // Drawn placeholders, so the example needs no image files: swap `source` for real photos.
@@ -40,7 +40,9 @@ const collection: Collection = {
 const viewer = createViewer({
   collection,
   plugins: [
-    thumbnails(resolvePreset('tour').thumbnails),
+    // the tour preset makes the rail a section index; an explicit option wins over the preset's
+    // (numberItems: false drops the item numbers), the rest still come from the preset
+    thumbnails({ numberItems: false }),
     grid({ layout: 'sections', startOpen: true, strings: { start: 'Start tour' } }),
   ],
 })

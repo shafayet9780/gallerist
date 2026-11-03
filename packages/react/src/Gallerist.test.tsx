@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import type { Collection, MediaAdapter, ViewerApi } from '@gallerist/core'
+import type { Collection, MediaAdapter, Plugin, RegionCtx, ViewerApi } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { StrictMode, createRef, useState } from 'react'
@@ -48,6 +48,21 @@ describe('<Gallerist>', () => {
     expect(root.getAttribute('data-gallerist-skin')).toBe('console')
     expect(root.getAttribute('data-gallerist-scheme')).toBe('light')
     expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
+  })
+
+  it('hands the preset to plugin regions (thumbnails() reads its rail defaults there)', () => {
+    const seen: RegionCtx['preset'][] = []
+    const probe: Plugin = () => ({
+      name: 'probe',
+      regions: {
+        footer: (ctx) => {
+          seen.push(ctx.preset)
+          return document.createElement('div')
+        },
+      },
+    })
+    render(<Gallerist collection={collection} open preset="reviewer" plugins={[probe]} />)
+    expect(seen[0]?.thumbnails).toEqual({ itemAxis: 'vertical', timeline: true, numberItems: true })
   })
 
   it('passes navigator to the renderer, overriding the preset', () => {

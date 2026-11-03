@@ -1,13 +1,14 @@
 // Layout presets (M14 UX-E). A preset bundles a coherent set of layout choices — arrow placement,
 // chrome auto-hide, and the thumbnail rail's secondary-axis layout / time-ribbon — behind a single
-// name. Pure resolver (no DOM): the renderer applies `rootAttrs` + `arrows`/`autoHide`, and a host
-// (or the React adapter) spreads `thumbnails` into the thumbnails() plugin.
+// name. Pure resolver (no DOM): the renderer applies `rootAttrs` + `arrows`/`autoHide`, and hands
+// the preset to plugin regions (RegionCtx.preset), so thumbnails() takes `thumbnails` as defaults.
 
 import type { ArrowLayout, GroupAxis, ItemIndicator, RailPlacement } from './mount'
 
 export type PresetName = 'filmstrip' | 'immersive' | 'reviewer' | 'contact' | 'editorial' | 'tour'
 
-export interface ResolvedPreset {
+// A type alias, not an interface, so it is a core `PresetDefaults` (the region context's `preset`).
+export type ResolvedPreset = {
   /** data-* attributes the renderer sets on the root (drives the theme). */
   rootAttrs: Record<string, string>
   /** default arrow placement (overridable by an explicit mount option). */
@@ -16,7 +17,7 @@ export interface ResolvedPreset {
   autoHide: boolean
   /** default thumbnail rail placement (overridable). */
   rail: RailPlacement
-  /** preferred thumbnails() options for this preset. */
+  /** thumbnails() defaults: the plugin applies them to the options it wasn't given. */
   thumbnails: {
     itemAxis: 'vertical' | 'horizontal'
     groupDisplay?: 'stacked' | 'flat' | 'index'

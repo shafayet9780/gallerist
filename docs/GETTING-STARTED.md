@@ -51,15 +51,15 @@ Skins other than the default need their stylesheet too.
 
 ```ts
 import { createViewer } from '@gallerist/core'
-import { mount, resolvePreset } from '@gallerist/renderer-dom'
+import { mount } from '@gallerist/renderer-dom'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
 
 const viewer = createViewer({
   collection,
-  // the renderer doesn't own the plugin, so hand it the preset's rail options
-  plugins: [thumbnails(resolvePreset('reviewer').thumbnails)],
+  // the preset sets the rail too (reviewer: a timeline, numbered items); options you pass win
+  plugins: [thumbnails()],
 })
 mount(viewer, { preset: 'reviewer', skin: 'console', accent: 'cyan', scheme: 'dark' })
 ```

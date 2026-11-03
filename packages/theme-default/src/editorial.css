@@ -18,7 +18,7 @@
   .gallerist[data-gallerist-skin="editorial"] {
     color-scheme: light;
     --gallerist-bg: #f3f0e9;
-    --gallerist-backdrop: rgb(243 240 233 / 0.99);
+    --gallerist-backdrop: rgb(243 240 233); /* opaque: a phone showed the page through */
     --gallerist-fg: #1c1b18;
     --gallerist-fg-muted: #58544b;
     --gallerist-chrome-bg: #f3f0e9;
@@ -134,7 +134,7 @@
   .gallerist[data-gallerist-skin="editorial"][data-gallerist-scheme="dark"] {
     color-scheme: dark;
     --gallerist-bg: #191816;
-    --gallerist-backdrop: rgb(25 24 22 / 0.99);
+    --gallerist-backdrop: rgb(25 24 22);
     --gallerist-fg: #ede9e0;
     --gallerist-fg-muted: #aba597;
     --gallerist-chrome-bg: #191816;
@@ -163,7 +163,7 @@
     .gallerist[data-gallerist-skin="editorial"][data-gallerist-scheme="auto"] {
       color-scheme: dark;
       --gallerist-bg: #191816;
-      --gallerist-backdrop: rgb(25 24 22 / 0.99);
+      --gallerist-backdrop: rgb(25 24 22);
       --gallerist-fg: #ede9e0;
       --gallerist-fg-muted: #aba597;
       --gallerist-chrome-bg: #191816;

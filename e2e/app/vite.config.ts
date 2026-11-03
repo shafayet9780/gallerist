@@ -19,6 +19,7 @@ export default defineConfig({
       '@gallerist/plugin-hash': r('../../packages/plugin-hash/src/index.ts'),
       '@gallerist/plugin-download': r('../../packages/plugin-download/src/index.ts'),
       '@gallerist/plugin-pins': r('../../packages/plugin-pins/src/index.ts'),
+      '@gallerist/plugin-captions': r('../../packages/plugin-captions/src/index.ts'),
     },
   },
 })

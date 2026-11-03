@@ -61,7 +61,7 @@ export interface GalleristProps extends ViewerOptions {
   onClose?: () => void
   container?: HTMLElement | null
   controls?: boolean
-  /** layout preset (sets arrow placement, auto-hide, data-gallerist-preset) — UX-E. */
+  /** layout preset (arrow placement, auto-hide, data-gallerist-preset, the thumbnails() defaults) — UX-E. */
   preset?: PresetName
   /** visual skin, default `gallery`; other skins need their stylesheet (reactive). */
   skin?: Skin
