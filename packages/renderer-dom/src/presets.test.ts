@@ -52,6 +52,18 @@ describe('resolvePreset', () => {
     expect(p.thumbnails.groupDisplay).toBe('index')
   })
 
+  it('hands out frozen entries, so a plugin cannot change a preset for later mounts', () => {
+    for (const name of ['filmstrip', 'immersive', 'reviewer', 'editorial', 'tour', 'contact']) {
+      const p = resolvePreset(name)
+      expect(Object.isFrozen(p)).toBe(true)
+      expect(Object.isFrozen(p.thumbnails)).toBe(true)
+      expect(Object.isFrozen(p.rootAttrs)).toBe(true)
+      expect(() => {
+        ;(p.thumbnails as { numberItems?: boolean }).numberItems = false
+      }).toThrow(TypeError)
+    }
+  })
+
   it('falls back to filmstrip for an unknown name (and warns)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(resolvePreset('nope')).toEqual(resolvePreset('filmstrip'))

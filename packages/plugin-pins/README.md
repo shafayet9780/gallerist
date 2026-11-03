@@ -44,6 +44,10 @@ mount(viewer)
 | `comment` | a numbered disc in the accent; muted when `resolved` | `label` (author), `meta` (time), `body`, `replies`, a resolved badge |
 | `feature` | a numbered disc | `label`, `meta`, `body`, an optional link |
 
+The default card links only to `http:`, `https:`, `mailto:` and `tel:` URLs, and to relative ones
+(judged as http, whatever the page's own scheme). Any other `href` (`javascript:`, `data:`, `file:`,
+`blob:` …) shows the card without its link. A `renderCard` card is yours to check.
+
 | Option | Default | |
 |---|---|---|
 | `presentation` | `'tag'` | how pins look and what the card holds |

@@ -3,7 +3,7 @@
 // zip lib (client-zip, a regular dependency) so it costs nothing until used (decision P1-H).
 
 import type { Group, Item, MediaSource, Plugin } from '@gallerist/core'
-import { ICONS } from '@gallerist/core/internal'
+import { ICONS, safeUrl } from '@gallerist/core/internal'
 
 /** Resolve a MediaSource to a downloadable URL (string/responsive sync; loader async). */
 export async function urlOf(source: MediaSource): Promise<string | null> {
@@ -18,16 +18,11 @@ export async function urlOf(source: MediaSource): Promise<string | null> {
 
 // Security: only schemes that fetch/save inert media. Rejects javascript:/data:/file: etc., which
 // could navigate the host frame or exfiltrate. Relative URLs resolve to http(s) and are allowed.
-const SAFE_SCHEMES = new Set(['http:', 'https:', 'blob:'])
+const SAFE_SCHEMES = ['http:', 'https:', 'blob:']
 
-/** Return `url` if its scheme is download-safe, else null. */
+/** Return `url` if its scheme is download-safe (http(s), blob, or relative), else null. */
 export function safeHref(url: string): string | null {
-  try {
-    const base = typeof location !== 'undefined' ? location.href : 'http://localhost/'
-    return SAFE_SCHEMES.has(new URL(url, base).protocol) ? url : null
-  } catch {
-    return null
-  }
+  return safeUrl(url, SAFE_SCHEMES)
 }
 
 /** Strip path separators, traversal, and control chars so a filename can't escape its directory

@@ -70,7 +70,7 @@ Try every combination on the docs site's playground (`pnpm --filter @gallerist/s
 | `pnpm e2e` | Browser tests (Playwright: gestures, a11y/axe, overlays) |
 | `pnpm typecheck` | TypeScript strict typecheck, all packages |
 | `pnpm lint` / `pnpm format` | Biome check / write |
-| `pnpm size` | size-limit budget gate (core ≤ 12 KB, core+renderer ≤ 16 KB gz) |
+| `pnpm size` | size-limit budget gate (core ≤ 12 KB, core+renderer ≤ 16.5 KB gz) |
 | `pnpm check:dist` | Checks on built output: the `"use client"` banner, the global build |
 
 ## Packages

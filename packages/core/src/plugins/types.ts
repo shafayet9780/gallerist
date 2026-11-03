@@ -31,9 +31,9 @@ export type PresetDefaults = { readonly [key: string]: unknown }
 
 /** Passed to a region renderer; the viewer is the handle for state/actions/subscription. */
 export interface RegionCtx {
-  viewer: ViewerApi
-  /** the mounted preset's layout defaults; undefined without a preset */
-  preset?: PresetDefaults
+  readonly viewer: ViewerApi
+  /** the mounted preset's layout defaults (frozen); undefined without a preset */
+  readonly preset?: PresetDefaults
 }
 
 /** Pluggable transition seam (spec §10.4) — minimal in Phase 1; full API is future work. */

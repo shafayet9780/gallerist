@@ -101,6 +101,11 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
   },
 }
 
+// The entries are shared by every mount and handed to plugins (RegionCtx.preset): freeze them, so a
+// plugin writing to one can't change the preset for the next mount.
+for (const p of Object.values(PRESETS))
+  for (const o of [p.rootAttrs, p.thumbnails, p]) Object.freeze(o)
+
 /** Resolve a preset name to its layout config; unknown names warn (dev) and fall back to `filmstrip`. */
 export function resolvePreset(name: string): ResolvedPreset {
   const preset = PRESETS[name as PresetName]

@@ -245,7 +245,7 @@ describe('plugin-pins', () => {
     expect(tag.querySelector('.gallerist-pin-link')?.textContent).toBe('View')
   })
 
-  it('the default card links only to http(s), mailto and relative URLs', () => {
+  it('the default card links only to http(s), mailto, tel and relative URLs', () => {
     const link = (href: string) =>
       defaultPinCard(pin('l', 0, 0, { label: 'Lamp', href }))
         .querySelector('.gallerist-pin-link')
@@ -253,6 +253,7 @@ describe('plugin-pins', () => {
     expect(link('https://shop.example/lamp')).toBe('https://shop.example/lamp')
     expect(link('http://shop.example/lamp')).toBe('http://shop.example/lamp')
     expect(link('mailto:sales@example.com')).toBe('mailto:sales@example.com')
+    expect(link('tel:+15550100')).toBe('tel:+15550100')
     expect(link('/lamp')).toBe('/lamp')
     expect(link('lamp?id=2')).toBe('lamp?id=2')
     expect(link('#lamp')).toBe('#lamp')
@@ -266,6 +267,16 @@ describe('plugin-pins', () => {
       'blob:https://shop.example/1',
     ]) {
       expect(link(bad), bad).toBeNull()
+    }
+  })
+
+  it('keeps relative links on a page whose own URL is not http (about:srcdoc)', () => {
+    vi.stubGlobal('location', { href: 'about:srcdoc', protocol: 'about:' })
+    try {
+      const card = defaultPinCard(pin('l', 0, 0, { label: 'Lamp', href: 'lamp?id=2' }))
+      expect(card.querySelector('.gallerist-pin-link')?.getAttribute('href')).toBe('lamp?id=2')
+    } finally {
+      vi.unstubAllGlobals()
     }
   })
 

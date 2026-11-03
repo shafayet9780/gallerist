@@ -1428,6 +1428,76 @@ describe('mount — modal accessibility (WS-3)', () => {
     expect(document.querySelectorAll('.gallerist')[1]?.hasAttribute('aria-describedby')).toBe(false)
   })
 
+  // A caption renderer's band that overflows takes focus and a name (axe scrollable-region-focusable),
+  // only while it overflows; the band keeps ↑/↓/Home/End for scrolling.
+  for (const indicator of ['pills', 'placard'] as const) {
+    it(`an overflowing custom caption band is keyboard-scrollable (${indicator})`, () => {
+      const fits: (() => void)[] = []
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(cb: () => void) {
+            fits.push(cb)
+          }
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        },
+      )
+      try {
+        const tall = document.createElement('div')
+        tall.textContent = 'Long'
+        const v = createViewer({
+          collection: {
+            groups: [
+              { id: 'g0', items: [item('a0'), item('a1')] },
+              { id: 'g1', items: [item('b0')] },
+            ],
+          },
+          plugins: [() => ({ name: 'tall-caption', regions: { caption: () => tall } })],
+        })
+        mount(v, { itemIndicator: indicator })
+        v.open()
+        const band = (
+          indicator === 'placard'
+            ? document.querySelector('.gallerist-region-caption')
+            : document.querySelector('.gallerist-caption')
+        ) as HTMLElement
+        let content = 50
+        Object.defineProperty(band, 'scrollHeight', { get: () => content, configurable: true })
+        Object.defineProperty(band, 'clientHeight', { get: () => 100, configurable: true })
+        const resize = () => {
+          for (const fit of fits) fit()
+        }
+        resize()
+        expect(band.hasAttribute('tabindex')).toBe(false)
+        expect(band.hasAttribute('role')).toBe(false)
+        content = 300 // now it scrolls
+        resize()
+        expect(band.getAttribute('tabindex')).toBe('0')
+        expect(band.getAttribute('role')).toBe('region')
+        const label = document.getElementById(band.getAttribute('aria-labelledby') ?? '')
+        expect(label?.textContent).toBe('Caption')
+        // the viewer's description is still the caption's text, not the band's name
+        const root = document.querySelector('.gallerist') as HTMLElement
+        expect(root.getAttribute('aria-describedby')?.split(' ')).not.toContain(label?.id)
+        // ↑/↓/Home/End on the focused band scroll it rather than navigate
+        band.focus()
+        band.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+        band.dispatchEvent(key({ key: 'End', cancelable: true }))
+        expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+        band.dispatchEvent(key({ key: 'ArrowRight', cancelable: true })) // ← / → still navigate
+        expect(v.getState().cursor.g).toBe(1)
+        content = 80 // fits again
+        resize()
+        for (const a of ['tabindex', 'role', 'aria-labelledby'])
+          expect(band.hasAttribute(a), a).toBe(false)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  }
+
   it('ignores a caption that is not a string (untyped data with an old caption object)', () => {
     const v = createViewer({
       collection: {

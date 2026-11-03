@@ -47,6 +47,18 @@ describe('plugin-grid', () => {
     expect(gridEl().querySelectorAll('.gallerist-grid-cell').length).toBe(3) // 2 + 1 items
   })
 
+  it('each group’s listbox is named after its header', () => {
+    open()
+    ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+    const headers = [...gridEl().querySelectorAll('.gallerist-grid-header')]
+    const boxes = [...gridEl().querySelectorAll('[role="listbox"]')]
+    expect(boxes.length).toBe(2)
+    expect(boxes.map((b) => b.getAttribute('aria-label'))).toEqual(
+      headers.map((h) => h.textContent),
+    )
+    expect(boxes[0]?.getAttribute('aria-label')).toBeTruthy()
+  })
+
   it('clicking a cell navigates and hides the grid', () => {
     const v = open()
     ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()

@@ -28,6 +28,25 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   skin took ~660 ms there; now ~65 ms.
 
 ### Fixed
+- **plugin-thumbnails**: mounting a viewer again with another preset (`h = mount(v, { preset:
+  'reviewer' }); h.destroy(); mount(v, { preset: 'editorial' })`, or none, then `tour`) kept the first
+  mount's rail (its timeline and aside stack under the new layout); the rail is rebuilt for each mount.
+- **plugin-thumbnails**: `thumbnails({ groupDisplay: 'stacked' })` under `tour` no longer inherits the
+  index's horizontal item row and numbering: an explicit `groupDisplay` other than the preset's starts
+  from the plugin's own `itemAxis`, `numberItems` and `timeline`. Unknown `groupDisplay` / `itemAxis`
+  values (from a renderer's preset or untyped options) fall back to the defaults, and a preset that
+  makes the rail `flat` leaves the claimed items toggle and `e` key inert.
+- **renderer-dom**: the built-in presets are frozen, so a plugin writing to `ctx.preset` can't change
+  the preset for the next mount; `RegionCtx` fields are `readonly`.
+- **renderer-dom**: a caption renderer's band that overflows (a long `plugin-captions` /
+  `<Gallerist.Caption>` caption, in the band or the editorial placard) can be scrolled by keyboard: while
+  it overflows it is focusable (`tabindex="0"`), a `region` named by `strings.caption` ("Caption"), and
+  ↑/↓/Home/End scroll it instead of moving the viewer. A band that fits stays out of the tab order.
+- **plugin-grid**: each group's `listbox` in the `cells` layout is named after its header.
+- **plugin-pins, plugin-download**: relative URLs are judged against a fixed http base rather than the
+  page's own URL, so they keep their link / download on `file:`, app-scheme (`capacitor:`) and
+  `about:srcdoc` pages (resolving against `about:srcdoc` threw). Pins also link `tel:` URLs. Both use
+  one check (`safeUrl` in `@gallerist/core/internal`) with their own scheme lists.
 - **plugin-thumbnails**: a right-to-left rail follows its scroll; it read the first card (the
   rightmost) as the one in the middle and folded the drawn run back to the start, leaving what showed
   empty. The rail reads which way it runs from its scroller rather than from two cards, so a `flat`
@@ -68,7 +87,7 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **theme**: a caption renderer's band stops growing where the stage would drop below 36% of the
   viewer (a tall rail and bar on a phone, or the reviewer's timeline), and scrolls from there; it
   used to take its full 40vh and leave the stage as little as 28%.
-- **plugin-pins**: the default card links only to `http:`, `https:`, `mailto:` and relative URLs; a
+- **plugin-pins**: the default card links only to `http:`, `https:`, `mailto:`, `tel:` and relative URLs; a
   pin whose `href` is `javascript:`, `data:` or any other scheme gets no link (pin data can come from
   users).
 - **plugin-download**: an item with nothing safe to save (no URL, or a `data:`, `javascript:` or
@@ -126,9 +145,16 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **examples/tour**: a listing page using all of the above.
 
 ### Breaking
-- **plugin-thumbnails**: under a preset, an option left unset follows the preset: `thumbnails()` with
-  `preset: 'reviewer'` now draws the timeline and numbered items it used to need spelling out. Pass
-  the option (e.g. `timeline: false`) to keep a plain rail.
+- **plugin-thumbnails**: under a preset, an option left unset follows the preset, so a bare
+  `thumbnails()` changes with it: `preset: 'reviewer'` now draws the timeline and numbered items it
+  used to need spelling out; `tour` turns the rail into the section index (`groupDisplay: 'index'`,
+  numbered items); `editorial` moves the item stack out of the aside column into a numbered row in the
+  rail (`itemAxis: 'horizontal'`, `numberItems: true`). Pass the option (e.g. `timeline: false`,
+  `groupDisplay: 'stacked'`) to keep the old rail. An explicit `groupDisplay` other than the preset's
+  also drops its `itemAxis`, `numberItems` and `timeline`, which belong to the preset's own display.
+- **plugin-thumbnails**: the rail's DOM is no longer created in `init()`, only when its region mounts
+  (`mount()`, or a `viewer.use()` after it), so a viewer that is never mounted creates none. A new
+  mount after the previous one was destroyed builds the rail again, with that mount's preset.
 - **core**: `Item.caption` is plain text (`string`); it no longer accepts an `OverlaySpec`, which the
   DOM renderer never drew. Designed captions come from `@gallerist/plugin-captions` or
   `<Gallerist.Caption>`, so item data stays JSON.

@@ -71,6 +71,8 @@ const VIEWPORTS = {
   desktop: { viewport: { width: 1280, height: 800 } },
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
   narrow: { viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true },
+  // a phone turned sideways: wide but short, so the bar, caption and rail compete for 390px of height
+  landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true },
 } as const
 
 // One entry per independently placed piece of chrome. Containers that merely group other atoms are
@@ -175,6 +177,33 @@ async function installClip(page: Page) {
       if (x1 - x0 < 1 || y1 - y0 < 1) return null
       r = new DOMRect(x0, y0, x1 - x0, y1 - y0)
       return r
+    }
+  })
+}
+
+// The rail has drawn its cards and the layout has held still for two frames (rail contents and
+// scroll, stage and caption band size), rather than a fixed delay.
+async function railSettled(page: Page) {
+  await expect(page.locator('.gallerist-thumbs > *').first()).toBeAttached()
+  await page.evaluate(async () => {
+    const frame = () => new Promise((done) => requestAnimationFrame(done))
+    const snap = () => {
+      const rail = document.querySelector('.gallerist-thumbs')
+      const box = (sel: string) => document.querySelector(sel)?.getBoundingClientRect().height
+      return [
+        rail?.childElementCount,
+        rail?.scrollLeft,
+        rail?.scrollTop,
+        box('.gallerist-stage'),
+        box('.gallerist-caption'),
+      ].join()
+    }
+    let last = snap()
+    for (let still = 0, n = 0; still < 2 && n < 120; n++) {
+      await frame()
+      const now = snap()
+      still = now === last ? still + 1 : 0
+      last = now
     }
   })
 }
@@ -480,8 +509,9 @@ test.describe('layout behaviour', () => {
     for (const vp of [
       { width: 1280, height: 800 },
       { width: 390, height: 844 },
+      { width: 844, height: 390 }, // a phone turned sideways
     ]) {
-      test(`a custom caption band grows, then scrolls (${preset || 'default'}, ${skin}, ${vp.width}px)`, async ({
+      test(`a custom caption band grows, then scrolls (${preset || 'default'}, ${skin}, ${vp.width}×${vp.height})`, async ({
         page,
       }) => {
         await page.setViewportSize(vp)
@@ -489,7 +519,7 @@ test.describe('layout behaviour', () => {
           await page.goto(`/layout.html?skin=${skin}&${preset}&custom=${size}&g=1`)
           await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
           await expect(page.locator('.gallerist-caption .fixture-caption')).toBeVisible()
-          await page.waitForTimeout(150) // let the rail settle
+          await railSettled(page)
           return page.evaluate(() => {
             const box = (sel: string) => {
               const el = document.querySelector<HTMLElement>(sel)

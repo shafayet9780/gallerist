@@ -404,6 +404,22 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const cid = `gallerist-caption-${++mounts}`
   const captionText = el('span', 'gallerist-caption-text', { id: cid })
   regionHosts.caption.id = `${cid}r`
+  // While a caption renderer's band overflows, its scroller (the band; in a placard, the region in
+  // its slot) takes focus and a name, so a keyboard can scroll it. Named by reference: an aria-label
+  // would also replace the region's text in the viewer's description.
+  const capLabel = el('span', '', { id: `${cid}l`, hidden: '' })
+  capLabel.textContent = ui.caption
+  const capScroll = placard ? regionHosts.caption : caption
+  const fitCaption = () => {
+    const set =
+      regionHosts.caption.hasChildNodes() && capScroll.scrollHeight > capScroll.clientHeight
+        ? 'setAttribute'
+        : 'removeAttribute'
+    capScroll[set]('tabindex', '0')
+    capScroll[set]('role', 'region')
+    capScroll[set]('aria-labelledby', capLabel.id)
+  }
+  const capObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fitCaption) : null
   caption.append(captionText, regionHosts.caption)
   caption.hidden = true
   let anyCaption = false
@@ -418,6 +434,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     caption.toggleAttribute('data-gallerist-custom', own)
     // described by the caption only while it shows (hidden text would still be read out)
     root[hide ? 'removeAttribute' : 'setAttribute']('aria-describedby', `${cid} ${cid}r`)
+    // the band and its content resize as it grows or scrolls: check then (no layout read here)
+    for (const n of [capScroll, ...capScroll.children]) capObserver?.observe(n)
+    if (!own) fitCaption()
   }
   root.append(
     regionHosts.backdrop,
@@ -427,6 +446,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     caption,
     regionHosts.footer,
     regionHosts.thumbnails,
+    capLabel,
   )
 
   const live = el('div', 'gallerist-live', { 'aria-live': 'polite', role: 'status' })
@@ -1075,6 +1095,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // closes from anywhere (I-UX2), unless a handler before ours called preventDefault() on it
     // (a host form keeping Escape for itself).
     if (isEditableTarget(e.target) && e.key !== 'Escape') return
+    // a focused caption band scrolls with ↑/↓/Home/End rather than navigating
+    if (e.target === capScroll && /^(Arrow(Up|Down)|Home|End)$/.test(e.key)) return
     // Focus trap: cycle Tab within the dialog so focus can't escape to the inert page (C5).
     if (e.key === 'Tab' && overlay) {
       const tabbables = focusableWithin(root)
@@ -1412,6 +1434,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       detachGestures()
       resizeObserver?.disconnect()
       bandObserver?.disconnect()
+      capObserver?.disconnect()
       if (insetFrame) cancelAnimationFrame(insetFrame)
       if (resizeFrame) cancelAnimationFrame(resizeFrame)
       idle?.destroy()

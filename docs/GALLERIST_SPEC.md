@@ -591,7 +591,7 @@ Full option list with defaults lives in §8.1; defaults summary: `loop:true`, `i
 
 | Metric | Target |
 |---|---|
-| Core (`@gallerist/core` + `renderer-dom`, gz) | ≤ 16 KB |
+| Core (`@gallerist/core` + `renderer-dom`, gz) | ≤ 16.5 KB (16 KB until 2026-11-03; raised for the keyboard-scrollable caption band, plan P2-R) |
 | Core + thumbnails + image, gz | ≤ 24 KB (≈ lighter than lightGallery+plugins and ~PhotoSwipe) |
 | Cold open → first slide painted | < 100 ms (cached) |
 | Navigation frame rate | 60 fps (no long tasks > 50 ms) |

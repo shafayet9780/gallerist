@@ -749,6 +749,101 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       v.open()
       expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
     })
+
+    it('a new mount builds the rail again for its own preset (reviewer, then editorial)', () => {
+      const v = createViewer({ collection: timed(), plugins: [thumbnails()] })
+      const first = mount(v, { preset: 'reviewer' })
+      v.open()
+      v.next()
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+      expect(
+        document.querySelector('.gallerist-region-aside .gallerist-thumb-items'),
+      ).not.toBeNull()
+      first.destroy()
+      mount(v, { preset: 'editorial' })
+      expect(document.querySelectorAll('.gallerist-thumbs').length).toBe(1)
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+      const row = document.querySelector('.gallerist-region-thumbnails .gallerist-thumb-items')
+      expect(row?.getAttribute('data-axis')).toBe('horizontal')
+      expect(nums()).toEqual(['1', '2'])
+      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+      // the rail follows the viewer from the new mount
+      v.goTo(2)
+      expect(
+        document.querySelector('.gallerist-thumb[data-active]')?.getAttribute('data-group'),
+      ).toBe('g2')
+    })
+
+    it('a new mount builds the rail again for its own preset (none, then tour)', () => {
+      const v = createViewer({ collection: timed(), plugins: [thumbnails()] })
+      const first = mount(v)
+      v.open()
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-display')).toBe(false)
+      first.destroy()
+      mount(v, { preset: 'tour' })
+      expect(document.querySelectorAll('.gallerist-thumbs').length).toBe(1)
+      expect(document.querySelector('.gallerist-thumbs')?.getAttribute('data-display')).toBe(
+        'index',
+      )
+      expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(3)
+      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+    })
+
+    it('an explicit groupDisplay other than the preset’s drops its layout keys (tour, stacked)', () => {
+      const v = openPreset('tour', { groupDisplay: 'stacked' })
+      v.next()
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-display')).toBe(false)
+      // the plugin's own item axis (a vertical stack in the aside column) and no numbers
+      expect(
+        document
+          .querySelector('.gallerist-region-aside .gallerist-thumb-items')
+          ?.getAttribute('data-axis'),
+      ).toBe('vertical')
+      expect(nums()).toEqual([])
+    })
+
+    it('an explicit groupDisplay equal to the preset’s keeps its layout keys (reviewer, stacked)', () => {
+      const v = openPreset('reviewer', { groupDisplay: 'stacked' })
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+      v.next()
+      expect(nums()).toEqual(['1', '2'])
+    })
+
+    // A renderer's preset is untyped data: values outside the known ones take the defaults.
+    const regionsWith = (thumbs: unknown, opts?: Parameters<typeof thumbnails>[0]) => {
+      const v = createViewer({ collection: timed() })
+      const inst = thumbnails(opts)(v)
+      inst.init?.()
+      const ctx = { viewer: v, preset: { thumbnails: thumbs } }
+      const regions = inst.regions ?? {}
+      const rail = regions.thumbnails?.(ctx) as HTMLElement
+      document.body.appendChild(rail)
+      return { v, inst, ctx, rail, regions }
+    }
+
+    it('unknown groupDisplay / itemAxis values from a preset fall back to the defaults', () => {
+      const { ctx, rail, regions } = regionsWith({ groupDisplay: 'grid', itemAxis: 'diagonal' })
+      const strip = rail.querySelector('.gallerist-thumbs')
+      expect(strip?.hasAttribute('data-display')).toBe(false)
+      expect(strip?.getAttribute('role')).toBe('listbox')
+      // a vertical stack, so the aside column gets its node
+      const aside = regions.aside?.(ctx)
+      expect(aside?.nodeType).toBe(Node.ELEMENT_NODE)
+      expect((aside as HTMLElement).className).toBe('gallerist-thumbs-aside')
+    })
+
+    it('a preset that makes the rail flat leaves the claimed toggle and `e` key inert', () => {
+      const { v, inst, ctx, rail, regions } = regionsWith({ groupDisplay: 'flat' })
+      v.open()
+      expect(rail.querySelector('.gallerist-thumbs')?.getAttribute('data-display')).toBe('flat')
+      // the toolbar region was claimed (the explicit options allowed it) but gets no button
+      expect(regions.toolbar?.(ctx).nodeType).toBe(Node.COMMENT_NODE)
+      const before = rail.innerHTML
+      inst.keymap?.e?.(new KeyboardEvent('keydown', { key: 'e' }))
+      inst.keymap?.E?.(new KeyboardEvent('keydown', { key: 'E' }))
+      expect(rail.innerHTML).toBe(before)
+      expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
+    })
   })
 
   describe('scrolling', () => {

@@ -19,6 +19,8 @@ export interface Strings {
   resetZoom: string
   showThumbnails: string
   hideThumbnails: string
+  /** name of a caption renderer's band while it scrolls (it then takes focus, to scroll by keyboard) */
+  caption: string
   /** label of an item pill in the position indicator */
   item: (n: number) => string
   /** announced on group navigation, e.g. "Group 2 of 12" */
@@ -40,6 +42,7 @@ export const DEFAULT_STRINGS: Strings = {
   resetZoom: 'Reset zoom',
   showThumbnails: 'Show thumbnails',
   hideThumbnails: 'Hide thumbnails',
+  caption: 'Caption',
   item: (n) => `Item ${n}`,
   groupOf: (n, total) => `Group ${n} of ${total}`,
   itemOf: (n, total) => `Item ${n} of ${total}`,

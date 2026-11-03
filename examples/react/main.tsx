@@ -156,7 +156,8 @@ function App() {
 
   // thumbnails plugin
   const [groupDisplay, setGroupDisplay] = useState<GroupDisplay>('stacked')
-  const [itemAxis, setItemAxis] = useState<ItemAxis>('vertical')
+  // 'auto' leaves itemAxis unset, so the preset's rail shows (editorial's numbered row, tour's index)
+  const [itemAxis, setItemAxis] = useState<Opt<ItemAxis>>('auto')
   const [overscan, setOverscan] = useState(24)
   const [expandActive, setExpandActive] = useState(true)
 
@@ -180,7 +181,14 @@ function App() {
   )
 
   const plugins = useMemo(() => {
-    const list = [thumbnails({ groupDisplay, itemAxis, overscan, expandActive })]
+    const list = [
+      thumbnails({
+        groupDisplay,
+        itemAxis: itemAxis === 'auto' ? undefined : itemAxis,
+        overscan,
+        expandActive,
+      }),
+    ]
     if (pGrid) list.push(grid())
     if (pFullscreen) list.push(fullscreen())
     if (pDownload) list.push(download())
@@ -427,12 +435,18 @@ function App() {
             </select>
           </label>
           <label className="field">
-            Item axis{groupDisplay === 'flat' && <span className="def">ignored in flat</span>}
+            Item axis
+            {groupDisplay === 'flat' ? (
+              <span className="def">ignored in flat</span>
+            ) : (
+              <span className="def">preset: {def.thumbnails.itemAxis}</span>
+            )}
             <select
               value={itemAxis}
               disabled={groupDisplay === 'flat'}
-              onChange={(e) => setItemAxis(e.target.value as ItemAxis)}
+              onChange={(e) => setItemAxis(e.target.value as Opt<ItemAxis>)}
             >
+              <option value="auto">auto (preset)</option>
               {AXES.map((a) => (
                 <option key={a} value={a}>
                   {a}
@@ -611,7 +625,7 @@ function usageSnippet(c: {
   startGroup: number
   linear: boolean
   groupDisplay: GroupDisplay
-  itemAxis: ItemAxis
+  itemAxis: Opt<ItemAxis>
   overscan: number
   expandActive: boolean
   pGrid: boolean
@@ -622,7 +636,7 @@ function usageSnippet(c: {
 }): string {
   const thumbOpts = [
     `groupDisplay: '${c.groupDisplay}'`,
-    c.groupDisplay === 'flat' ? null : `itemAxis: '${c.itemAxis}'`,
+    c.groupDisplay === 'flat' || c.itemAxis === 'auto' ? null : `itemAxis: '${c.itemAxis}'`,
     c.overscan !== 24 ? `overscan: ${c.overscan}` : null,
     c.groupDisplay !== 'flat' && !c.expandActive ? 'expandActive: false' : null,
   ].filter(Boolean)

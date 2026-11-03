@@ -44,7 +44,8 @@ download({
 })
 ```
 
-Only `http:`, `https:` and `blob:` URLs (and relative ones) are saved. When the current item has none
+Only `http:`, `https:` and `blob:` URLs (and relative ones, judged as http whatever the page's own
+scheme, so they work on `file:` and app pages too) are saved. When the current item has none
 (no source URL, a `data:`, `javascript:` or `file:` URL, a tiled source, or `downloadUrl` returned
 `null`), the button is marked unavailable (`aria-disabled="true"`, dimmed by the theme) and `d` does
 nothing; the state follows the item as you navigate. The button stays focusable, so focus never drops

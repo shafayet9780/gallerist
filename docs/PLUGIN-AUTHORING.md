@@ -39,6 +39,11 @@ A region renderer gets `ctx = { viewer, preset? }`. `preset` is the renderer's m
 `PresetDefaults`, a map keyed by what each entry configures (the DOM renderer passes `resolvePreset()`'s
 result; it's undefined without a preset). A plugin reads its own key as defaults under the options it
 was given: `plugin-thumbnails` takes `preset.thumbnails` and settles its layout when its region mounts.
+Treat it as untyped, read-only data: the built-in presets are frozen, and a value your plugin doesn't
+know should fall back to its default. Each mount passes its own `ctx` to all of its regions, and a
+region renderer runs once per mount: when a viewer is mounted again (after the first mount was
+destroyed) the renderer calls it with a new `ctx`, perhaps with another preset, so a plugin that builds
+its UI from `ctx.preset` builds it again for that mount (see `plugin-thumbnails`).
 
 ## Patterns
 
@@ -69,7 +74,9 @@ was given: `plugin-thumbnails` takes `preset.thumbnails` and settles its layout 
 - **Treat collection data (URLs, ids, captions, the URL hash) as untrusted** — it often comes from a
   host app's end users. Prefer `textContent` over `innerHTML` (the renderer is text-first). Before
   assigning an attacker-influenceable URL to `a.href`/`fetch`, allowlist the scheme
-  (`http`/`https`/`blob`; reject `javascript:`/`data:`/`file:`); sanitize any value used as a
+  (`http`/`https`/`blob`; reject `javascript:`/`data:`/`file:`) with `safeUrl(url, schemes)` from
+`@gallerist/core/internal`, which judges relative URLs against a fixed http base (the page's own URL
+may be `file:` or `about:srcdoc`); sanitize any value used as a
   filename or zip entry name (strip `/`, `\`, `..`, control chars) — see `plugin-download`. Anchor
   provider URL matching to the hostname, not a substring — see `plugin-video-youtube`. Inject a
   third-party `<script>`/iframe only from a hardcoded trusted origin and document the required CSP.

@@ -72,8 +72,10 @@ thumbnails({
 
 Presets configure these for you: with `mount(viewer, { preset })` (or React's `preset` prop) every
 option you leave unset takes the preset's value, so `thumbnails()` under `preset: 'reviewer'` gets the
-timeline and numbered items; an option you pass wins, key by key (`undefined` counts as unset). The
-options settle when the rail mounts. See [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md)
+timeline and numbered items; an option you pass wins, key by key (`undefined` counts as unset). One
+exception: the preset's `itemAxis`, `numberItems` and `timeline` belong to its own group display, so
+an explicit `groupDisplay` other than the preset's starts from the plugin's defaults for those. The
+options settle when the rail mounts (and again for each new mount, with its preset). See [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md)
 for each preset's values. The rail's **position** (bottom/top/hidden) is a renderer option (`rail`),
 not a thumbnails option.
 

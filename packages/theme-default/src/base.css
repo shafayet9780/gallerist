@@ -1764,6 +1764,9 @@
     .gallerist[data-gallerist-preset="tour"] {
       --gallerist-frame-inset: 12px;
     }
+  }
+  /* a narrow viewer, or a short one (a phone turned sideways) */
+  @media (max-width: 600px), (max-height: 500px) {
     .gallerist {
       --gallerist-thumb-h: 56px;
       --gallerist-toolbar-h: 52px;
@@ -1809,6 +1812,25 @@
   .gallerist-caption {
     padding: 6px 12px;
     font-size: 13px;
+  }
+}
+/* a short viewer (a phone turned sideways): compact caption type, and a bottom rail's handle sits
+   beside the strip instead of on top of it, so the stage keeps its share of the height. The rail keeps
+   its full height: a tall caption band scrolls rather than squeezing the strip off the screen. */
+@media (max-height: 500px) {
+  .gallerist-caption {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .gallerist[data-gallerist-orientation="horizontal"] .gallerist-region-thumbnails {
+    flex-direction: row;
+    min-height: auto;
+  }
+  .gallerist[data-gallerist-orientation="horizontal"] .gallerist-rail-handle {
+    height: auto;
+  }
+  .gallerist[data-gallerist-orientation="horizontal"] .gallerist-thumbs-region {
+    flex: 1 1 auto;
   }
 }
 @media (pointer: coarse) {

@@ -243,6 +243,7 @@ export function grid(opts: GridOptions = {}): Plugin {
         const cells = document.createElement('div')
         cells.className = 'gallerist-grid-cells'
         cells.setAttribute('role', 'listbox')
+        cells.setAttribute('aria-label', header.textContent) // named after its group's header
         root.insertBefore(header, atStart ? head.nextSibling : tail)
         root.insertBefore(cells, header.nextSibling)
         block = { header, cells }

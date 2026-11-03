@@ -69,8 +69,10 @@ arrow's accessible name with `strings.previousTo` / `strings.nextTo`.
 ## Group display (`thumbnails({ groupDisplay })`)
 
 A `thumbnails()` option (not a preset/rail field), so set it on the plugin. Presets default to
-`stacked` (`tour` uses `index`); opt into `flat` explicitly, e.g. `thumbnails({ groupDisplay: 'flat' })`
-(the preset's other rail options still apply).
+`stacked` (`tour` uses `index`); opt into `flat` explicitly, e.g. `thumbnails({ groupDisplay: 'flat' })`.
+A preset's `itemAxis`, `numberItems` and `timeline` belong to its own group display, so an explicit
+`groupDisplay` other than the preset's starts from the plugin's defaults for those (`tour` with
+`groupDisplay: 'stacked'` gets the plain vertical stack, unnumbered); pass them too to keep them.
 
 - `stacked` (default) — one collapsed card per group. Hover/focus a multi-item card to **peek** its
   items without navigating in (touch gets an expand affordance). The active group's items show as a

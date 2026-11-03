@@ -50,7 +50,8 @@ and where a canvas and this plan disagree, the plan wins.
 | P2-N | Plugin escape hatches | Pins: `renderCard` returning `null` keeps the default card, which is exported (`defaultPinCard`). Download: `downloadUrl(item)` (full-resolution file, `null` = not downloadable); no safe URL marks the button unavailable per item; `client-zip` is a regular dependency. |
 | P2-O | Escape | Closes from anywhere (I-UX2), except when a handler before the viewer's called `preventDefault()`, so a host form can keep it. |
 | P2-P | Published output | Source maps carry their sources; `check:dist` packs every package and rejects a leftover `workspace:` range. Every skin's backdrop is opaque. |
-| P2-Q | Presets configure the rail (owner) | The renderer hands the resolved preset to plugin regions (`RegionCtx.preset`, typed in core as a generic `PresetDefaults` map so core stays renderer-agnostic); `thumbnails()` takes its `thumbnails` entry for each option it wasn't given, explicit options win per key. Presets stay layout-only (P2-A). The rail settles its options when its region mounts. |
+| P2-Q | Presets configure the rail (owner) | The renderer hands the resolved preset to plugin regions (`RegionCtx.preset`, typed in core as a generic `PresetDefaults` map so core stays renderer-agnostic); `thumbnails()` takes its `thumbnails` entry for each option it wasn't given, explicit options win per key. Presets stay layout-only (P2-A). The rail settles its options when its region mounts, and is rebuilt when a new mount brings another context. The preset's `itemAxis`, `numberItems` and `timeline` belong to its own group display: an explicit `groupDisplay` other than the preset's starts from the plugin's defaults for those. The built-in presets are frozen. |
+| P2-R | Size budget (owner, 2026-11-03) | core + renderer-dom 16 → 16.5 KB gz, for one change: a caption renderer's band that overflows is keyboard-scrollable (`tabindex="0"` and a name only while it overflows; axe `scrollable-region-focusable`). It didn't fit the old limit (15,952 B before it). The headroom is for that fix, not for new features. |
 
 Backlog for 0.4 from the same pass: per-item `zoomable: false`, and a built-in pins compose UI.
 
@@ -109,6 +110,8 @@ first publish from waiting on Atlas and the review plugins.
 
 - Core stays ≤ 12 KB gz (today 3.1 KB); renderer growth for peek, navigator, labels, indicator
   variants ≤ +2.5 KB gz (core + renderer ≤ 16 KB, today 12.8 KB).
+- Raised 2026-11-03 (owner, P2-R): core + renderer ≤ **16.5 KB** gz, for the keyboard-scrollable
+  caption band only (the a11y fix didn't fit at 15,952 B against 16,000 B). Not headroom for features.
 - Each skin CSS ≤ 6 KB gz; `base.css` ≤ 10 KB gz.
 - Each new plugin gets its own size-limit entry (pins ≤ 4 KB, atlas ≤ 5 KB).
 

@@ -20,7 +20,7 @@ react/vue/svelte (P1) ────┘
 | Package | Role | Touches DOM? | Bundle (gz) |
 |---|---|---|---|
 | `@gallerist/core` | Headless engine: model, store, FSM, nav, zoom/arbitration math, events, spring sampler, `createViewer` | **No** | 3.07 KB |
-| `@gallerist/renderer-dom` | The only DOM ring: windowing, image adapter, gestures, overlays, a11y, chrome | Yes | core+renderer 6.75 KB / 16 KB budget |
+| `@gallerist/renderer-dom` | The only DOM ring: windowing, image adapter, gestures, overlays, a11y, chrome | Yes | core+renderer 6.75 KB / 16 KB budget (16.5 KB since 0.3, plan P2-R) |
 | `@gallerist/theme-default` | Pure-CSS skin, `--gallerist-*` tokens, motion | n/a (CSS) | shipped separately |
 
 **Dependency direction:** `renderer-dom → core` (type-only, plus the runtime spring/zoom math).
@@ -232,7 +232,7 @@ afterSlide`, **cancelable** `beforeSlide`), item axis (`beforeItem/item/afterIte
 - **Tests:** vitest **node** env for pure logic; **happy-dom** (per-file pragma) for DOM units;
   **Playwright** (chromium) for real gestures, axe a11y, and overlay zoom-tracking.
 - **Gates (CI = `.github/workflows/ci.yml`):** lint (Biome) → typecheck → unit → build →
-  size-limit (`core ≤ 12 KB`, `core+renderer ≤ 16 KB`) → Playwright e2e (incl. axe).
+  size-limit (`core ≤ 12 KB`, `core+renderer ≤ 16.5 KB`) → Playwright e2e (incl. axe).
 - **Deferred budget:** the 60fps frame-trace assertion is flaky as a gate → dedicated perf job;
   size and the DOM-bound memory claim are gated now.
 

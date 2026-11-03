@@ -50,6 +50,18 @@ describe('safeHref (scheme allowlist)', () => {
     expect(safeHref('javascript:alert(1)')).toBeNull()
     expect(safeHref('data:text/html,<script>alert(1)</script>')).toBeNull()
     expect(safeHref('file:///etc/passwd')).toBeNull()
+    expect(safeHref('mailto:a@b.c')).toBeNull()
+  })
+
+  it('keeps relative URLs on a page whose own URL is not http (file:, about:srcdoc)', () => {
+    for (const href of ['file:///app/index.html', 'about:srcdoc']) {
+      vi.stubGlobal('location', { href, protocol: `${href.split(':')[0]}:` })
+      try {
+        expect(safeHref('a0.jpg'), href).toBe('a0.jpg')
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
   })
 })
 

@@ -233,6 +233,14 @@ function canHover(): boolean {
   return window.matchMedia?.('(hover: hover)').matches ?? true
 }
 
+const DISPLAYS = ['stacked', 'flat', 'index'] as const
+const AXES = ['vertical', 'horizontal'] as const
+// a preset's options that only make sense with the group display it was designed for
+const LAYOUT_KEYS = ['itemAxis', 'numberItems', 'timeline'] as const
+/** `value` if it is one of `known`, else the first (the default). */
+const oneOf = <T extends string>(known: readonly T[], value: unknown): T =>
+  known.includes(value as T) ? (value as T) : (known[0] as T)
+
 interface FlatEntry {
   g: number
   i: number
@@ -253,18 +261,27 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let itemAxis: NonNullable<ThumbnailsOptions['itemAxis']> = 'vertical'
     let timeLabel: ((group: Group, index: number) => string | undefined) | null = null
     let panelOpen = true // whether the active group's item panel is shown (toggle: button / `e`)
-    const configure = (preset?: ThumbnailsOptions) => {
+    const configure = (defaults?: unknown) => {
+      const preset = (defaults && typeof defaults === 'object' ? defaults : {}) as ThumbnailsOptions
       o = { ...preset }
+      // The preset's item axis, numbering and timeline belong to its own group display: an explicit
+      // `groupDisplay` that differs from it starts from the plugin's defaults for those instead.
+      if (
+        opts.groupDisplay !== undefined &&
+        opts.groupDisplay !== oneOf(DISPLAYS, preset.groupDisplay)
+      )
+        for (const k of LAYOUT_KEYS) delete o[k]
       for (const [k, v] of Object.entries(opts)) if (v !== undefined) Object.assign(o, { [k]: v })
-      groupDisplay = o.groupDisplay ?? 'stacked'
+      // untyped values (a renderer's preset, plain JS) outside the known ones take the default
+      groupDisplay = oneOf(DISPLAYS, o.groupDisplay)
       isIndex = groupDisplay === 'index'
       isFlat = groupDisplay === 'flat'
-      itemAxis = isIndex ? 'horizontal' : (o.itemAxis ?? 'vertical')
+      itemAxis = isIndex ? 'horizontal' : oneOf(AXES, o.itemAxis)
       timeLabel =
         groupDisplay === 'stacked' && o.timeline
-          ? o.timeline === true
-            ? metaTime
-            : o.timeline
+          ? typeof o.timeline === 'function'
+            ? o.timeline
+            : metaTime
           : null
       panelOpen = o.expandActive ?? true
     }
@@ -683,6 +700,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     const toggleActivePanel = () => {
+      if (isFlat) return // a preset made the rail flat after the toggle and `e` were claimed
       panelOpen = !panelOpen
       toolbarBtn?.setAttribute('aria-pressed', String(panelOpen))
       if (panelOpen) closePeek() // the persistent panel supersedes a transient peek
@@ -964,13 +982,39 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       lastI = cur.i
     }
 
-    // Build the rail once its region mounts, with the mounted preset's defaults (configure). No DOM
-    // before then, so a viewer that is never mounted (server rendering) creates none.
-    let built = false
+    // Drop the rail's DOM and listeners (destroy, or a new mount that builds it again).
+    const teardown = () => {
+      unsub?.()
+      unsub = null
+      resizeObs?.disconnect()
+      resizeObs = null
+      root?.removeEventListener('scroll', scheduleRewindow)
+      if (frame) cancelAnimationFrame(frame)
+      frame = 0
+      cancelPeekClose()
+      resetAll()
+      toolbarBtn?.removeEventListener('click', toggleActivePanel)
+      toolbarBtn = null
+      asideEl = null
+      regionEl = null
+      root = null
+      lastCol = null
+      lastG = lastI = -1
+      axis = null
+      perView = 0
+      wasClosed = true
+    }
+
+    // Build the rail when its region mounts, with the mounted preset's defaults (configure). No DOM
+    // before then, so a viewer that is never mounted (server rendering) creates none. Every region of
+    // one mount gets the same context; a later mount (after the first one was destroyed) brings a
+    // new one, maybe with another preset, so the rail is built again for it.
+    let builtFor: RegionCtx | null = null
     const build = (ctx: RegionCtx) => {
-      if (built) return
-      built = true
-      configure(ctx.preset?.thumbnails as ThumbnailsOptions | undefined)
+      if (ctx === builtFor) return
+      if (builtFor) teardown()
+      builtFor = ctx
+      configure(ctx.preset?.thumbnails)
       regionEl = document.createElement('div')
       regionEl.className = 'gallerist-thumbs-region'
       root = document.createElement('div')
@@ -1042,28 +1086,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         hoverCapable = canHover()
       },
       destroy() {
-        unsub?.()
-        observer?.disconnect()
-        resizeObs?.disconnect()
-        resizeObs = null
-        root?.removeEventListener('scroll', scheduleRewindow)
-        if (frame) cancelAnimationFrame(frame)
-        frame = 0
-        cancelPeekClose()
-        removePeek()
-        groupBtns.clear()
-        itemBtns.clear()
-        coverUrls.clear()
-        cardHost.clear()
-        groupWraps.clear()
-        itemRow?.remove()
-        itemRow = null
-        asideEl = null
-        toolbarBtn?.removeEventListener('click', toggleActivePanel)
-        toolbarBtn = null
-        liveCardId = null
-        regionEl = null
-        root = null
+        teardown()
+        builtFor = null
       },
       regions,
       keymap,

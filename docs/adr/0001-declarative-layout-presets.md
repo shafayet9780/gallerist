@@ -1,6 +1,6 @@
 # ADR 0001 — Declarative layout via data-attributes + a pure preset resolver
 
-- Status: accepted
+- Status: accepted (the preset → thumbnails consequence is superseded by plan P2-Q, 0.3)
 - Date: 2026-06-18
 - Milestone: M14 (UX/UI overhaul, v0.2.0)
 
@@ -39,5 +39,10 @@ into JS.
 - A preset cannot, by itself, configure the thumbnails plugin or open the grid — the host wires
   `resolvePreset(name).thumbnails` into `thumbnails()` (and opens `plugin-grid` for `contact`).
   Accepted as the price of keeping plugins independent and tree-shakeable.
+  **Superseded by P2-Q** (`plans/phase-2-product.md`, release 0.3): the renderer now hands its
+  resolved preset to plugin regions (`RegionCtx.preset`), and `thumbnails()` takes the preset's
+  `thumbnails` entry for each option it wasn't given, so hosts no longer wire
+  `resolvePreset(name).thumbnails` in. Plugins stay independent: core only knows a generic
+  `PresetDefaults` map. Opening the grid for `contact` is still the host's.
 - Auto-hide is inert under `prefers-reduced-motion`; the default theme appearance changed (a
   pre-1.0, semver-minor visual break) — documented, and reversible via token overrides.
