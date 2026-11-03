@@ -67,9 +67,17 @@
 .gallerist-pin-marker:focus-visible {
   outline: none;
 }
+/* the ring over the image: the focus colour banded inside and out by --gallerist-focus-halo, so it
+   shows on light and dark media alike (the focus colour alone can match the image under it) */
 .gallerist-pin-marker:focus-visible .gallerist-pin-dot {
   outline: 2px solid var(--gallerist-focus);
   outline-offset: 3px;
+  box-shadow: 0 0 0 2px var(--gallerist-pin-ring), 0 0 0 7px var(--gallerist-focus-halo), 0 2px 8px
+    rgb(0 0 0 / 0.35);
+}
+.gallerist-pin[data-presentation="tag"] .gallerist-pin-marker:focus-visible .gallerist-pin-dot {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.6), 0 0 0 7px var(--gallerist-focus-halo), 0 2px
+    8px rgb(0 0 0 / 0.3);
 }
 .gallerist-pin-card {
   position: absolute;
@@ -102,6 +110,21 @@
 /* ... and a vertical pan while it scrolls (the plugin puts it in the tab order then) */
 .gallerist-pin-card[tabindex="0"] {
   touch-action: pan-y;
+  scroll-padding-block-end: 24px; /* a control focused near the bottom clears the fade below */
+}
+/* a scrolling card says there's more below (a touch screen shows no scrollbar): its contents fade
+   out at its bottom edge. The fade sticks there as the card scrolls and, at the end, rests in the
+   room below the last control, where it covers nothing; it never takes a tap. */
+.gallerist-pin-card[tabindex="0"]::after {
+  content: "";
+  position: sticky;
+  bottom: -12px; /* the card's edge: sticky insets count from its content box */
+  flex: none;
+  height: 24px;
+  margin-block: 0 -12px; /* below the contents: 12px of its own and the card's 12px padding */
+  margin-inline: -14px -36px; /* the card's full width */
+  background: linear-gradient(transparent, var(--gallerist-pin-card-bg));
+  pointer-events: none;
 }
 .gallerist-pin-card > * {
   flex-shrink: 0; /* the card scrolls; its contents keep their height */
@@ -164,6 +187,10 @@
 .gallerist-pin-card:focus-visible {
   outline: 2px solid var(--gallerist-focus);
   outline-offset: 2px;
+}
+/* the card's ring falls outside it, on the image: banded like the pin's */
+.gallerist-pin-card:focus-visible {
+  box-shadow: 0 0 0 6px var(--gallerist-focus-halo), var(--gallerist-shadow);
 }
 .gallerist-pin-close {
   /* first in the column, 4px from the card's top and inline-end corner, taking no room (the

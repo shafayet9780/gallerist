@@ -453,3 +453,151 @@ test('a scrolled card keeps its close button in view', async ({ page }) => {
   await close.click()
   await expect(card).toBeHidden()
 })
+
+// Screen pixels of a page area (CSS px), decoded in the page: rgb triples, row by row.
+const pixels = async (
+  page: Page,
+  clip: { x: number; y: number; width: number; height: number },
+) => {
+  const png = await page.screenshot({ clip, scale: 'css', animations: 'disabled' })
+  return page.evaluate(async (b64) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const c = document.createElement('canvas')
+    c.width = img.width
+    c.height = img.height
+    const g = c.getContext('2d') as CanvasRenderingContext2D
+    g.drawImage(img, 0, 0)
+    const d = g.getImageData(0, 0, c.width, c.height).data
+    const rows: Array<Array<[number, number, number]>> = []
+    for (let y = 0; y < c.height; y++) {
+      const row: Array<[number, number, number]> = []
+      for (let x = 0; x < c.width; x++) {
+        const k = (y * c.width + x) * 4
+        row.push([d[k] as number, d[k + 1] as number, d[k + 2] as number])
+      }
+      rows.push(row)
+    }
+    return rows
+  }, png.toString('base64'))
+}
+// WCAG relative luminance and contrast ratio
+const luminance = (rgb: [number, number, number]) => {
+  const [r, g, b] = rgb.map((v) => {
+    const c = v / 255
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }) as [number, number, number]
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+const contrast = (a: [number, number, number], b: [number, number, number]) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((p, q) => q - p) as [number, number]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+// A pin sits on the image, so its focus ring needs 3:1 against whatever is under it (WCAG 2.4.11,
+// 1.4.11): the skin's focus colour alone vanishes on media of its own lightness (Console's #f5f6f7
+// ring on a light screenshot, Apploye). On a white and on a black image, in every skin and scheme,
+// for both presentations, a band of the ring at least 2px wide reaches 3:1 against the image
+// (sampled on screen, along the row through the dot's centre).
+for (const look of [
+  'skin=gallery',
+  'skin=gallery&scheme=light',
+  'skin=console',
+  'skin=console&scheme=light',
+  'skin=editorial',
+  'skin=editorial&scheme=dark',
+]) {
+  test(`a focused pin's ring stands out on white and on black media (${look})`, async ({
+    page,
+  }) => {
+    for (const bg of ['white', 'black']) {
+      for (const presentation of ['tag', 'comment']) {
+        const at = `${look} ${bg} ${presentation}`
+        await ready(page, `${look}&bg=${bg}&presentation=${presentation}`)
+        const marker = page.locator('[data-pin="b"] .gallerist-pin-marker')
+        await marker.focus()
+        expect(await marker.evaluate((el) => el.matches(':focus-visible')), at).toBe(true)
+        const dot = await dotOf(page, 'b')
+        const x0 = Math.round(dot.cx + dot.w / 2)
+        const [row] = await pixels(page, { x: x0, y: Math.round(dot.cy), width: 32, height: 1 })
+        if (!row) throw new Error('no pixels')
+        const media = row[row.length - 1] as [number, number, number]
+        expect(contrast(media, bg === 'white' ? [255, 255, 255] : [0, 0, 0]), at).toBeLessThan(1.1)
+        // the longest run of pixels at 3:1 or more within 12px of the dot's edge
+        let run = 0
+        let best = 0
+        for (const px of row.slice(0, 12)) {
+          run = contrast(px, media) >= 3 ? run + 1 : 0
+          best = Math.max(best, run)
+        }
+        expect(best, at).toBeGreaterThanOrEqual(2)
+      }
+    }
+  })
+}
+
+// A card that scrolls says there's more below (touch screens show no scrollbar): at the top of its
+// scroll its contents fade out at its bottom edge; at the end the fade covers nothing (the last
+// button looks as it does without the fade, and takes the click). In every skin, in LTR and RTL.
+for (const look of ['skin=gallery', 'skin=console', 'skin=editorial&scheme=light']) {
+  for (const dir of ['ltr', 'rtl']) {
+    test(`a scrolling card fades at its bottom edge until its end (${look}, ${dir})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 844, height: 390 })
+      await ready(page, `card=draft&presentation=comment&${look}&dir=${dir}`)
+      await page.locator('[data-pin="a"] .gallerist-pin-marker').click()
+      const card = page.locator('[data-pin="a"] .gallerist-pin-card')
+      await expect(card).toHaveAttribute('tabindex', '0')
+      // runs a measure with the fade hidden
+      const unfaded = async <T>(measure: () => Promise<T>) => {
+        const style = await page.addStyleTag({
+          content: '.gallerist-pin-card::after { visibility: hidden !important }',
+        })
+        const value = await measure()
+        await style.evaluate((el) => el.remove())
+        return value
+      }
+      // the fade spans the card without widening what it scrolls
+      const wide = () => card.evaluate((el) => el.scrollWidth)
+      expect(await wide()).toBe(await unfaded(wide))
+      const c = await card.boundingBox()
+      if (!c) throw new Error('no card box')
+      // the painted difference the fade makes in an area (max channel delta)
+      const fadeIn = async (clip: { x: number; y: number; width: number; height: number }) => {
+        const on = await pixels(page, clip)
+        const off = await unfaded(() => pixels(page, clip))
+        let max = 0
+        on.forEach((row, y) =>
+          row.forEach((px, x) => {
+            const q = off[y]?.[x] ?? px
+            max = Math.max(max, ...px.map((v, k) => Math.abs(v - (q[k] as number))))
+          }),
+        )
+        return max
+      }
+      const bottom = { x: c.x + 2, y: c.y + c.height - 8, width: c.width - 4, height: 6 }
+      expect(await fadeIn(bottom)).toBeGreaterThanOrEqual(8)
+      await card.evaluate((el) => {
+        el.scrollTop = el.scrollHeight
+      })
+      await expect
+        .poll(() => card.evaluate((el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1))
+        .toBe(true)
+      const discard = card.getByRole('button', { name: 'Discard' })
+      const b = await discard.boundingBox()
+      if (!b) throw new Error('no button box')
+      expect(b.y + b.height).toBeLessThanOrEqual(c.y + c.height)
+      expect(await fadeIn(b)).toBeLessThanOrEqual(1)
+      // nothing over the button: its bottom edge hits it
+      const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.textContent, {
+        x: b.x + b.width / 2,
+        y: b.y + b.height - 1,
+      })
+      expect(hit).toBe('Discard')
+      await discard.click()
+      await expect(card).toBeHidden()
+    })
+  }
+}

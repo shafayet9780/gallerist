@@ -1,5 +1,6 @@
 // Pins fixture (e2e/tests/pins.spec.ts): one landscape item with three pins and one portrait item
-// (for the contained zoom bounds). Query: skin, scheme, preset, presentation.
+// (for the contained zoom bounds). Query: skin, scheme, preset, presentation, card, bg (the landscape
+// image's colour), dir.
 import { type Collection, createViewer } from '@gallerist/core'
 import { type Pin, type PinPresentation, pins } from '@gallerist/plugin-pins'
 import { type ColorScheme, type PresetName, mount } from '@gallerist/renderer-dom'
@@ -8,6 +9,7 @@ import '@gallerist/theme-default/console.css'
 import '@gallerist/theme-default/editorial.css'
 
 const p = new URLSearchParams(location.search)
+if (p.get('dir') === 'rtl') document.documentElement.dir = 'rtl'
 const svg = (w: number, h: number, color: string) =>
   `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/><circle cx="${w / 4}" cy="${h / 4}" r="${w / 40}" fill="white"/></svg>`,
@@ -40,7 +42,7 @@ const collection: Collection = {
         {
           id: 'land',
           type: 'image',
-          source: svg(1600, 1000, '#2980b9'),
+          source: svg(1600, 1000, p.get('bg') ?? '#2980b9'),
           naturalSize: { w: 1600, h: 1000 },
           alt: 'landscape',
           meta: { pins: landscapePins },

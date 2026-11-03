@@ -45,6 +45,10 @@
     --gallerist-pin-resolved-bg: #5a6069; /* opaque: pins sit on photos of any brightness */
     --gallerist-pin-resolved-fg: #f0f1f3;
     --gallerist-pin-card-bg: var(--gallerist-panel); /* near-opaque: it sits on the image */
+    /* the band either side of a focus ring drawn over the image (pins): the ground, which is dark
+       where the focus colour is light and light where it is dark, so on any media one of the two
+       stands out (WCAG 2.4.11; technique C40). Set it with --gallerist-focus. */
+    --gallerist-focus-halo: var(--gallerist-bg);
 
     /* bands and tools: a skin may give the bar and rail a solid band, tint the tools, and mark a
        pressed toggle with a shadow (an underline) as well as its fill */

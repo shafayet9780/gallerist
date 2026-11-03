@@ -102,6 +102,16 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   skin took ~660 ms there; now ~65 ms.
 
 ### Fixed
+- **theme**: a focused pin's ring could vanish on the image under it (Console's near-white ring on a
+  light screenshot measured 1.08:1). The ring over media is now two-tone: the focus colour banded
+  inside and out by a new `--gallerist-focus-halo` token (the skin's ground, dark where the focus
+  colour is light and light where it is dark), so one of the two reaches 3:1 against white and black
+  media in every skin and scheme (lowest best case 6.56:1). A scrolling pin card's ring, which also
+  falls on the image, gets the same band. Chrome on the viewer's own background is unchanged.
+- **theme**: a pin card that scrolls now shows that there's more below (a touch screen has no
+  scrollbar): its contents fade out at its bottom edge until the end of the scroll, where the fade
+  rests below the last control (it never takes a tap). A control focused near the bottom scrolls
+  clear of the fade (`scroll-padding`).
 - **renderer-dom**: a focused caption band that stops scrolling (a shorter caption after ←/→, a taller
   viewport, the captions plugin removed) hands focus back to the viewer instead of dropping it to
   `<body>`, and ↑/↓/Home/End aimed at a band that no longer scrolls navigate again. A sub-pixel overflow
