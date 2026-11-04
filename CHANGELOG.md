@@ -146,6 +146,9 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   viewport, the captions plugin removed) hands focus back to the viewer instead of dropping it to
   `<body>`, and ↑/↓/Home/End aimed at a band that no longer scrolls navigate again. A sub-pixel overflow
   doesn't count as scrolling. The theme rings a focused band (`--gallerist-focus`, inset).
+- **renderer-dom**: ↑/↓/Home/End on a focused caption band scroll it by the renderer's hand (a 40px
+  line, or to the top or bottom) instead of being left to the browser: WebKit on Linux didn't scroll
+  the editorial placard's band at all. The step is immediate, not smooth.
 - **plugin-download**: whether a URL is cross-origin is judged the way the link resolves it (against
   `document.baseURI`, so a `<base href>` counts) and against the document's origin: in an
   `about:srcdoc` frame a relative URL no longer throws (no download, an unhandled rejection), and a

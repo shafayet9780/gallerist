@@ -95,7 +95,7 @@ for (const look of LOOKS) {
 }
 
 // A caption renderer's band taller than its room scrolls: it then takes focus and a name, so a
-// keyboard can scroll it (axe scrollable-region-focusable), and ↑/↓/End scroll it rather than move
+// keyboard can scroll it (axe scrollable-region-focusable), and ↑/↓/Home/End scroll it, not move
 // the viewer. A band that fits stays out of the tab order. Default band, and the editorial placard
 // (where the region in the placard's slot is what scrolls).
 for (const [look, scroller] of [
@@ -126,10 +126,18 @@ for (const [look, scroller] of [
     const head = page.locator('.fixture-caption strong')
     const item = await head.textContent()
     await band.focus()
+    const top = () => band.evaluate((el) => el.scrollTop)
+    // the renderer scrolls the band itself, so every engine and platform agrees (Linux WebKit's own
+    // keyboard scrolling left the placard's band at 0)
     await page.keyboard.press('ArrowDown')
+    await expect.poll(top).toBeGreaterThan(0)
     await page.keyboard.press('End')
-    await expect.poll(() => band.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+    const end = await band.evaluate((el) => el.scrollHeight - el.clientHeight)
+    await expect.poll(top).toBeGreaterThanOrEqual(end - 1)
+    await page.keyboard.press('Home')
+    await expect.poll(top).toBe(0)
     await expect(head).toHaveText(item ?? '')
+    await expect(band).toBeFocused()
   })
 
   test(`a custom caption band that fits stays out of the tab order (${look})`, async ({ page }) => {

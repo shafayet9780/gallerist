@@ -1604,10 +1604,30 @@ describe('mount — modal accessibility (WS-3)', () => {
         // the viewer's description is still the caption's text, not the band's name
         const root = document.querySelector('.gallerist') as HTMLElement
         expect(root.getAttribute('aria-describedby')?.split(' ')).not.toContain(label?.id)
-        // ↑/↓/Home/End on the focused band scroll it rather than navigate
+        // ↑/↓/Home/End on the focused band scroll it rather than navigate: the renderer scrolls it
+        // (a browser's own keyboard scrolling isn't relied on), clamped as a browser clamps
+        let top = 0
+        Object.defineProperty(band, 'scrollTop', {
+          get: () => top,
+          set: (t: number) => {
+            top = Math.max(0, Math.min(t, content - 100))
+          },
+          configurable: true,
+        })
         band.focus()
-        band.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
-        band.dispatchEvent(key({ key: 'End', cancelable: true }))
+        const press = (k: string) => {
+          const e = key({ key: k, cancelable: true })
+          band.dispatchEvent(e)
+          return e.defaultPrevented
+        }
+        expect(press('ArrowDown')).toBe(true)
+        expect(top).toBe(40)
+        expect(press('End')).toBe(true)
+        expect(top).toBe(200)
+        expect(press('ArrowUp')).toBe(true)
+        expect(top).toBe(160)
+        expect(press('Home')).toBe(true)
+        expect(top).toBe(0)
         expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
         band.dispatchEvent(key({ key: 'ArrowRight', cancelable: true })) // ← / → still navigate
         expect(v.getState().cursor.g).toBe(1)
