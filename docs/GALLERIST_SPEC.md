@@ -478,7 +478,7 @@ interface PluginInstance {
   // hooks
   on?: Partial<EventMap>;
   // UI region injection (renderer provides named regions)
-  regions?: Partial<Record<RegionName, (ctx) => Node>>;  // 'toolbar'|'footer'|'stage'|'thumbnails'|'backdrop'
+  regions?: Partial<Record<RegionName, (ctx) => Node>>;  // 'toolbar'|'aside'|'footer'|'stage'|'thumbnails'|'backdrop'
   // extensions
   overlays?: OverlaySpec[];
   mediaAdapters?: MediaAdapter[];

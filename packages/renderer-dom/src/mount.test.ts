@@ -73,7 +73,8 @@ describe('mount — navigation reflects in the DOM', () => {
     mount(v)
     v.open({ g: 1 })
     v.nextItem()
-    expect(document.querySelector('.gallerist-live')?.textContent).toMatch(/screen 2 of 3/i)
+    expect(document.querySelector('.gallerist-live')?.textContent).toMatch(/item 2 of 3/i)
+    expect(document.querySelector('.gallerist-live')?.textContent).not.toMatch(/screen/i) // generic wording
   })
 })
 
@@ -229,11 +230,16 @@ describe('mount — chrome + keyboard', () => {
     expect(pos.textContent).toContain('1 / 12')
   })
 
-  it('hides the position indicator for single-item groups', () => {
+  it('hides the whole item navigator (↑ · position · ↓) for single-item groups', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open() // g0 → single item
-    expect((document.querySelector('.gallerist-position') as HTMLElement).hidden).toBe(true)
+    const itemNav = document.querySelector('.gallerist-itemnav') as HTMLElement
+    expect(itemNav.hidden).toBe(true)
+    expect(itemNav.querySelector('.gallerist-item-prev')).not.toBeNull() // ↑/↓ live inside it
+    v.next() // g1 → three items
+    expect(itemNav.hidden).toBe(false)
+    expect(document.querySelector('.gallerist-position-text')?.textContent).toBe('1 / 3')
   })
 
   it('defaults the rail position to bottom', () => {
@@ -616,6 +622,212 @@ describe('mount — open/close transitions (lifecycle driver)', () => {
   })
 })
 
+describe('mount — chrome structure (M15)', () => {
+  const captioned = (): Collection => ({
+    groups: [
+      { id: 'g0', caption: 'Morning', items: [{ ...item('a0'), caption: 'Front view' }] },
+      { id: 'g1', items: [item('b0'), item('b1')] },
+    ],
+  })
+
+  it('lays the chrome out in its own areas: bar, main, caption, aside, footer, rail', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const kids = [...(document.querySelector('.gallerist') as HTMLElement).children].map(
+      (c) => c.className,
+    )
+    for (const cls of ['gallerist-bar', 'gallerist-main', 'gallerist-caption']) {
+      expect(kids).toContain(cls)
+    }
+    expect(document.querySelector('.gallerist-bar .gallerist-region-toolbar')).not.toBeNull()
+    expect(document.querySelector('.gallerist-main .gallerist-stage')).not.toBeNull()
+    expect(document.querySelector('.gallerist-main .gallerist-next')).not.toBeNull()
+    expect(document.querySelector('.gallerist > .gallerist-region-aside')).not.toBeNull()
+  })
+
+  it('shows the group caption as the bar title and the item caption in the caption bar', () => {
+    const v = createViewer({ collection: captioned() })
+    mount(v)
+    v.open()
+    const title = document.querySelector('.gallerist-title') as HTMLElement
+    const cap = document.querySelector('.gallerist-caption') as HTMLElement
+    expect([title.hidden, title.textContent]).toEqual([false, 'Morning'])
+    expect([cap.hidden, cap.textContent]).toEqual([false, 'Front view'])
+    v.next() // no captions: the title hides, the caption track stays reserved (no stage jump)
+    expect(title.hidden).toBe(true)
+    expect([cap.hidden, cap.textContent]).toEqual([false, ''])
+  })
+
+  it('shows zoom reset only while zoomed in', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const reset = document.querySelector('.gallerist-zoom-reset') as HTMLElement
+    expect(reset.hidden).toBe(true)
+    getInternals(v).setZoom({ scale: 2, x: 0, y: 0 })
+    expect(reset.hidden).toBe(false)
+    v.resetZoom()
+    expect(reset.hidden).toBe(true)
+  })
+
+  it('keeps plugin tools in the bar without built-in controls', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { controls: false })
+    v.open()
+    expect(document.querySelector('.gallerist-bar .gallerist-region-toolbar')).not.toBeNull()
+    expect(document.querySelector('.gallerist-close')).toBeNull()
+  })
+})
+
+describe('mount — strings (translation)', () => {
+  it('uses English defaults with generic wording', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open({ g: 1 })
+    expect(document.querySelector('.gallerist-close')?.getAttribute('aria-label')).toBe('Close')
+    expect(document.querySelector('.gallerist-pill')?.getAttribute('aria-label')).toBe('Item 1')
+    expect(document.querySelector('.gallerist-live')?.textContent).toBe(
+      'Group 2 of 3, Item 1 of 3 — b0',
+    )
+  })
+
+  it('applies partial overrides, including position templates', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, {
+      strings: {
+        close: 'Schließen',
+        next: 'Weiter',
+        item: (n) => `Bild ${n}`,
+        groupOf: (n, total) => `Gruppe ${n} von ${total}`,
+        itemOf: (n, total) => `Bild ${n} von ${total}`,
+      },
+    })
+    v.open({ g: 1 })
+    expect(document.querySelector('.gallerist-close')?.getAttribute('aria-label')).toBe('Schließen')
+    expect(document.querySelector('.gallerist-next')?.getAttribute('aria-label')).toBe('Weiter')
+    expect(document.querySelector('.gallerist-prev')?.getAttribute('aria-label')).toBe('Previous') // not overridden
+    expect(document.querySelector('.gallerist-pill')?.getAttribute('aria-label')).toBe('Bild 1')
+    expect(document.querySelector('.gallerist-live')?.textContent).toBe(
+      'Gruppe 2 von 3, Bild 1 von 3 — b0',
+    )
+  })
+})
+
+describe('mount — item indicator variants', () => {
+  const big = (n: number): Collection => ({
+    groups: [{ id: 'g', items: Array.from({ length: n }, (_, k) => item(`i${k}`)) }],
+  })
+  const ind = () => document.querySelector('.gallerist-position') as HTMLElement
+
+  it('pills (default): numbered pills up to 8 items, then the count', () => {
+    let v = createViewer({ collection: big(8) })
+    mount(v)
+    v.open()
+    expect(ind().dataset.mode).toBe('pills')
+    expect(ind().querySelectorAll('.gallerist-pill')).toHaveLength(8)
+    document.body.innerHTML = ''
+    v = createViewer({ collection: big(9) })
+    mount(v)
+    v.open()
+    expect(ind().dataset.mode).toBe('counter')
+    expect(ind().querySelector('.gallerist-pill')).toBeNull()
+  })
+
+  it('dots: a dot per item (up to 12) that jumps to it, with the count alongside', () => {
+    const v = createViewer({ collection: big(5) })
+    mount(v, { itemIndicator: 'dots' })
+    v.open()
+    expect(ind().dataset.mode).toBe('dots')
+    const dots = ind().querySelectorAll<HTMLButtonElement>('.gallerist-dot')
+    expect(dots).toHaveLength(5)
+    dots[3]?.click()
+    expect(v.getState().cursor).toEqual({ g: 0, i: 3 })
+    expect(dots[3]?.hasAttribute('data-active')).toBe(true)
+    expect(ind().querySelector('.gallerist-position-text')?.textContent).toBe('4 / 5')
+  })
+
+  it('counter: always the count, no jump buttons', () => {
+    const v = createViewer({ collection: big(3) })
+    mount(v, { itemIndicator: 'counter' })
+    v.open()
+    expect(ind().dataset.mode).toBe('counter')
+    expect(ind().querySelector('button')).toBeNull()
+  })
+})
+
+describe('mount — review fixes (M15)', () => {
+  const captioned = (): Collection => ({
+    groups: [
+      { id: 'g0', items: [{ ...item('a0'), caption: 'Front view' }, item('a1')] },
+      { id: 'g1', items: [item('b0')] },
+    ],
+  })
+
+  it('no captions anywhere: no caption track at all', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect((document.querySelector('.gallerist-caption') as HTMLElement).hidden).toBe(true)
+  })
+
+  it('reserves the caption track across items once the collection has captions', () => {
+    const v = createViewer({ collection: captioned() })
+    mount(v)
+    v.open()
+    const cap = document.querySelector('.gallerist-caption') as HTMLElement
+    expect([cap.hidden, cap.textContent]).toEqual([false, 'Front view'])
+    v.nextItem()
+    expect([cap.hidden, cap.textContent]).toEqual([false, ''])
+  })
+
+  it('hiding a focused control hands focus to the viewer root (keymap keeps working)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open({ g: 1 })
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const nextItemBtn = document.querySelector('.gallerist-item-next') as HTMLElement
+    nextItemBtn.focus()
+    v.goTo(0) // single-item group: the item navigator hides under focus
+    expect(document.activeElement).toBe(root)
+  })
+
+  it('an empty bar is hidden when there are no built-in controls and no plugin tools', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { controls: false })
+    v.open()
+    expect((document.querySelector('.gallerist-bar') as HTMLElement).hidden).toBe(true)
+    v.use(() => ({ name: 'tool', regions: { toolbar: () => document.createElement('button') } }))
+    expect((document.querySelector('.gallerist-bar') as HTMLElement).hidden).toBe(false)
+  })
+
+  it('marks the reading direction for the theme', () => {
+    document.documentElement.dir = 'rtl'
+    try {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-dir')).toBe('rtl')
+    } finally {
+      document.documentElement.removeAttribute('dir')
+    }
+  })
+
+  it('translates the dialog name and the inline role description', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { strings: { dialog: 'Visionneuse' } })
+    v.open()
+    expect(document.querySelector('.gallerist')?.getAttribute('aria-label')).toBe('Visionneuse')
+    document.body.innerHTML = ''
+    const host = document.body.appendChild(document.createElement('div'))
+    mount(createViewer({ collection: collection() }), {
+      container: host,
+      strings: { carousel: 'carrousel' },
+    })
+    expect(host.querySelector('.gallerist')?.getAttribute('aria-roledescription')).toBe('carrousel')
+  })
+})
+
 describe('mount — destroy', () => {
   it('removes the root and stops reacting', () => {
     const v = createViewer({ collection: collection() })
@@ -640,7 +852,7 @@ describe('mount — linear flat traversal', () => {
   it('sets data-gallerist-linear and hides the within-group pills', () => {
     openLinear()
     expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-linear')).toBe('true')
-    expect((document.querySelector('.gallerist-position') as HTMLElement)?.hidden).toBe(true)
+    expect((document.querySelector('.gallerist-itemnav') as HTMLElement)?.hidden).toBe(true)
   })
 
   it('ArrowRight walks the flattened item sequence across groups (1a,1b,2a…)', () => {
@@ -805,10 +1017,14 @@ describe('mount — linear Home/End (S-R3)', () => {
 
 describe('mount — resize re-clamp (C2)', () => {
   it('re-clamps committed zoom when the stage shrinks', () => {
-    let roCb: () => void = () => {}
+    // every ResizeObserver the renderer creates; "the stage resized" fires them all
+    const roCbs: (() => void)[] = []
+    const roCb = () => {
+      for (const cb of roCbs) cb()
+    }
     class FakeRO {
       constructor(cb: () => void) {
-        roCb = cb
+        roCbs.push(cb)
       }
       observe() {}
       disconnect() {}

@@ -28,8 +28,8 @@ export function myPlugin(opts?: MyOptions): Plugin {
 }
 ```
 
-`RegionName` = `'toolbar' | 'footer' | 'thumbnails' | 'stage' | 'backdrop'` (extensible). `toolbar`
-and `footer` are **additive** (many plugins contribute); the others are **exclusive** (last-wins +
+`RegionName` = `'toolbar' | 'aside' | 'footer' | 'thumbnails' | 'stage' | 'backdrop'` (extensible). `toolbar`,
+`aside` and `footer` are **additive** (many plugins contribute); the others are **exclusive** (last-wins +
 dev warn).
 
 ## Patterns

@@ -14,6 +14,43 @@
   content stays fixed, defaulting to the stage centre. It used to be treated as the pan offset. Set
   a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
 
+### Changed
+- **renderer-dom + theme (M15)**: the viewer is laid out as a grid of areas: top bar (counter →
+  group title → plugin tools → zoom reset → close), stage, an `aside` column, caption bar, footer and
+  rail. Persistent chrome now takes space instead of covering the image, and no two pieces of chrome
+  can overlap in any preset, arrow layout, rail position or direction. A Playwright layout lint
+  checks 16 configurations on desktop and phone for overlaps, off-screen chrome, a covered stage
+  and touch targets under 44px.
+- **renderer-dom**: ↑ · position · ↓ form one item navigator, hidden for one-item groups and in
+  linear mode; zoom reset shows only while zoomed; group and item captions are shown (bar title and
+  caption bar); the `dpad` layout is now a keyboard-arrow cluster.
+- **plugin-thumbnails**: the vertical item stack moves into the new `aside` region beside the stage
+  (it used to float over the stage), and stays up for one-item groups so the stage keeps its width.
+- **theme**: a mobile layer (compact chrome under 600px, 44px touch targets, safe areas, swipes
+  instead of on-image arrows on touch) and RTL arrow glyphs that point the reading direction.
+- **renderer-dom**: generic wording: announcements and pill labels say "item", not "screen".
+- **renderer-dom + react**: `itemIndicator` option: `pills` (default), `dots` (plain dots with the
+  count) or `counter`.
+- **renderer-dom + react**: `strings` option (`mount(viewer, { strings })`, `<Gallerist strings>`)
+  for every label and announcement the renderer produces, with English defaults
+  (`DEFAULT_STRINGS`); positions are functions so a language can order words and numbers.
+- **plugins + renderer-dom**: one icon family. The shared SVG set moves to `@gallerist/core/internal`
+  (`ICONS`) and the toolbar buttons of thumbnails, grid, fullscreen and download use it instead of
+  Unicode glyphs. Zoom reset gets its own icon (it used to look like fullscreen). The fullscreen
+  button exposes `aria-pressed`, and a pressed toggle (accent fill) looks different from focus (ring).
+- **renderer-dom + theme (M15 review)**: the chrome contract was hardened after an independent
+  review. Captions get a fixed two-line band, reserved per collection so the stage doesn't jump.
+  Focus stays in the viewer when the focused zoom reset or item navigator hides. With
+  `controls: false` an empty top bar is hidden. Immersive arrows are inset clear of the floating bar,
+  caption and rail, and the floating chrome lets clicks through to the image. On touch the item
+  navigator is always reachable, and group arrows reappear on keyboard focus. Phones drop the items
+  toggle and let bar tools scroll instead of overflowing. Collapsing the rail hides the `aside` item
+  stack. Side rails stay on their physical side in RTL, using the new `data-gallerist-dir`
+  attribute instead of `:dir()`. The dialog name and carousel role description are translatable
+  (`strings.dialog`, `strings.carousel`). The layout lint now also covers long captions, zoom,
+  `controls: false`, RTL side rails, immersive arrow layouts and a 320px touch screen, and checks
+  occlusion, stage size and item-axis reachability.
+
 ### Fixed
 - **core**: a throwing event handler no longer stops later handlers (it is reported via
   `reportError`); a destructured `preventDefault()` works; `zoomTo` ignores NaN/negative input.

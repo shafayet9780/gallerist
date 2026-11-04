@@ -7,7 +7,7 @@
 - [x] Six design directions, 24 frames each (links in the plan)
 
 ## Release 0.3
-- [ ] **M15** Chrome architecture: top bar region, reserved space, item indicator variants, hidden axes, mobile layer, `strings`, caption bar, SVG plugin icons, screenshot matrix gate
+- [x] **M15** Chrome architecture: top bar region, reserved space, item indicator variants, hidden axes, mobile layer, `strings`, caption bar, SVG plugin icons. The verification gate is a geometry lint (`e2e/tests/layout.spec.ts`) instead of screenshot baselines, which differ between macOS and Linux CI. An independent review followed: 25 findings, 22 fixed, 3 accepted as intended (idle tool fade, rail collapse not animated, caption overlay specs not rendered yet)
 - [ ] **M16** Skin system: base/skin split, `skin`/`accent`/`scheme`, Gallery default, `console` extracted with zero visual diff
 - [ ] **M17** Contained-rect zoom bounds + `plugin-pins` (`comment`, `tag`, `feature`)
 - [ ] **M18** Console: skin polish, `reviewer` preset upgrade, zoom navigator, comment pins in the monitoring example

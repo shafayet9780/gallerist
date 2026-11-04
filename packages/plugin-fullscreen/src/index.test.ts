@@ -106,6 +106,20 @@ describe('plugin-fullscreen', () => {
     document.dispatchEvent(new Event('fullscreenchange'))
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ fullscreen: true }))
   })
+
+  it('the button is a toggle: aria-pressed tracks fullscreen, and it uses the shared SVG icon', () => {
+    openViewer()
+    const btn = document.querySelector('.gallerist-fullscreen-btn') as HTMLButtonElement
+    expect(btn.getAttribute('aria-pressed')).toBe('false')
+    expect(btn.querySelector('svg.gallerist-icon')).not.toBeNull()
+    expect(btn.textContent).toBe('') // no Unicode glyph
+    fsEl = document.querySelector('.gallerist')
+    document.dispatchEvent(new Event('fullscreenchange'))
+    expect(btn.getAttribute('aria-pressed')).toBe('true')
+    fsEl = null
+    document.dispatchEvent(new Event('fullscreenchange'))
+    expect(btn.getAttribute('aria-pressed')).toBe('false')
+  })
 })
 
 describe('fullscreen() against a stand-in viewer', () => {

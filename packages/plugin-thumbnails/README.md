@@ -30,14 +30,15 @@ mount(viewer)
   **beneath the thumbnail**, only when a string `caption` is provided on the group/item (no `alt`
   fallback — `alt` stays accessibility text). A timestamp is just a caption the host supplies.
 - **Active item panel** (`stacked` mode). The active multi-item group auto-expands a panel of its
-  item thumbs (`expandActive`, default on). It mounts on the rail's region host, so it's visible +
-  clickable in every rail position and opens in the right direction (up for a bottom rail, down for
-  a top rail). Hide/show it with the toolbar items-toggle button or the **`e`** key; the state
-  persists as you navigate.
+  item thumbs (`expandActive`, default on). With the default vertical item axis it is a stack in
+  the viewer's `aside` column beside the stage (a renderer without that region gets it on the rail
+  instead). Hide/show it with the toolbar items-toggle button or the **`e`** key; the state
+  persists as you navigate. Phones drop the column and the toggle; the viewer's ↑ · position · ↓
+  navigator moves between items there.
 - **Peek flyout** (`stacked` mode). Hovering or keyboard-focusing a multi-item card opens a
   transient flyout of its item thumbs — preview a group **without** navigating into it; click a
-  thumb to jump straight to it. Hover never moves the cursor. On touch devices (no hover) the card
-  shows an explicit expand affordance, while a first tap still navigates. Inert in `flat` mode
+  thumb to jump straight to it. Hover never moves the cursor. Touch screens have no hover, so a tap
+  just navigates and the card shows no peek caret. Inert in `flat` mode
   (every item is already visible); for the active group it defers to the panel unless that panel is
   hidden, in which case hovering the active card peeks too.
 - **Flat mode** (`groupDisplay: 'flat'`). Every item of every group renders side-by-side as its own

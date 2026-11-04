@@ -4,8 +4,20 @@
 import type { EventHandlers, ViewerApi } from '../api'
 import type { MediaAdapter, OverlaySpec } from '../types'
 
-/** Named UI slots the renderer exposes; plugins inject Nodes into them. */
-export type RegionName = 'toolbar' | 'footer' | 'stage' | 'thumbnails' | 'backdrop' | (string & {})
+/**
+ * Named UI slots the renderer exposes; plugins inject Nodes into them. `toolbar` sits in the top
+ * bar, `aside` is a side column at the stage's inline end (item stack, info or filter panels),
+ * `thumbnails` is the rail, `footer` a band above it; all of them take space rather than covering
+ * the stage. `stage` and `backdrop` are layers over and under the media.
+ */
+export type RegionName =
+  | 'toolbar'
+  | 'aside'
+  | 'footer'
+  | 'stage'
+  | 'thumbnails'
+  | 'backdrop'
+  | (string & {})
 
 /** Passed to a region renderer; the viewer is the handle for state/actions/subscription. */
 export interface RegionCtx {

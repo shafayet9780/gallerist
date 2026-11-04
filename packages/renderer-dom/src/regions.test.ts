@@ -13,6 +13,7 @@ const hosts = (): RegionHosts =>
     backdrop: document.createElement('div'),
     stage: document.createElement('div'),
     toolbar: document.createElement('div'),
+    aside: document.createElement('div'),
     thumbnails: document.createElement('div'),
     footer: document.createElement('div'),
   }) as RegionHosts

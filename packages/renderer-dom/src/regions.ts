@@ -1,12 +1,12 @@
 // Region mounting (spec §13). The renderer exposes named region hosts; plugins inject Nodes.
-// toolbar/footer are additive (many plugins contribute buttons); thumbnails/stage/backdrop are
-// exclusive (one owner) — a second claim warns and the last wins.
+// toolbar/footer/aside are additive (many plugins contribute buttons or panels); thumbnails/stage/
+// backdrop are exclusive (one owner) — a second claim warns and the last wins.
 
 import type { PluginInstance, RegionCtx, RegionName } from '@gallerist/core'
 
 export type RegionHosts = Record<RegionName, HTMLElement>
 
-const ADDITIVE: ReadonlySet<string> = new Set(['toolbar', 'footer'])
+const ADDITIVE: ReadonlySet<string> = new Set(['toolbar', 'footer', 'aside'])
 
 /**
  * Returns a function that mounts the current plugin set's regions into their hosts; call it at

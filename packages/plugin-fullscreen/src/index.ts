@@ -3,7 +3,7 @@
 // Plugins may touch the DOM (the headless invariant binds @gallerist/core only).
 
 import type { Plugin } from '@gallerist/core'
-import { getInternals } from '@gallerist/core/internal'
+import { ICONS, getInternals } from '@gallerist/core/internal'
 
 export interface FullscreenOptions {
   /** CSS selector for the element to fullscreen; defaults to the bound viewer's root. */
@@ -58,20 +58,23 @@ export function fullscreen(opts: FullscreenOptions = {}): Plugin {
       }
     }
 
+    let btnEl: HTMLButtonElement | null = null
     // Look the internals up when emitting, not at construction, so building the plugin against a
     // wrapped viewer or a test double doesn't throw.
-    const onChange = () =>
-      getInternals(viewer).emit('fullscreenChange', {
-        viewer,
-        fullscreen: isOurFullscreen(resolveRoot()),
-      })
+    const onChange = () => {
+      const fullscreen = isOurFullscreen(resolveRoot())
+      btnEl?.setAttribute('aria-pressed', String(fullscreen)) // a toggle: pressed while fullscreen
+      getInternals(viewer).emit('fullscreenChange', { viewer, fullscreen })
+    }
 
     const button = () => {
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = 'gallerist-fullscreen-btn'
       btn.setAttribute('aria-label', 'Toggle fullscreen')
-      btn.textContent = '⛶'
+      btn.setAttribute('aria-pressed', 'false')
+      btn.innerHTML = ICONS.fullscreen
+      btnEl = btn
       btn.addEventListener('click', () => void toggle(btn))
       // Capture our root once the button is mounted (so onChange/`f` target the right viewer).
       queueMicrotask(() => {
@@ -89,6 +92,7 @@ export function fullscreen(opts: FullscreenOptions = {}): Plugin {
         }
       },
       destroy() {
+        btnEl = null
         if (typeof document !== 'undefined') {
           document.removeEventListener('fullscreenchange', onChange)
           document.removeEventListener('webkitfullscreenchange', onChange)
