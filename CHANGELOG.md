@@ -2,6 +2,25 @@
 
 ## v0.3.0
 
+### Performance (U17)
+Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-based regression gate.
+- **plugin-thumbnails**: a step writes the active state of the two thumbs that changed, not of every
+  thumb (10,017 attribute writes per item step in a 10k-item group, now 17).
+- **plugin-thumbnails**: the rail draws what fits in it plus 3 cards on each side and follows its own
+  scroll, inserting only the cards that enter and removing the ones that leave; the scroll offset
+  follows, so what's on screen doesn't move. Viewer elements at 2000 groups × 5: 283 → 179 (Console
+  reviewer preset 470 → 274); nodes re-appended per group step 38 → 3.
+- **plugin-grid**: the grid draws the cells or sections around the current item and more as you
+  scroll toward either end, and drops them when hidden. The `tour` overview at 5000 groups held 50,435
+  elements and blocked the main thread for 662 ms on open; now 221 and no long task. A move inside the
+  open cells moves the selection instead of redrawing them (20,003 elements recreated per step at one
+  10k-item group, now 1).
+- **renderer-dom**: the images one step away within the current group are fetched ahead (`preload`
+  ahead/behind), as the spec always said; the slide window already covered neighbouring groups.
+- **theme**: each thumb in the vertical item stack contains its own layout and paint, so scrolling a
+  long stack doesn't make WebKit revisit every item: an item step in a 10k-item group with the Console
+  skin took ~660 ms there; now ~65 ms.
+
 ### Fixed
 - **plugin-thumbnails, plugin-grid**: moving the cursor no longer scrolls the page around an inline
   viewer; only the viewer's own panels scroll.
@@ -27,6 +46,11 @@
 - **examples/tour**: a listing page using all of the above.
 
 ### Breaking
+- **plugin-thumbnails**: `overscan` is unset by default (the rail measures itself; it was 24) and
+  counts cards on each side of the middle of the rail rather than of the cursor.
+- **plugin-grid**: `overscan` counts cells (default 40) or sections (default 4) on each side of the
+  current one, drawn when the grid opens; it used to count groups (default 12) and, for `sections`,
+  bound the overview, which otherwise drew every group.
 - **renderer-dom (M19)**: without a `scheme` option the root no longer carries
   `data-gallerist-scheme="dark"`. Each skin applies its own default (Gallery and Console dark,
   Editorial light), so the look is unchanged; only CSS that selected `[data-gallerist-scheme="dark"]`

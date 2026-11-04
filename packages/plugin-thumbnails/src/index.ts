@@ -12,16 +12,30 @@
 //    count); the active group's items expand in place under its row. On a bottom rail, or any rail at
 //    900px wide or less, the rows become a strip of chips.
 //
-// Reconcile-in-place (M14 UX-B): the rail is NOT torn down on cursor moves. It is rebuilt only when
-// the collection or the visible window changes; cursor moves just flip `data-active` and scroll the
-// active node into view — no DOM churn, no scroll reset.
+// Reconcile-in-place (M14 UX-B): the rail is NOT torn down on cursor moves. Cursor moves flip
+// `data-active` on the previous and the new active thumb only, and scroll the active one into view.
+//
+// Windowing (U17): the rail draws a contiguous run of cards, what fits in its scroller plus a few each
+// side, and follows its own scroll: when the middle of the rail moves, cards that left the run are
+// removed and the ones that entered are inserted in place (the rest stay put), with the scroll offset
+// corrected so nothing on screen moves. A cursor outside the run re-centres it on the cursor.
 
 import type { Group, Item, MediaSource, Plugin, PluginInstance, ViewerApi } from '@gallerist/core'
-import { ICONS, windowIndices } from '@gallerist/core/internal'
+import { ICONS } from '@gallerist/core/internal'
+import { type Axis, keepPlace, measureRun, middleOf, spanAround } from './strip'
+
+/** Cards drawn beyond the visible ones on each side, so a step or a short scroll lands on drawn cards. */
+const MARGIN = 3
+/** Cards on each side of the cursor while the rail has no layout to measure. */
+const FALLBACK = 8
 
 export interface ThumbnailsOptions {
-  /** group thumbs rendered on each side of the active group (default 24). In `flat` mode this is
-   *  the per-side bound on item cards. */
+  /**
+   * Cards drawn on each side of the middle of the rail; scrolling the rail draws the ones it reaches.
+   * By default the rail measures itself and draws what fits plus 3 cards on each side (8 on each
+   * side before it has a layout to measure). A number fixes the bound. Group cards, or item cards
+   * in `flat` mode.
+   */
   overscan?: number
   /**
    * Layout of the active group's item thumbs (the secondary ↑/↓ axis), in `stacked` mode.
@@ -144,12 +158,15 @@ function toggleAriaCurrent(btn: HTMLElement, on: boolean): void {
   else btn.removeAttribute('aria-current')
 }
 
-function setActiveAttr(btn: HTMLElement, active: boolean): void {
-  if (active) btn.setAttribute('data-active', '')
-  else btn.removeAttribute('data-active')
+/** Mark a thumb (or a card's wrapper, which only takes `data-active`) active or not; a no-op when it
+ *  already is, so a step writes to the two thumbs that changed and nothing else. */
+function setActiveAttr(el: HTMLElement, active: boolean): void {
+  if (el.hasAttribute('data-active') === active) return
+  toggleAttr(el, 'data-active', active)
+  if (el.tagName !== 'BUTTON') return
   // index rows are plain buttons (their list holds a listbox of items, which can't nest in another)
-  if (btn.getAttribute('role') === 'option') btn.setAttribute('aria-selected', String(active))
-  else toggleAriaCurrent(btn, active)
+  if (el.getAttribute('role') === 'option') el.setAttribute('aria-selected', String(active))
+  else toggleAriaCurrent(el, active)
 }
 
 function toggleAttr(el: HTMLElement, name: string, on: boolean): void {
@@ -208,7 +225,6 @@ interface FlatEntry {
 
 export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
   return (viewer: ViewerApi) => {
-    const overscan = opts.overscan ?? 24
     const t: ThumbnailsStrings = { ...DEFAULT_THUMBNAILS_STRINGS, ...opts.strings }
     const groupDisplay = opts.groupDisplay ?? 'stacked'
     const isIndex = groupDisplay === 'index'
@@ -241,10 +257,16 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let lastCol: object | null = null
     let lastG = -1
     let lastI = -1
-    let lastWindowKey = ''
     let lastActiveGroupId: string | null = null
-    let lastActiveItemId: string | null = null // flat mode active item
+    let activeEls: HTMLElement[] = [] // the thumbs (and card wrappers) now marked active
     let liveCardId: string | null = null // group card currently showing a live item preview
+    // the drawn run: positions winStart..winEnd of the sequence (groups; flat: items), inclusive
+    let winStart = 0
+    let winEnd = -1
+    let axis: Axis | null = null // which way the rail scrolls, once measured
+    let perView = 0 // cards that fit in the rail, once measured
+    let resizeObs: ResizeObserver | null = null
+    let frame = 0 // pending rAF for a scroll/resize re-window
     const groupBtns = new Map<string, HTMLButtonElement>()
     const itemBtns = new Map<string, HTMLButtonElement>()
     const coverUrls = new Map<string, string | null>() // group id → its fixed cover thumb
@@ -462,23 +484,41 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       return btn
     }
 
-    // rebuild the group rail to the windowed set, reusing existing cards (identity preserved)
-    const rebuildRail = (col: ReturnType<ViewerApi['getCollection']>, windowIdx: number[]) => {
+    // a removed card's lazy image stops being watched (it would otherwise stay observed, detached)
+    const drop = (el: Element) => {
+      el.remove()
+      for (const img of el.querySelectorAll('img')) observer?.unobserve(img)
+    }
+
+    // Put `node` right after `prev` (or first in `parent`), unless it already is there: cards that stay
+    // in the run are already in order, so only the ones entering it are inserted.
+    const place = (parent: Element, node: Element, prev: Element | null) => {
+      const at = prev ? prev.nextSibling : parent.firstChild
+      if (at !== node) parent.insertBefore(node, at)
+    }
+
+    // redraw the group rail as groups start..end, keeping the cards that stay (identity preserved)
+    const rebuildRail = (
+      col: ReturnType<ViewerApi['getCollection']>,
+      start: number,
+      end: number,
+    ) => {
       if (!root) return
       const desiredIds = new Set<string>()
-      for (const g of windowIdx) {
+      for (let g = start; g <= end; g++) {
         const group = col.groups[g]
         if (group) desiredIds.add(group.id)
       }
       for (const [id, btn] of groupBtns) {
         if (!desiredIds.has(id)) {
-          ;(cardHost.get(id) ?? btn).remove()
+          drop(cardHost.get(id) ?? btn)
           groupBtns.delete(id)
           coverUrls.delete(id) // keep the cover cache windowed too (avoids unbounded growth)
           cardHost.delete(id)
         }
       }
-      for (const g of windowIdx) {
+      let prev: Element | null = null
+      for (let g = start; g <= end; g++) {
         const group = col.groups[g]
         if (!group) continue
         let btn = groupBtns.get(group.id)
@@ -486,7 +526,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           btn = buildGroupCard(group, g)
           groupBtns.set(group.id, btn)
         }
-        root.appendChild(cardHost.get(group.id) ?? btn) // moves existing node → reorders, keeps identity
+        const host = cardHost.get(group.id) ?? btn
+        place(root, host, prev)
+        prev = host
       }
       // the active item column lives on the region host (see rebuildItemColumn), not the rail.
     }
@@ -536,19 +578,23 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const img = card.querySelector<HTMLImageElement>('.gallerist-thumb-img')
       if (!img) return
       img.dataset.live = '1'
-      img.src = url ?? ''
+      if (img.getAttribute('src') !== (url ?? '')) img.src = url ?? ''
     }
 
-    const applyActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
+    // Active state, O(1) per step: unmark what was active, mark the thumbs for (g, i). Thumbs drawn
+    // since (a re-drawn card, a rebuilt item column) are new elements, so they're compared by node.
+    const markActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
       const activeGroup = col.groups[g]
       const activeGroupId = activeGroup?.id ?? null
       const activeItemId = activeGroup?.items[i]?.id ?? null
-      for (const [id, btn] of groupBtns) {
-        setActiveAttr(btn, id === activeGroupId)
-        const host = cardHost.get(id)
-        if (host && host !== btn) toggleAttr(host, 'data-active', id === activeGroupId)
-      }
-      for (const [id, btn] of itemBtns) setActiveAttr(btn, id === activeItemId)
+      const card = activeGroupId ? groupBtns.get(activeGroupId) : undefined
+      const host = activeGroupId ? cardHost.get(activeGroupId) : undefined
+      const next = [card, host, activeItemId ? itemBtns.get(activeItemId) : undefined].filter(
+        (el): el is HTMLElement => !!el,
+      )
+      for (const el of activeEls) if (!next.includes(el)) setActiveAttr(el, false)
+      for (const el of next) setActiveAttr(el, true)
+      activeEls = next
 
       // live-preview (UX-A): the active multi-item group's card mirrors the currently-viewed item;
       // restore a card's fixed cover once its group is no longer the live one.
@@ -558,17 +604,21 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         liveCardId = null
       }
       // an index row keeps its section's cover: the expanded items below it show the current one
-      if (!isIndex && activeGroupId && activeGroup && activeGroup.items.length > 1) {
-        const card = groupBtns.get(activeGroupId)
+      if (!isIndex && card && activeGroupId && activeGroup && activeGroup.items.length > 1) {
         const it = activeGroup.items[i]
         const url =
           thumbUrl(it?.thumb) ?? thumbUrl(it?.source) ?? coverUrls.get(activeGroupId) ?? null
-        if (card) setCardImage(card, url)
+        setCardImage(card, url)
         liveCardId = activeGroupId
       }
+    }
 
-      if (activeGroupId) scrollActiveIntoView(groupBtns.get(activeGroupId))
-      if (activeItemId) scrollActiveIntoView(itemBtns.get(activeItemId))
+    const applyActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
+      markActive(col, g, i)
+      const group = col.groups[g]
+      if (group) scrollActiveIntoView(groupBtns.get(group.id))
+      const item = group?.items[i]
+      if (item) scrollActiveIntoView(itemBtns.get(item.id))
     }
 
     // re-evaluate the active item panel for the current cursor (used when `panelOpen` toggles, since
@@ -613,13 +663,17 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       return wrap
     }
 
-    const rebuildRailFlat = (col: ReturnType<ViewerApi['getCollection']>, windowIdx: number[]) => {
+    const rebuildRailFlat = (
+      col: ReturnType<ViewerApi['getCollection']>,
+      start: number,
+      end: number,
+    ) => {
       if (!root) return
       const desiredItemIds = new Set<string>()
       const desiredGroupIds = new Set<string>()
       const minI = new Map<string, number>()
       const maxI = new Map<string, number>()
-      for (const fi of windowIdx) {
+      for (let fi = start; fi <= end; fi++) {
         const e = flat[fi]
         if (!e) continue
         desiredItemIds.add(e.itemId)
@@ -630,19 +684,22 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // evict nodes that left the window
       for (const [id, btn] of itemBtns) {
         if (!desiredItemIds.has(id)) {
-          btn.remove()
+          drop(btn)
           itemBtns.delete(id)
         }
       }
       for (const [id, w] of groupWraps) {
         if (!desiredGroupIds.has(id)) {
-          w.remove()
+          drop(w)
           groupWraps.delete(id)
         }
       }
-      // (re)build in window order — appendChild moves existing nodes, so identity is preserved
+      // place in window order, inserting only what entered (the rest is already in order)
       let curGroupId: string | null = null
-      for (const fi of windowIdx) {
+      let prevWrap: Element | null = null
+      let row: Element = root
+      let prevBtn: Element | null = null
+      for (let fi = start; fi <= end; fi++) {
         const e = flat[fi]
         if (!e) continue
         const grp = col.groups[e.g]
@@ -654,15 +711,19 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           groupWraps.set(e.groupId, wrap)
         }
         if (e.groupId !== curGroupId) {
-          root.appendChild(wrap)
+          place(root, wrap, prevWrap)
+          prevWrap = wrap
           curGroupId = e.groupId
+          row = wrap.querySelector('.gallerist-thumb-group-row') ?? wrap
+          prevBtn = null
         }
         let ib = itemBtns.get(e.itemId)
         if (!ib) {
           ib = buildItemButton(item, e.g, e.i)
           itemBtns.set(e.itemId, ib)
         }
-        ;(wrap.querySelector('.gallerist-thumb-group-row') ?? wrap).appendChild(ib)
+        place(row, ib, prevBtn)
+        prevBtn = ib
       }
       // per-wrapper caption header + partial-edge flags
       for (const [id, wrap] of groupWraps) {
@@ -688,25 +749,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
     }
 
-    const applyActiveFlat = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
-      const activeItemId = col.groups[g]?.items[i]?.id ?? null
-      if (lastActiveItemId && lastActiveItemId !== activeItemId) {
-        const prev = itemBtns.get(lastActiveItemId)
-        if (prev) setActiveAttr(prev, false)
-      }
-      if (activeItemId) {
-        const cur = itemBtns.get(activeItemId)
-        if (cur) {
-          setActiveAttr(cur, true)
-          scrollActiveIntoView(cur)
-        }
-      }
-      lastActiveItemId = activeItemId
-    }
-
     // wipe everything (collection identity changed — ids may be entirely different)
     const resetAll = () => {
       if (root) root.replaceChildren()
+      observer?.disconnect() // every lazy image went with it
       groupBtns.clear()
       itemBtns.clear()
       coverUrls.clear()
@@ -716,12 +762,92 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       itemRow?.remove() // itemRow lives on the region host, so root.replaceChildren() won't catch it
       itemRow = null
       liveCardId = null
-      lastWindowKey = ''
+      winStart = 0
+      winEnd = -1
       lastActiveGroupId = null
-      lastActiveItemId = null
+      activeEls = []
       flat = []
       flatPos.clear()
       groupIndexById.clear()
+    }
+
+    // ── the drawn run ────────────────────────────────────────────────────────
+    const isFlat = groupDisplay === 'flat'
+    const seqLength = (col: ReturnType<ViewerApi['getCollection']>) =>
+      isFlat ? flat.length : col.groups.length
+    // the node in the rail for position `idx` of the sequence, when drawn
+    const hostAt = (col: ReturnType<ViewerApi['getCollection']>, idx: number) => {
+      if (isFlat) {
+        const e = flat[idx]
+        return e ? itemBtns.get(e.itemId) : undefined
+      }
+      const id = col.groups[idx]?.id
+      return id ? (cardHost.get(id) ?? groupBtns.get(id)) : undefined
+    }
+    const drawnHosts = (col: ReturnType<ViewerApi['getCollection']>) => {
+      const out: HTMLElement[] = []
+      for (let k = winStart; k <= winEnd; k++) {
+        const h = hostAt(col, k)
+        if (h) out.push(h)
+      }
+      return out
+    }
+
+    // Draw positions start..end. A card drawn both before and after anchors the scroll offset, so
+    // cards entering or leaving before it don't move what's on screen.
+    const setWindow = (col: ReturnType<ViewerApi['getCollection']>, start: number, end: number) => {
+      if (!root || (start === winStart && end === winEnd)) return
+      const shared = Math.max(start, winStart)
+      const ref = shared <= Math.min(end, winEnd) ? hostAt(col, shared) : undefined
+      const focused = document.activeElement
+      // a section's items live in its row: lift them out when that row leaves the run, and put them
+      // back when it's drawn again (left alone otherwise, so a focused item keeps its focus)
+      const g = viewer.getState().cursor.g
+      const active = isIndex && itemRow ? col.groups[g] : undefined
+      keepPlace(root, ref, axis, () => {
+        if (active && (g < start || g > end)) itemRow?.remove()
+        if (isFlat) rebuildRailFlat(col, start, end)
+        else rebuildRail(col, start, end)
+        const host = active ? cardHost.get(active.id) : undefined
+        if (host && itemRow && itemRow.parentNode !== host) host.appendChild(itemRow)
+      })
+      winStart = start
+      winEnd = end
+      // a focused card scrolled out of the run: keep the keys working (focus would fall to <body>)
+      if (focused instanceof HTMLElement && !focused.isConnected) {
+        regionEl?.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
+      }
+    }
+
+    // How many cards fit in the rail, and which way it runs; false while it has no layout.
+    const measure = (col: ReturnType<ViewerApi['getCollection']>) => {
+      if (!root) return false
+      const run = measureRun(drawnHosts(col))
+      const extent = run && (run.axis === 'x' ? root.clientWidth : root.clientHeight)
+      if (!run || !extent) return false
+      axis = run.axis
+      perView = Math.ceil(extent / run.stride) + 1 // a part-shown card at each end
+      return true
+    }
+
+    // Re-centre the run on the middle of the rail (after a scroll, a resize, or opening).
+    const rewindow = () => {
+      if (!root || winEnd < 0) return
+      const col = viewer.getCollection()
+      if (col !== lastCol || !measure(col)) return
+      const hosts = drawnHosts(col)
+      const middle = winStart + middleOf(root, hosts, axis as Axis)
+      const side = opts.overscan ?? Math.ceil(perView / 2) + MARGIN
+      setWindow(col, ...spanAround(middle, seqLength(col), side, side))
+      const cur = viewer.getState().cursor
+      markActive(col, cur.g, cur.i) // a re-drawn active card gets its state back
+    }
+    const scheduleRewindow = () => {
+      if (frame || typeof requestAnimationFrame === 'undefined') return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        rewindow()
+      })
     }
 
     // The rail first renders before it has any layout, so a viewer opening on a far group has to
@@ -738,6 +864,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           scrollActiveIntoView(groupBtns.get(group.id))
           const item = group.items[i]
           if (item) scrollActiveIntoView(itemBtns.get(item.id))
+          rewindow() // the first layout: size the run to the rail
         })
       }
       wasClosed = closed
@@ -756,27 +883,17 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         collectionHasMulti = col.groups.some((g) => g.items.length > 1)
       }
 
-      if (groupDisplay === 'flat') {
-        if (colChanged) buildFlatModel(col)
-        const cursorFi = flatPos.get(`${cur.g}:${cur.i}`) ?? 0
-        // The rail is an ordered display slice, not an absolutely-positioned preload window:
-        // looping here would wrap-reorder the visible thumbs (windowIndices is wrap-first), so it
-        // stays linear. The slide window (mount.ts) is what threads viewer.loop for wrap preload.
-        const windowIdx = windowIndices(cursorFi, flat.length, overscan, overscan, false)
-        const windowKey = `${windowIdx[0] ?? -1}-${windowIdx[windowIdx.length - 1] ?? -1}-${flat.length}`
-        if (colChanged || windowKey !== lastWindowKey) {
-          rebuildRailFlat(col, windowIdx)
-          lastWindowKey = windowKey
-        }
-        applyActiveFlat(col, cur.g, cur.i)
-      } else {
-        const windowIdx = windowIndices(cur.g, col.groups.length, overscan, overscan, false)
-        const windowKey = windowIdx.join(',')
-        if (colChanged || windowKey !== lastWindowKey) {
-          rebuildRail(col, windowIdx)
-          lastWindowKey = windowKey
-        }
-
+      if (isFlat && colChanged) buildFlatModel(col)
+      // The rail is an ordered display slice, not a preload window, so it never wraps (viewer.loop
+      // is the slide window's business, mount.ts). A cursor outside the drawn run re-centres it: wide
+      // enough for the cursor to land at either edge of the rail once scrolled into view, then the
+      // scroll that follows trims it to the middle of the rail (rewindow).
+      const at = isFlat ? (flatPos.get(`${cur.g}:${cur.i}`) ?? 0) : cur.g
+      if (colChanged || at < winStart || at > winEnd) {
+        const side = opts.overscan ?? (perView ? perView + MARGIN : FALLBACK)
+        setWindow(col, ...spanAround(at, seqLength(col), side, side))
+      }
+      if (!isFlat) {
         const activeGroup = col.groups[cur.g]
         const activeGroupId = activeGroup?.id ?? null
         if (colChanged || activeGroupId !== lastActiveGroupId) {
@@ -784,8 +901,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           lastActiveGroupId = activeGroupId
         }
         if (peekGroupId && peekGroupId === activeGroupId) closePeek() // navigated into the peeked group
-        applyActive(col, cur.g, cur.i)
       }
+      applyActive(col, cur.g, cur.i)
 
       lastCol = col
       lastG = cur.g
@@ -824,6 +941,12 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         root.setAttribute('aria-label', t.rail)
         if (timeLabel) root.setAttribute('data-timeline', '')
         regionEl.appendChild(root)
+        root.style.overflowAnchor = 'none' // keepPlace corrects the offset itself
+        root.addEventListener('scroll', scheduleRewindow, { passive: true })
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObs = new ResizeObserver(scheduleRewindow)
+          resizeObs.observe(root)
+        }
         if (groupDisplay === 'flat') {
           root.dataset.display = 'flat'
         } else {
@@ -846,6 +969,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       destroy() {
         unsub?.()
         observer?.disconnect()
+        resizeObs?.disconnect()
+        resizeObs = null
+        root?.removeEventListener('scroll', scheduleRewindow)
+        if (frame) cancelAnimationFrame(frame)
+        frame = 0
         cancelPeekClose()
         removePeek()
         groupBtns.clear()

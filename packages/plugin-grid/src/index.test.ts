@@ -4,6 +4,7 @@ import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { grid } from './index'
+import { groupAt, spanAround } from './run'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
 const collection = (): Collection => ({
@@ -65,14 +66,18 @@ describe('plugin-grid', () => {
     expect(gridEl().style.display).not.toBe('none')
   })
 
-  it('does not rebuild while open on a non-cursor change (zoom)', () => {
+  it('does not rebuild while open: a zoom changes nothing, a move only the selection', () => {
     const v = open()
     ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click() // open
     const spy = vi.spyOn(gridEl(), 'replaceChildren')
+    const cells = [...gridEl().querySelectorAll('.gallerist-grid-cell')]
     v.zoomTo(2) // not a cursor/collection change → must not rebuild
+    v.next() // a drawn cell: the selection moves, the cells stay
     expect(spy).not.toHaveBeenCalled()
-    v.next() // cursor change → must rebuild
-    expect(spy).toHaveBeenCalled()
+    expect([...gridEl().querySelectorAll('.gallerist-grid-cell')]).toEqual(cells)
+    const selected = gridEl().querySelectorAll('[aria-selected="true"]')
+    expect([...selected].map((c) => (c as HTMLElement).dataset.item)).toEqual(['b0'])
+    expect(gridEl().querySelectorAll('[data-active]').length).toBe(1)
   })
 
   it('re-opening with the same cursor still renders cells', () => {
@@ -178,15 +183,15 @@ describe('plugin-grid', () => {
       expect(document.activeElement).toBe(document.querySelector('.gallerist'))
     })
 
-    it('draws every section; an explicit overscan bounds them', () => {
+    it('draws the sections near the current one (4 each side, or overscan)', () => {
       const many: Collection = {
         groups: Array.from({ length: 20 }, (_, i) => ({ id: `g${i}`, items: [item(`m${i}`)] })),
       }
       openSections(many)
-      expect(gridEl().querySelectorAll('.gallerist-grid-section').length).toBe(20)
+      expect(gridEl().querySelectorAll('.gallerist-grid-section').length).toBe(9)
       document.body.innerHTML = ''
       openSections(many, { overscan: 2 })
-      expect(gridEl().querySelectorAll('.gallerist-grid-section').length).toBe(3)
+      expect(gridEl().querySelectorAll('.gallerist-grid-section').length).toBe(5)
     })
 
     it('added to an open viewer, startOpen does not cover what is being viewed', () => {
@@ -224,5 +229,151 @@ describe('plugin-grid', () => {
       openSections(named(), { startOpen: false })
       expect(gridEl().style.display).toBe('none')
     })
+  })
+
+  describe('drawn run (U17)', () => {
+    // An IntersectionObserver the test drives: `near(el)` reports `el` as come into range.
+    type Fake = { cb: IntersectionObserverCallback; targets: Set<Element>; root: unknown }
+    let fakes: Fake[] = []
+    const stubIO = () => {
+      fakes = []
+      vi.stubGlobal(
+        'IntersectionObserver',
+        class {
+          f: Fake
+          constructor(cb: IntersectionObserverCallback, o?: IntersectionObserverInit) {
+            this.f = { cb, targets: new Set(), root: o?.root }
+            fakes.push(this.f)
+          }
+          observe(el: Element) {
+            this.f.targets.add(el)
+          }
+          unobserve(el: Element) {
+            this.f.targets.delete(el)
+          }
+          disconnect() {
+            this.f.targets.clear()
+          }
+        },
+      )
+    }
+    const near = (el: Element) => {
+      const f = fakes.find((x) => x.root && x.targets.has(el))
+      f?.cb(
+        [{ target: el, isIntersecting: true } as unknown as IntersectionObserverEntry],
+        {} as never,
+      )
+    }
+    const edges = () => [...gridEl().querySelectorAll('.gallerist-grid-edge')]
+    const oneGroup = (n: number): Collection => ({
+      groups: [{ id: 'g0', items: Array.from({ length: n }, (_, i) => item(`x${i}`)) }],
+    })
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('cells: one 10k-item group draws 40 cells each side of the current one', () => {
+      const v = open(oneGroup(10_000))
+      v.goTo(0, 5000)
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      const cells = gridEl().querySelectorAll<HTMLElement>('.gallerist-grid-cell')
+      expect(cells.length).toBe(81)
+      expect(cells[0]?.dataset.item).toBe('x4960')
+      expect(cells[80]?.dataset.item).toBe('x5040')
+      expect(gridEl().querySelector('[data-active]')?.getAttribute('data-item')).toBe('x5000')
+    })
+
+    it('cells: a move outside the drawn run redraws around it', () => {
+      const v = open(oneGroup(10_000))
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      v.goTo(0, 9000)
+      const cells = gridEl().querySelectorAll<HTMLElement>('.gallerist-grid-cell')
+      expect(cells.length).toBe(81)
+      expect(gridEl().querySelector('[data-active]')?.getAttribute('data-item')).toBe('x9000')
+    })
+
+    it('cells: scrolling near either end draws more, keeping groups in order', () => {
+      stubIO()
+      const groups = Array.from({ length: 100 }, (_, g) => ({
+        id: `g${g}`,
+        items: [item(`a${g}`), item(`b${g}`)],
+      }))
+      const v = open({ groups })
+      v.goTo(50, 0) // unit 100
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      const ids = () =>
+        [...gridEl().querySelectorAll<HTMLElement>('.gallerist-grid-cell')].map(
+          (c) => c.dataset.item,
+        )
+      expect(ids().length).toBe(81) // units 60..140
+      const [head, tail] = edges() as [Element, Element]
+      near(tail)
+      near(head)
+      const drawn = ids()
+      expect(drawn.length).toBe(161) // units 20..180
+      expect(drawn[0]).toBe('a10')
+      expect(drawn.at(-1)).toBe('a90')
+      // one header + one cells block per group, in collection order, between the edges
+      const kids = [...gridEl().children]
+      expect(kids[0]).toBe(head)
+      expect(kids.at(-1)).toBe(tail)
+      const headers = gridEl().querySelectorAll('.gallerist-grid-header')
+      expect([...headers].map((h) => h.textContent)).toEqual(
+        Array.from({ length: 81 }, (_, k) => `Group ${k + 11}`),
+      )
+    })
+
+    it('sections: scrolling near the end draws the next ones; the first one is never lost', () => {
+      stubIO()
+      const groups = Array.from({ length: 50 }, (_, g) => ({ id: `g${g}`, items: [item(`m${g}`)] }))
+      const v = createViewer({ collection: { groups }, plugins: [grid({ layout: 'sections' })] })
+      mount(v)
+      v.open({ g: 20, i: 0 })
+      ;(document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement).click()
+      const names = () =>
+        [...gridEl().querySelectorAll('.gallerist-grid-section')].map((s) =>
+          s.getAttribute('aria-label'),
+        )
+      expect(names()).toEqual(Array.from({ length: 9 }, (_, k) => `Group ${k + 17}`))
+      const [head, tail] = edges() as [Element, Element]
+      for (let k = 0; k < 10; k++) near(tail)
+      for (let k = 0; k < 10; k++) near(head)
+      expect(names()).toEqual(Array.from({ length: 50 }, (_, k) => `Group ${k + 1}`))
+    })
+
+    it('closing drops what it drew; re-opening draws it again', () => {
+      open()
+      const toggle = document.querySelector('.gallerist-grid-toggle') as HTMLButtonElement
+      toggle.click()
+      expect(gridEl().children.length).toBeGreaterThan(0)
+      toggle.click()
+      expect(gridEl().children.length).toBe(0)
+      toggle.click()
+      expect(gridEl().querySelectorAll('.gallerist-grid-cell').length).toBe(3)
+    })
+
+    it('the tour start drops the overview', () => {
+      const v = createViewer({
+        collection: { groups: [{ id: 'g0', items: [item('a')] }] },
+        plugins: [grid({ layout: 'sections', startOpen: true })],
+      })
+      mount(v)
+      v.open()
+      ;(gridEl().querySelector('.gallerist-grid-start') as HTMLButtonElement).click()
+      expect(gridEl().children.length).toBe(0)
+    })
+  })
+})
+
+describe('run helpers', () => {
+  it('spanAround keeps the run full at either end', () => {
+    expect(spanAround(5, 100, 2)).toEqual([3, 7])
+    expect(spanAround(0, 100, 2)).toEqual([0, 4])
+    expect(spanAround(99, 100, 2)).toEqual([95, 99])
+    expect(spanAround(1, 3, 2)).toEqual([0, 2])
+    expect(spanAround(0, 0, 2)).toEqual([0, -1])
+  })
+
+  it('groupAt finds the group holding a unit, past empty groups', () => {
+    const offsets = [0, 2, 2, 5, 6] // sizes 2, 0, 3, 1
+    expect([0, 1, 2, 3, 4, 5].map((u) => groupAt(offsets, u))).toEqual([0, 0, 2, 2, 2, 3])
   })
 })
