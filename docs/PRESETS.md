@@ -39,7 +39,9 @@ navigator?, frame?, itemIndicator?, groupAxis?, arrowLabels? }`. Unknown names f
 The renderer hands the resolved preset to every plugin region (`RegionCtx.preset`), and
 `thumbnails()` takes its `thumbnails` entry for each option it wasn't given (`undefined` counts as
 not given). The rail settles its options when its region mounts, so this also holds for a
-`viewer.use(thumbnails())` after `mount()`. Each preset's rail:
+`viewer.use(thumbnails())` after `mount()`. A preset's `timeline` carries into a `flat` rail too
+(`thumbnails({ groupDisplay: 'flat' })` under `reviewer` heads each group with its time); pass
+`timeline: false` to drop it. Each preset's rail:
 
 | Preset      | `thumbnails` defaults |
 |-------------|-----------------------|
@@ -70,28 +72,40 @@ arrow's accessible name with `strings.previousTo` / `strings.nextTo`.
 
 A `thumbnails()` option (not a preset/rail field), so set it on the plugin. Presets default to
 `stacked` (`tour` uses `index`); opt into `flat` explicitly, e.g. `thumbnails({ groupDisplay: 'flat' })`.
-A preset's `itemAxis`, `numberItems` and `timeline` belong to its own group display, so an explicit
-`groupDisplay` other than the preset's starts from the plugin's defaults for those (`tour` with
-`groupDisplay: 'stacked'` gets the plain vertical stack, unnumbered); pass them too to keep them.
+A preset's `itemAxis` and `numberItems` belong to its own group display, so an explicit `groupDisplay`
+other than the preset's starts from the plugin's defaults for those (`tour` with
+`groupDisplay: 'stacked'` gets the plain vertical stack, unnumbered); pass them too to keep them. Its
+`timeline` is not tied to a display: `stacked` and `flat` both draw it (an `index` rail doesn't), so it
+carries over unless you pass `timeline: false`.
 
 - `stacked` (default) — one collapsed card per group. Hover/focus a multi-item card to **peek** its
   items without navigating in (touch gets an expand affordance). The active group's items show as a
   vertical stack in the **`aside` column** beside the stage (`itemAxis: 'vertical'`, the default), or
   as a row inline in the rail (`itemAxis: 'horizontal'`). The stack takes space rather than covering
   the stage, and stays up for one-item groups so the stage doesn't change width as you navigate.
-- `flat` — every item renders side-by-side, each group bracketed (left accent rule + caption
-  header). Item-windowed, so it stays bounded for large galleries and for a single giant group.
+- `flat` — every item renders side-by-side, each group under its label (the `timeline` label, else
+  `group.caption`) with a hairline between groups; only the current group's label takes the accent.
+  On a side rail the groups run down the rail, each one's items in a column. Item-windowed, so it
+  stays bounded for large galleries and for a single giant group. A flat rail makes the renderer's
+  traversal linear by default (below).
 - `index` — a section index: a row per group with its cover, `group.caption`, `group.meta.subtitle`
   and item count; the active group's items expand under its row. At 900px wide or less, or on a
   bottom rail, it's a strip of chips instead, which don't expand.
 
 ## Linear traversal (`mount({ linear })`, `<Gallerist linear>`)
 
-A renderer option that pairs with the **flat** rail: when set, ←/→ walks the flattened item
-sequence across groups (1a, 1b, 2a, 2b, 2c, 3a…), the ↑/↓ item axis retires, the counter shows
-`item N / total`, and the within-group pills hide — surfaced as `data-gallerist-linear`. Pass `loop`
-alongside it to wrap at the global first/last item. The React example couples it to the flat rail
-(`linear={groupDisplay === 'flat'}`).
+In linear traversal ←/→ (↑/↓ beside a side rail) walk the flattened item sequence across groups
+(1a, 1b, 2a, 2b, 2c, 3a…), the ↑/↓ item axis retires, the counter shows `item N / total`, the
+within-group pills hide, and the arrows walk the items — surfaced as `data-gallerist-linear`. Pass
+`loop` alongside it to wrap at the global first/last item.
+
+It follows the rail by default: a flat thumbnails rail (`thumbnails({ groupDisplay: 'flat' })`) turns
+it on, since that rail shows every item in one run; a stacked or index rail, or no rail, leaves it
+off. The thumbnails plugin marks its region with `data-gallerist-linear` in flat mode and the renderer
+reads that whenever the plugin set changes, so a rail added or removed after mount (or a new mount
+with another preset) updates it. An explicit option wins either way: `linear: false` (React:
+`linear={false}`) keeps the group and item axes under a flat rail, and `linear: true` makes any rail
+linear. React passes nothing when the prop is omitted, so the rail decides there too.
 
 ## Arrow placement (`data-gallerist-arrows`)
 

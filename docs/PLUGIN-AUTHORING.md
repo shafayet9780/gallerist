@@ -33,7 +33,11 @@ export function myPlugin(opts?: MyOptions): Plugin {
 `RegionName` = `'toolbar' | 'aside' | 'footer' | 'caption' | 'thumbnails' | 'stage' | 'backdrop'`
 (extensible). `toolbar`, `aside` and `footer` are **additive** (many plugins contribute); the others are
 **exclusive** (last-wins + dev warn). A `caption` node replaces the caption bar's text and keeps the
-bar up for every item (`plugin-captions` is the reference).
+bar up for every item (`plugin-captions` is the reference). A `thumbnails` node that carries (or holds
+an element with) `data-gallerist-linear` asks the DOM renderer for linear traversal: unless `mount()`
+got an explicit `linear`, ←/→ then walk every item in order across groups. The renderer reads it each
+time the plugin set changes, so it follows the rail being added or removed; `plugin-thumbnails` marks
+its region this way in `flat` mode.
 
 A region renderer gets `ctx = { viewer, preset? }`. `preset` is the renderer's mounted layout preset as
 `PresetDefaults`, a map keyed by what each entry configures (the DOM renderer passes `resolvePreset()`'s

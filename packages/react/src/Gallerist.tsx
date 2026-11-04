@@ -75,7 +75,8 @@ export interface GalleristProps extends ViewerOptions {
   rail?: RailPlacement
   /** auto-hide chrome on idle (overrides the preset default) — UX-C. */
   autoHide?: boolean
-  /** linear flat traversal: ←/→ walks the flattened item sequence; pairs with a flat thumbnail rail. */
+  /** linear traversal: ←/→ walk the flattened item sequence. Omitted, it follows the rail (on with a
+   *  flat thumbnails rail, off otherwise); `true` / `false` fix it. */
   linear?: boolean
   /** UI text overrides (button labels, announcements) for translation; read once at mount. */
   strings?: Partial<Strings>

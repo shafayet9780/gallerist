@@ -350,20 +350,90 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
     expect(wraps[0]?.getAttribute('role')).toBe('group')
   })
 
-  it('shows a group caption header only when provided', () => {
+  it('heads a group with its caption only when provided; the label joins the group name', () => {
     openFlat({
       groups: [
         { id: 'g0', caption: 'Morning', items: [item('a0'), item('a1')] },
         { id: 'g1', items: [item('b0'), item('b1')] },
       ],
     })
+    const g0 = document.querySelector('.gallerist-thumb-group[data-group="g0"]')
+    const cap = g0?.querySelector('.gallerist-thumb-group-cap')
+    expect(cap?.textContent).toBe('Morning')
+    expect(cap?.getAttribute('aria-hidden')).toBe('true') // read once, in the group's name
+    expect(g0?.getAttribute('aria-label')).toBe('Group 1, Morning')
+    const g1 = document.querySelector('.gallerist-thumb-group[data-group="g1"]')
+    expect(g1?.querySelector('.gallerist-thumb-group-cap')).toBeNull()
+    expect(g1?.getAttribute('aria-label')).toBe('Group 2')
+  })
+
+  it('marks the group holding the current item, and moves the mark with navigation', () => {
+    const v = openFlat()
+    const current = () =>
+      [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-group[data-active]')].map(
+        (w) => w.dataset.group,
+      )
+    expect(current()).toEqual(['g0'])
+    v.goTo(1, 0)
+    expect(current()).toEqual(['g1'])
+    v.goTo(1, 2) // another item of the same group: the mark stays
+    expect(current()).toEqual(['g1'])
+    v.goTo(2, 1)
+    expect(current()).toEqual(['g2'])
+    // the wrapper only takes data-active: role=group has no selected/current state of its own
+    const g2 = document.querySelector('.gallerist-thumb-group[data-group="g2"]')
+    expect(g2?.hasAttribute('aria-current')).toBe(false)
+    expect(g2?.hasAttribute('aria-selected')).toBe(false)
+  })
+
+  it('a re-drawn group gets the mark back (the run follows the cursor)', () => {
+    if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
+    const big: Collection = {
+      groups: Array.from({ length: 300 }, (_, g) => ({
+        id: `g${g}`,
+        items: [item(`g${g}a`), item(`g${g}b`)],
+      })),
+    }
+    const v = openFlat(big)
+    v.goTo(250, 1) // outside the drawn run: it is drawn afresh around the cursor
+    expect(document.querySelector('.gallerist-thumb-group[data-group="g0"]')).toBeNull()
     expect(
-      document.querySelector('.gallerist-thumb-group[data-group="g0"] .gallerist-thumb-group-cap')
-        ?.textContent,
-    ).toBe('Morning')
-    expect(
-      document.querySelector('.gallerist-thumb-group[data-group="g1"] .gallerist-thumb-group-cap'),
-    ).toBeNull()
+      [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-group[data-active]')].map(
+        (w) => w.dataset.group,
+      ),
+    ).toEqual(['g250'])
+  })
+
+  it('marks its region so the renderer walks it linearly; stacked and index rails do not', () => {
+    const v = openFlat()
+    const region = document.querySelector('.gallerist-thumbs-region')
+    expect(region?.hasAttribute('data-gallerist-linear')).toBe(true)
+    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-linear')).toBe('true')
+    const root = document.querySelector('.gallerist') as HTMLElement
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 }) // a0 → b0 → b1, across the group boundary
+    for (const groupDisplay of ['stacked', 'index'] as const) {
+      document.body.innerHTML = ''
+      const w = createViewer({ collection: collection(), plugins: [thumbnails({ groupDisplay })] })
+      mount(w)
+      w.open()
+      expect(document.querySelector('[data-gallerist-linear]')).toBeNull()
+    }
+  })
+
+  it('an explicit linear: false on the renderer keeps the two axes under a flat rail', () => {
+    const v = createViewer({
+      collection: collection(),
+      plugins: [thumbnails({ groupDisplay: 'flat' })],
+    })
+    mount(v, { linear: false })
+    v.open()
+    expect(document.querySelector('.gallerist')?.hasAttribute('data-gallerist-linear')).toBe(false)
+    const root = document.querySelector('.gallerist') as HTMLElement
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 }) // group by group
   })
 
   it('clicking an item card navigates', () => {
@@ -426,6 +496,26 @@ describe('plugin-thumbnails — flat rail (groupDisplay: flat)', () => {
     const wrap = document.querySelector('.gallerist-thumb-group[data-group="g0"]')
     expect(wrap).not.toBeNull()
     expect(wrap?.hasAttribute('data-partial-end')).toBe(true) // tail of the group is out of the window
+  })
+
+  it('shows a group’s label only over its start: a run cut into the group hides it', () => {
+    if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
+    const big: Collection = {
+      groups: [
+        { id: 'g0', caption: 'Long', items: Array.from({ length: 500 }, (_, i) => item(`it${i}`)) },
+      ],
+    }
+    const v = openFlat(big)
+    const wrap = () => document.querySelector('.gallerist-thumb-group[data-group="g0"]')
+    const cap = () => wrap()?.querySelector<HTMLElement>('.gallerist-thumb-group-cap')
+    expect(cap()?.hidden).toBe(false)
+    v.goTo(0, 400) // the run is drawn around item 400: the group's start isn't in it
+    expect(wrap()?.hasAttribute('data-partial-start')).toBe(true)
+    expect(cap()?.hidden).toBe(true)
+    expect(wrap()?.getAttribute('aria-label')).toBe('Group 1, Long') // still named
+    v.goTo(0, 0)
+    expect(wrap()?.hasAttribute('data-partial-start')).toBe(false)
+    expect(cap()?.hidden).toBe(false)
   })
 
   it('stays bounded after a full flat traversal (no leak)', () => {
@@ -648,12 +738,93 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
     expect(active()).toEqual(['g1'])
   })
 
-  it('no timeline row without the option, or in flat mode', () => {
+  it('no timeline row without the option, or in flat mode (whose groups take the labels)', () => {
     openWith({})
     expect(document.querySelector('.gallerist-thumb-time')).toBeNull()
     document.body.innerHTML = ''
     openWith({ timeline: true, groupDisplay: 'flat' })
     expect(document.querySelector('.gallerist-thumb-time')).toBeNull()
+    expect(document.querySelectorAll('.gallerist-thumb-group-cap').length).toBe(2)
+  })
+
+  describe('on a flat rail', () => {
+    const caps = () =>
+      [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-group')].map((w) => [
+        w.dataset.group,
+        w.querySelector('.gallerist-thumb-group-cap')?.textContent ?? null,
+        w.getAttribute('aria-label'),
+      ])
+    // g0 has a time and a caption, g1 only a time, g2 only a caption, g3 neither
+    const mixed = (): Collection => ({
+      groups: [
+        { id: 'g0', caption: 'Desk', meta: { time: '09:00' }, items: [item('a0')] },
+        { id: 'g1', meta: { time: '09:10' }, items: [item('b0'), item('b1')] },
+        { id: 'g2', caption: 'Lunch', items: [item('c0')] },
+        { id: 'g3', items: [item('d0')] },
+      ],
+    })
+
+    it('timeline: true heads each group with group.meta.time, else its caption', () => {
+      openWith({ groupDisplay: 'flat', timeline: true }, mixed())
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+      expect(caps()).toEqual([
+        ['g0', '09:00', 'Group 1, 09:00'], // the time wins over the caption
+        ['g1', '09:10', 'Group 2, 09:10'],
+        ['g2', 'Lunch', 'Group 3, Lunch'], // no time: the caption
+        ['g3', null, 'Group 4'],
+      ])
+      for (const cap of document.querySelectorAll('.gallerist-thumb-group-cap'))
+        expect(cap.getAttribute('aria-hidden')).toBe('true')
+    })
+
+    it('a timeline function supplies the labels; undefined falls back to the caption', () => {
+      const seen: Array<[string, number]> = []
+      openWith(
+        {
+          groupDisplay: 'flat',
+          timeline: (group, index) => {
+            seen.push([group.id, index])
+            return index % 2 ? undefined : `T${index}`
+          },
+        },
+        mixed(),
+      )
+      expect(caps()).toEqual([
+        ['g0', 'T0', 'Group 1, T0'],
+        ['g1', null, 'Group 2'], // undefined, and no caption
+        ['g2', 'T2', 'Group 3, T2'],
+        ['g3', null, 'Group 4'],
+      ])
+      expect(seen).toContainEqual(['g2', 2])
+      document.body.innerHTML = ''
+      openWith({ groupDisplay: 'flat', timeline: () => undefined }, mixed())
+      expect(caps().map(([, cap]) => cap)).toEqual(['Desk', null, 'Lunch', null])
+    })
+
+    it('without a timeline the captions head the groups', () => {
+      openWith({ groupDisplay: 'flat' }, mixed())
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+      expect(caps().map(([, cap]) => cap)).toEqual(['Desk', null, 'Lunch', null])
+    })
+
+    it('the current group’s label is the marked one, and follows the cursor', () => {
+      const v = openWith({ groupDisplay: 'flat', timeline: true }, mixed())
+      const current = () =>
+        document.querySelector('.gallerist-thumb-group[data-active] > .gallerist-thumb-group-cap')
+          ?.textContent
+      expect(current()).toBe('09:00')
+      v.goTo(1, 1)
+      expect(current()).toBe('09:10')
+      v.goTo(2)
+      expect(current()).toBe('Lunch')
+      expect(document.querySelectorAll('.gallerist-thumb-group[data-active]').length).toBe(1)
+    })
+
+    it('an index rail draws no timeline', () => {
+      openWith({ groupDisplay: 'index', timeline: true }, mixed())
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+      expect(document.querySelector('.gallerist-thumb-time')).toBeNull()
+    })
   })
 
   it('numberItems puts a 1-based number on each item thumb', () => {
@@ -802,6 +973,41 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       expect(nums()).toEqual([])
     })
 
+    it('the preset’s timeline carries into an explicit flat rail; its numbering does not', () => {
+      openPreset('reviewer', { groupDisplay: 'flat' })
+      const rail = document.querySelector('.gallerist-thumbs')
+      expect(rail?.getAttribute('data-display')).toBe('flat')
+      expect(rail?.hasAttribute('data-timeline')).toBe(true)
+      expect(
+        [...document.querySelectorAll('.gallerist-thumb-group-cap')].map((c) => c.textContent),
+      ).toEqual(['09:00', '09:10']) // g2 has no time (and no caption): no label
+      expect(document.querySelector('.gallerist-thumb-group')?.getAttribute('aria-label')).toBe(
+        'Group 1, 09:00',
+      )
+      expect(document.querySelector('.gallerist-thumb-num')).toBeNull() // numberItems stays behind
+      // a flat rail under the reviewer walks item by item
+      expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-linear')).toBe(
+        'true',
+      )
+    })
+
+    it('the caller can still turn the preset’s timeline off on a flat rail', () => {
+      openPreset(
+        'reviewer',
+        { groupDisplay: 'flat', timeline: false },
+        {
+          groups: [
+            { id: 'g0', caption: 'Desk', meta: { time: '09:00' }, items: [item('a0')] },
+            { id: 'g1', meta: { time: '09:10' }, items: [item('b0')] },
+          ],
+        },
+      )
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+      expect(
+        [...document.querySelectorAll('.gallerist-thumb-group-cap')].map((c) => c.textContent),
+      ).toEqual(['Desk'])
+    })
+
     it('an explicit groupDisplay equal to the preset’s keeps its layout keys (reviewer, stacked)', () => {
       const v = openPreset('reviewer', { groupDisplay: 'stacked' })
       expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
@@ -820,6 +1026,14 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       document.body.appendChild(rail)
       return { v, inst, ctx, rail, regions }
     }
+
+    it('a preset that makes the rail flat carries its timeline too (untyped preset data)', () => {
+      const { v, rail } = regionsWith({ groupDisplay: 'flat', timeline: true })
+      v.open()
+      expect(rail.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+      expect(rail.querySelector('.gallerist-thumb-group-cap')?.textContent).toBe('09:00')
+      expect(rail.hasAttribute('data-gallerist-linear')).toBe(true)
+    })
 
     it('unknown groupDisplay / itemAxis values from a preset fall back to the defaults', () => {
       const { ctx, rail, regions } = regionsWith({ groupDisplay: 'grid', itemAxis: 'diagonal' })

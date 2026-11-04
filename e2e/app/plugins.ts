@@ -35,7 +35,8 @@ const rail = (['left', 'right'].includes(railParam) ? railParam : 'bottom') as
   | 'bottom'
   | 'left'
   | 'right'
-const linear = params.get('linear') === '1'
+// linear=1 / linear=0 force it; unset, it follows the rail (on with a flat one)
+const linear = params.get('linear') ? params.get('linear') === '1' : undefined
 
 const viewer = createViewer({
   collection,

@@ -66,9 +66,12 @@ export interface MountOptions {
    */
   rail?: RailPlacement
   /**
-   * Linear traversal (pairs with `thumbnails({ groupDisplay: 'flat' })`). When true, ←/→ walks the
-   * flattened item sequence across groups (1a, 1b, 2a, 2b, 2c, 3a…), ↑/↓ retire, the counter shows
-   * `item N / total`, and the within-group pills hide — surfaced as `data-gallerist-linear`.
+   * Linear traversal: ←/→ walk the flattened item sequence across groups (1a, 1b, 2a, 2b, 2c, 3a…),
+   * ↑/↓ retire, the counter shows `item N / total`, and the within-group pills hide — surfaced as
+   * `data-gallerist-linear`. Unset, it follows the rail: on while the `thumbnails` region holds an
+   * element marked `data-gallerist-linear` (a flat rail, `thumbnails({ groupDisplay: 'flat' })`,
+   * marks its region so), off otherwise, and it changes when the plugins do. `true` or `false`
+   * fixes it.
    */
   linear?: boolean
   /**
@@ -266,10 +269,12 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     rail === 'left' || rail === 'right' ? 'vertical' : 'horizontal'
   const groupAxis: GroupAxis = opts.groupAxis ?? preset?.groupAxis ?? orientation
   const vertical = groupAxis === 'vertical'
-  const linear = opts.linear ?? false
+  // settled with the plugin regions (mountRegions): the option, else what the rail asks for
+  let linear = false
   const arrowLabelsOpt = opts.arrowLabels ?? preset?.arrowLabels ?? false
+  // the arrows' group names (not shown while linear, whose arrows walk the items)
   const arrowLabel: ((group: Group, index: number) => string | undefined) | null =
-    !arrowLabelsOpt || !controls || vertical || linear || arrows !== 'pill-right'
+    !arrowLabelsOpt || !controls || vertical || arrows !== 'pill-right'
       ? null
       : arrowLabelsOpt === true
         ? (group) => str(group.caption)
@@ -362,9 +367,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   root.setAttribute('data-gallerist-rail-pos', railPos)
   root.setAttribute('data-gallerist-orientation', orientation)
   root.setAttribute('data-gallerist-axis', groupAxis)
-  if (arrowLabel) root.setAttribute('data-gallerist-arrow-labels', '')
   root.setAttribute('data-gallerist-rail', railHidden ? 'collapsed' : 'expanded')
-  if (linear) root.setAttribute('data-gallerist-linear', 'true')
   if (frame) root.setAttribute('data-gallerist-frame', '')
   if (placard) root.setAttribute('data-gallerist-indicator', 'placard')
   applyAppearance(root, { skin: opts.skin, accent: opts.accent, scheme: opts.scheme })
@@ -912,7 +915,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       const nameAt = (step: number) => {
         const n = viewer.loop && G > 1 ? (cur.g + step + G) % G : cur.g + step
         const target = col.groups[n]
-        return target ? arrowLabel(target, n) : undefined
+        return target && !linear ? arrowLabel(target, n) : undefined
       }
       setArrowLabel(prevArrow, nameAt(-1), ui.previous, ui.previousTo)
       setArrowLabel(nextArrow, nameAt(1), ui.next, ui.nextTo)
@@ -1435,6 +1438,16 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(internals.getPlugins())
     mountPluginRegions(internals.getPlugins())
+    // Linear traversal: the option, else on while the rail asks for it (a flat thumbnails rail marks
+    // its region), so it follows a rail added or removed after mount.
+    const on = opts.linear ?? !!regionHosts.thumbnails.querySelector('[data-gallerist-linear]')
+    root.toggleAttribute('data-gallerist-arrow-labels', !!arrowLabel && !on)
+    if (on !== linear) {
+      linear = on
+      if (on) root.setAttribute('data-gallerist-linear', 'true')
+      else root.removeAttribute('data-gallerist-linear')
+      chromeCol = null // the counter, the item navigator and the arrows' names follow it
+    }
     // The pull-handle leads the rail region while a rail plugin is mounted. The mounter leaves
     // nodes it didn't add alone, so place (or drop) the handle here.
     const thumbs = regionHosts.thumbnails
@@ -1446,7 +1459,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItem = undefined
-    if (attached) renderWindow()
+    if (attached) {
+      renderWindow()
+      updateChrome()
+    }
   }
   mountRegions()
   const offPlugins = internals.onPluginsChanged(mountRegions)
