@@ -33,6 +33,15 @@
     --gallerist-accent: var(--gallerist-accent-dark);
     --gallerist-accent-fg: var(--gallerist-accent-dark-fg);
 
+    /* pins (plugin-pins): numbered discs in the accent */
+    --gallerist-pin-size: 26px;
+    --gallerist-pin-bg: var(--gallerist-accent);
+    --gallerist-pin-fg: var(--gallerist-accent-fg);
+    --gallerist-pin-ring: rgb(0 0 0 / 0.35);
+    --gallerist-pin-resolved-bg: #5a6069; /* opaque: pins sit on photos of any brightness */
+    --gallerist-pin-resolved-fg: #f0f1f3;
+    --gallerist-pin-card-bg: var(--gallerist-panel); /* near-opaque: it sits on the image */
+
     /* hover: unchanged unless a skin sets one */
     --gallerist-arrow-hover-bg: var(--gallerist-arrow-bg);
     --gallerist-itemnav-button-hover-bg: var(--gallerist-itemnav-button-bg);

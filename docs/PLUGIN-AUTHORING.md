@@ -22,7 +22,9 @@ export function myPlugin(opts?: MyOptions): Plugin {
     on?: EventHandlers     // { slide, item, zoom, overlayClick, ... } wired to the emitter
     keymap?: Record<string, (e: KeyboardEvent) => void>
     mediaAdapters?: MediaAdapter[]      // e.g. a <video> or YouTube adapter
-    overlays?: OverlaySpec[]            // image-space / viewport overlays
+    overlays?: OverlaySpec[] | ((slide: { group, item }) => OverlaySpec[])
+                                        // image-space / viewport overlays; the function form gives
+                                        // each slide its own (e.g. pins read from the item)
     regions?: Partial<Record<RegionName, (ctx) => Node>>  // inject UI into named slots
   })
 }

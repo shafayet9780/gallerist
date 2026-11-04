@@ -84,6 +84,9 @@ mount(viewer, {
   scheme: (p.get('scheme') ?? undefined) as ColorScheme | undefined,
 })
 ;(window as unknown as { viewer: typeof viewer }).viewer = viewer
+// late=1: open a moment after mount, as a page does on a click (the overlay root isn't in the
+// document until then)
+if (p.get('late') === '1') await new Promise((r) => setTimeout(r, 50))
 viewer.open()
 if (p.get('zoom')) viewer.zoomTo(Number(p.get('zoom')))
 // expand the rail even where the preset starts it collapsed (immersive)

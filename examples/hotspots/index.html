@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gallerist — pins</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #111;
+        color: #eee;
+      }
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 32px 24px;
+      }
+      h1 {
+        font-weight: 500;
+        margin: 0 0 8px;
+      }
+      p {
+        color: #aaa;
+        line-height: 1.5;
+      }
+      .demos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .demos button {
+        padding: 16px;
+        border: 1px solid #333;
+        border-radius: 10px;
+        background: #1a1a1c;
+        color: inherit;
+        font: inherit;
+        text-align: start;
+        cursor: pointer;
+      }
+      .demos button:hover {
+        border-color: #666;
+      }
+      .demos strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .demos span {
+        color: #aaa;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Pins</h1>
+      <p>
+        <code>@gallerist/plugin-pins</code> anchors points to the image. They follow pan and zoom at a
+        constant size and open a card. One plugin, three presentations; zoom in (scroll, pinch or
+        <kbd>+</kbd>) to see a pin hold its place, and press <kbd>P</kbd> to hide them.
+      </p>
+      <div class="demos">
+        <button type="button" data-demo="shop">
+          <strong>Shop · tag</strong><span>Product hotspots on the Gallery skin.</span>
+        </button>
+        <button type="button" data-demo="review">
+          <strong>Review · comment</strong
+          ><span>Numbered threads on the Console skin. Add one with <kbd>C</kbd>.</span>
+        </button>
+        <button type="button" data-demo="tour">
+          <strong>Tour · feature</strong><span>Notes on a home tour, Gallery light.</span>
+        </button>
+      </div>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

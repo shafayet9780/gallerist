@@ -1,0 +1,70 @@
+{
+  "name": "@gallerist/plugin-pins",
+  "version": "0.2.0",
+  "description": "Gallerist plugin — pins anchored to the image: comment threads, product tags or feature notes.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist", "LICENSE", "README.md"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../../scripts/copy-license.mjs"
+  },
+  "peerDependencies": {
+    "@gallerist/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@gallerist/core": "workspace:*",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shafayet9780/gallerist.git",
+    "directory": "packages/plugin-pins"
+  },
+  "homepage": "https://github.com/shafayet9780/gallerist#readme",
+  "bugs": {
+    "url": "https://github.com/shafayet9780/gallerist/issues"
+  },
+  "author": "Shafayet Ahmmed",
+  "keywords": [
+    "lightbox",
+    "gallery",
+    "image-viewer",
+    "media-viewer",
+    "photo-gallery",
+    "carousel",
+    "zoom",
+    "pan",
+    "overlays",
+    "headless",
+    "framework-agnostic",
+    "virtualized",
+    "nested-gallery",
+    "pins",
+    "hotspots",
+    "annotations",
+    "comments",
+    "shoppable"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

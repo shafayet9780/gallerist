@@ -30,6 +30,20 @@
   content stays fixed, defaulting to the stage centre. It used to be treated as the pan offset. Set
   a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
 
+### Added
+- **plugin-pins (M17)**: new `@gallerist/plugin-pins`. Pins are points on an item that follow pan
+  and zoom at a constant size and open a card. Three presentations: `comment` (numbered threads
+  with replies and a resolved state, plus `onPlace` to drop a new one with a click or `c`), `tag`
+  (a product hotspot with a card and link) and `feature` (numbered notes). Pins come from
+  `item.meta.pins` or a `pins(item, group)` reader. A toolbar toggle and `p` show or hide them;
+  Escape closes a card, not the viewer. `refresh()`, `setVisible()` and `open(id)` let the host
+  drive them. Styles are in `theme-default/pins.css`, which `gallerist.css` includes, and are drawn
+  from the skin's tokens. Demo: `examples/hotspots`.
+- **core + renderer-dom**: a plugin's `overlays` may be a function of the slide
+  (`({ group, item }) => OverlaySpec[]`). Overlays repaint when an item's data changes under the
+  same id. An interactive overlay whose content has its own controls is no longer an extra tab
+  stop, and double-clicking a control in the stage no longer zooms.
+
 ### Changed
 - **theme (M16)**: `theme-default` splits into `base.css` (structure: layout areas, reserved space,
   the mobile layer, RTL, reduced motion, every component rule) and skins that only set tokens.
@@ -76,6 +90,15 @@
   occlusion, stage size and item-axis reachability.
 
 ### Fixed
+- **plugin-thumbnails**: the item stack went into the rail instead of the side column when an
+  overlay viewer opened after mount (on a click, as pages do). The column is used whenever the
+  renderer has mounted it, not only once it is in the document.
+- **renderer-dom (M17)**: a repaint of the overlays keeps keyboard focus on the same overlay
+  instead of dropping it to `<body>`; a double click inside an interactive overlay doesn't zoom.
+- **core + renderer-dom (M17)**: zoom and pan are bounded by the painted image, not the stage. A
+  zoomed portrait in a landscape stage (or a panorama in a tall one) stays centred until it is wider
+  than the stage, and can no longer be dragged into the empty letterbox beside it. The bound updates
+  when the image's natural size arrives. New `clampPanToBox` in `@gallerist/core/internal`.
 - **core**: a throwing event handler no longer stops later handlers (it is reported via
   `reportError`); a destructured `preventDefault()` works; `zoomTo` ignores NaN/negative input.
 - **core**: the `overlays` option of `createViewer` (and so `<Gallerist overlays>`) was declared but

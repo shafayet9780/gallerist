@@ -28,6 +28,14 @@ export const ICONS = {
   itemStack: svg(
     '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/><path d="M18 8h0M18 12h0M18 16h0"/>',
   ),
+  // a map pin: show / hide the pins on the image (plugin-pins)
+  pin: svg(
+    '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  ),
+  // a speech bubble with a plus: place a new comment pin
+  comment: svg(
+    '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/><path d="M12 8.5v7M8.5 12h7"/>',
+  ),
 } as const
 
 export type IconName = keyof typeof ICONS

@@ -38,5 +38,13 @@
     "ignore": ["react", "react-dom", "@gallerist/core", "@gallerist/renderer-dom"],
     "limit": "3 kB",
     "gzip": true
+  },
+  {
+    "name": "@gallerist/plugin-pins (gz)",
+    "path": "packages/plugin-pins/dist/index.js",
+    "import": "{ pins }",
+    "ignore": ["@gallerist/core"],
+    "limit": "4 kB",
+    "gzip": true
   }
 ]

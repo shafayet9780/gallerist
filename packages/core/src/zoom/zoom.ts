@@ -11,6 +11,13 @@ export interface Size {
   w: number
   h: number
 }
+/** An axis-aligned box: origin + size. */
+export interface Rect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
 
 const EPS = 1e-3
 
@@ -43,17 +50,31 @@ export function fitTransform(stage: Size, natural: Size): ZoomState {
   }
 }
 
-function clampAxis(t: number, scaled: number, stage: number): number {
-  if (scaled <= stage) return (stage - scaled) / 2 // centered
-  return Math.min(0, Math.max(stage - scaled, t)) // edges cover the stage
+// One axis of the pan: `start`/`size` locate the box in content space, so the box's stage edge is
+// t + start * scale. Smaller than the stage → centred; larger → its edges may not come inside.
+function clampAxis(t: number, scale: number, start: number, size: number, stage: number): number {
+  const scaled = size * scale
+  const offset = start * scale
+  if (scaled <= stage) return (stage - scaled) / 2 - offset // centered
+  return Math.min(0 - offset, Math.max(stage - scaled - offset, t)) // edges cover the stage (0 - offset: no -0)
 }
 
 /** Clamp the pan so the content always covers the stage (centered when smaller). */
 export function clampPan(zoom: ZoomState, stage: Size, natural: Size): ZoomState {
+  return clampPanToBox(zoom, stage, { x: 0, y: 0, w: natural.w, h: natural.h })
+}
+
+/**
+ * Clamp the pan against a box inside the content layer: the painted media, e.g. the letterboxed
+ * image of an object-fit: contain layer. Along an axis where the scaled box is smaller than the
+ * stage it stays centred; where it is larger its edges never come inside the stage, so a zoomed
+ * portrait can't be panned into the empty bars beside it.
+ */
+export function clampPanToBox(zoom: ZoomState, stage: Size, box: Rect): ZoomState {
   return {
     scale: zoom.scale,
-    x: clampAxis(zoom.x, natural.w * zoom.scale, stage.w),
-    y: clampAxis(zoom.y, natural.h * zoom.scale, stage.h),
+    x: clampAxis(zoom.x, zoom.scale, box.x, box.w, stage.w),
+    y: clampAxis(zoom.y, zoom.scale, box.y, box.h, stage.h),
   }
 }
 

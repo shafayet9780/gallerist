@@ -1,0 +1,180 @@
+/*
+ * @gallerist/theme-default — pins.css: styles for @gallerist/plugin-pins, drawn from the skin's
+ * tokens (--gallerist-pin-* and the shared surfaces). Included by gallerist.css.
+ */
+
+/* ── pins (plugin-pins): points on the image that open a card ─────────────────────
+   The overlay host is counter-scaled, so a pin keeps its screen size under zoom. The marker is a
+   44px hit area around a smaller dot; the card opens beside it, away from the image's near edges. */
+.gallerist-pin {
+  position: relative;
+}
+.gallerist-pin[hidden] {
+  display: none;
+}
+.gallerist-pin-marker {
+  display: grid;
+  place-items: center;
+  width: var(--gallerist-target);
+  height: var(--gallerist-target);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+/* numbered (comment, feature): an accent disc with the number */
+.gallerist-pin-dot {
+  display: grid;
+  place-items: center;
+  min-width: var(--gallerist-pin-size);
+  height: var(--gallerist-pin-size);
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--gallerist-pin-bg);
+  color: var(--gallerist-pin-fg);
+  font: 600 12px var(--gallerist-font);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--gallerist-pin-ring), 0 2px 8px rgb(0 0 0 / 0.35);
+  transition: transform var(--gallerist-dur-gentle) var(--gallerist-ease-pop);
+}
+.gallerist-pin[data-resolved] .gallerist-pin-dot {
+  background: var(--gallerist-pin-resolved-bg);
+  color: var(--gallerist-pin-resolved-fg);
+}
+/* tag: a frosted ring with a white centre (it sits on photos, so it doesn't follow the scheme) */
+.gallerist-pin[data-presentation="tag"] .gallerist-pin-dot {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  background: rgb(255 255 255 / 0.28);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.6), 0 2px 8px rgb(0 0 0 / 0.3);
+  backdrop-filter: blur(4px);
+}
+.gallerist-pin[data-presentation="tag"] .gallerist-pin-dot::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+}
+.gallerist-pin-marker:hover .gallerist-pin-dot,
+.gallerist-pin[data-open] .gallerist-pin-dot {
+  transform: scale(1.12);
+}
+.gallerist-pin-marker:focus-visible {
+  outline: none;
+}
+.gallerist-pin-marker:focus-visible .gallerist-pin-dot {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: 3px;
+}
+.gallerist-pin-card {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box; /* the renderer's max-width is the room beside the pin, padding included */
+  width: max-content;
+  max-width: min(280px, 70vw);
+  padding: 12px 36px 12px 14px;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-pin-card-bg);
+  backdrop-filter: var(--gallerist-blur);
+  box-shadow: var(--gallerist-shadow);
+  color: var(--gallerist-fg);
+  font: 400 13px / 1.4 var(--gallerist-font);
+  text-align: start;
+  cursor: auto;
+}
+.gallerist-pin-card[hidden] {
+  display: none;
+}
+.gallerist-pin[data-side="right"] .gallerist-pin-card {
+  left: calc(100% + 4px);
+}
+.gallerist-pin[data-side="left"] .gallerist-pin-card {
+  right: calc(100% + 4px);
+}
+.gallerist-pin[data-v="down"] .gallerist-pin-card {
+  top: 0;
+}
+.gallerist-pin[data-v="up"] .gallerist-pin-card {
+  bottom: 0;
+}
+.gallerist-pin-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.gallerist-pin-title {
+  font-weight: 600;
+}
+.gallerist-pin-meta {
+  color: var(--gallerist-fg-muted);
+  font-size: 12px;
+}
+.gallerist-pin-body {
+  margin: 4px 0 0;
+}
+.gallerist-pin-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--gallerist-pin-resolved-bg);
+  color: var(--gallerist-pin-resolved-fg);
+  font-size: 11px;
+  font-weight: 600;
+}
+.gallerist-pin-replies {
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--gallerist-hairline);
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.gallerist-pin-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--gallerist-fg);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.gallerist-pin-link:focus-visible,
+.gallerist-pin-close:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: 2px;
+}
+.gallerist-pin-close {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gallerist-fg-muted);
+  cursor: pointer;
+}
+.gallerist-pin-close .gallerist-icon {
+  width: 16px;
+  height: 16px;
+}
+.gallerist-pins-tools {
+  display: flex;
+  gap: inherit;
+}
+/* placing a comment: a crosshair over the image */
+.gallerist[data-gallerist-placing] .gallerist-content[data-gallerist-current] {
+  cursor: crosshair;
+}
+.gallerist[data-gallerist-placing] .gallerist-pin-add {
+  background: var(--gallerist-pressed-bg);
+  color: var(--gallerist-pressed-fg);
+}

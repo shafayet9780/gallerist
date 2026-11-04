@@ -346,7 +346,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // the aside column when the renderer hosts one (asideEl is in the document); otherwise fall
       // back to the rail region rather than letting the stack silently disappear
       const mountEl =
-        (itemAxis === 'vertical' && asideEl?.isConnected ? asideEl : null) ?? regionEl ?? root
+        (itemAxis === 'vertical' && asideEl?.parentNode ? asideEl : null) ?? regionEl ?? root
       const show =
         panelOpen &&
         !!activeGroup &&
@@ -615,7 +615,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       regions.aside = () => {
         // the renderer attaches asideEl right after this returns: move the stack in then
         queueMicrotask(() => {
-          if (asideEl?.isConnected && itemRow && itemRow.parentNode !== asideEl) syncPanel()
+          if (asideEl?.parentNode && itemRow && itemRow.parentNode !== asideEl) syncPanel()
         })
         return asideEl ?? document.createElement('div')
       }

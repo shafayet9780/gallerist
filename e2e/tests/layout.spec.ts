@@ -377,6 +377,15 @@ test.describe('layout behaviour', () => {
     }
   })
 
+  test('the item stack is in the side column when the viewer opens after mount', async ({
+    page,
+  }) => {
+    await page.goto('/layout.html?late=1')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    await expect(page.locator('.gallerist-region-aside .gallerist-thumb-items')).toBeVisible()
+    await expect(page.locator('.gallerist-region-thumbnails .gallerist-thumb-items')).toHaveCount(0)
+  })
+
   test('RTL: the group arrows point the reading direction', async ({ page }) => {
     const flipped = async () =>
       page.evaluate(() =>

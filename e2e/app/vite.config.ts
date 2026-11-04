@@ -18,6 +18,7 @@ export default defineConfig({
       '@gallerist/plugin-fullscreen': r('../../packages/plugin-fullscreen/src/index.ts'),
       '@gallerist/plugin-hash': r('../../packages/plugin-hash/src/index.ts'),
       '@gallerist/plugin-download': r('../../packages/plugin-download/src/index.ts'),
+      '@gallerist/plugin-pins': r('../../packages/plugin-pins/src/index.ts'),
     },
   },
 })
