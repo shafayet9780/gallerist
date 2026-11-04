@@ -2,9 +2,9 @@
 // lint (e2e/tests/layout.spec.ts) can sweep presets × arrow layouts × rails × direction × viewport.
 import { type Collection, type Item, type Plugin, createViewer } from '@gallerist/core'
 import { captions } from '@gallerist/plugin-captions'
-import { download } from '@gallerist/plugin-download'
 import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
+import { download } from '@gallerist/plugin-save'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import {
   type ArrowLayout,

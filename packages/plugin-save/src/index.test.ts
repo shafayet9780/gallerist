@@ -135,7 +135,7 @@ describe('downloadItems zip', () => {
   })
 })
 
-describe('plugin-download', () => {
+describe('plugin-save', () => {
   it('mounts a toolbar button that downloads the current item', async () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     const v = createViewer({ collection: collection(), plugins: [download()] })

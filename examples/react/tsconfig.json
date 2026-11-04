@@ -13,7 +13,7 @@
       "@gallerist/plugin-thumbnails": ["../../packages/plugin-thumbnails/src/index.ts"],
       "@gallerist/plugin-grid": ["../../packages/plugin-grid/src/index.ts"],
       "@gallerist/plugin-fullscreen": ["../../packages/plugin-fullscreen/src/index.ts"],
-      "@gallerist/plugin-download": ["../../packages/plugin-download/src/index.ts"],
+      "@gallerist/plugin-save": ["../../packages/plugin-save/src/index.ts"],
       "@gallerist/plugin-hash": ["../../packages/plugin-hash/src/index.ts"],
       "@gallerist/plugin-video": ["../../packages/plugin-video/src/index.ts"],
       "@gallerist/plugin-video-youtube": ["../../packages/plugin-video-youtube/src/index.ts"]

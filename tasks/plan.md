@@ -37,7 +37,7 @@ packages/plugin-fullscreen         @gallerist/plugin-fullscreen
 packages/plugin-hash               @gallerist/plugin-hash
 packages/plugin-thumbnails         @gallerist/plugin-thumbnails
 packages/plugin-grid               @gallerist/plugin-grid
-packages/plugin-download           @gallerist/plugin-download
+packages/plugin-save               @gallerist/plugin-save
 packages/plugin-video              @gallerist/plugin-video           (HTML5)
 packages/plugin-video-youtube      @gallerist/plugin-video-youtube
 ```
@@ -50,7 +50,7 @@ core: Plugin/PluginInstance/RegionName contract + registry        (F1)
   └─ renderer-dom: region hosts + plugin consumption              (F2)
        ├─ plugin-fullscreen   (thin slice — proves the contract)  [M7]
        ├─ @gallerist/react (hook → component → portal bridge)        [M8]
-       ├─ plugin-hash, plugin-download                            [M9]
+       ├─ plugin-hash, plugin-save                                [M9]
        ├─ plugin-thumbnails (grouped; reuses windowing)           [M10]
        ├─ plugin-grid (in-viewer mode; reuses windowing)          [M11]
        └─ plugin-video + plugin-video-youtube                     [M12]

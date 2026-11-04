@@ -211,7 +211,7 @@ const button = (cls: string, label: string, icon = '') => {
 
 // Security: pin data can come from users (comments) or a CMS, so the card links only to http(s),
 // mailto, tel and relative URLs; a `javascript:`, `data:` or other scheme drops the link rather than
-// becoming something to click. plugin-download's safeHref uses the same check with its own list.
+// becoming something to click. plugin-save's safeHref uses the same check with its own list.
 const LINK_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:']
 const safeLink = (url: string): string | null => safeUrl(url, LINK_SCHEMES)
 

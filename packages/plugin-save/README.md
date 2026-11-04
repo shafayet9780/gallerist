@@ -1,20 +1,23 @@
-# @gallerist/plugin-download
+# @gallerist/plugin-save
 
 Gallerist plugin — download the current item, a whole group, or a bulk zip.
+
+This is the download plugin. Its package is named `plugin-save` because npm doesn't allow the word
+"download" in package names; the plugin itself is still `download()`.
 
 Part of [Gallerist](https://github.com/shafayet9780/gallerist#readme) — a headless, framework-agnostic media viewer for grouped / nested galleries with image-space overlays and virtualized rendering.
 
 ## Install
 
 ```bash
-npm i @gallerist/plugin-download
+npm i @gallerist/plugin-save
 ```
 
 ## Usage
 
 ```ts
 import { createViewer } from '@gallerist/core'
-import { download } from '@gallerist/plugin-download'
+import { download } from '@gallerist/plugin-save'
 import { mount } from '@gallerist/renderer-dom'
 
 const viewer = createViewer({ groups, plugins: [download()] })
@@ -58,7 +61,7 @@ its server sends `Content-Disposition: attachment`.
 ## Several items and zips
 
 ```ts
-import { downloadGroup, downloadItems } from '@gallerist/plugin-download'
+import { downloadGroup, downloadItems } from '@gallerist/plugin-save'
 
 await downloadGroup(viewer.getCollection().groups[0]) // one file per item
 await downloadItems(items, { zip: true, zipName: 'review.zip', downloadUrl })

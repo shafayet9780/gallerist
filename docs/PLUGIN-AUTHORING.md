@@ -77,7 +77,7 @@ its UI from `ctx.preset` builds it again for that mount (see `plugin-thumbnails`
   (`http`/`https`/`blob`; reject `javascript:`/`data:`/`file:`) with `safeUrl(url, schemes)` from
 `@gallerist/core/internal`, which judges relative URLs against a fixed http base (the page's own URL
 may be `file:` or `about:srcdoc`); sanitize any value used as a
-  filename or zip entry name (strip `/`, `\`, `..`, control chars) — see `plugin-download`. Anchor
+  filename or zip entry name (strip `/`, `\`, `..`, control chars) — see `plugin-save`. Anchor
   provider URL matching to the hostname, not a substring — see `plugin-video-youtube`. Inject a
   third-party `<script>`/iframe only from a hardcoded trusted origin and document the required CSP.
 - **Decorative images get `alt=""`**; interactive controls get an `aria-label` (axe is a CI gate).

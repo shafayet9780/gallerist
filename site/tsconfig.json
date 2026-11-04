@@ -7,7 +7,7 @@
       "@gallerist/core": ["./packages/core/src/index.ts"],
       "@gallerist/core/internal": ["./packages/core/src/internal.ts"],
       "@gallerist/renderer-dom": ["./packages/renderer-dom/src/index.ts"],
-      "@gallerist/plugin-download": ["./packages/plugin-download/src/index.ts"],
+      "@gallerist/plugin-save": ["./packages/plugin-save/src/index.ts"],
       "@gallerist/plugin-fullscreen": ["./packages/plugin-fullscreen/src/index.ts"],
       "@gallerist/plugin-grid": ["./packages/plugin-grid/src/index.ts"],
       "@gallerist/plugin-pins": ["./packages/plugin-pins/src/index.ts"],

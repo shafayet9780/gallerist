@@ -1,9 +1,9 @@
 import './site.css'
 import { type Collection, type ViewerApi, createViewer } from '@gallerist/core'
-import { download } from '@gallerist/plugin-download'
 import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
 import { type Pin, pins } from '@gallerist/plugin-pins'
+import { download } from '@gallerist/plugin-save'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import {
   type ColorScheme,
