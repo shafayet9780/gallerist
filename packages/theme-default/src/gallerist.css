@@ -32,6 +32,7 @@
   --gallerist-dur-hero: 420ms;
   --gallerist-dur-snappy: 340ms;
   --gallerist-dur-gentle: 280ms;
+  --gallerist-dur-exit: 180ms; /* exits run shorter than entrances */
 
   color: var(--gallerist-fg);
   font-family: system-ui, -apple-system, sans-serif;
@@ -962,6 +963,14 @@
     opacity: 1;
   }
 }
+@keyframes gallerist-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
 
 /* time axis = horizontal slide; screen axis = depth pop — never the same motion */
 .gallerist-slide[data-gallerist-enter="group"] {
@@ -970,8 +979,13 @@
 .gallerist-slide[data-gallerist-enter="item"] {
   animation: gallerist-enter-item var(--gallerist-dur-snappy) var(--gallerist-ease-pop);
 }
-.gallerist[data-gallerist-mode="overlay"] {
+/* open/close: the renderer settles the viewer to open/closed when these end (data-gallerist-phase) */
+.gallerist[data-gallerist-mode="overlay"][data-gallerist-phase="opening"] {
   animation: gallerist-fade var(--gallerist-dur-gentle) var(--gallerist-ease-out);
+}
+.gallerist[data-gallerist-mode="overlay"][data-gallerist-phase="closing"] {
+  animation: gallerist-fade-out var(--gallerist-dur-exit) ease-in forwards;
+  pointer-events: none; /* a fading viewer must not take clicks meant for the page */
 }
 
 /* immersive preset: chrome AND the rail fade together on idle (UX-E). */
@@ -996,8 +1010,9 @@
   .gallerist[data-gallerist-preset="immersive"] .gallerist-region-toolbar {
     transition-duration: 0ms;
   }
+  /* the phase selector must match the phase rules' specificity (0,3,0) so this later rule wins */
   .gallerist-slide[data-gallerist-enter],
-  .gallerist[data-gallerist-mode="overlay"] {
+  .gallerist[data-gallerist-mode][data-gallerist-phase] {
     animation: none;
   }
 }

@@ -92,4 +92,61 @@ describe('makeCancelable', () => {
     p.preventDefault()
     expect(p.defaultPrevented).toBe(true)
   })
+  it('a destructured preventDefault still cancels', () => {
+    const p = makeCancelable({ n: 1 })
+    const { preventDefault } = p
+    preventDefault()
+    expect(p.defaultPrevented).toBe(true)
+  })
+})
+
+describe('createEmitter — handler isolation', () => {
+  it('a throwing handler does not stop later handlers, and the error is reported', () => {
+    const e = createEmitter<TestMap>()
+    const report = vi.fn()
+    vi.stubGlobal('reportError', report)
+    try {
+      const boom = new Error('boom')
+      const after = vi.fn()
+      e.on('ping', () => {
+        throw boom
+      })
+      e.on('ping', after)
+      expect(() => e.emit('ping', { n: 1 })).not.toThrow()
+      expect(after).toHaveBeenCalledWith({ n: 1 })
+      expect(report).toHaveBeenCalledWith(boom)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('a throwing handler does not cancel a cancelable event', () => {
+    const e = createEmitter<TestMap>()
+    vi.stubGlobal('reportError', vi.fn())
+    try {
+      e.on('before', () => {
+        throw new Error('boom')
+      })
+      expect(e.emit('before', makeCancelable({ n: 1 }))).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('falls back to console.error when reportError is unavailable', () => {
+    const e = createEmitter<TestMap>()
+    vi.stubGlobal('reportError', undefined)
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const boom = new Error('boom')
+      e.on('ping', () => {
+        throw boom
+      })
+      e.emit('ping', { n: 1 })
+      expect(log).toHaveBeenCalledWith(boom)
+    } finally {
+      log.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
 })

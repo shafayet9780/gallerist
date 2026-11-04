@@ -1,7 +1,6 @@
 // The vanilla controller (spec §8): composes normalize + store + FSM + nav + events
-// into the ViewerApi. Headless — no DOM. Lifecycle transitions settle synchronously here;
-// the DOM renderer (M3) will drive opening/closing over real CSS transitions and own the
-// async nav coalescing (spec §6) once transitions become time-based.
+// into the ViewerApi. Headless — no DOM. Lifecycle transitions settle synchronously unless a
+// renderer installs a LifecycleDriver, which settles opening/closing when its CSS transition ends.
 
 import type { EventHandlers, ViewerApi, ViewerOptions } from '../api'
 import {
@@ -17,6 +16,8 @@ import * as nav from '../nav/nav'
 import type { Plugin, PluginInstance } from '../plugins/types'
 import { createStore } from '../store/store'
 import type { Collection, Cursor, LoadStatus, ViewerState, ZoomState } from '../types'
+import { focalZoom } from '../zoom/zoom'
+import { type LifecycleDriver, type ZoomBounds, attachInternals } from './internals'
 
 const IDENTITY_ZOOM: ZoomState = { scale: 1, x: 0, y: 0 }
 
@@ -157,23 +158,86 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     else groupNav(target)
   }
 
-  const commitZoom = (z: ZoomState): void => {
+  // Zoom transforms are only meaningful against the stage, which the core never sees: the renderer
+  // lends its geometry as ZoomBounds, and every commit passes through it, so no caller (API,
+  // gesture, keyboard) can leave the image off-centre or panned past its edges.
+  let zoomBounds: ZoomBounds | null = null
+  const validZoom = (z: ZoomState): boolean =>
+    Number.isFinite(z.scale) && z.scale > 0 && Number.isFinite(z.x) && Number.isFinite(z.y)
+
+  const commitZoom = (candidate: ZoomState): void => {
+    if (destroyed || !validZoom(candidate)) return
+    const z = zoomBounds ? zoomBounds.constrain(candidate) : candidate
+    if (!validZoom(z)) return
+    // Nothing changed (holding + at max zoom, a re-clamp that lands where it was): skip the commit,
+    // its re-render and the zoom events. Gestures restore their own live transform after committing.
+    const cur = store.get().zoom
+    if (z.scale === cur.scale && z.x === cur.x && z.y === cur.y) return
     store.set((s) => ({ ...s, zoom: z }))
     emitter.emit('zoom', { ...basePayload(), zoom: z })
     emitter.emit('zoomEnd', { ...basePayload(), zoom: z })
+  }
+
+  // viewer.refresh() → the renderer re-measures (registered via internals.onRefresh)
+  const refreshListeners = new Set<() => void>()
+
+  // ── lifecycle transitions (spec §6) ──────────────────────────────────────
+  // opening → open and closing → closed settle when the renderer's driver calls done(). Each
+  // transition gets a generation so a done() from one that was superseded (close during opening,
+  // reopen during closing) is ignored.
+  let lifecycleDriver: LifecycleDriver | null = null
+  let generation = 0
+  let pendingSettle: (() => void) | null = null
+  // The driver whose hook is running the in-flight transition: if it goes away, even after another
+  // renderer replaced it as the active driver, nobody else will ever report that transition done.
+  let pendingDriver: LifecycleDriver | null = null
+  const runTransition = (hook: 'opening' | 'closing', settle: () => void): void => {
+    const gen = ++generation
+    const done = () => {
+      if (gen !== generation || destroyed) return
+      pendingSettle = null
+      pendingDriver = null
+      settle()
+    }
+    pendingSettle = done
+    pendingDriver = lifecycleDriver
+    const run = lifecycleDriver?.[hook]
+    if (!run) {
+      done()
+      return
+    }
+    try {
+      run.call(lifecycleDriver, done)
+    } catch (error) {
+      done() // never strand the viewer mid-transition on a renderer bug
+      throw error
+    }
   }
 
   // ── public api ───────────────────────────────────────────────────────────
   api = {
     open(at) {
       if (destroyed) return
-      if (at) setCursor(nav.goTo(at.g ?? store.get().cursor.g, at.i, navCtx()))
-      // Only emit when OPEN actually transitions — a second open() on an already-open viewer
-      // must not re-fire open/opened (review I-C1).
+      const s = store.get()
+      const target = at ? nav.goTo(at.g ?? s.cursor.g, at.i, navCtx()) : s.cursor
+      if (s.phase === 'open' || s.phase === 'opening') {
+        // Already showing: open({ g, i }) is a navigation like goTo (events, cancelable), and a
+        // second open() must not re-fire open/opened (review I-C1).
+        if (at) navTo(target)
+        return
+      }
+      if (s.phase === 'closing') {
+        // Still on screen (fading out): moving is a navigation too, then the reopen cancels the close.
+        if (at) navTo(target)
+      } else {
+        // A fresh open starts at fit; a zoom left over from the last session would open pre-zoomed.
+        store.set((st) => ({ ...st, cursor: target, zoom: { ...IDENTITY_ZOOM } }))
+      }
       if (!dispatch({ t: 'OPEN' })) return
       emitter.emit('open', basePayload())
-      dispatch({ t: 'OPENED' }) // sync settle (renderer overrides in M3)
-      emitter.emit('opened', basePayload())
+      runTransition('opening', () => {
+        if (dispatch({ t: 'OPENED' })) emitter.emit('opened', basePayload())
+      })
     },
     close() {
       if (destroyed) return
@@ -182,8 +246,9 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       // open+onClose double-fire, I-X1).
       if (!dispatch({ t: 'CLOSE' })) return
       emitter.emit('close', basePayload())
-      dispatch({ t: 'CLOSED' })
-      emitter.emit('closed', basePayload())
+      runTransition('closing', () => {
+        if (dispatch({ t: 'CLOSED' })) emitter.emit('closed', basePayload())
+      })
     },
     next() {
       groupNav(nav.nextGroup(store.get().cursor, navCtx()))
@@ -206,11 +271,20 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     },
     zoomTo(scale, focal) {
       if (destroyed) return
+      // A NaN/negative/infinite transform would poison the committed state and every later
+      // focal computation built on it — ignore invalid input instead.
+      if (!(Number.isFinite(scale) && scale > 0)) return
+      if (focal && !(Number.isFinite(focal.x) && Number.isFinite(focal.y))) return
+      // Keep the content pixel under the focal point fixed (spec §8.2). No focal: the stage centre
+      // when a renderer lent its geometry, else the stage origin.
+      const pivot = focal ?? zoomBounds?.center() ?? { x: 0, y: 0 }
       const cur = store.get().zoom
-      commitZoom({ scale, x: focal?.x ?? cur.x, y: focal?.y ?? cur.y })
+      // Clamp the scale before pivoting: pivoting at an out-of-range scale and clamping after
+      // would keep the pan computed for the wrong scale and drift the focal point.
+      const target = zoomBounds ? zoomBounds.constrain({ ...cur, scale }).scale : scale
+      commitZoom(focalZoom(cur, pivot, target))
     },
     resetZoom() {
-      if (destroyed) return
       commitZoom({ ...IDENTITY_ZOOM })
     },
     setCollection(next) {
@@ -242,7 +316,8 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       return collection
     },
     refresh() {
-      // renderer re-measures; no-op in the headless core.
+      if (destroyed) return
+      for (const fn of [...refreshListeners]) fn() // the renderer re-measures
     },
     getState() {
       return store.get()
@@ -253,20 +328,8 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     on(event, handler) {
       return emitter.on(event, handler)
     },
-    emit(event, payload) {
-      return emitter.emit(event, payload)
-    },
     use(plugin) {
       return registerPlugin(plugin)
-    },
-    getPlugins() {
-      return [...pluginInstances] // copy — callers must not mutate the registry
-    },
-    onPluginsChanged(fn) {
-      pluginsChanged.add(fn)
-      return () => {
-        pluginsChanged.delete(fn)
-      }
     },
     destroy() {
       if (destroyed) return
@@ -275,6 +338,7 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       for (const inst of [...pluginInstances].reverse()) inst.destroy?.()
       pluginInstances.length = 0
       pluginsChanged.clear()
+      refreshListeners.clear()
       emitter.clear()
       store.clear()
     },
@@ -289,6 +353,51 @@ export function createViewer(options: ViewerOptions): ViewerApi {
     },
   }
 
+  attachInternals(api, {
+    emit(event, payload) {
+      return emitter.emit(event, payload)
+    },
+    getPlugins() {
+      return [...pluginInstances] // copy — callers must not mutate the registry
+    },
+    onPluginsChanged(fn) {
+      pluginsChanged.add(fn)
+      return () => {
+        pluginsChanged.delete(fn)
+      }
+    },
+    setZoom(zoom) {
+      commitZoom({ scale: zoom.scale, x: zoom.x, y: zoom.y })
+    },
+    setZoomBounds(bounds) {
+      zoomBounds = bounds
+      return () => {
+        // a later renderer (e.g. a StrictMode remount) may have replaced us — don't clear theirs
+        if (zoomBounds === bounds) zoomBounds = null
+      }
+    },
+    cancelLoad(id) {
+      store.set((s) =>
+        s.loaded[id] === 'loading' ? { ...s, loaded: { ...s.loaded, [id]: 'idle' } } : s,
+      )
+    },
+    onRefresh(fn) {
+      refreshListeners.add(fn)
+      return () => {
+        refreshListeners.delete(fn)
+      }
+    },
+    setLifecycleDriver(driver) {
+      lifecycleDriver = driver
+      return () => {
+        if (lifecycleDriver === driver) lifecycleDriver = null
+        // The renderer is going away: a transition it is running will never report back, so settle
+        // it now rather than leaving the viewer stuck in opening/closing (`closed` never firing).
+        if (pendingDriver === driver) pendingSettle?.()
+      }
+    },
+  })
+
   // wire `on` option handlers
   if (options.on) {
     for (const [type, fn] of Object.entries(options.on) as [
@@ -298,6 +407,11 @@ export function createViewer(options: ViewerOptions): ViewerApi {
       if (fn) emitter.on(type, fn as Handler<EventMap[keyof EventMap]>)
     }
   }
+
+  // Global overlays from the `overlays` option reach the renderer the same way plugin overlays do.
+  const globalOverlays = options.overlays
+  if (globalOverlays?.length)
+    registerPlugin(() => ({ name: 'options:overlays', overlays: globalOverlays }))
 
   // register plugins before init so their on-handlers see the init event
   if (options.plugins) for (const plugin of options.plugins) registerPlugin(plugin)

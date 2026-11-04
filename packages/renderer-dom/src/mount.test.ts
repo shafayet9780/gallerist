@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from './mount'
 
@@ -292,12 +293,90 @@ describe('mount — zoom transform', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    v.zoomTo(2, { x: 10, y: 20 })
+    getInternals(v).setZoom({ scale: 2, x: 10, y: 20 }) // stage unmeasured in happy-dom: unclamped
     const content = document.querySelector(
       '.gallerist-content[data-gallerist-current]',
     ) as HTMLElement
     expect(content.style.transform).toContain('scale(2)')
     expect(content.style.transform).toContain('translate(10px, 20px)')
+  })
+
+  describe('zoom bounds (every commit clamped against the stage)', () => {
+    const measure = (w: number, h: number) => {
+      const stage = document.querySelector('.gallerist-stage') as HTMLElement
+      vi.spyOn(stage, 'getBoundingClientRect').mockImplementation(
+        () =>
+          ({ width: w, height: h, left: 0, top: 0, right: w, bottom: h, x: 0, y: 0 }) as DOMRect,
+      )
+    }
+
+    it('zooming back out to fit re-centres a panned image (keyboard)', () => {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      measure(1000, 800)
+      getInternals(v).setZoom({ scale: 2, x: -1000, y: 0 }) // zoomed and panned to the right edge
+      const root = document.querySelector('.gallerist') as HTMLElement
+      for (let k = 0; k < 6; k++) root.dispatchEvent(key({ key: '-' }))
+      expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+    })
+
+    it('zoomTo clamps scale into [fit, max] and pivots on the stage centre', () => {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      measure(1000, 800)
+      v.zoomTo(10)
+      expect(v.getState().zoom).toEqual({ scale: 4, x: -1500, y: -1200 }) // centre fixed: 500 = 500·4 + x
+      v.zoomTo(0.2)
+      expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+    })
+
+    it('a pan past the edge is clamped on commit', () => {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      measure(1000, 800)
+      getInternals(v).setZoom({ scale: 2, x: 400, y: -5000 })
+      expect(v.getState().zoom).toEqual({ scale: 2, x: 0, y: -800 })
+    })
+
+    it('viewer.refresh() re-measures and re-clamps after a layout change', () => {
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        cb(0)
+        return 1
+      })
+      try {
+        const v = createViewer({ collection: collection() })
+        mount(v)
+        v.open()
+        measure(1000, 800)
+        getInternals(v).setZoom({ scale: 2, x: -1000, y: 0 })
+        measure(300, 800) // the container shrank without a resize notification
+        v.refresh()
+        expect(v.getState().zoom.x).toBe(-300)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('clamps the scale even before the stage is laid out', () => {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open() // happy-dom: the stage measures 0×0
+      v.zoomTo(50)
+      expect(v.getState().zoom.scale).toBe(4)
+    })
+
+    it('stops clamping once the renderer is destroyed', () => {
+      const v = createViewer({ collection: collection() })
+      const h = mount(v)
+      v.open()
+      measure(1000, 800)
+      h.destroy()
+      v.zoomTo(10)
+      expect(v.getState().zoom.scale).toBe(10)
+    })
   })
 })
 
@@ -355,6 +434,185 @@ describe('mount — late mediaAdapters via use()', () => {
     }))
     v.open() // current item is the video → late adapter must be selected
     expect(document.querySelector('video.late-marker')).not.toBeNull()
+  })
+})
+
+describe('mount — load lifecycle', () => {
+  // An adapter whose load never settles on its own: it rejects only when aborted, or on fail().
+  const pendingAdapter = (failures: Map<string, (e: unknown) => void>) => ({
+    type: 'image',
+    mount: (it: Item, slot: HTMLElement, ctx: { signal: AbortSignal }) => {
+      const img = document.createElement('img')
+      slot.appendChild(img)
+      const ready = new Promise<void>((_resolve, reject) => {
+        ctx.signal.addEventListener('abort', () =>
+          reject(new DOMException('Image load aborted', 'AbortError')),
+        )
+        failures.set(it.id, reject)
+      })
+      return {
+        element: img,
+        ready,
+        supportsZoom: true,
+        naturalSize: () => null,
+        destroy: () => img.remove(),
+      }
+    },
+  })
+  const flush = () => new Promise((r) => setTimeout(r, 0))
+
+  it('a load cancelled by navigation is not reported as loadError', async () => {
+    const loadError = vi.fn()
+    const v = createViewer({ collection: collection(), on: { loadError } })
+    mount(v, { adapters: [pendingAdapter(new Map())] })
+    v.open({ g: 1 })
+    v.nextItem() // swaps b0 → b1: b0's in-flight load is aborted
+    v.next() // g1 → g2 and further: tears slides down mid-load
+    v.next()
+    await flush()
+    expect(loadError).not.toHaveBeenCalled()
+    const statuses = v.getState().loaded
+    expect(Object.values(statuses)).not.toContain('error')
+    // b1's load was abandoned: back to idle instead of reading 'loading' forever. b0 was
+    // remounted as g1's preview once g1 stopped being current, so its fresh load owns the status.
+    expect(statuses.b1).toBe('idle')
+    expect(statuses.b0).toBe('loading')
+  })
+
+  it('a genuine load failure still emits loadError and marks the item error', async () => {
+    const loadError = vi.fn()
+    const failures = new Map<string, (e: unknown) => void>()
+    const v = createViewer({ collection: collection(), on: { loadError } })
+    mount(v, { adapters: [pendingAdapter(failures)] })
+    v.open()
+    const boom = new Error('404')
+    failures.get('a0')?.(boom)
+    await flush()
+    expect(loadError).toHaveBeenCalledTimes(1)
+    expect(loadError.mock.calls[0]?.[0]).toMatchObject({ id: 'a0', error: boom })
+    expect(v.getState().loaded.a0).toBe('error')
+  })
+})
+
+describe('mount — overlays option', () => {
+  it('paints global overlays passed to createViewer({ overlays })', () => {
+    const v = createViewer({
+      collection: collection(),
+      overlays: [{ id: 'wm', anchor: { kind: 'viewport', at: 'top-right' }, render: () => 'WM' }],
+    })
+    mount(v)
+    v.open()
+    const el = document.querySelector('.gallerist-viewport-layer [data-overlay="wm"]')
+    expect(el?.textContent).toBe('WM')
+  })
+})
+
+describe('mount — open/close transitions (lifecycle driver)', () => {
+  afterEach(() => vi.restoreAllMocks()) // the getComputedStyle mock must not leak into later tests
+  // happy-dom loads no theme CSS: pretend the root runs a 180ms phase animation.
+  const animated = () =>
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(
+      (el: Element) =>
+        ({
+          animationName: (el as HTMLElement).classList.contains('gallerist')
+            ? 'gallerist-fade-out'
+            : 'none',
+          animationDuration: '0.18s',
+          animationDelay: '0s',
+        }) as CSSStyleDeclaration,
+    )
+  const root = () => document.querySelector('.gallerist') as HTMLElement | null
+  const animationEnd = (target: Element) =>
+    target.dispatchEvent(new Event('animationend', { bubbles: true }))
+
+  it('reflects the phase on the root; with no animation it settles at once', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    expect(v.getState().phase).toBe('open')
+    expect(root()?.getAttribute('data-gallerist-phase')).toBe('open')
+  })
+
+  it('stays mounted through the exit animation, then detaches and fires closed', () => {
+    const closed = vi.fn()
+    const v = createViewer({ collection: collection(), on: { closed } })
+    mount(v)
+    animated()
+    v.open()
+    const el = root() as HTMLElement
+    animationEnd(el) // opening done
+    expect(v.getState().phase).toBe('open')
+    v.close()
+    expect(v.getState().phase).toBe('closing')
+    expect(el.getAttribute('data-gallerist-phase')).toBe('closing')
+    expect(root()).not.toBeNull()
+    expect(closed).not.toHaveBeenCalled()
+    animationEnd(el)
+    expect(root()).toBeNull()
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores animationend bubbling up from a descendant', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    animated()
+    v.open()
+    animationEnd(document.querySelector('.gallerist-slide') as HTMLElement)
+    expect(v.getState().phase).toBe('opening')
+  })
+
+  it('the backup timer covers every iteration of the phase animation', () => {
+    vi.useFakeTimers()
+    try {
+      vi.spyOn(window, 'getComputedStyle').mockImplementation(
+        () =>
+          ({
+            animationName: 'pulse',
+            animationDuration: '100ms',
+            animationDelay: '0s',
+            animationIterationCount: '3',
+          }) as CSSStyleDeclaration,
+      )
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      v.open()
+      vi.advanceTimersByTime(340) // 3 × 100ms + 50ms grace = 350ms
+      expect(v.getState().phase).toBe('opening')
+      vi.advanceTimersByTime(20)
+      expect(v.getState().phase).toBe('open')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('settles on a timer if animationend never fires', () => {
+    vi.useFakeTimers()
+    try {
+      const v = createViewer({ collection: collection() })
+      mount(v)
+      animated()
+      v.open()
+      vi.advanceTimersByTime(229) // 180ms + 50ms grace
+      expect(v.getState().phase).toBe('opening')
+      vi.advanceTimersByTime(2)
+      expect(v.getState().phase).toBe('open')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('destroying the renderer mid-close still settles to closed', () => {
+    const closed = vi.fn()
+    const v = createViewer({ collection: collection(), on: { closed } })
+    const h = mount(v)
+    animated()
+    v.open()
+    animationEnd(root() as HTMLElement)
+    v.close()
+    h.destroy()
+    expect(v.getState().phase).toBe('closed')
+    expect(closed).toHaveBeenCalledTimes(1)
+    expect(root()).toBeNull()
   })
 })
 
@@ -580,10 +838,11 @@ describe('mount — resize re-clamp (C2)', () => {
             y: 0,
           }) as DOMRect,
       )
-      v.zoomTo(2, { x: -900, y: 0 }) // core does not clamp; pan is far out of bounds
-      w = 300 // stage shrinks
+      getInternals(v).setZoom({ scale: 2, x: -1000, y: 0 }) // valid: the right edge of a 1000px stage
+      expect(v.getState().zoom.x).toBe(-1000)
+      w = 300 // stage shrinks: the content is now 600px wide, so x must lie in [-300, 0]
       roCb() // ResizeObserver fires
-      expect(v.getState().zoom.x).toBeGreaterThan(-900) // re-clamped inward to the new bounds
+      expect(v.getState().zoom.x).toBe(-300) // re-clamped to the new edge
       h.destroy()
     } finally {
       vi.unstubAllGlobals()

@@ -10,6 +10,10 @@ export default defineConfig({
   define: { __GALLERIST_VERSION__: JSON.stringify('0.0.0-dev') },
   resolve: {
     alias: {
+      // subpath before the bare name: a string alias also prefix-matches '@gallerist/core/…'
+      '@gallerist/core/internal': fileURLToPath(
+        new URL('./packages/core/src/internal.ts', import.meta.url),
+      ),
       '@gallerist/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
       '@gallerist/renderer-dom': fileURLToPath(
         new URL('./packages/renderer-dom/src/index.ts', import.meta.url),

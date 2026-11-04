@@ -9,13 +9,15 @@ export interface Cancelable {
 }
 
 export function makeCancelable<T extends object>(base: T): T & Cancelable {
-  return {
+  // Closure, not `this`: a destructured `const { preventDefault } = e` must still cancel.
+  const payload: T & Cancelable = {
     ...base,
     defaultPrevented: false,
-    preventDefault(this: Cancelable) {
-      this.defaultPrevented = true
+    preventDefault() {
+      payload.defaultPrevented = true
     },
   }
+  return payload
 }
 
 function isCancelable(p: unknown): p is Cancelable {
@@ -69,6 +71,15 @@ export interface Emitter<M> {
   clear(): void
 }
 
+// Surface a handler's exception without aborting the emit: by the time an event fires the state
+// change it describes has already happened, so the remaining handlers must still run (as DOM
+// event dispatch does). `reportError` reaches window.onerror in browsers; elsewhere, log it.
+const reportHandlerError = (error: unknown): void => {
+  const report = (globalThis as { reportError?: (e: unknown) => void }).reportError
+  if (typeof report === 'function') report(error)
+  else console.error(error)
+}
+
 export function createEmitter<M>(): Emitter<M> {
   const map = new Map<keyof M, Set<Handler<unknown>>>()
 
@@ -91,7 +102,13 @@ export function createEmitter<M>(): Emitter<M> {
     if (set) {
       // Snapshot so a handler that (un)subscribes mid-emit doesn't disturb this round.
       for (const fn of [...set]) {
-        const result = fn(payload)
+        let result: unknown
+        try {
+          result = fn(payload)
+        } catch (error) {
+          reportHandlerError(error)
+          continue
+        }
         if (result === false && isCancelable(payload)) payload.preventDefault()
       }
     }

@@ -1,4 +1,9 @@
 import {
+  type Collection,
+  type EventHandlers,
+  type EventMap,
+  type Group,
+  type Item,
   type OverlaySpec,
   type RegionName,
   type ViewerApi,
@@ -17,12 +22,20 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useInsertionEffect,
   useRef,
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
 import { GalleristContext, useViewerContext } from './context'
 
+/**
+ * `items` / `groups` / `collection` and `on` are reactive. Changed data swaps the collection in
+ * place (diffed by id, keeping the cursor); data rebuilt with the same content is ignored. Every other viewer option
+ * (`loop`, `itemMemory`, `startAt`, `plugins`, `overlays`, …) and the layout props (`container`,
+ * `preset`, `arrows`, `rail`, …) are read once; change the component's `key` to apply new ones.
+ * `theme` and `open` are reactive.
+ */
 export interface GalleristProps extends ViewerOptions {
   /** controlled visibility. */
   open?: boolean
@@ -44,6 +57,75 @@ export interface GalleristProps extends ViewerOptions {
   children?: ReactNode
 }
 
+// Every viewer event, checked against EventMap (a missing or unknown name fails to compile), so
+// the forwarders below can route each one to the latest `on` handlers.
+const EVENT_NAMES = Object.keys({
+  init: 1,
+  destroy: 1,
+  open: 1,
+  opened: 1,
+  close: 1,
+  closed: 1,
+  beforeSlide: 1,
+  slide: 1,
+  afterSlide: 1,
+  beforeItem: 1,
+  item: 1,
+  afterItem: 1,
+  zoom: 1,
+  zoomEnd: 1,
+  load: 1,
+  loaded: 1,
+  loadError: 1,
+  collectionChange: 1,
+  fullscreenChange: 1,
+  overlayClick: 1,
+} satisfies Record<keyof EventMap, 1>) as (keyof EventMap)[]
+
+// The collection a data prop describes (flat items → singleton groups). setCollection validates it.
+const toCollection = (items?: Item[], groups?: Group[], collection?: Collection): Collection =>
+  collection ?? { groups: groups ?? (items ?? []).map((it) => ({ id: it.id, items: [it] })) }
+
+// Values equal at one level of depth: identical, or arrays/plain objects with identical entries
+// (a `source: { src }`, `naturalSize`, or a re-created `overlays` array of the same specs).
+const shallowSame = (a: unknown, b: unknown): boolean => {
+  if (Object.is(a, b)) return true
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => Object.is(v, b[i]))
+  }
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
+  const ka = Object.keys(a)
+  const rb = b as Record<string, unknown>
+  return (
+    ka.length === Object.keys(b).length &&
+    ka.every((k) => Object.is((a as Record<string, unknown>)[k], rb[k]))
+  )
+}
+const sameRecord = (a: object, b: object, skip?: string): boolean => {
+  const ra = a as Record<string, unknown>
+  const rb = b as Record<string, unknown>
+  const ka = Object.keys(ra).filter((k) => k !== skip)
+  const kb = Object.keys(rb).filter((k) => k !== skip)
+  return ka.length === kb.length && ka.every((k) => shallowSame(ra[k], rb[k]))
+}
+// Same content (groups, items and their fields), even when rebuilt as fresh objects — so an
+// inline `items={photos.map(…)}` doesn't swap the collection (and reset load status) every render.
+const sameCollection = (a: Collection, b: Readonly<Collection>): boolean =>
+  a.groups.length === b.groups.length &&
+  shallowSame(a.meta, b.meta) &&
+  a.groups.every((g, gi) => {
+    const h = b.groups[gi]
+    return (
+      !!h &&
+      sameRecord(g, h, 'items') &&
+      g.items.length === h.items.length &&
+      g.items.every((it, ii) => {
+        const other = h.items[ii]
+        return !!other && sameRecord(it, other)
+      })
+    )
+  })
+
 const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(props, ref) {
   const {
     open,
@@ -60,14 +142,45 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     ...options
   } = props
   const rootRef = useRef<HTMLElement | null>(null)
+  const { items, groups, collection, on } = options
+
+  // The viewer outlives renders, so its handlers must not capture the first render's `on`: they
+  // forward to whatever `on` the latest committed render passed (a returned `false` still cancels).
+  const onRef = useRef<EventHandlers | undefined>(on)
+  useInsertionEffect(() => {
+    onRef.current = on
+  })
   // Create the viewer once (core is DOM-free → SSR-safe); options are read at construction. Lazy
   // useState (not useMemo, which React may discard) guarantees a single stable instance. Plugins
   // are deliberately NOT registered at construction — they're managed in an effect below so their
   // teardown runs on unmount (I-X2).
   const [viewer] = useState(() => {
-    const { plugins: _plugins, ...rest } = options
-    return createViewer(rest)
+    const { plugins: _plugins, on: _on, ...rest } = options
+    const forward: EventHandlers = {}
+    for (const name of EVENT_NAMES) {
+      ;(forward as Record<string, (p: unknown) => unknown>)[name] = (payload) =>
+        (onRef.current?.[name] as ((p: unknown) => unknown) | undefined)?.(payload)
+    }
+    return createViewer({ ...rest, on: forward })
   })
+
+  // Data props are reactive: new data swaps the collection via setCollection (diffed by id, so the
+  // cursor and zoom survive when the current item does). The first render's data is already in the
+  // viewer; a new reference with the same content is ignored; invalid data (a duplicate id) is
+  // reported and the viewer keeps its current collection instead of crashing the React tree.
+  const appliedData = useRef({ items, groups, collection })
+  useEffect(() => {
+    const prev = appliedData.current
+    if (prev.items === items && prev.groups === groups && prev.collection === collection) return
+    appliedData.current = { items, groups, collection }
+    const next = toCollection(items, groups, collection)
+    if (sameCollection(next, viewer.getCollection())) return
+    try {
+      viewer.setCollection(next)
+    } catch (error) {
+      console.error('[gallerist] ignored an invalid collection update:', error)
+    }
+  }, [viewer, items, groups, collection])
   useImperativeHandle(ref, () => viewer, [viewer])
 
   // Register the construction-time plugins via use() and dispose them on unmount, so their

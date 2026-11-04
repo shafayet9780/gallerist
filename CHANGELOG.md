@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+- **core**: renderer/plugin plumbing moved off the public `ViewerApi` to
+  `@gallerist/core/internal`: `viewer.emit`, `getPlugins` and `onPluginsChanged` are now
+  `getInternals(viewer).emit(…)` etc. The engine building blocks (normalize, store, FSM, nav,
+  windowing, springs, arbitration, zoom math, emitter) moved there too, so the root entry is just
+  the app-facing API (spec §8.4). Root bundle 3.5 → 2.7 KB gz.
+- **core**: `normalize` (and so `createViewer` / `setCollection`) throws on a duplicate group id or
+  item id.
+- **core**: `zoomTo(scale, focal?)` now does what spec §8.2 says: `focal` is a stage point (px) whose
+  content stays fixed, defaulting to the stage centre. It used to be treated as the pan offset. Set
+  a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
+
+### Fixed
+- **core**: a throwing event handler no longer stops later handlers (it is reported via
+  `reportError`); a destructured `preventDefault()` works; `zoomTo` ignores NaN/negative input.
+- **core**: the `overlays` option of `createViewer` (and so `<Gallerist overlays>`) was declared but
+  never read. Global overlays passed there now render.
+- **react**: `items` / `groups` / `collection` are reactive. They were read once at construction,
+  so data that arrived later (an API call) never showed. Changed content is applied with
+  `setCollection`, keeping the cursor on the same item. Inline data rebuilt with the same content
+  is ignored, and an invalid update is logged instead of crashing the tree.
+- **react**: `on` handlers always call the latest props instead of the first render's closures.
+- **core + renderer-dom + theme**: open/close are real transitions. `opened` / `closed` fire when
+  the open fade (280ms) or close fade (180ms) ends, and the overlay stays mounted through its exit
+  instead of vanishing. Renderers drive this via `getInternals(viewer).setLifecycleDriver`. The
+  phase is exposed as `data-gallerist-phase`. No animation under reduced motion.
+- **renderer-dom**: plugin region renderers run once per plugin instance, as PLUGIN-AUTHORING
+  promises. Every plugin change (each React `<Gallerist.Overlay>` mount) used to re-run all of them
+  and rebuild every region host. Hosts are now only touched when their nodes change.
+- **core + renderer-dom**: `viewer.refresh()` re-measures (re-anchors overlays, re-clamps zoom).
+  It was a no-op that no renderer could hook.
+- **core**: `open({ g, i })` on a viewer that is already open now navigates like `goTo` (slide/item
+  events, cancelable). It used to move the cursor silently. Reopening starts at fit instead of
+  the previous session's zoom.
+- **renderer-dom**: cancelled media loads are no longer reported as `loadError`.
+- **core + renderer-dom**: zooming back out (keyboard, double-tap, pinch, `zoomTo`) no longer
+  leaves the image off-centre or panned past its edge. The renderer lends the core its stage
+  geometry, and every committed zoom is clamped against it.
+- **renderer-dom**: `pointercancel` abandons the gesture instead of acting as a release (no stray
+  navigate/dismiss); the item-axis swipe needs the same commit distance as the group axis.
+
 ## v0.2.0 — first public release
 
 > **Renamed before first publish:** the project was developed as *Visora* (`@visora/*`); the

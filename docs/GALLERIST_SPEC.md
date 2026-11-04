@@ -152,7 +152,7 @@ One internal representation, two ergonomic front doors. Flat users never see the
 
 ### 4.4 Identity & stability
 
-`id` on group and item is mandatory and must be stable across renders. It powers: DOM keying/recycling, deep-link hashes (`#g=<groupId>&i=<itemId>`), overlay persistence, and the diffing used when the collection updates live (e.g. Apploye streaming in new screenshots). The engine supports **live collection updates** — `viewer.setCollection(next)` diffs by id, preserving cursor and zoom where possible.
+`id` on group and item is mandatory, must be stable across renders, and must be unique: group ids among groups, item ids across the whole collection (a group and an item may share one, as flat items do). `normalize` throws on a duplicate. It powers: DOM keying/recycling, deep-link hashes (`#g=<groupId>&i=<itemId>`), overlay persistence, and the diffing used when the collection updates live (e.g. Apploye streaming in new screenshots). The engine supports **live collection updates** — `viewer.setCollection(next)` diffs by id, preserving cursor and zoom where possible.
 
 ---
 
@@ -281,7 +281,7 @@ viewer.next() / prev(): void
 viewer.nextItem() / prevItem(): void
 viewer.goTo(g: number, i?: number): void
 viewer.goToId(groupId: string, itemId?: string): void
-viewer.zoomTo(scale: number, focal?: {x:number;y:number}): void
+viewer.zoomTo(scale: number, focal?: {x:number;y:number}): void  // keeps the content under `focal` (stage px) fixed; default: stage centre
 viewer.resetZoom(): void
 viewer.setCollection(next: Collection): void   // live diff update
 viewer.refresh(): void                         // re-measure (e.g. container resize)
@@ -294,6 +294,25 @@ viewer.destroy(): void
 ### 8.3 Inline vs overlay mode
 
 Single flag (`container`) toggles between a full-screen lightbox (default, mounted to a portal) and an **inline** embedded viewer (carousel-in-page). All features work in both; inline mode can "maximize" to overlay if a plugin provides the control. This subsumes lightGallery's separate inline-gallery concept into one code path.
+
+### 8.4 Internal surface (`@gallerist/core/internal`)
+
+The root entry is the app-facing API that freezes at 1.0. Renderers and plugin authors also need plumbing that apps should not touch, so it lives behind a second entry, unstable before 1.0:
+
+```ts
+import { getInternals } from '@gallerist/core/internal'
+const { emit, getPlugins, onPluginsChanged } = getInternals(viewer)
+```
+
+- `emit(event, payload)`: surface an event (the renderer emits load/overlay events, plugins their own). Off the public API so app code can't forge, say, a `loaded` event.
+- `getPlugins()` / `onPluginsChanged(fn)`: the plugin registry the renderer mounts regions, adapters and overlays from.
+- `setZoom(transform)`: commit a full `{scale, x, y}` (gesture end, resize re-clamp).
+- `onRefresh(fn)`: run when the app calls `viewer.refresh()`; the DOM renderer re-measures and re-clamps zoom.
+- `setLifecycleDriver({ opening?(done), closing?(done) })`: stretch open/close over a real transition. `opened` / `closed` fire when the renderer calls `done()`; a `done()` from a superseded transition is ignored, and removing the driver settles one in flight. The DOM renderer settles when the theme's phase animation on the root (`data-gallerist-phase`) ends.
+- `setZoomBounds({ center, constrain })`: the renderer lends the core its stage geometry. Every committed zoom, from `zoomTo`, `resetZoom` or `setZoom`, passes through `constrain` (scale into [fit, max], pan so the content covers the stage, centred at fit), and `zoomTo` without a focal point pivots on `center()`.
+- The engine building blocks: normalize, store, FSM, nav, windowing, springs, gesture arbitration and zoom math.
+
+`getInternals` finds the viewer's internals under a `Symbol.for` key, so it works even when the two entries are bundled as separate copies.
 
 ---
 

@@ -3,16 +3,18 @@
 // no store writes during a gesture), and commits the result on release. The arbitration matrix
 // itself is unit-tested in core; real multi-pointer flows are verified in Playwright (M3.5).
 
+import type { ViewerApi, ZoomState } from '@gallerist/core'
 import {
   type Intent,
-  type ViewerApi,
   arbitrate,
   clampPan,
   clampScale,
   fitScale,
   focalZoom,
+  getInternals,
   toggleZoom,
-} from '@gallerist/core'
+} from '@gallerist/core/internal'
+import { zoomTransform } from './transform'
 
 export interface Geometry {
   stageRect: { left: number; top: number; width: number; height: number }
@@ -86,15 +88,30 @@ export function attachGestures(opts: GestureOptions): () => void {
   let gestureGeom: Geometry | null = null
 
   const geom = () => gestureGeom ?? getGeometry()
-  const fit = () => {
-    const g = geom()
-    return g.naturalSize
-      ? fitScale({ w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-      : 1
-  }
+  const fitOf = (g: Geometry) =>
+    g.naturalSize ? fitScale({ w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize) : 1
+  const fit = () => fitOf(geom())
   const toStage = (p: Pt): Pt => {
     const r = geom().stageRect
     return { x: p.x - r.left, y: p.y - r.top }
+  }
+  // Every commit is settled first: scale into [fit, max], pan so the content covers the stage
+  // (centred once it fits). Without this a pinch or double-tap back to fit kept its pan offset and
+  // left the image off-centre. The renderer's zoom bounds re-check the same in the core.
+  const settle = (z: ZoomState, g: Geometry = geom()): ZoomState => {
+    const scaled = { scale: clampScale(z.scale, fitOf(g), maxScale), x: z.x, y: z.y }
+    return g.naturalSize
+      ? clampPan(scaled, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
+      : scaled
+  }
+  const internals = getInternals(viewer)
+  // Commit, then show the committed transform: a commit identical to the stored zoom is skipped
+  // (no store change, so the renderer won't repaint), which would leave the content at the live
+  // gesture transform — e.g. a pan dragged past the edge and clamped back to where it started.
+  const commit = (z: ZoomState) => {
+    internals.setZoom(z)
+    const content = getContent()
+    if (content) content.style.transform = zoomTransform(viewer.getState().zoom)
   }
 
   const schedule = () => {
@@ -103,7 +120,7 @@ export function attachGestures(opts: GestureOptions): () => void {
       frame = 0
       const content = getContent()
       if (content) {
-        content.style.transform = `translate(${live.x}px, ${live.y}px) scale(${live.scale})`
+        content.style.transform = zoomTransform(live)
       }
     })
   }
@@ -136,7 +153,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     wheelTimer = undefined
     wheelGeom = null
     if (wheelZoom) {
-      viewer.zoomTo(wheelZoom.scale, { x: wheelZoom.x, y: wheelZoom.y })
+      commit(wheelZoom) // already clamped per tick
       wheelZoom = null
     }
   }
@@ -237,7 +254,8 @@ export function attachGestures(opts: GestureOptions): () => void {
     // zoom now and re-seat the gesture onto the remaining finger so it continues as a fresh
     // pan/swipe. Otherwise the lingering finger is dead until the second finger lifts (I-R2).
     if (intent === 'zoom' && pointers.size === 1) {
-      viewer.zoomTo(live.scale, { x: live.x, y: live.y })
+      live = settle(live)
+      commit(live)
       const [remaining] = [...pointers.values()]
       startZoom = { ...live }
       start = remaining ? { x: remaining.x, y: remaining.y } : null
@@ -255,16 +273,11 @@ export function attachGestures(opts: GestureOptions): () => void {
     if (intent === 'none') intent = resolveIntent(dx, dy)
 
     switch (intent) {
-      case 'pan': {
-        const g = geom()
-        const committed = g.naturalSize
-          ? clampPan(live, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-          : live
-        viewer.zoomTo(committed.scale, { x: committed.x, y: committed.y })
+      case 'pan':
+        commit(settle(live))
         break
-      }
       case 'zoom':
-        if (pointers.size === 0) viewer.zoomTo(live.scale, { x: live.x, y: live.y })
+        if (pointers.size === 0) commit(settle(live))
         break
       case 'navigate':
         if (Math.abs(dx) >= commitNav) dx < 0 ? nav.next() : nav.prev()
@@ -272,11 +285,12 @@ export function attachGestures(opts: GestureOptions): () => void {
       case 'close':
         dismissEl.style.removeProperty('--gallerist-dismiss')
         if (Math.abs(dy) >= closeDismiss) viewer.close()
-        else viewer.zoomTo(startZoom.scale, { x: startZoom.x, y: startZoom.y })
+        else commit(startZoom) // snap back from the drag-to-dismiss shrink
         break
       case 'secondary':
-        if (dy < 0) nav.nextItem()
-        else nav.prevItem()
+        // Arbitration only yields 'secondary' for an upward drag (downward is dismiss), and like
+        // the group axis it needs a real commit distance — not just the 10px intent threshold.
+        if (-dy >= commitNav) nav.nextItem()
         break
     }
 
@@ -287,21 +301,36 @@ export function attachGestures(opts: GestureOptions): () => void {
     }
   }
 
+  // pointercancel means the browser took the pointer away (a system gesture, palm rejection, a
+  // scroll takeover): abandon the whole gesture rather than treating it as a release, which could
+  // navigate or dismiss from a drag the user never finished. Snap back to the committed transform.
+  const onCancel = (e: PointerEvent) => {
+    if (!pointers.has(e.pointerId)) return
+    for (const id of pointers.keys()) release(id)
+    pointers.clear()
+    if (frame) {
+      caf(frame)
+      frame = 0
+    }
+    dismissEl.style.removeProperty('--gallerist-dismiss')
+    const content = getContent()
+    if (content) content.style.transform = zoomTransform(viewer.getState().zoom)
+    start = null
+    intent = 'none'
+    gestureGeom = null
+  }
+
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
     if (!wheelGeom) wheelGeom = getGeometry()
     const g = wheelGeom
     const base = wheelZoom ?? viewer.getState().zoom
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
-    const fitW = g.naturalSize
-      ? fitScale({ w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-      : 1
-    const newScale = clampScale(base.scale * factor, fitW, maxScale)
+    // clamp the scale before pivoting (so the cursor point stays put), then settle the pan; uses
+    // the burst's geometry snapshot, never a fresh measure per tick
+    const newScale = clampScale(base.scale * factor, fitOf(g), maxScale)
     const focal = { x: e.clientX - g.stageRect.left, y: e.clientY - g.stageRect.top }
-    const next = focalZoom(base, focal, newScale)
-    wheelZoom = g.naturalSize
-      ? clampPan(next, { w: g.stageRect.width, h: g.stageRect.height }, g.naturalSize)
-      : next
+    wheelZoom = settle(focalZoom(base, focal, newScale), g)
     live = { ...wheelZoom }
     schedule()
     if (wheelTimer) clearTimeout(wheelTimer)
@@ -312,22 +341,34 @@ export function attachGestures(opts: GestureOptions): () => void {
     flushWheel() // commit a pending wheel zoom before reading the base for the toggle
     const z = viewer.getState().zoom
     const target = toggleZoom(z.scale, fit(), maxScale)
-    const next = focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), target)
-    viewer.zoomTo(next.scale, { x: next.x, y: next.y })
+    commit(settle(focalZoom(z, toStage({ x: e.clientX, y: e.clientY }), target)))
   }
 
+  // A mouse drag over the media starts the browser's native image drag-and-drop, which fires
+  // pointercancel and steals the gesture. Block it on the media only: overlays and plugin UI in the
+  // stage keep their own drag-and-drop.
+  const onDragStart = (e: Event) => {
+    const target = e.target as Element | null
+    const content = getContent()
+    if (!target || !content?.contains(target)) return
+    if (target.closest?.('.gallerist-overlays-content')) return
+    e.preventDefault()
+  }
+
+  stage.addEventListener('dragstart', onDragStart)
   stage.addEventListener('pointerdown', onDown)
   stage.addEventListener('pointermove', onMove)
   stage.addEventListener('pointerup', onUp)
-  stage.addEventListener('pointercancel', onUp)
+  stage.addEventListener('pointercancel', onCancel)
   stage.addEventListener('wheel', onWheel, { passive: false })
   stage.addEventListener('dblclick', onDblClick)
 
   return () => {
+    stage.removeEventListener('dragstart', onDragStart)
     stage.removeEventListener('pointerdown', onDown)
     stage.removeEventListener('pointermove', onMove)
     stage.removeEventListener('pointerup', onUp)
-    stage.removeEventListener('pointercancel', onUp)
+    stage.removeEventListener('pointercancel', onCancel)
     stage.removeEventListener('wheel', onWheel)
     stage.removeEventListener('dblclick', onDblClick)
     if (frame) caf(frame)

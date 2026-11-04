@@ -87,16 +87,23 @@ for Phase 0; overlays bridge the gap via the contain-rect mapping in
 
 `ViewerState.zoom` is the **last committed** transform, not the live one. During an active
 pan/zoom, `attachGestures` mutates `content.style.transform` directly via a RAF and **does not
-write the store**; it commits once on gesture end (`viewer.zoomTo`). This protects 60fps and stops
-framework adapters (Phase 1) from re-rendering 60×/second. See
+write the store**; it commits once on gesture end (`getInternals(viewer).setZoom`, clamped by the
+renderer's zoom bounds). This protects 60fps and stops framework adapters (Phase 1) from
+re-rendering 60×/second. See
 `packages/renderer-dom/src/gestures.ts`.
 
-### 3.3 Lifecycle settles synchronously (Phase-0 limitation)
+### 3.3 Lifecycle transitions are renderer-driven
 
-`open()`/`close()` dispatch `OPEN→OPENED` (and `CLOSE→CLOSED`) in one tick, so the `opening`/
-`closing` FSM phases are transient and there is no exit animation yet. The async path (and the
-nav coalescing described in spec §6) lands when transitions become time-based (M5 follow-up). The
-FSM reducer itself already models the full lifecycle including re-open-cancels-close.
+`open()`/`close()` dispatch `OPEN`/`CLOSE`, then wait for the renderer's lifecycle driver
+(`getInternals(viewer).setLifecycleDriver`) to call `done()` before dispatching `OPENED`/`CLOSED`
+and emitting `opened`/`closed`. Without a driver they settle in the same tick. The DOM renderer
+reflects the phase as `data-gallerist-phase` on the root and settles when the theme's phase
+animation ends (fade in 280ms, fade out 180ms; none under reduced motion), with a timer backing
+up `animationend`. The overlay therefore stays mounted, focus-trapped and scroll-locked through
+its exit. Each transition carries a generation, so a `done()` from a superseded one (close during
+opening, reopen during closing) is ignored, and removing the driver settles a transition in
+flight so `closed` always fires. Nav coalescing during transitions (spec §6) is still future
+work.
 
 ### 3.4 Overlay paint vs update
 
@@ -164,10 +171,12 @@ const viewer = createViewer({
 viewer.open(at?) / close()
 viewer.next() / prev() / nextItem() / prevItem()
 viewer.goTo(g, i?) / goToId(groupId, itemId?)
-viewer.zoomTo(scale, focal?) / resetZoom()
+viewer.zoomTo(scale, focal?) / resetZoom()  // focal: stage px kept fixed; default centre; clamped
 viewer.setCollection(next)          // diff by id, preserves cursor (+ zoom if same item)
 viewer.getState() / getCollection() / subscribe(fn)
-viewer.on(event, handler) / emit(event, payload)   // runtime events (renderer/plugins)
+viewer.on(event, handler)           // runtime events
+// renderer/plugin plumbing: getInternals(viewer).emit / getPlugins / onPluginsChanged
+// from '@gallerist/core/internal' (spec §8.4), alongside the zoom/nav/windowing math
 viewer.destroy()
 
 // renderer-dom
@@ -247,9 +256,6 @@ items are deferred with rationale (we launch at 0.x, so none is frozen):
   reveal letterbox area and anchor to the stage box rather than the painted image box. The true
   contained-rect mapping is the spec's M4 work; until then, pass `item.naturalSize` for best results
   and avoid anchored overlays on extreme ratios.
-- **Public surface breadth (review S-A1).** `@gallerist/core` still re-exports some engine internals
-  (FSM reducer, store factory, spring tables, raw nav). At 0.x this is harmless; the surface will be
-  split to a deep `@gallerist/core/internal` entry before 1.0 so the frozen root stays minimal.
 - **Gesture discoverability (review S-UX2).** There is no first-run hint for swipe / pinch /
   swipe-to-dismiss. Planned as an opt-in coachmark; for now, document the gestures in your UI.
 - **Cross-browser e2e.** The Playwright suite runs on chromium + webkit. Five synthetic-input/

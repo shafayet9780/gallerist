@@ -3,23 +3,16 @@
 // image adapter, minimal chrome, dialog a11y, keyboard map, and the committed zoom transform.
 // Live pan/zoom (imperative RAF) and motion land in M3.4 / M5.
 
-import {
-  type MediaAdapter,
-  type OverlaySpec,
-  type Phase,
-  type ViewerApi,
-  type ZoomState,
-  clampPan,
-  clampScale,
-  focalZoom,
-} from '@gallerist/core'
+import type { MediaAdapter, OverlaySpec, Phase, ViewerApi, ZoomState } from '@gallerist/core'
+import { clampPan, clampScale, getInternals } from '@gallerist/core/internal'
 import { imageAdapter } from './adapters/image'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
 import { type IdleController, createIdleController } from './idle'
 import { type OverlayEntry, gatherOverlays, paintOverlays, updateOverlays } from './overlays/render'
 import { type PresetName, resolvePreset } from './presets'
-import { type RegionHosts, aggregateKeymap, mountPluginRegions } from './regions'
+import { type RegionHosts, aggregateKeymap, createRegionMounter } from './regions'
+import { zoomTransform } from './transform'
 import { reconcileKeys, windowIndices } from './windowing'
 
 export interface MountOptions {
@@ -115,8 +108,33 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName ?? ''))
 }
 
+/** Longest animation (delay + duration × iterations) in ms from a computed style's comma lists.
+ *  An infinite animation counts one iteration: it never ends, so the timer settles after one. */
+function animationMs(style: CSSStyleDeclaration): number {
+  const ms = (v: string) => {
+    const n = Number.parseFloat(v)
+    if (!Number.isFinite(n)) return 0
+    return v.trim().endsWith('ms') ? n : n * 1000
+  }
+  const count = (v: string | undefined) => {
+    const n = Number.parseFloat(v ?? '1')
+    return Number.isFinite(n) && n > 0 ? n : 1
+  }
+  const at = (list: string[], i: number) => list[i % list.length]
+  const durations = style.animationDuration.split(',')
+  const delays = style.animationDelay.split(',')
+  const iterations = (style.animationIterationCount || '1').split(',')
+  return Math.max(
+    0,
+    ...durations.map((d, i) => ms(at(delays, i) ?? '0s') + ms(d) * count(at(iterations, i))),
+  )
+}
+
+/** Max committed zoom (fit == 1 in the contained model); shared by gestures, keys and bounds. */
+const MAX_ZOOM = 4
+
 function applyTransform(content: HTMLElement, zoom: ZoomState): void {
-  content.style.transform = `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`
+  content.style.transform = zoomTransform(zoom)
 }
 
 // Body scroll-lock is shared across all open overlay viewers: the original overflow is
@@ -177,17 +195,18 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
-  const plugins = viewer.getPlugins()
+  const internals = getInternals(viewer)
+  const plugins = internals.getPlugins()
   const baseAdapters = opts.adapters ?? [imageAdapter()]
   // Adapters, overlays, and keymap are recomputed live so a plugin added via use() after mount
   // contributes all of its extensions, not just regions (review T4 / Important #5).
   const currentAdapters = () => [
     ...baseAdapters,
-    ...viewer.getPlugins().flatMap((p) => p.mediaAdapters ?? []),
+    ...internals.getPlugins().flatMap((p) => p.mediaAdapters ?? []),
   ]
   const currentGlobalOverlays = () => [
     ...(opts.overlays ?? []),
-    ...viewer.getPlugins().flatMap((p) => p.overlays ?? []),
+    ...internals.getPlugins().flatMap((p) => p.overlays ?? []),
   ]
   let pluginKeymap = aggregateKeymap(plugins)
 
@@ -457,10 +476,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         // group/item are stable for this slide; the cursor is read fresh at emit time because
         // loaded/loadError fire later from the ready promise, when the cursor may have moved (review #5).
         const loadBase = { viewer, group, item: it }
-        viewer.emit('load', { ...loadBase, cursor: viewer.cursor, id: mountedId })
+        internals.emit('load', { ...loadBase, cursor: viewer.cursor, id: mountedId })
         rec.media?.ready
           ?.then(() => {
-            viewer.emit('loaded', { ...loadBase, cursor: viewer.cursor, id: mountedId })
+            internals.emit('loaded', { ...loadBase, cursor: viewer.cursor, id: mountedId })
             const r = mounted.get(slideKey)
             if (!r || r.itemId !== mountedId) return // navigated away / item swapped out
             if (groupIndex(slideKey) !== viewer.getState().cursor.g) return // no longer current
@@ -468,7 +487,20 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
             if (attached) renderWindow()
           })
           .catch((error) => {
-            viewer.emit('loadError', { ...loadBase, cursor: viewer.cursor, id: mountedId, error })
+            // A load we cancelled (slide torn down, item swapped out) is not a failure — adapters
+            // reject `ready` on abort, and reporting it would mark the item 'error'. Return its
+            // status to 'idle' unless the item is already mounted again (a fresh load owns it now).
+            if (abort.signal.aborted) {
+              const remounted = [...mounted.values()].some((r) => r.itemId === mountedId)
+              if (!remounted) internals.cancelLoad(mountedId)
+              return
+            }
+            internals.emit('loadError', {
+              ...loadBase,
+              cursor: viewer.cursor,
+              id: mountedId,
+              error,
+            })
           })
       }
       // activate/deactivate media on slide enter/leave (spec §12 — play/pause for video)
@@ -656,6 +688,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   const sync = () => {
     const phase: Phase = viewer.getState().phase
+    // The theme keys the open/close animation off the phase (see the lifecycle driver below).
+    if (root.getAttribute('data-gallerist-phase') !== phase)
+      root.setAttribute('data-gallerist-phase', phase)
     if (overlay) {
       if (phase !== 'closed') attach()
       else detach()
@@ -666,14 +701,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     }
   }
 
-  // Keyboard zoom pivots on the stage centre (not the transform origin), spec §5.
-  const zoomAroundCenter = (factor: number) => {
-    const r = stage.getBoundingClientRect()
-    const z = viewer.getState().zoom
-    const newScale = clampScale(z.scale * factor, 1, 4) // fit == 1 in the contained model
-    const next = focalZoom(z, { x: r.width / 2, y: r.height / 2 }, newScale)
-    viewer.zoomTo(next.scale, { x: next.x, y: next.y })
-  }
+  // Keyboard zoom pivots on the stage centre (zoomTo's default pivot), spec §5; the zoom bounds
+  // clamp the scale and pan.
+  const zoomAroundCenter = (factor: number) => viewer.zoomTo(viewer.zoom.scale * factor)
 
   // ── keyboard (spec §5) ───────────────────────────────────────────────────────
   // Which physical arrow drives which axis depends on orientation (point 5): a vertical (left/right)
@@ -806,6 +836,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const detachGestures = attachGestures({
     stage,
     viewer,
+    maxScale: MAX_ZOOM,
     nav, // route swipes through the linear/oriented nav seam
     getContent: () => currentRec()?.content ?? null,
     getGeometry: () => {
@@ -821,6 +852,62 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     },
   })
 
+  // ── open/close transitions (spec §6, §27) ───────────────────────────────────────
+  // The theme animates the root per data-gallerist-phase (fade in while opening, out while
+  // closing) and the viewer settles to open/closed when that animation ends, so the overlay stays
+  // mounted, focus-trapped and scroll-locked through its exit. No animation (reduced motion, inline
+  // mode, a theme without one) settles at once. A timer backs up animationend, which never fires if
+  // the animation is cancelled or the root is display:none.
+  let cancelPhaseWait: (() => void) | null = null
+  const awaitPhaseAnimation = (done: () => void) => {
+    cancelPhaseWait?.()
+    const style = getComputedStyle(root)
+    if (!style.animationName || style.animationName === 'none') return done()
+    const onEnd = (e: Event) => {
+      if (e.target === root) finish() // slide/thumbnail animations bubble up too
+    }
+    const stop = () => {
+      root.removeEventListener('animationend', onEnd)
+      clearTimeout(timer)
+      cancelPhaseWait = null
+    }
+    const finish = () => {
+      stop()
+      done()
+    }
+    root.addEventListener('animationend', onEnd) // events dispatch async: never before `timer` exists
+    const timer = setTimeout(finish, animationMs(style) + 50)
+    cancelPhaseWait = stop
+  }
+  const offLifecycle = internals.setLifecycleDriver({
+    opening: awaitPhaseAnimation,
+    closing: awaitPhaseAnimation,
+  })
+
+  // ── zoom bounds (spec §11.1) ───────────────────────────────────────────────────
+  // Lend the core the stage geometry so every committed zoom (API, keyboard, gesture end, resize)
+  // is clamped in one place. Contained model: the media is object-fit inside a stage-sized content
+  // layer, so fit == scale 1 and pan bounds use the stage size.
+  const stageSize = () => {
+    const r = stage.getBoundingClientRect()
+    return { w: r.width, h: r.height }
+  }
+  const constrainZoom = (z: ZoomState): ZoomState => {
+    const scaled = { scale: clampScale(z.scale, 1, MAX_ZOOM), x: z.x, y: z.y }
+    const size = stageSize()
+    // Not laid out (closed overlay, hidden container): the scale range needs no geometry, the pan
+    // bounds do; the ResizeObserver re-clamps the pan once the stage has a size.
+    if (!(size.w > 0 && size.h > 0)) return scaled
+    return clampPan(scaled, size, size)
+  }
+  const offZoomBounds = internals.setZoomBounds({
+    center: () => {
+      const size = stageSize()
+      return { x: size.w / 2, y: size.h / 2 }
+    },
+    constrain: constrainZoom,
+  })
+
   // ── re-measure on resize (spec §10.5) ──────────────────────────────────────────
   // A single ResizeObserver on the stage, debounced to one frame. On resize / device rotation
   // it repaints the current slide's content overlays (their px box is derived from the stage
@@ -834,12 +921,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       if (!attached) return
       const cur = currentRec()
       if (cur) cur.overlayItemId = undefined // re-anchor overlays against the new stage rect
-      const r = stage.getBoundingClientRect()
-      const size = { w: r.width, h: r.height }
       const z = viewer.getState().zoom
-      const clamped = size.w > 0 && size.h > 0 ? clampPan(z, size, size) : z
-      if (clamped.x !== z.x || clamped.y !== z.y) {
-        viewer.zoomTo(clamped.scale, { x: clamped.x, y: clamped.y }) // commit → sync → repaint
+      const clamped = constrainZoom(z)
+      if (clamped.scale !== z.scale || clamped.x !== z.x || clamped.y !== z.y) {
+        internals.setZoom(clamped) // commit → sync → repaint
       } else {
         renderWindow() // repaint overlays at the new rect
       }
@@ -848,23 +933,27 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const resizeObserver =
     typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onStageResize) : null
   resizeObserver?.observe(stage)
+  // viewer.refresh(): an explicit re-measure, for layout changes a ResizeObserver can't see
+  const offRefresh = internals.onRefresh(onStageResize)
 
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
+  const mountPluginRegions = createRegionMounter(regionHosts, { viewer })
   const mountRegions = () => {
-    pluginKeymap = aggregateKeymap(viewer.getPlugins())
-    mountPluginRegions(regionHosts, viewer.getPlugins(), { viewer })
-    // attach the pull-handle into the rail region (only when a rail is mounted); mountPluginRegions
-    // replaceChildren'd the host, so prepend it fresh each time.
-    if (regionHosts.thumbnails.childElementCount > 0) {
-      regionHosts.thumbnails.prepend(railHandle)
-    }
+    pluginKeymap = aggregateKeymap(internals.getPlugins())
+    mountPluginRegions(internals.getPlugins())
+    // The pull-handle leads the rail region while a rail plugin is mounted. The mounter leaves
+    // nodes it didn't add alone, so place (or drop) the handle here.
+    const thumbs = regionHosts.thumbnails
+    const hasRail = [...thumbs.childNodes].some((n) => n !== railHandle)
+    if (!hasRail) railHandle.remove()
+    else if (thumbs.firstChild !== railHandle) thumbs.prepend(railHandle)
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItemId = undefined
     if (attached) renderWindow()
   }
   mountRegions()
-  const offPlugins = viewer.onPluginsChanged(mountRegions)
+  const offPlugins = internals.onPluginsChanged(mountRegions)
 
   const unsubscribe = viewer.subscribe(sync)
   sync()
@@ -874,6 +963,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     destroy() {
       unsubscribe()
       offPlugins()
+      offZoomBounds()
+      offRefresh()
+      cancelPhaseWait?.()
+      offLifecycle() // settles a transition in flight, so `closed` still fires
       detachGestures()
       resizeObserver?.disconnect()
       if (resizeFrame) cancelAnimationFrame(resizeFrame)

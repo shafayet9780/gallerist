@@ -7,6 +7,7 @@ export default defineConfig({
   root: r('.'),
   resolve: {
     alias: {
+      '@gallerist/core/internal': r('../../packages/core/src/internal.ts'),
       '@gallerist/core': r('../../packages/core/src/index.ts'),
       '@gallerist/renderer-dom': r('../../packages/renderer-dom/src/index.ts'),
       '@gallerist/theme-default/gallerist.css': r('../../packages/theme-default/src/gallerist.css'),

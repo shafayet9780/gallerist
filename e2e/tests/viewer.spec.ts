@@ -91,6 +91,72 @@ test('drag downward dismisses the viewer (arbitration: close)', async ({ page })
   await expect(page.locator('.gallerist')).toHaveCount(0)
 })
 
+test('zooming back out after a pan returns to a centred fit (zoom bounds)', async ({ page }) => {
+  test.skip(
+    test.info().project.name === 'webkit',
+    'WebKit synthetic mouse drops drag pointer events',
+  )
+  const zoom = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            viewer: { getState(): { zoom: { scale: number; x: number; y: number } } }
+          }
+        ).viewer.getState().zoom,
+    )
+  await page.keyboard.press('+')
+  await page.keyboard.press('+')
+  await expect.poll(async () => (await zoom()).scale).toBeGreaterThan(1)
+  const centred = (await zoom()).x
+  const box = await page.locator('.gallerist-stage').boundingBox()
+  if (!box) throw new Error('no stage box')
+  const cy = box.y + box.height / 2
+  await drag(page, box.x + box.width * 0.6, cy, box.x + box.width * 0.4, cy) // pan off-centre
+  await expect.poll(async () => (await zoom()).x).toBeLessThan(centred)
+  for (let k = 0; k < 6; k++) await page.keyboard.press('-')
+  await expect.poll(zoom).toEqual({ scale: 1, x: 0, y: 0 })
+})
+
+test('close fades out before unmounting; phases settle on the real animation', async ({ page }) => {
+  const phase = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { viewer: { getState(): { phase: string } } }).viewer.getState()
+          .phase,
+    )
+  await expect.poll(phase).toBe('open') // the opening fade has settled
+  await page.evaluate(() => {
+    const w = window as unknown as {
+      viewer: { subscribe(fn: (s: { phase: string }) => void): void; close(): void }
+      __phases: string[]
+    }
+    w.__phases = []
+    w.viewer.subscribe((s) => {
+      if (w.__phases.at(-1) !== s.phase) w.__phases.push(s.phase)
+    })
+    w.viewer.close()
+  })
+  await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'closing')
+  await expect(page.locator('.gallerist')).toHaveCount(0)
+  const phases = await page.evaluate(() => (window as unknown as { __phases: string[] }).__phases)
+  expect(phases).toEqual(['closing', 'closed'])
+})
+
+test('with reduced motion, open and close do not animate', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const root = page.locator('.gallerist')
+  await expect(root).toHaveAttribute('data-gallerist-phase', 'open')
+  await page.evaluate(() => (window as unknown as { viewer: { close(): void } }).viewer.close())
+  await expect(root).toHaveCount(0)
+  await page.click('#open')
+  const name = await root.evaluate((el) => {
+    el.setAttribute('data-gallerist-phase', 'closing') // force the exit rule to apply
+    return getComputedStyle(el).animationName
+  })
+  expect(name).toBe('none')
+})
+
 test('wheel zooms in past fit (arbitration: zoom)', async ({ page }) => {
   const box = await page.locator('.gallerist-stage').boundingBox()
   if (!box) throw new Error('no stage box')

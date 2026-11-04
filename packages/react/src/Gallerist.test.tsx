@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { Collection, ViewerApi } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { StrictMode, createRef, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -87,6 +88,114 @@ function Counter() {
   const { state } = useGallerist(useViewerContext())
   return <div data-testid="cnt">{state.cursor.g}</div>
 }
+
+describe('<Gallerist> reactive props', () => {
+  const img = (id: string) => ({ id, type: 'image' as const, source: `${id}.jpg` })
+
+  it('applies a new collection reference in place, keeping the cursor on the same item', () => {
+    const ref = createRef<ViewerApi>()
+    const { rerender } = render(<Gallerist ref={ref} collection={collection} open />)
+    act(() => ref.current?.next()) // on g1 / b
+    const next: Collection = {
+      groups: [{ id: 'g9', items: [img('z')] }, ...collection.groups],
+    }
+    rerender(<Gallerist ref={ref} collection={next} open />)
+    expect(ref.current?.getCollection().groups).toHaveLength(3)
+    expect(ref.current?.getState().cursor).toEqual({ g: 2, i: 0 }) // still on b, now at index 2
+    expect(document.querySelector('.gallerist-counter')?.textContent).toContain('3 / 3')
+  })
+
+  it('applies a new flat items array', () => {
+    const ref = createRef<ViewerApi>()
+    const { rerender } = render(<Gallerist ref={ref} items={[img('a')]} open />)
+    rerender(<Gallerist ref={ref} items={[img('a'), img('b'), img('c')]} open />)
+    expect(ref.current?.getCollection().groups.map((g) => g.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('does not re-apply the same data reference on re-render, or the initial data on mount', () => {
+    const collectionChange = vi.fn()
+    const { rerender } = render(
+      <StrictMode>
+        <Gallerist collection={collection} on={{ collectionChange }} open />
+      </StrictMode>,
+    )
+    rerender(
+      <StrictMode>
+        <Gallerist collection={collection} on={{ collectionChange }} open theme="cyan" />
+      </StrictMode>,
+    )
+    expect(collectionChange).not.toHaveBeenCalled()
+  })
+
+  it('re-rendering with rebuilt-but-identical inline data does not swap the collection', () => {
+    const ref = createRef<ViewerApi>()
+    const collectionChange = vi.fn()
+    const photos = ['a', 'b', 'c']
+    const view = (theme: 'cyan' | 'amber') => (
+      <Gallerist
+        ref={ref}
+        items={photos.map((id) => ({ id, type: 'image' as const, source: { src: `${id}.jpg` } }))}
+        on={{ collectionChange }}
+        theme={theme}
+        open
+      />
+    )
+    const { rerender } = render(view('cyan'))
+    act(() => {
+      getInternals(ref.current as ViewerApi).emit('loaded', {
+        viewer: ref.current as ViewerApi,
+        cursor: { g: 0, i: 0 },
+        id: 'a',
+      })
+    })
+    rerender(view('amber')) // fresh item objects, same content
+    expect(collectionChange).not.toHaveBeenCalled()
+    expect(ref.current?.getState().loaded.a).toBe('loaded') // load status survives
+  })
+
+  it('an invalid data update is reported and the current collection kept (no crash)', () => {
+    const ref = createRef<ViewerApi>()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { rerender } = render(<Gallerist ref={ref} items={[img('a'), img('b')]} open />)
+      rerender(<Gallerist ref={ref} items={[img('a'), img('a')]} open />)
+      expect(error).toHaveBeenCalledWith(
+        '[gallerist] ignored an invalid collection update:',
+        expect.any(Error),
+      )
+      expect(ref.current?.getCollection().groups.map((g) => g.id)).toEqual(['a', 'b'])
+    } finally {
+      error.mockRestore()
+    }
+  })
+
+  it('calls the latest on handler, not the one from the first render', () => {
+    const ref = createRef<ViewerApi>()
+    const first = vi.fn()
+    const second = vi.fn()
+    const { rerender } = render(
+      <Gallerist ref={ref} collection={collection} on={{ slide: first }} open />,
+    )
+    rerender(<Gallerist ref={ref} collection={collection} on={{ slide: second }} open />)
+    act(() => ref.current?.next())
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(first).not.toHaveBeenCalled()
+  })
+
+  it('a handler added after mount fires, and a returned false still cancels', () => {
+    const ref = createRef<ViewerApi>()
+    const { rerender } = render(<Gallerist ref={ref} collection={collection} open />)
+    rerender(<Gallerist ref={ref} collection={collection} on={{ beforeSlide: () => false }} open />)
+    act(() => ref.current?.next())
+    expect(ref.current?.getState().cursor).toEqual({ g: 0, i: 0 })
+  })
+
+  it('still fires init from the constructor-time on handlers', () => {
+    const init = vi.fn()
+    render(<Gallerist collection={collection} on={{ init }} />)
+    expect(init).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe('useGallerist', () => {
   it('reflects state changes via useSyncExternalStore', () => {

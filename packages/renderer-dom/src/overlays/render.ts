@@ -3,6 +3,7 @@
 // free; point overlays are counter-scaled to hold a constant screen size (decision per §9.1).
 
 import type { Group, Item, OverlaySpec, ViewerApi, ZoomState } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 import {
   type Size,
   contentAnchorBox,
@@ -71,7 +72,7 @@ export function paintOverlays(
     if (spec.interactive) {
       host.tabIndex = 0
       host.addEventListener('click', () =>
-        ctx.viewer.emit('overlayClick', {
+        getInternals(ctx.viewer).emit('overlayClick', {
           viewer: ctx.viewer,
           cursor: ctx.viewer.getState().cursor,
           group: ctx.group,

@@ -3,7 +3,7 @@
 // the toolbar button or `g`; clicking a cell navigates and hides the grid.
 
 import type { Item, MediaSource, Plugin, ViewerApi } from '@gallerist/core'
-import { windowIndices } from '@gallerist/core'
+import { windowIndices } from '@gallerist/core/internal'
 
 export interface GridOptions {
   /** groups rendered on each side of the active group (default 12). */
