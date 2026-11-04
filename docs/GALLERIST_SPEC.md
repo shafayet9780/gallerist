@@ -622,7 +622,7 @@ gallerist/
 └─ .changeset/
 ```
 
-- **CI:** typecheck → unit (vitest) → e2e (Playwright) → axe → size-limit → perf trace → docs build. Release via Changesets on merge to main.
+- **CI:** typecheck → unit (vitest) → size-limit → docs build. e2e (Playwright, including axe and the perf gate) runs locally before merging, or on demand through the manual E2E workflow. Release via Changesets, run by hand.
 
 ---
 
