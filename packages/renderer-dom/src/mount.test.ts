@@ -194,7 +194,110 @@ describe('mount — chrome + keyboard', () => {
     v.open()
     const root = document.querySelector('.gallerist') as HTMLElement
     expect(root.getAttribute('data-gallerist-preset')).toBe('reviewer')
-    expect(root.getAttribute('data-gallerist-arrows')).toBe('corner-br') // reviewer default
+    expect(root.getAttribute('data-gallerist-arrows')).toBe('docked') // reviewer default
+  })
+
+  it('docked arrows: the item navigator is a grid item of the root, off the stage', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'docked' })
+    v.open({ g: 1 })
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const nav = document.querySelector('.gallerist-itemnav') as HTMLElement
+    expect(root.getAttribute('data-gallerist-arrows')).toBe('docked')
+    // a root child after the caption it ends and before the item column it heads; DOM order is tab
+    // order: the stage's group arrows, the caption band, the navigator, the item column
+    expect(nav.parentElement).toBe(root)
+    const caption = root.querySelector('.gallerist-caption') as HTMLElement
+    expect(caption.previousElementSibling?.classList.contains('gallerist-main')).toBe(true)
+    expect(nav.previousElementSibling).toBe(caption)
+    expect(nav.nextElementSibling?.classList.contains('gallerist-region-aside')).toBe(true)
+    const tabOrder = [
+      '.gallerist-prev',
+      '.gallerist-next',
+      '.gallerist-caption',
+      '.gallerist-item-prev',
+      '.gallerist-item-next',
+      '.gallerist-region-aside',
+    ].map((sel) => root.querySelector(sel) as HTMLElement)
+    for (let k = 1; k < tabOrder.length; k++) {
+      const [a, b] = [tabOrder[k - 1] as HTMLElement, tabOrder[k] as HTMLElement]
+      expect(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+    // nothing of it is inside the main area over the stage; the group arrows still are
+    const controls = document.querySelector('.gallerist-controls') as HTMLElement
+    expect(controls.querySelector('.gallerist-item-prev, .gallerist-position')).toBeNull()
+    expect(controls.querySelector('.gallerist-prev')).not.toBeNull()
+    expect(nav.hidden).toBe(false)
+    expect(nav.querySelector('.gallerist-position-text')?.textContent).toBe('1 / 3')
+    ;(nav.querySelector('.gallerist-item-next') as HTMLButtonElement).click()
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    v.goTo(0, 0) // a one-item group hides it, as in the other layouts
+    expect(nav.hidden).toBe(true)
+  })
+
+  it('other arrow layouts keep the caption after the aside', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'corner-br' })
+    v.open({ g: 1 })
+    const caption = document.querySelector('.gallerist-caption') as HTMLElement
+    expect(caption.previousElementSibling?.classList.contains('gallerist-region-aside')).toBe(true)
+  })
+
+  it('flags a one-group collection (docked drops the group arrows and their gutters)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'docked' })
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.hasAttribute('data-gallerist-one-group')).toBe(false)
+    v.setCollection({ groups: [{ id: 'g0', items: [item('a0'), item('a1')] }] })
+    expect(root.hasAttribute('data-gallerist-one-group')).toBe(true)
+    expect(root.hasAttribute('data-gallerist-multi')).toBe(true)
+    v.setCollection(collection())
+    expect(root.hasAttribute('data-gallerist-one-group')).toBe(false)
+  })
+
+  it('a focused docked group arrow the collection drops to one group hands focus to the root', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'docked' })
+    v.open({ g: 1 })
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const next = document.querySelector('.gallerist-next') as HTMLButtonElement
+    next.focus()
+    v.setCollection({ groups: [{ id: 'g0', items: [item('a0'), item('a1')] }] })
+    expect(root.hasAttribute('data-gallerist-one-group')).toBe(true)
+    expect(document.activeElement).toBe(root) // the theme hides the arrow: not <body>
+    // linear mode keeps its arrows (they walk the items): focus stays
+    document.body.innerHTML = ''
+    const w = createViewer({ collection: collection() })
+    mount(w, { arrows: 'docked', linear: true })
+    w.open({ g: 1 })
+    const arrow = document.querySelector('.gallerist-next') as HTMLButtonElement
+    arrow.focus()
+    w.setCollection({ groups: [{ id: 'g0', items: [item('a0'), item('a1')] }] })
+    expect(document.activeElement).toBe(arrow)
+  })
+
+  it('docked arrows with the reviewer preset; a placard still holds the navigator', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { preset: 'reviewer' })
+    v.open({ g: 1 })
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(document.querySelector('.gallerist-itemnav')?.parentElement).toBe(root)
+    v.destroy()
+    document.body.innerHTML = ''
+    const w = createViewer({ collection: collection() })
+    mount(w, { arrows: 'docked', itemIndicator: 'placard' })
+    w.open({ g: 1 })
+    expect(document.querySelector('.gallerist-itemnav')?.parentElement?.className).toBe(
+      'gallerist-caption',
+    )
+  })
+
+  it('without controls there is no docked navigator', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { arrows: 'docked', controls: false })
+    v.open({ g: 1 })
+    expect(document.querySelector('.gallerist-itemnav')).toBeNull()
   })
 
   it('an explicit arrows option overrides the preset default', () => {
@@ -883,6 +986,26 @@ describe('mount — chrome structure (M15)', () => {
     expect([cap.hidden, cap.textContent]).toEqual([false, ''])
   })
 
+  it('ignores a group caption that is not a string (title, arrow labels)', () => {
+    const odd = { id: 'c', render: () => 'x' } as unknown as string
+    const v = createViewer({
+      collection: {
+        groups: [
+          { id: 'g0', caption: odd, items: [{ id: 'a0', type: 'image', source: 'a0.jpg' }] },
+          { id: 'g1', caption: odd, items: [{ id: 'b0', type: 'image', source: 'b0.jpg' }] },
+        ],
+      },
+    })
+    mount(v, { arrowLabels: true, arrows: 'pill-right' })
+    v.open()
+    const title = document.querySelector('.gallerist-title') as HTMLElement
+    expect([title.hidden, title.textContent]).toEqual([true, ''])
+    expect(document.querySelector('.gallerist')?.textContent).not.toContain('[object Object]')
+    expect(document.querySelector('.gallerist-next')?.getAttribute('aria-label')).not.toContain(
+      'object',
+    )
+  })
+
   it('shows zoom reset only while zoomed in', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
@@ -1356,6 +1479,199 @@ describe('mount — modal accessibility (WS-3)', () => {
     expect(v.getState().phase).toBe('closed')
   })
 
+  it('keeps the viewer open on an Escape a host handler already took (defaultPrevented)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const input = document.createElement('input')
+    root.appendChild(input)
+    // a host form clears its field on Escape and keeps the viewer up
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') e.preventDefault()
+    })
+    input.focus()
+    input.dispatchEvent(key({ key: 'Escape', cancelable: true }))
+    expect(v.getState().phase).toBe('open')
+    // from a non-editable target too
+    const button = document.createElement('button')
+    root.appendChild(button)
+    button.addEventListener('keydown', (e) => e.preventDefault())
+    button.dispatchEvent(key({ key: 'Escape', cancelable: true }))
+    expect(v.getState().phase).toBe('open')
+    // an Escape nobody took still closes
+    root.dispatchEvent(key({ key: 'Escape', cancelable: true }))
+    expect(v.getState().phase).toBe('closed')
+  })
+
+  it('describes the viewer with the caption (aria-describedby)', () => {
+    const v = createViewer({
+      collection: {
+        groups: [{ id: 'g0', items: [{ ...item('a0'), caption: 'Front view' }, item('a1')] }],
+      },
+    })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const describe = () =>
+      (root.getAttribute('aria-describedby') ?? '')
+        .split(' ')
+        .map((id) => document.getElementById(id)?.textContent ?? '')
+        .join('')
+    expect(describe()).toBe('Front view')
+    v.nextItem()
+    expect(describe()).toBe('')
+    // ids are unique per viewer
+    const w = createViewer({
+      collection: { groups: [{ id: 'g0', items: [{ ...item('b0'), caption: 'Back view' }] }] },
+    })
+    mount(w)
+    w.open()
+    const roots = document.querySelectorAll('.gallerist')
+    expect(roots[1]?.getAttribute('aria-describedby')).toBeTruthy()
+    expect(roots[1]?.getAttribute('aria-describedby')).not.toBe(
+      root.getAttribute('aria-describedby'),
+    )
+  })
+
+  it('is described by the caption only while the caption bar shows', () => {
+    const captioned = {
+      groups: [{ id: 'g0', items: [{ ...item('a0'), caption: 'Front view' }] }],
+    }
+    const v = createViewer({ collection: captioned })
+    mount(v, { controls: false }) // no chrome: the caption bar stays hidden
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(document.querySelector('.gallerist-caption')?.hasAttribute('hidden')).toBe(true)
+    expect(root.hasAttribute('aria-describedby')).toBe(false)
+    // nor without any caption in the collection
+    const w = createViewer({ collection: collection() })
+    mount(w)
+    w.open()
+    expect(document.querySelectorAll('.gallerist')[1]?.hasAttribute('aria-describedby')).toBe(false)
+  })
+
+  // A caption renderer's band that overflows takes focus and a name (axe scrollable-region-focusable),
+  // only while it overflows; the band keeps ↑/↓/Home/End for scrolling.
+  for (const indicator of ['pills', 'placard'] as const) {
+    it(`an overflowing custom caption band is keyboard-scrollable (${indicator})`, () => {
+      const fits: (() => void)[] = []
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(cb: () => void) {
+            fits.push(cb)
+          }
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        },
+      )
+      try {
+        const tall = document.createElement('div')
+        tall.textContent = 'Long'
+        const v = createViewer({
+          collection: {
+            groups: [
+              { id: 'g0', items: [item('a0'), item('a1')] },
+              { id: 'g1', items: [item('b0')] },
+            ],
+          },
+          plugins: [() => ({ name: 'tall-caption', regions: { caption: () => tall } })],
+        })
+        mount(v, { itemIndicator: indicator })
+        v.open()
+        const band = (
+          indicator === 'placard'
+            ? document.querySelector('.gallerist-region-caption')
+            : document.querySelector('.gallerist-caption')
+        ) as HTMLElement
+        let content = 50
+        Object.defineProperty(band, 'scrollHeight', { get: () => content, configurable: true })
+        Object.defineProperty(band, 'clientHeight', { get: () => 100, configurable: true })
+        const resize = () => {
+          for (const fit of fits) fit()
+        }
+        resize()
+        expect(band.hasAttribute('tabindex')).toBe(false)
+        expect(band.hasAttribute('role')).toBe(false)
+        content = 300 // now it scrolls
+        resize()
+        expect(band.getAttribute('tabindex')).toBe('0')
+        expect(band.getAttribute('role')).toBe('region')
+        const label = document.getElementById(band.getAttribute('aria-labelledby') ?? '')
+        expect(label?.textContent).toBe('Caption')
+        // the viewer's description is still the caption's text, not the band's name
+        const root = document.querySelector('.gallerist') as HTMLElement
+        expect(root.getAttribute('aria-describedby')?.split(' ')).not.toContain(label?.id)
+        // ↑/↓/Home/End on the focused band scroll it rather than navigate: the renderer scrolls it
+        // (a browser's own keyboard scrolling isn't relied on), clamped as a browser clamps
+        let top = 0
+        Object.defineProperty(band, 'scrollTop', {
+          get: () => top,
+          set: (t: number) => {
+            top = Math.max(0, Math.min(t, content - 100))
+          },
+          configurable: true,
+        })
+        band.focus()
+        const press = (k: string) => {
+          const e = key({ key: k, cancelable: true })
+          band.dispatchEvent(e)
+          return e.defaultPrevented
+        }
+        expect(press('ArrowDown')).toBe(true)
+        expect(top).toBe(40)
+        expect(press('End')).toBe(true)
+        expect(top).toBe(200)
+        expect(press('ArrowUp')).toBe(true)
+        expect(top).toBe(160)
+        expect(press('Home')).toBe(true)
+        expect(top).toBe(0)
+        expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+        band.dispatchEvent(key({ key: 'ArrowRight', cancelable: true })) // ← / → still navigate
+        expect(v.getState().cursor.g).toBe(1)
+        expect(document.activeElement).toBe(band)
+        content = 101 // a sub-pixel overflow is not a scroller
+        resize()
+        // fits again while focused (a shorter caption, a taller viewport): focus goes back to the
+        // viewer rather than falling to <body>, and the keys navigate again
+        for (const a of ['tabindex', 'role', 'aria-labelledby'])
+          expect(band.hasAttribute(a), a).toBe(false)
+        expect(document.activeElement).toBe(root)
+        root.dispatchEvent(key({ key: 'ArrowLeft', cancelable: true }))
+        expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+        root.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+        expect(v.getState().cursor).toEqual({ g: 0, i: 1 })
+        // a key still aimed at the band (no longer a scroller) navigates rather than being swallowed
+        band.dispatchEvent(key({ key: 'ArrowUp', cancelable: true }))
+        expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  }
+
+  it('ignores a caption that is not a string (untyped data with an old caption object)', () => {
+    const v = createViewer({
+      collection: {
+        groups: [
+          {
+            id: 'g0',
+            items: [
+              { ...item('a0'), caption: { id: 'c', render: () => 'x' } as unknown as string },
+            ],
+          },
+        ],
+      },
+    })
+    mount(v)
+    v.open()
+    const bar = document.querySelector('.gallerist-caption') as HTMLElement
+    expect(bar.textContent).not.toContain('[object Object]')
+    expect(bar.hidden).toBe(true) // no text caption anywhere: no band reserved for one
+  })
+
   it('announces the current item description in the live region (S-UX4)', () => {
     const v = createViewer({ collection: collection() }) // items carry alt = id
     mount(v)
@@ -1513,45 +1829,107 @@ describe('groupAxis and arrowLabels', () => {
 })
 
 describe('mount — preloading within a group (U17)', () => {
-  const warmed: string[] = []
+  // Image stub: records each warmer and every src it is given (nothing is fetched in happy-dom)
+  let warmers: Array<{ img: HTMLImageElement; srcs: string[] }> = []
   const stubImage = () => {
-    warmed.length = 0
+    warmers = []
     const Real = window.Image
     vi.stubGlobal(
       'Image',
       class extends Real {
+        rec = { img: this as HTMLImageElement, srcs: [] as string[] }
+        constructor() {
+          super()
+          warmers.push(this.rec)
+        }
         override set src(v: string) {
-          warmed.push(v)
+          this.rec.srcs.push(v)
         }
       },
     )
   }
-  afterEach(() => vi.unstubAllGlobals())
-
-  it('warms the images a step within the group lands on, not other media', () => {
-    stubImage()
-    const v = createViewer({
-      collection: {
-        groups: [
-          {
-            id: 'g0',
-            items: [
-              item('p0'),
-              item('p1'),
-              { id: 'clip', type: 'video', source: 'clip.mp4' },
-              { id: 'p3', type: 'image', source: { src: 'p3.jpg', srcset: 'p3-2x.jpg 2x' } },
-              item('p4'),
-            ],
-          },
+  const warmed = () => warmers.map((w) => w.srcs[0])
+  const group = (): Collection => ({
+    groups: [
+      {
+        id: 'g0',
+        items: [
+          item('p0'),
+          item('p1'),
+          { id: 'clip', type: 'video', source: 'clip.mp4' },
+          { id: 'p3', type: 'image', source: { src: 'p3.jpg', srcset: 'p3-2x.jpg 2x' } },
+          item('p4'),
         ],
       },
-    })
+    ],
+  })
+  // the current image finished loading: its adapter's `ready` settles
+  const loadCurrent = () =>
+    document
+      .querySelector('.gallerist-slide[data-gallerist-current] img')
+      ?.dispatchEvent(new Event('load'))
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('warms the images a step within the group lands on, once the current one is ready', async () => {
+    stubImage()
+    const v = createViewer({ collection: group() })
     mount(v)
     v.open({ g: 0, i: 1 })
+    expect(warmers).toEqual([]) // nothing competes with the image on screen
+    loadCurrent()
     // behind 1 (p0); ahead 2: the video is skipped, p3 is warmed with its srcset
-    expect(warmed).toContain('p0.jpg')
-    expect(warmed).toContain('p3.jpg')
-    expect(warmed).not.toContain('clip.mp4')
-    expect(warmed).not.toContain('p1.jpg') // the current item is mounted, not warmed
+    await vi.waitFor(() => expect(warmed()).toEqual(['p0.jpg', 'p3.jpg']))
+    const p3 = warmers[1]?.img
+    expect(p3?.srcset).toBe('p3-2x.jpg 2x')
+    expect(p3?.fetchPriority).toBe('low')
+  })
+
+  it('cancels the warmers a move leaves behind, and keeps the ones still wanted', async () => {
+    stubImage()
+    const v = createViewer({ collection: group() })
+    mount(v)
+    v.open({ g: 0, i: 1 })
+    loadCurrent()
+    await vi.waitFor(() => expect(warmers.length).toBe(2))
+    v.goTo(0, 4) // wants p3 (behind) only
+    const [p0, p3] = warmers
+    expect(p0?.srcs.at(-1)).toBe('') // its request is dropped
+    expect(p3?.srcs).toEqual(['p3.jpg'])
+    loadCurrent()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(warmers.length).toBe(2) // p3 isn't fetched twice
+  })
+
+  it('leaves items a custom adapter mounts alone', async () => {
+    stubImage()
+    const v = createViewer({ collection: group() })
+    const custom = {
+      type: 'image',
+      mount: (_item: Item, slot: HTMLElement) => {
+        const node = document.createElement('div')
+        slot.appendChild(node)
+        return {
+          element: node,
+          ready: Promise.resolve(),
+          supportsZoom: false,
+          destroy: () => node.remove(),
+        }
+      },
+    }
+    mount(v, { adapters: [custom] })
+    v.open({ g: 0, i: 1 })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(warmers).toEqual([])
+  })
+
+  it('destroying the viewer cancels warmers in flight', async () => {
+    stubImage()
+    const v = createViewer({ collection: group() })
+    const handle = mount(v)
+    v.open({ g: 0, i: 1 })
+    loadCurrent()
+    await vi.waitFor(() => expect(warmers.length).toBe(2))
+    handle.destroy()
+    expect(warmers.map((w) => w.srcs.at(-1))).toEqual(['', ''])
   })
 })

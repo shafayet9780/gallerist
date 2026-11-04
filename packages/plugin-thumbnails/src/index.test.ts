@@ -2,10 +2,10 @@
 
 import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
-import { mount } from '@gallerist/renderer-dom'
+import { type PresetName, mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { thumbnails } from './index'
-import { keepPlace, measureRun, middleOf, spanAround } from './strip'
+import { axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
 const collection = (): Collection => ({
@@ -665,6 +665,187 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
     expect(nums).toEqual(['1', '2'])
   })
 
+  describe('preset defaults (RegionCtx.preset)', () => {
+    const openPreset = (
+      preset: PresetName | undefined,
+      opts?: Parameters<typeof thumbnails>[0],
+      col = timed(),
+    ) => {
+      const v = createViewer({ collection: col, plugins: [thumbnails(opts)] })
+      mount(v, { preset })
+      v.open()
+      return v
+    }
+    const nums = () =>
+      [...document.querySelectorAll('.gallerist-thumb-items .gallerist-thumb-num')].map(
+        (n) => n.textContent,
+      )
+
+    it('thumbnails() takes the mounted preset’s rail: reviewer → timeline + numbered items', () => {
+      const v = openPreset('reviewer')
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+      expect(document.querySelector('.gallerist-thumb-time')?.textContent).toBe('09:00')
+      v.next()
+      expect(nums()).toEqual(['1', '2'])
+      // still a vertical stack in the aside column (the preset's itemAxis)
+      expect(
+        document
+          .querySelector('.gallerist-region-aside .gallerist-thumb-items')
+          ?.getAttribute('data-axis'),
+      ).toBe('vertical')
+    })
+
+    it('an explicit option wins per key; an undefined one still takes the preset', () => {
+      const v = openPreset('reviewer', { timeline: false, numberItems: undefined })
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+      v.next()
+      expect(nums()).toEqual(['1', '2'])
+    })
+
+    it('editorial puts the items in a numbered row in the rail, not the aside column', () => {
+      const v = openPreset('editorial')
+      v.next()
+      const row = document.querySelector('.gallerist-region-thumbnails .gallerist-thumb-items')
+      expect(row?.getAttribute('data-axis')).toBe('horizontal')
+      expect(nums()).toEqual(['1', '2'])
+      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+    })
+
+    it('tour makes the rail a section index', () => {
+      openPreset('tour')
+      expect(document.querySelector('.gallerist-thumbs')?.getAttribute('data-display')).toBe(
+        'index',
+      )
+      expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(3)
+      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+    })
+
+    it('explicit options can undo the preset’s layout (tour as a stacked vertical rail)', () => {
+      openPreset('tour', { groupDisplay: 'stacked', itemAxis: 'vertical' })
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-display')).toBe(false)
+      expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(0)
+    })
+
+    it('without a preset, and with filmstrip, the rail keeps its own defaults', () => {
+      for (const preset of [undefined, 'filmstrip'] as const) {
+        const v = openPreset(preset)
+        expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(
+          false,
+        )
+        v.next()
+        expect(nums()).toEqual([])
+        expect(
+          document.querySelector('.gallerist-region-aside .gallerist-thumb-items'),
+        ).not.toBeNull()
+        document.body.innerHTML = ''
+      }
+    })
+
+    it('a plugin added after mount takes the preset too', () => {
+      const v = createViewer({ collection: timed() })
+      mount(v, { preset: 'reviewer' })
+      v.use(thumbnails())
+      v.open()
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+    })
+
+    it('a new mount builds the rail again for its own preset (reviewer, then editorial)', () => {
+      const v = createViewer({ collection: timed(), plugins: [thumbnails()] })
+      const first = mount(v, { preset: 'reviewer' })
+      v.open()
+      v.next()
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+      expect(
+        document.querySelector('.gallerist-region-aside .gallerist-thumb-items'),
+      ).not.toBeNull()
+      first.destroy()
+      mount(v, { preset: 'editorial' })
+      expect(document.querySelectorAll('.gallerist-thumbs').length).toBe(1)
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+      const row = document.querySelector('.gallerist-region-thumbnails .gallerist-thumb-items')
+      expect(row?.getAttribute('data-axis')).toBe('horizontal')
+      expect(nums()).toEqual(['1', '2'])
+      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+      // the rail follows the viewer from the new mount
+      v.goTo(2)
+      expect(
+        document.querySelector('.gallerist-thumb[data-active]')?.getAttribute('data-group'),
+      ).toBe('g2')
+    })
+
+    it('a new mount builds the rail again for its own preset (none, then tour)', () => {
+      const v = createViewer({ collection: timed(), plugins: [thumbnails()] })
+      const first = mount(v)
+      v.open()
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-display')).toBe(false)
+      first.destroy()
+      mount(v, { preset: 'tour' })
+      expect(document.querySelectorAll('.gallerist-thumbs').length).toBe(1)
+      expect(document.querySelector('.gallerist-thumbs')?.getAttribute('data-display')).toBe(
+        'index',
+      )
+      expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(3)
+      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+    })
+
+    it('an explicit groupDisplay other than the preset’s drops its layout keys (tour, stacked)', () => {
+      const v = openPreset('tour', { groupDisplay: 'stacked' })
+      v.next()
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-display')).toBe(false)
+      // the plugin's own item axis (a vertical stack in the aside column) and no numbers
+      expect(
+        document
+          .querySelector('.gallerist-region-aside .gallerist-thumb-items')
+          ?.getAttribute('data-axis'),
+      ).toBe('vertical')
+      expect(nums()).toEqual([])
+    })
+
+    it('an explicit groupDisplay equal to the preset’s keeps its layout keys (reviewer, stacked)', () => {
+      const v = openPreset('reviewer', { groupDisplay: 'stacked' })
+      expect(document.querySelector('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+      v.next()
+      expect(nums()).toEqual(['1', '2'])
+    })
+
+    // A renderer's preset is untyped data: values outside the known ones take the defaults.
+    const regionsWith = (thumbs: unknown, opts?: Parameters<typeof thumbnails>[0]) => {
+      const v = createViewer({ collection: timed() })
+      const inst = thumbnails(opts)(v)
+      inst.init?.()
+      const ctx = { viewer: v, preset: { thumbnails: thumbs } }
+      const regions = inst.regions ?? {}
+      const rail = regions.thumbnails?.(ctx) as HTMLElement
+      document.body.appendChild(rail)
+      return { v, inst, ctx, rail, regions }
+    }
+
+    it('unknown groupDisplay / itemAxis values from a preset fall back to the defaults', () => {
+      const { ctx, rail, regions } = regionsWith({ groupDisplay: 'grid', itemAxis: 'diagonal' })
+      const strip = rail.querySelector('.gallerist-thumbs')
+      expect(strip?.hasAttribute('data-display')).toBe(false)
+      expect(strip?.getAttribute('role')).toBe('listbox')
+      // a vertical stack, so the aside column gets its node
+      const aside = regions.aside?.(ctx)
+      expect(aside?.nodeType).toBe(Node.ELEMENT_NODE)
+      expect((aside as HTMLElement).className).toBe('gallerist-thumbs-aside')
+    })
+
+    it('a preset that makes the rail flat leaves the claimed toggle and `e` key inert', () => {
+      const { v, inst, ctx, rail, regions } = regionsWith({ groupDisplay: 'flat' })
+      v.open()
+      expect(rail.querySelector('.gallerist-thumbs')?.getAttribute('data-display')).toBe('flat')
+      // the toolbar region was claimed (the explicit options allowed it) but gets no button
+      expect(regions.toolbar?.(ctx).nodeType).toBe(Node.COMMENT_NODE)
+      const before = rail.innerHTML
+      inst.keymap?.e?.(new KeyboardEvent('keydown', { key: 'e' }))
+      inst.keymap?.E?.(new KeyboardEvent('keydown', { key: 'E' }))
+      expect(rail.innerHTML).toBe(before)
+      expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
+    })
+  })
+
   describe('scrolling', () => {
     const rect = (top: number, bottom: number) =>
       ({ top, bottom, left: 0, right: 100, width: 100, height: bottom - top }) as DOMRect
@@ -939,6 +1120,19 @@ describe('plugin-thumbnails — windowing (U17)', () => {
     ).toBe('false')
   })
 
+  it('index: a group caption that is not a string names the row by number', () => {
+    const odd = { id: 'c', render: () => 'x' } as unknown as string
+    const v = createViewer({
+      collection: { groups: [{ id: 'g0', caption: odd, items: [item('a0'), item('a1')] }] },
+      plugins: [thumbnails({ groupDisplay: 'index' })],
+    })
+    mount(v)
+    v.open()
+    const row = document.querySelector('.gallerist-thumb-row')
+    expect(row?.getAttribute('aria-label')).toContain('Group 1')
+    expect(document.querySelector('.gallerist-thumbs')?.innerHTML).not.toContain('object Object')
+  })
+
   it('index: the active section keeps its items through a scroll, and gets them back', async () => {
     const v = createViewer({
       collection: many(2000, 3),
@@ -980,6 +1174,219 @@ describe('plugin-thumbnails — windowing (U17)', () => {
     v.goTo(0, 1000)
     expect(items()).toEqual(range(992, 1008))
   })
+
+  it('cards carry their place in the whole list, though only a run is drawn', () => {
+    const v = open(many(2000, 2))
+    v.goTo(1500)
+    const card = document.querySelector('.gallerist-thumb[data-group="g1500"]')
+    expect(card?.getAttribute('aria-posinset')).toBe('1501')
+    expect(card?.getAttribute('aria-setsize')).toBe('2000')
+    const thumb = document.querySelector('.gallerist-thumb-item[data-item="g1500i1"]')
+    expect(thumb?.getAttribute('aria-posinset')).toBe('2')
+    expect(thumb?.getAttribute('aria-setsize')).toBe('2')
+  })
+
+  it('flat: item cards are placed within their group (the role=group they sit in)', () => {
+    const v = createViewer({
+      collection: many(3000, 3),
+      plugins: [thumbnails({ groupDisplay: 'flat' })],
+    })
+    mount(v)
+    v.open({ g: 1200, i: 1 })
+    const thumb = document.querySelector('.gallerist-thumb-item[data-item="g1200i1"]')
+    expect(thumb?.closest('[role="group"]')?.getAttribute('data-group')).toBe('g1200')
+    expect(thumb?.getAttribute('aria-posinset')).toBe('2') // "Item 2, 2 of 3", not "…, 3602 of 9000"
+    expect(thumb?.getAttribute('aria-setsize')).toBe('3')
+  })
+
+  it('a numeric overscan below what fits is raised to it, so the rail never shows gaps', async () => {
+    const v = createViewer({ collection: many(2000), plugins: [thumbnails({ overscan: 1 })] })
+    mount(v)
+    v.open()
+    layOut()
+    await scrollTo(0)
+    await scrollTo(0) // 11 fit: half of them (6) each side of the middle card, g5, kept full
+    expect(drawn()).toEqual(range(0, 12))
+    // a jump past the run walks there a pass at a time (each pass keeps the offset, so the
+    // screen doesn't move), then holds what fits each side of the middle card, g15
+    await scrollTo(1000)
+    for (let k = 0; k < 4; k++) {
+      rail.dispatchEvent(new Event('scroll'))
+      await frame()
+    }
+    expect(drawn()).toEqual(range(9, 21))
+  })
+
+  it('setCollection while a thumb has focus hands focus to the viewer', () => {
+    const v = open(many(20))
+    ;(document.querySelector('.gallerist-thumb[data-group="g3"]') as HTMLElement).focus()
+    v.setCollection(many(10))
+    expect(document.activeElement).toBe(document.querySelector('.gallerist'))
+  })
+})
+
+// The rail in other layouts. Each card is 90px along the axis, every 100px, in DOM order.
+describe('plugin-thumbnails — windowing in every direction (U17 review)', () => {
+  const EXTENT = 1000
+  let rail: HTMLElement
+  let scrollX = 0
+  let scrollY = 0
+  const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, k) => a + k)
+  const many = (n: number, per = 1): Collection => ({
+    groups: Array.from({ length: n }, (_, g) => ({
+      id: `g${g}`,
+      items: Array.from({ length: per }, (_, i) => item(`g${g}i${i}`)),
+    })),
+  })
+  const box = (left: number, top: number, width: number, height: number) =>
+    ({ left, top, right: left + width, bottom: top + height, width, height }) as DOMRect
+  // `place(el)` returns the box of a card, or null for anything else
+  const layOut = (axis: 'x' | 'y', place: (el: HTMLElement) => DOMRect | null) => {
+    rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+    scrollX = 0
+    scrollY = 0
+    Object.defineProperties(rail, {
+      clientWidth: { configurable: true, value: axis === 'x' ? EXTENT : 200 },
+      clientHeight: { configurable: true, value: axis === 'y' ? EXTENT : 100 },
+      // negative in a right-to-left rail, as browsers report it
+      scrollLeft: {
+        configurable: true,
+        get: () => scrollX,
+        set: (v: number) => {
+          scrollX = v
+        },
+      },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollY,
+        set: (v: number) => {
+          scrollY = v
+        },
+      },
+    })
+    if (axis === 'y') rail.style.flexDirection = 'column'
+    const real = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this === rail) return axis === 'x' ? box(0, 0, EXTENT, 100) : box(0, 0, 200, EXTENT)
+      return place(this) ?? real.call(this)
+    })
+  }
+  const scroll = async (x: number, y: number) => {
+    rail.scrollLeft = x
+    rail.scrollTop = y
+    rail.dispatchEvent(new Event('scroll'))
+    await frame()
+  }
+  const childIndex = (el: HTMLElement) =>
+    el.parentElement === rail ? [...rail.children].indexOf(el) : -1
+  const groupsDrawn = (sel = '.gallerist-thumb') =>
+    [...document.querySelectorAll<HTMLElement>(`.gallerist-thumbs > ${sel}`)].map((c) =>
+      Number(c.dataset.group?.slice(1)),
+    )
+  afterEach(() => {
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+    document.documentElement.removeAttribute('dir')
+  })
+
+  it('right to left: follows the scroll toward the end, keeping what is on screen', async () => {
+    document.documentElement.setAttribute('dir', 'rtl')
+    const v = createViewer({ collection: many(2000), plugins: [thumbnails()] })
+    mount(v)
+    v.open()
+    // card k runs from the right edge leftwards; scrolling toward the end makes scrollLeft negative
+    layOut('x', (el) => {
+      const k = childIndex(el)
+      return k < 0 ? null : box(EXTENT - (k + 1) * 100 + 10 - scrollX, 0, 90, 80)
+    })
+    await scroll(0, 0)
+    expect(groupsDrawn()).toEqual(range(0, 18)) // the middle is g5, as left to right
+    await scroll(-1000, 0) // g10..g20 now show: the middle is g15
+    expect(groupsDrawn()).toEqual(range(6, 24)) // not collapsed back to the start
+    const g15 = document.querySelector('.gallerist-thumb[data-group="g15"]') as HTMLElement
+    const r = g15.getBoundingClientRect()
+    expect(r.left <= EXTENT / 2 && r.right >= EXTENT / 2).toBe(true) // still under the middle
+    expect(rail.scrollTop).toBe(0)
+    v.goTo(15)
+    expect(document.querySelector('.gallerist-thumb[data-active]')).toBe(g15)
+  })
+
+  it('a side rail: runs down the column, scrolled by scrollTop', async () => {
+    const v = createViewer({ collection: many(2000), plugins: [thumbnails()] })
+    mount(v, { rail: 'left' })
+    v.open()
+    layOut('y', (el) => {
+      const k = childIndex(el)
+      return k < 0 ? null : box(10, k * 100 - scrollY, 180, 90)
+    })
+    await scroll(0, 0)
+    expect(groupsDrawn()).toEqual(range(0, 18))
+    await scroll(0, 1000)
+    expect(groupsDrawn()).toEqual(range(6, 24))
+    expect(rail.scrollTop).toBe(400) // six cards went above: the offset follows
+    expect(rail.scrollLeft).toBe(0)
+  })
+
+  it('flat on a side rail: rows of item cards across a vertical rail, no sideways jump', async () => {
+    const v = createViewer({
+      collection: many(1, 3000),
+      plugins: [thumbnails({ groupDisplay: 'flat' })],
+    })
+    mount(v, { rail: 'left' })
+    v.open()
+    // three item cards side by side per row, rows 100px apart, in drawn order
+    layOut('y', (el) => {
+      if (!el.classList.contains('gallerist-thumb-item')) return null
+      const k = [...rail.querySelectorAll('.gallerist-thumb-item')].indexOf(el)
+      return box((k % 3) * 60, Math.floor(k / 3) * 100 - scrollY, 56, 90)
+    })
+    const items = () =>
+      [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-item')].map((b) =>
+        Number(b.dataset.item?.split('i')[1]),
+      )
+    await scroll(0, 0)
+    // 11 rows of 3 fit: half of 33 (17) + 3 each side of the middle card, kept full at the start
+    expect(items()).toEqual(range(0, 40))
+    await scroll(0, 3000) // rows 30..40 show: the middle row starts at item 105
+    for (let k = 0; k < 6; k++) {
+      rail.dispatchEvent(new Event('scroll')) // the run walks there, keeping the offset
+      await frame()
+    }
+    expect(items()).toContain(105)
+    expect(items()[0]).toBeGreaterThan(0)
+    expect(rail.scrollLeft).toBe(0) // the old axis-from-cards read 'x' here and scrolled sideways
+    // the drawn cards cover the rail from edge to edge: nothing on screen is missing
+    const boxes = [...rail.querySelectorAll('.gallerist-thumb-item')].map((b) =>
+      b.getBoundingClientRect(),
+    )
+    expect(Math.min(...boxes.map((r) => r.top))).toBeLessThanOrEqual(0)
+    expect(Math.max(...boxes.map((r) => r.bottom))).toBeGreaterThanOrEqual(EXTENT)
+  })
+
+  it('index chips on a bottom rail: run along the row and follow its scroll', async () => {
+    const v = createViewer({
+      collection: many(2000, 3),
+      plugins: [thumbnails({ groupDisplay: 'index' })],
+    })
+    mount(v)
+    v.open({ g: 12, i: 0 })
+    layOut('x', (el) => {
+      const k = childIndex(el)
+      return k < 0 ? null : box(k * 100 - scrollX, 0, 90, 60)
+    })
+    await scroll(0, 0)
+    const sections = () => groupsDrawn('.gallerist-thumb-section')
+    expect(sections()).toEqual(range(0, 18))
+    await scroll(1000, 0)
+    expect(sections()).toEqual(range(6, 24))
+    expect(rail.scrollLeft).toBe(400)
+    // the active section is still drawn, with its items
+    const g12 = document.querySelector('.gallerist-thumb-section[data-group="g12"]')
+    expect(g12?.querySelector('.gallerist-thumb-items')).not.toBeNull()
+  })
 })
 
 describe('strip helpers', () => {
@@ -996,18 +1403,61 @@ describe('strip helpers', () => {
     expect(spanAround(2, 4, 3, 3)).toEqual([0, 3])
   })
 
-  it('measureRun reads the axis and the smallest step', () => {
-    expect(measureRun([at(0), at(60), at(200), at(260)])).toEqual({ axis: 'x', stride: 60 })
-    expect(measureRun([at(0, 0), at(0, 70), at(0, 140)])).toEqual({ axis: 'y', stride: 70 })
-    expect(measureRun([at(0), at(0)])).toBeNull() // no layout
-    expect(measureRun([at(0)])).toBeNull()
+  it('measureRun reads the smallest step along the axis, and how many cards share a step', () => {
+    expect(measureRun([at(0), at(60), at(200), at(260)], 'x')).toEqual({ stride: 60, perLine: 1 })
+    expect(measureRun([at(0, 0), at(0, 70), at(0, 140)], 'y')).toEqual({ stride: 70, perLine: 1 })
+    // a flat rail down the side: rows of three across the axis
+    const rows = [0, 1, 2, 3, 4, 5].map((k) => at((k % 3) * 60, Math.floor(k / 3) * 90))
+    expect(measureRun(rows, 'y')).toEqual({ stride: 90, perLine: 3 })
+    expect(measureRun([at(0), at(0)], 'x')).toBeNull() // no layout
+    expect(measureRun([at(0)], 'x')).toBeNull()
   })
 
-  it('middleOf finds the card under the middle of the scroller', () => {
+  it('axisOf reads the way the scroller runs, not the cards', () => {
+    const rail = document.createElement('div')
+    document.body.appendChild(rail)
+    expect(axisOf(rail)).toBe('x')
+    rail.style.flexDirection = 'column'
+    expect(axisOf(rail)).toBe('y')
+    rail.style.flexDirection = ''
+    rail.style.overflowX = 'hidden'
+    rail.style.overflowY = 'auto'
+    expect(axisOf(rail)).toBe('y')
+    // a block / grid box that scrolls both ways: the way its content overflows, else its longer side
+    rail.style.overflowX = 'auto'
+    const box = (sw: number, cw: number, sh: number, ch: number) => {
+      for (const [k, v] of Object.entries({
+        scrollWidth: sw,
+        clientWidth: cw,
+        scrollHeight: sh,
+        clientHeight: ch,
+      }))
+        Object.defineProperty(rail, k, { get: () => v, configurable: true })
+    }
+    box(120, 100, 900, 300)
+    expect(axisOf(rail)).toBe('y')
+    box(900, 300, 120, 100)
+    expect(axisOf(rail)).toBe('x')
+    box(400, 400, 400, 400)
+    expect(axisOf(rail)).toBe('x') // fits, as wide as tall: a row
+    box(80, 80, 400, 400)
+    expect(axisOf(rail)).toBe('y') // fits, taller than wide
+    // a flex row (the theme's bottom rail: overflow-x auto, which makes overflow-y auto too) runs
+    // along x whatever its box
+    rail.style.display = 'flex'
+    box(80, 80, 900, 400)
+    expect(axisOf(rail)).toBe('x')
+  })
+
+  it('middleOf finds the card under the middle of the scroller, in any order', () => {
     const scroller = at(0)
     scroller.getBoundingClientRect = () => ({ left: 0, right: 300, top: 0, bottom: 50 }) as DOMRect
-    expect(middleOf(scroller, [at(0), at(100), at(200)], 'x')).toBe(1) // 100..150 reaches the middle
+    expect(middleOf(scroller, [at(0), at(100), at(200)], 'x')).toBe(1) // 100..150 holds the middle
+    // right to left: the first card is the rightmost
+    expect(middleOf(scroller, [at(250), at(200), at(150), at(100), at(50)], 'x')).toBe(2)
+    // nothing under the middle (a gap, or every card off one side): the nearest centre
     expect(middleOf(scroller, [at(-500)], 'x')).toBe(0)
+    expect(middleOf(scroller, [at(0), at(170), at(400)], 'x')).toBe(1)
   })
 
   it('keepPlace scrolls by however far the reference moved', () => {

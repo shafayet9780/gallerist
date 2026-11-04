@@ -1,38 +1,41 @@
 // Layout presets (M14 UX-E). A preset bundles a coherent set of layout choices — arrow placement,
 // chrome auto-hide, and the thumbnail rail's secondary-axis layout / time-ribbon — behind a single
-// name. Pure resolver (no DOM): the renderer applies `rootAttrs` + `arrows`/`autoHide`, and a host
-// (or the React adapter) spreads `thumbnails` into the thumbnails() plugin.
+// name. Pure resolver (no DOM): the renderer applies `rootAttrs` + `arrows`/`autoHide`, and hands
+// the preset to plugin regions (RegionCtx.preset), so thumbnails() takes `thumbnails` as defaults.
 
 import type { ArrowLayout, GroupAxis, ItemIndicator, RailPlacement } from './mount'
 
 export type PresetName = 'filmstrip' | 'immersive' | 'reviewer' | 'contact' | 'editorial' | 'tour'
 
-export interface ResolvedPreset {
+// A type alias, not an interface, so it is a core `PresetDefaults` (the region context's `preset`).
+// Read-only through and through: the built-in presets are frozen, so a write fails at compile time
+// rather than throwing (strict mode) or being ignored at run time.
+export type ResolvedPreset = {
   /** data-* attributes the renderer sets on the root (drives the theme). */
-  rootAttrs: Record<string, string>
+  readonly rootAttrs: Readonly<Record<string, string>>
   /** default arrow placement (overridable by an explicit mount option). */
-  arrows: ArrowLayout
+  readonly arrows: ArrowLayout
   /** default chrome auto-hide-on-idle (overridable). */
-  autoHide: boolean
+  readonly autoHide: boolean
   /** default thumbnail rail placement (overridable). */
-  rail: RailPlacement
-  /** preferred thumbnails() options for this preset. */
-  thumbnails: {
+  readonly rail: RailPlacement
+  /** thumbnails() defaults: the plugin applies them to the options it wasn't given. */
+  readonly thumbnails: Readonly<{
     itemAxis: 'vertical' | 'horizontal'
     groupDisplay?: 'stacked' | 'flat' | 'index'
     timeline?: boolean
     numberItems?: boolean
-  }
+  }>
   /** turn on the zoom navigator by default (overridable). */
-  navigator?: boolean
+  readonly navigator?: boolean
   /** frame the media (overridable). */
-  frame?: boolean
+  readonly frame?: boolean
   /** default item indicator (overridable). */
-  itemIndicator?: ItemIndicator
+  readonly itemIndicator?: ItemIndicator
   /** which arrow keys and on-screen arrows move between groups, if not the rail's own (overridable). */
-  groupAxis?: GroupAxis
+  readonly groupAxis?: GroupAxis
   /** name the group arrows after the group they go to (overridable). */
-  arrowLabels?: boolean
+  readonly arrowLabels?: boolean
 }
 
 const PRESETS: Record<PresetName, ResolvedPreset> = {
@@ -55,10 +58,11 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     navigator: false,
   },
   // time-series reviewer: a bottom timeline rail (a time over each group, from group.meta.time),
-  // numbered items, a corner arrow cluster and the zoom navigator.
+  // numbered items, the zoom navigator, and no control over the media (review needs every pixel):
+  // docked arrows, the item navigator on the item column or the caption row.
   reviewer: {
     rootAttrs: { 'data-gallerist-preset': 'reviewer' },
-    arrows: 'corner-br',
+    arrows: 'docked',
     autoHide: false,
     rail: 'bottom',
     thumbnails: { itemAxis: 'vertical', timeline: true, numberItems: true },
@@ -99,6 +103,11 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     navigator: false,
   },
 }
+
+// The entries are shared by every mount and handed to plugins (RegionCtx.preset): freeze them, so a
+// plugin writing to one can't change the preset for the next mount.
+for (const p of Object.values(PRESETS))
+  for (const o of [p.rootAttrs, p.thumbnails, p]) Object.freeze(o)
 
 /** Resolve a preset name to its layout config; unknown names warn (dev) and fall back to `filmstrip`. */
 export function resolvePreset(name: string): ResolvedPreset {

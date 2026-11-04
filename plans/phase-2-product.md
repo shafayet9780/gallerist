@@ -41,6 +41,22 @@ and where a canvas and this plan disagree, the plan wins.
 | P2-J | Stories | `mode: 'stories'` in renderer-dom (portrait stage, progress segments, tap zones, auto-advance) plus a story-tray rail. Scheduled after 0.3, with an explicit go/no-go: ReelKit already ships a stories player. |
 | P2-K | Verification | A Playwright layout lint (`e2e/tests/layout.spec.ts`) sweeps configurations × desktop/phone × direction and fails on overlapping chrome, off-screen chrome, a covered stage, small touch targets or a text glyph instead of the shared icons. It measures geometry, so it is deterministic across macOS and Linux CI, unlike screenshot baselines. Skins add their configurations to it, alongside axe and an RTL pass per skin. |
 
+## Decisions from the first integration (Apploye, before publishing 0.3)
+
+| # | Decision | Choice |
+|---|---|---|
+| P2-L | Captions | A caption's design is per viewer, not per item: `Item.caption` is plain text (data stays JSON), and `@gallerist/plugin-captions` (`captions({ render })`) or React's `<Gallerist.Caption>` draws the current item's caption into a renderer `caption` region. Presets keep placing the bar. `render` returning `null` shows the text caption. The caption is the viewer's `aria-describedby`; the navigation announcement stays position + `alt`. |
+| P2-M | React surface | `useCurrentItem()`; `open` takes `{ g, i }` (applied on change, a new position while open moves the cursor); the mount options `label`, `returnFocus`, `preload`, `adapters` are props; the ref is the `ViewerApi`. React 18+ stays the floor. |
+| P2-N | Plugin escape hatches | Pins: `renderCard` returning `null` keeps the default card, which is exported (`defaultPinCard`). Download: `downloadUrl(item)` (full-resolution file, `null` = not downloadable); no safe URL marks the button unavailable per item; `client-zip` is a regular dependency. |
+| P2-O | Escape | Closes from anywhere (I-UX2), except when a handler before the viewer's called `preventDefault()`, so a host form can keep it. |
+| P2-P | Published output | Source maps carry their sources; `check:dist` packs every package and rejects a leftover `workspace:` range. Every skin's backdrop is opaque. |
+| P2-Q | Presets configure the rail (owner) | The renderer hands the resolved preset to plugin regions (`RegionCtx.preset`, typed in core as a generic `PresetDefaults` map so core stays renderer-agnostic); `thumbnails()` takes its `thumbnails` entry for each option it wasn't given, explicit options win per key. Presets stay layout-only (P2-A). The rail settles its options when its region mounts, and is rebuilt when a new mount brings another context. The preset's `itemAxis`, `numberItems` and `timeline` belong to its own group display: an explicit `groupDisplay` other than the preset's starts from the plugin's defaults for those. The built-in presets are frozen. |
+| P2-R | Size budget (owner, 2026-11-03) | core + renderer-dom 16 → 16.5 KB gz, for one change: a caption renderer's band that overflows is keyboard-scrollable (`tabindex="0"` and a name only while it overflows; axe `scrollable-region-focusable`). It didn't fit the old limit (15,952 B before it). The headroom is for that fix, not for new features. |
+| P2-S | Reviewer controls off the media (owner, 2026-11-03) | In `reviewer` no control covers the media, corners included (a screenshot's taskbar clock sits bottom-right). A preset layout, not a reviewer special case: a new arrow layout `arrows: 'docked'` (renderer option + theme CSS). Group arrows in gutters the stage leaves beside it (none on touch); the item navigator (`n / N` over ↑ ↓) is a grid item of the root, the aside item column's header while that shows, else the end of the caption row (coexisting with a text or designed caption). `reviewer` switches from `corner-br`; other presets keep their placement. Fits the 16.5 KB budget (+29 B). The one intended exception: the zoom minimap (`.gallerist-navigator`) stays in the stage's corner over the zoomed media; it shows only while zoomed and is the zoom tool itself (owner, 2026-11-03). Review fixes: one group drops the group arrows and their gutters (`data-gallerist-one-group`); `linear` keeps no navigator room; the docked box takes the skin's panel radius at most (no stadium in `gallery`); the caption precedes the navigator in DOM (tab order matches the caption row); `editorial` without a placard ends its caption column with the navigator, `immersive` puts it in the stage's bottom inline-end corner (over the media there, as immersive's bands are). +15 B (16,241). |
+| P2-T | Pin cards follow the host (owner, 2026-11-03) | A card holds its contents only while open: `renderCard` runs on open and on redraw, and `onCardRemove(pin, node)` hands each returned node back exactly once (close, redraw, item change, pin gone, destroy) so hosts can unmount portals/roots. Focus leaving a card goes to its pin, else the add-pin button, else the viewer, never `<body>`. `open(id, { focus })`; `onOpenChange` context carries `previous` (`PinOpenChange`). |
+
+Backlog for 0.4 from the same pass: per-item `zoomable: false`, and a built-in pins compose UI.
+
 ## Architecture changes in the code
 
 - **Chrome regions.** One top bar region in fixed order: counter → title/caption → tools → close.
@@ -96,6 +112,8 @@ first publish from waiting on Atlas and the review plugins.
 
 - Core stays ≤ 12 KB gz (today 3.1 KB); renderer growth for peek, navigator, labels, indicator
   variants ≤ +2.5 KB gz (core + renderer ≤ 16 KB, today 12.8 KB).
+- Raised 2026-11-03 (owner, P2-R): core + renderer ≤ **16.5 KB** gz, for the keyboard-scrollable
+  caption band only (the a11y fix didn't fit at 15,952 B against 16,000 B). Not headroom for features.
 - Each skin CSS ≤ 6 KB gz; `base.css` ≤ 10 KB gz.
 - Each new plugin gets its own size-limit entry (pins ≤ 4 KB, atlas ≤ 5 KB).
 
@@ -113,6 +131,7 @@ first publish from waiting on Atlas and the review plugins.
 
 ## Still deferred from step 1
 
-A `RegionCtx` root handle for plugins, exporting gestures and overlay painting for custom renderers,
+A `RegionCtx` root handle for plugins (P2-Q added `preset` only; the rail still finds the root
+from its own node), exporting gestures and overlay painting for custom renderers,
 and holding navigation during open/close transitions. Revisit in M15 (the region work touches the
 first) or after 0.3.

@@ -5,9 +5,10 @@ import {
   type OverlaySpec,
   createViewer,
 } from '@gallerist/core'
+import { captions } from '@gallerist/plugin-captions'
 import { type Pin, pins } from '@gallerist/plugin-pins'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
-import { mount, resolvePreset } from '@gallerist/renderer-dom'
+import { mount } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
 
@@ -101,11 +102,30 @@ const commentPins = pins({
     commentPins.open(id)
   },
 })
+// The caption bar, designed once for the viewer: the capture time, which monitor, and the activity
+// (item data keeps only facts; plugin-captions turns them into markup for the current screen).
+const screenCaption = captions<{ time: string }, { activity: number }>({
+  render: (item, group, { cursor }) => {
+    const el = document.createElement('div')
+    el.style.cssText = 'display:flex;gap:12px;align-items:baseline'
+    const at = document.createElement('strong')
+    at.textContent = group.meta?.time ?? ''
+    const where = document.createElement('span')
+    where.textContent = `Monitor ${cursor.i + 1} of ${group.items.length}`
+    const activity = item.meta?.activity ?? 0
+    const level = document.createElement('span')
+    level.textContent = `${activity}% active`
+    level.style.color = activityColor(activity)
+    el.append(at, where, level)
+    return el
+  },
+})
 const viewer = createViewer({
   collection,
   loop: true,
   itemMemory: 'preserve',
-  plugins: [thumbnails(resolvePreset('reviewer').thumbnails), commentPins],
+  // the reviewer preset sets the rail: a timeline over the groups, numbered items
+  plugins: [thumbnails(), commentPins, screenCaption],
 })
 mount(viewer, { skin: 'console', preset: 'reviewer' })
 

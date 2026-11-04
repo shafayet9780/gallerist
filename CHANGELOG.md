@@ -2,6 +2,104 @@
 
 ## v0.3.0
 
+### Reviewer controls and pin cards (from the Apploye reviewer)
+- **renderer-dom, theme (breaking for `reviewer`)**: a new arrow layout, `arrows: 'docked'`, puts no
+  control over the media. The group arrows sit in gutters the stage leaves at its sides (none on
+  touch, where swipes stand in for them), and the item navigator leaves the stage: the `n / N` count
+  over ↑ ↓, as a header on the aside item column while that shows, otherwise at the end of the caption
+  row, which makes room for it beside a text caption or a designed one. It keeps its room on a
+  one-item group while any group has several items, so the stage holds still. The `reviewer` preset
+  uses it instead of `corner-br`, whose cluster covered the screenshot's bottom-right corner (where a
+  taskbar clock is) and, on a phone turned sideways, ~40% of the stage. On desktop the stage is
+  narrower by the gutters; a panorama no longer runs under the arrows. Other presets are unchanged.
+- **plugin-pins**: `onCardRemove(pin, node)` hands back each node `renderCard` returned once it has
+  left its card (the card closed, moved to another item, was redrawn, its pin left the data, the
+  plugin or viewer was destroyed), exactly once per node and never for default cards, so a host can
+  unmount a React portal or root. The README has a portal example.
+- **plugin-pins (changed)**: a card holds its contents only while open: `renderCard` runs when the
+  card opens and again when an open card is redrawn, not for every pin of every painted slide.
+- **plugin-pins**: `open(id, { focus: true })` moves focus into the card (once its pin is painted),
+  `open(null, { focus: true })` to the pin. `onOpenChange(pin, ctx)` gets `ctx.previous`, the pin
+  whose card was open until then (the one that closed); the context type is `PinOpenChange`.
+- **plugin-pins (fixed)**: focus inside a card that closes or is redrawn goes to its pin when that is
+  still on the current item, else the add-pin button, else the viewer, never `<body>` (the next Escape
+  closed the whole viewer). Only the close button and Escape did this before.
+- **plugin-pins (fixed)**: a pin opens on the current item only (a neighbour's slide can carry the
+  same id), painting a neighbour's slide no longer closes the open card, and a closed overlay
+  viewer's pins still open after it reopens.
+- **plugin-pins (changed)**: `onCardRemove` and `onOpenChange` run once the change has settled, in
+  order, also when one calls back into the plugin: `open(B)` from `onCardRemove` now reports B's
+  opening after the change that led to it, so the last event names the open pin. A callback that
+  throws is reported (`reportError`, else `console.error`, like core's event handlers) and the rest
+  still run; before, it propagated to whatever opened or closed the card.
+- **plugin-pins (fixed)**: a `renderCard` that throws gets the default card for that pin and the
+  error is reported, instead of leaving the plugin half-switched (the old card's node never handed
+  back, the new card open with only a close button, no `onOpenChange`). Returning the same node
+  again (one cached per pin) is supported: a redraw that gets it back no longer hands the live node
+  to `onCardRemove`.
+- **plugin-pins (fixed)**: a repaint's deferred reopen no longer reopens a card closed in the same
+  task, or adds listeners after the plugin was destroyed; `destroy()` forgets the viewer root, so the
+  same instance in a new viewer listens on the new one. `open(id, { focus: true })` for a pin not
+  painted yet leaves focus alone if the user moved it meanwhile. In an inline viewer, focus on
+  `<body>` is no longer pulled into the viewer when the host changes the item while a card is open
+  (only focus that was in the card, or anywhere in an open overlay viewer, is rescued). One `pins()`
+  per viewer is documented.
+- **plugin-pins (fixed)**: a card stays inside the stage on both axes. It was only sized across, so on
+  a landscape phone (a 159px stage, a 194px host card) it ran past the stage's bottom or opened up
+  under the toolbar, out of reach. It now opens level with its pin, slides along it to fit, is never
+  taller than the room (the stage less any band floated over it), and scrolls past that, joining the
+  tab order so the keys scroll it (↑ ↓ Home End Page Up/Down on the focused card don't navigate), with
+  its close button held in view. Across, it is never wider than the room and slides along over its
+  pin when the room beside it is narrow (with less than ~130px its close button was clipped), and it
+  never opens under the docked item navigator (immersive floats that over the stage). It is placed
+  again after a zoom or pan and, a frame later (no ResizeObserver loop error), as a host's contents
+  resize. A wheel over a card that scrolls scrolls it; over a short card, or a pinch (ctrl+wheel)
+  over any card, it zooms the image as elsewhere on the stage (a card swallowed every wheel, so a
+  pinch over one zoomed the page in Chromium). A touch in a card no longer pans or pinch-zooms the
+  page: a card is a scroll container, which the stage's `touch-action: none` doesn't reach into, so
+  it sets its own (`none`; `pan-y` while it scrolls).
+- **plugin-pins (fixed)**: when the host drops a pin as its card closes (an empty draft, removed in
+  `onOpenChange` with `refresh()`), the repaint a frame later took the pin focus had gone to and left
+  focus on `<body>`. A repaint that drops the focused pin now moves focus on to its marker if it is
+  back, else the add-pin button, else the viewer.
+- **plugin-pins**: focus the plugin moves shows the focus ring when the input that led to it was a key
+  (Escape, Enter on ×) and not after a pointer (`focusVisible: true` / `false`, from the last
+  keydown or pointerdown; it isn't inferred from the element focus leaves, as a text field always
+  matches `:focus-visible`).
+- **plugin-pins (fixed)**: `open()` from a callback run by `destroy()` (say `onCardRemove`) opens
+  nothing. It left a document listener attached past destroy, and a plugin moved to a new viewer
+  opened that card on the first paint. An `open(id)` before the plugin first joins a viewer still
+  waits and opens that card on the first paint, and a click before then (say the one that creates
+  the viewer, or reopens a closed overlay viewer) no longer cancels it.
+- **theme (fixed)**: an open card with no contents (a pin with nothing to show, a host card filled
+  later) or only a few pixels of them is tall enough for its close button (`min-height: 46px`), so it
+  doesn't scroll. The button overflowed it, and the scroll fade then flipped the card in and out of
+  scrolling every frame: the fade flickered and the card dropped in and out of the tab order.
+- **plugin-pins, theme (fixed)**: a card lays out its contents in normal block flow again. As a flex
+  column it stacked a host fragment's inline siblings, stretched its buttons, links and inputs to
+  the card's width and stopped paragraph margins collapsing. The close button is now first in the
+  card (so reading and tab order match what is drawn), sticky at its top inline-end corner, taking
+  no room, and above positioned host contents (as is the scroll fade). No card scrolls sideways any
+  more (Chromium counted the close button 4px past the content box: a classic scrollbar showed).
+- **plugin-pins (fixed)**: a wheel over a host's textarea or list that scrolls, in a card that
+  doesn't, zoomed the image instead of scrolling it (the stage cancels the wheel): a card keeps a
+  wheel when anything from the target up to the card scrolls on the wheel's axis, also inside a web
+  component's open shadow root (an `<sl-textarea>`: the walk follows the composed path). A pinch there
+  still zooms the image. A host's textarea or select pans vertically on touch rather than letting a
+  pinch zoom the page. A card that shrinks to within the fade's 12px of the room stops scrolling.
+- **plugin-pins**: the focus ring's input tracking leaves keydowns with meta, ctrl or alt held (a
+  shortcut, or ctrl held for a pinch) out of it, so a host shortcut (Ctrl+K → `open(id, { focus:
+  true })`) rings after a key and not after a pointer, and counts a click without a pointer
+  (assistive tech) as a key.
+  No frame is scheduled for a zoom with no card open, and `destroy()` cancels a pending one; with no
+  free width at all a card is 0px wide, not a negative `max-width`.
+- **renderer-dom, theme (fixed, docked)**: review fixes for `arrows: 'docked'`: the caption comes
+  before the navigator in DOM and tab order; placements for immersive and editorial; a box radius;
+  aside header room only with several items and not linear; the overview (`grid({ layout:
+  'sections' })`) hides the navigator too; and a new root attribute, `data-gallerist-one-group`,
+  drops the group arrows and their gutters on a one-group collection (not in linear mode), handing a
+  focused arrow's focus to the viewer.
+
 ### Performance (U17)
 Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-based regression gate.
 - **plugin-thumbnails**: a step writes the active state of the two thumbs that changed, not of every
@@ -15,18 +113,155 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   elements and blocked the main thread for 662 ms on open; now 221 and no long task. A move inside the
   open cells moves the selection instead of redrawing them (20,003 elements recreated per step at one
   10k-item group, now 1).
-- **renderer-dom**: the images one step away within the current group are fetched ahead (`preload`
-  ahead/behind), as the spec always said; the slide window already covered neighbouring groups.
+- **renderer-dom**: the images `preload.ahead` / `preload.behind` steps away within the current group
+  (default 2 ahead, 1 behind) are fetched ahead, as the spec always said; the slide window already
+  covered neighbouring groups. They start once the current item's media is ready, at low fetch
+  priority, are cancelled when a move leaves them behind or the viewer is destroyed, and cover only
+  items the built-in image adapter would mount (a custom adapter loads its own).
+- **plugin-grid**: the drawn run starts on a row, and scrolling up draws whole rows above it, so the
+  cells on screen keep their columns (a run of 40 into a grid of 3 or 7 columns shifted every
+  visible cell sideways); the same in the `sections` overview.
 - **theme**: each thumb in the vertical item stack contains its own layout and paint, so scrolling a
   long stack doesn't make WebKit revisit every item: an item step in a 10k-item group with the Console
   skin took ~660 ms there; now ~65 ms.
 
 ### Fixed
+- **theme**: a focused pin's ring could vanish on the image under it (Console's near-white ring on a
+  light screenshot measured 1.08:1). The ring over media is now banded whatever the skin, scheme or
+  accent (technique C40): 3px of a new `--gallerist-focus-halo` token (black) and 3px of white around
+  the pin, then the focus colour. Black and white are 21:1 apart, so one of them reaches 3:1 (at least
+  4.58:1) against any media; measured on Chromium and WebKit, the weakest case is 5.32:1 on mid-grey
+  (`#808080`), 21:1 on white and black. A first version banded the focus colour with the skin's
+  ground, which left mid-grey media under 3:1 in Gallery light and Console light (about 5.9:1 apart).
+  An override of `--gallerist-focus-halo` must be opaque and keep 9:1 against white. A scrolling pin
+  card's ring, which also falls on the image, gets the same bands. In forced colours the ring keeps
+  its outline (the bands are box-shadows, which forced colours drop). Chrome on the viewer's own
+  background is unchanged. (WCAG 2.2: contrast is 1.4.11 Non-text Contrast, and 2.4.13 Focus
+  Appearance at AAA; the 81b8d66 commit message cites 2.4.11, which is Focus Not Obscured.)
+- **theme**: a pin card that scrolls now shows that there's more below (a touch screen has no
+  scrollbar): its contents fade out at its bottom edge until the end of the scroll, where the fade
+  rests below the last control (it never takes a tap). A control focused near the bottom scrolls
+  clear of the fade (`scroll-padding`). Not drawn in forced colours.
+- **renderer-dom**: a focused caption band that stops scrolling (a shorter caption after ←/→, a taller
+  viewport, the captions plugin removed) hands focus back to the viewer instead of dropping it to
+  `<body>`, and ↑/↓/Home/End aimed at a band that no longer scrolls navigate again. A sub-pixel overflow
+  doesn't count as scrolling. The theme rings a focused band (`--gallerist-focus`, inset).
+- **renderer-dom**: ↑/↓/Home/End on a focused caption band scroll it by the renderer's hand (a 40px
+  line, or to the top or bottom) instead of being left to the browser: WebKit on Linux didn't scroll
+  the editorial placard's band at all. The step is immediate, not smooth.
+- **plugin-download**: whether a URL is cross-origin is judged the way the link resolves it (against
+  `document.baseURI`, so a `<base href>` counts) and against the document's origin: in an
+  `about:srcdoc` frame a relative URL no longer throws (no download, an unhandled rejection), and a
+  relative URL that a `<base>` sends to another origin opens in a new tab instead of navigating the
+  host page away.
+- **renderer-dom, plugin-thumbnails, plugin-grid**: a group caption that isn't a string counts as
+  none (the group title, arrow labels, index rows, overview sections), as item captions already did.
+- **plugin-thumbnails**: in a `flat` rail, item thumbs give their place within their group
+  (`aria-posinset` / `aria-setsize`), like the item column, not in the whole flattened list ("Item 2,
+  57 of 10000" inside "Group 29"). A block or grid rail that scrolls both ways takes its axis from
+  the way its content overflows (else its longer side).
+- **plugin-grid**: a run drawn before the grid had a layout (its columns unknown) is realigned to a
+  row on the first scroll check, so growing it upward no longer shifts every cell sideways once.
+- **renderer-dom**: `ResolvedPreset` is typed read-only (and its `rootAttrs` / `thumbnails`), matching
+  the frozen built-in presets.
+- **plugin-thumbnails**: mounting a viewer again with another preset (`h = mount(v, { preset:
+  'reviewer' }); h.destroy(); mount(v, { preset: 'editorial' })`, or none, then `tour`) kept the first
+  mount's rail (its timeline and aside stack under the new layout); the rail is rebuilt for each mount.
+- **plugin-thumbnails**: `thumbnails({ groupDisplay: 'stacked' })` under `tour` no longer inherits the
+  index's horizontal item row and numbering: an explicit `groupDisplay` other than the preset's starts
+  from the plugin's own `itemAxis`, `numberItems` and `timeline`. Unknown `groupDisplay` / `itemAxis`
+  values (from a renderer's preset or untyped options) fall back to the defaults, and a preset that
+  makes the rail `flat` leaves the claimed items toggle and `e` key inert.
+- **renderer-dom**: the built-in presets are frozen, so a plugin writing to `ctx.preset` can't change
+  the preset for the next mount; `RegionCtx` fields are `readonly`.
+- **renderer-dom**: a caption renderer's band that overflows (a long `plugin-captions` /
+  `<Gallerist.Caption>` caption, in the band or the editorial placard) can be scrolled by keyboard: while
+  it overflows it is focusable (`tabindex="0"`), a `region` named by `strings.caption` ("Caption"), and
+  ↑/↓/Home/End scroll it instead of moving the viewer. A band that fits stays out of the tab order.
+- **plugin-grid**: each group's `listbox` in the `cells` layout is named after its header.
+- **plugin-pins, plugin-download**: relative URLs are judged against a fixed http base rather than the
+  page's own URL, so they keep their link / download on `file:`, app-scheme (`capacitor:`) and
+  `about:srcdoc` pages (resolving against `about:srcdoc` threw). Pins also link `tel:` URLs. Both use
+  one check (`safeUrl` in `@gallerist/core/internal`) with their own scheme lists.
+- **plugin-thumbnails**: a right-to-left rail follows its scroll; it read the first card (the
+  rightmost) as the one in the middle and folded the drawn run back to the start, leaving what showed
+  empty. The rail reads which way it runs from its scroller rather than from two cards, so a `flat`
+  rail on a side rail (cards side by side in a vertical rail) measures down the rail and no longer
+  scrolls sideways; a line holding several cards counts them all.
+- **plugin-thumbnails**: a numeric `overscan` below half the cards that fit is raised to that, so the
+  rail never draws with gaps.
+- **plugin-thumbnails, plugin-grid**: focus on a thumb or cell that a redraw takes away (new data via
+  `setCollection`, a jump past the drawn run, the item column rebuilt for a new group) moves to the
+  grid's new current cell or to the viewer, not to `<body>` where the keys don't reach.
+- **plugin-thumbnails, plugin-grid**: the drawn cards, item thumbs and cells carry `aria-setsize` /
+  `aria-posinset`, so a screen reader gives each its place in the whole list, not in the drawn part.
+- **plugin-pins**: a form in a pin card can keep Escape with `preventDefault()`, as GETTING-STARTED
+  says; the card used to close first. Otherwise Escape inside the card closes the card (focus back on
+  its pin) and leaves the viewer open.
+- **renderer-dom, plugin-captions, react**: a caption that isn't a string (an old `OverlaySpec`
+  caption in untyped JSON or CDN data) counts as none: no "[object Object]" in the caption bar, no
+  object handed to the host, no React error from `<Gallerist.Caption>`.
+- **renderer-dom**: the viewer is described by its caption (`aria-describedby`) only while the caption
+  bar shows, so hidden text isn't read out.
+- **plugin-captions, react**: the item's text caption, shown when `render` / `<Gallerist.Caption>`
+  returns nothing, sits in a `span.gallerist-caption-text`, so it keeps the theme's caption font.
+  `<Gallerist.Caption>` treats `true` / `false` like `null`.
+- **plugin-download**: a cross-origin `downloadUrl` opens in a new tab (`target="_blank"`,
+  `rel="noopener"`; browsers ignore `download` there) instead of navigating the host page away, and
+  `downloadUrl(item)` is called once per click.
+- **build**: `pnpm check:dist` also fails when a packed package lacks a file its `package.json`
+  points at (`main`, `types`, every `exports` target, the theme's CSS, the CDN build), skips folders in
+  `packages/` without a `package.json`, and runs in the release workflow before publishing.
 - **plugin-thumbnails, plugin-grid**: moving the cursor no longer scrolls the page around an inline
   viewer; only the viewer's own panels scroll.
 - **plugin-thumbnails**: a viewer opening on a far group now scrolls the rail to it.
+- **theme**: every skin's backdrop is opaque (Gallery and Console were 98%, Editorial 99%), so the
+  host page no longer shows through on phones, in light and dark schemes. Drag-to-dismiss still fades
+  it to show the page.
+- **theme**: a caption renderer's content taller than a placard (editorial) scrolls inside the placard;
+  it was cut off. The placard keeps its slot, so the stage still doesn't move.
+- **theme**: a caption renderer's band stops growing where the stage would drop below 36% of the
+  viewer (a tall rail and bar on a phone, or the reviewer's timeline), and scrolls from there; it
+  used to take its full 40vh and leave the stage as little as 28%.
+- **plugin-pins**: the default card links only to `http:`, `https:`, `mailto:`, `tel:` and relative URLs; a
+  pin whose `href` is `javascript:`, `data:` or any other scheme gets no link (pin data can come from
+  users).
+- **plugin-download**: an item with nothing safe to save (no URL, or a `data:`, `javascript:` or
+  `file:` one) marks the button unavailable (`aria-disabled`, dimmed; it stays focusable) instead of a
+  click that does nothing, per item as you navigate. `client-zip` is a regular dependency (`^2.5.0`),
+  so an install without optional dependencies can't break a bundler on zip mode's `import()`.
+- **build**: source maps carry their sources (`sourcesContent`) in every package, since `src/` isn't
+  published; they pointed nowhere before. `pnpm check:dist` packs every package and fails on a leftover `workspace:`
+  range.
 
 ### Added
+- **renderer-dom, plugin-thumbnails**: presets configure the rail. `thumbnails()` takes the mounted
+  preset's `thumbnails` options for each option it wasn't given, and an explicit one wins, key by key:
+  `preset: 'reviewer'` alone now gives the timeline and numbered items, `tour` the section index,
+  `editorial` the numbered item row; React's `preset` prop too. No more
+  `thumbnails(resolvePreset(name).thumbnails)`. The rail settles its options when its region mounts,
+  so a `viewer.use(thumbnails())` after `mount()` follows the preset as well.
+- **core**: `RegionCtx.preset` (`PresetDefaults`), the renderer's mounted preset as defaults for
+  plugins, keyed by what they configure; core stays renderer-agnostic. The DOM renderer passes its
+  `ResolvedPreset` (now a type alias, so it fits).
+- **plugin-captions** (new): designed captions, one `render(item, group, ctx)` per viewer, drawn into
+  the renderer's new `caption` region (the caption bar, the editorial placard, wherever the preset puts
+  it). A string is set as text; `null` shows the item's text caption. Re-renders on navigation and
+  collection changes, not on zoom; `refresh()`; cleans up on removal. In the CDN global as `captions`.
+- **renderer-dom**: the caption is the viewer's accessible description (`aria-describedby`); the
+  navigation announcement stays position + `alt`.
+- **react**: `<Gallerist.Caption>{({ item, group, cursor }) => …}</Gallerist.Caption>` (a portal into
+  the caption region), `useCurrentItem()` → `{ item, group, cursor }`, `open={{ g, i }}` to open at a
+  position (a new position while open moves the cursor), and the mount options `label`,
+  `returnFocus`, `preload` and `adapters`, which were dropped before.
+- **plugin-pins**: `renderCard` returning `null` keeps the default card for that pin; the default card
+  is exported as `defaultPinCard(pin, { presentation, strings })`.
+- **plugin-download**: `downloadUrl(item)`, the file to save (e.g. the full-resolution original), or
+  `null` for an item that can't be downloaded; zip mode honours it too.
+- **renderer-dom**: Escape still closes from anywhere, including a text field, but not when a handler
+  before the viewer's called `preventDefault()` on it, so a host form can keep Escape.
+- **docs**: real READMEs for plugin-download and plugin-fullscreen; the React README documents the
+  imperative ref, `open` positions, captions and hooks.
 - **renderer-dom (M21)**: `bind()` and `collectionFromLinks()`: open a viewer from `data-gallerist`
   links, with groups, captions and thumbnails read from attributes; links added later join in.
 - **cdn (M21)**: `@gallerist/cdn`, a one-file UMD build on a global `Gallerist`, for pages with no
@@ -46,8 +281,24 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **examples/tour**: a listing page using all of the above.
 
 ### Breaking
+- **plugin-thumbnails**: under a preset, an option left unset follows the preset, so a bare
+  `thumbnails()` changes with it: `preset: 'reviewer'` now draws the timeline and numbered items it
+  used to need spelling out; `tour` turns the rail into the section index (`groupDisplay: 'index'`,
+  numbered items); `editorial` moves the item stack out of the aside column into a numbered row in the
+  rail (`itemAxis: 'horizontal'`, `numberItems: true`). Pass the option (e.g. `timeline: false`,
+  `groupDisplay: 'stacked'`) to keep the old rail. An explicit `groupDisplay` other than the preset's
+  also drops its `itemAxis`, `numberItems` and `timeline`, which belong to the preset's own display.
+- **plugin-thumbnails**: the rail's DOM is no longer created in `init()`, only when its region mounts
+  (`mount()`, or a `viewer.use()` after it), so a viewer that is never mounted creates none. A new
+  mount after the previous one was destroyed builds the rail again, with that mount's preset.
+- **core**: `Item.caption` is plain text (`string`); it no longer accepts an `OverlaySpec`, which the
+  DOM renderer never drew. Designed captions come from `@gallerist/plugin-captions` or
+  `<Gallerist.Caption>`, so item data stays JSON.
 - **plugin-thumbnails**: `overscan` is unset by default (the rail measures itself; it was 24) and
-  counts cards on each side of the middle of the rail rather than of the cursor.
+  counts cards on each side of the card in the middle of the rail rather than of the cursor. A jump
+  past the drawn run first draws around the new current card (wide enough for it to land at either
+  edge of the rail), and the scroll that reveals it trims the run back to the middle. A number below
+  half the cards that fit is raised to that.
 - **plugin-grid**: `overscan` counts cells (default 40) or sections (default 4) on each side of the
   current one, drawn when the grid opens; it used to count groups (default 12) and, for `sections`,
   bound the overview, which otherwise drew every group.

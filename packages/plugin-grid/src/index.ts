@@ -147,6 +147,11 @@ export function grid(opts: GridOptions = {}): Plugin {
       else cell.removeAttribute('data-active')
     }
 
+    // Focus inside the grid would drop to <body> as its element goes, where the viewer's keys don't
+    // reach: hand it to `to` (a cell drawn in its place) or the viewer.
+    const rescue = (to?: HTMLElement | null) =>
+      (to ?? root?.closest<HTMLElement>('.gallerist'))?.focus({ preventScroll: true })
+
     // bring `el` into the grid's view, without touching the page (scrollIntoView would scroll an
     // inline viewer's host page too)
     const reveal = (el: HTMLElement | null | undefined) => {
@@ -183,7 +188,7 @@ export function grid(opts: GridOptions = {}): Plugin {
     }
 
     const buildSection = (group: Group, g: number, cur: Cursor): HTMLElement => {
-      const name = group.caption ?? t.group(g + 1)
+      const name = typeof group.caption === 'string' ? group.caption : t.group(g + 1)
       const section = document.createElement('section')
       section.className = 'gallerist-grid-section'
       section.setAttribute('aria-label', name)
@@ -238,6 +243,7 @@ export function grid(opts: GridOptions = {}): Plugin {
         const cells = document.createElement('div')
         cells.className = 'gallerist-grid-cells'
         cells.setAttribute('role', 'listbox')
+        cells.setAttribute('aria-label', header.textContent) // named after its group's header
         root.insertBefore(header, atStart ? head.nextSibling : tail)
         root.insertBefore(cells, header.nextSibling)
         block = { header, cells }
@@ -251,25 +257,47 @@ export function grid(opts: GridOptions = {}): Plugin {
         block.header.textContent ?? '',
         cur,
       )
+      // only a window of the group's options is in the listbox: say where this one sits
+      cell.setAttribute('aria-setsize', String(group.items.length))
+      cell.setAttribute('aria-posinset', String(u - (offsets[g] ?? 0) + 1))
       if (atStart) block.cells.prepend(cell)
       else block.cells.append(cell)
       drawn.set(u, cell)
     }
 
-    // Draw `span` more units past either end of the run; false when there are none. Units added
-    // above what's on screen would push it down: the scroll offset follows.
-    const extend = (atStart: boolean): boolean => {
+    // The unit at or before `u` that starts a row of the grid it goes in (a group's cells, or the
+    // sections). The run starts on one, and grows at the start by whole rows, so what's drawn keeps
+    // its column instead of reflowing sideways. The resolved `grid-template-columns` lists one size
+    // per column; an unrendered grid gives back its `repeat(…)`: taken as 1, realigned next time.
+    const rowStart = (u: number): number => {
+      const el = sections ? box : drawn.get(first)?.parentElement
+      const tracks = (el && getComputedStyle(el).gridTemplateColumns) || 'none'
+      const cols = tracks === 'none' || tracks.includes('(') ? 1 : tracks.trim().split(/\s+/).length
+      const start = sections ? 0 : (offsets[groupAt(offsets, u)] ?? 0)
+      return u - ((u - start) % cols)
+    }
+
+    const drawBefore = (col: Collection, to: number, cur: Cursor) => {
+      for (let u = first - 1; u >= to; u--) drawUnit(col, u, true, cur)
+      first = to
+    }
+
+    // Draw `by` more units past either end of the run; false when there are none. Units added
+    // above what's on screen would push it down: the scroll offset follows. `by` 0 at the start
+    // only realigns the run to a row (drawn before layout, the columns weren't known).
+    const extend = (atStart: boolean, by = span): boolean => {
       const col = viewer.getCollection()
       if (!root || !open || col !== lastCol) return false
-      const to = atStart ? Math.max(0, first - span) : Math.min(unitCount(col) - 1, last + span)
+      const to = atStart
+        ? rowStart(Math.max(0, first - by))
+        : Math.min(unitCount(col) - 1, last + by)
       if (to === (atStart ? first : last)) return false
       const cur = viewer.getState().cursor
       if (atStart) {
         const ref = drawn.get(first)
         const top = ref?.getBoundingClientRect().top ?? 0
-        for (let u = first - 1; u >= to; u--) drawUnit(col, u, true, cur)
+        drawBefore(col, to, cur)
         if (ref) root.scrollTop += ref.getBoundingClientRect().top - top
-        first = to
       } else {
         for (let u = last + 1; u <= to; u++) drawUnit(col, u, false, cur)
         last = to
@@ -292,6 +320,7 @@ export function grid(opts: GridOptions = {}): Plugin {
     // draw the run around the cursor, from scratch
     const draw = (col: Collection, cur: Cursor) => {
       if (!root) return
+      const focused = root.contains(document.activeElement)
       clear()
       head = document.createElement('div')
       tail = document.createElement('div')
@@ -317,6 +346,8 @@ export function grid(opts: GridOptions = {}): Plugin {
       }
       ;[first, last] = spanAround(unitOf(cur), unitCount(col), span)
       for (let u = first; u <= last; u++) drawUnit(col, u, false, cur)
+      drawBefore(col, rowStart(first), cur) // start on a row: each cell in its own column
+      if (focused) rescue(activeCell)
       edges?.observe(head)
       edges?.observe(tail)
       // a redraw starts at the top: bring the current section or cell back into view
@@ -345,16 +376,14 @@ export function grid(opts: GridOptions = {}): Plugin {
 
     const setOpen = (v: boolean) => {
       // hiding the focused control would drop focus to <body>, where the viewer's keys don't reach
-      if (!v && root?.contains(document.activeElement)) {
-        root.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
-      }
-      // an overview hides the stage's controls (theme): same rescue for a control focused there
+      if (!v && root?.contains(document.activeElement)) rescue()
+      // an overview hides the stage's controls, caption and a docked item navigator (theme): same
+      // rescue for a control focused there
       if (v && sections) {
         const active = document.activeElement
         if (root?.closest('.gallerist')?.contains(active)) {
-          if (active?.closest('.gallerist-controls, .gallerist-caption')) {
-            root.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
-          }
+          if (active?.closest('.gallerist-controls, .gallerist-caption, .gallerist-itemnav'))
+            rescue()
         }
       }
       open = v
@@ -382,6 +411,8 @@ export function grid(opts: GridOptions = {}): Plugin {
         if (typeof IntersectionObserver !== 'undefined') {
           edges = new IntersectionObserver(
             (entries) => {
+              // laid out by now: a run drawn before its columns resolved starts on a row again
+              extend(true, 0)
               for (const e of entries) {
                 // still near after drawing more: observing again reports it again
                 if (e.isIntersecting && extend(e.target === head)) {

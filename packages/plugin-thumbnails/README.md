@@ -62,7 +62,7 @@ thumbnails({
 
 | Option         | Type                         | Default     | Notes |
 |----------------|------------------------------|-------------|-------|
-| `overscan`     | `number`                     | measured    | Cards drawn each side of the middle of the rail; scrolling draws the ones it reaches. By default what fits plus 3 each side (8 each side before the rail has a layout). Group cards in `stacked`/`index`, item cards in `flat`. |
+| `overscan`     | `number`                     | measured    | Cards drawn each side of the card in the middle of the rail; scrolling draws the ones it reaches. A jump past the drawn run first draws around the new current card, then the scroll that reveals it trims the run back to the middle. By default what fits plus 3 each side (8 each side before the rail has a layout); a number below half of what fits is raised to it. Group cards in `stacked`/`index`, item cards in `flat`. |
 | `itemAxis`     | `'vertical' \| 'horizontal'` | `'vertical'`| `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. Ignored in `flat`. |
 | `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, bracketed per group. |
 | `expandActive` | `boolean`                    | `true`      | `stacked` and `index`. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |
@@ -70,8 +70,14 @@ thumbnails({
 | `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 
-Presets configure these for you — see [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md). The rail's **position**
-(bottom/top/hidden) is a renderer option (`rail`), not a thumbnails option.
+Presets configure these for you: with `mount(viewer, { preset })` (or React's `preset` prop) every
+option you leave unset takes the preset's value, so `thumbnails()` under `preset: 'reviewer'` gets the
+timeline and numbered items; an option you pass wins, key by key (`undefined` counts as unset). One
+exception: the preset's `itemAxis`, `numberItems` and `timeline` belong to its own group display, so
+an explicit `groupDisplay` other than the preset's starts from the plugin's defaults for those. The
+options settle when the rail mounts (and again for each new mount, with its preset). See [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md)
+for each preset's values. The rail's **position** (bottom/top/hidden) is a renderer option (`rail`),
+not a thumbnails option.
 
 ## Data
 

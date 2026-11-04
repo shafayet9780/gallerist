@@ -4,6 +4,7 @@ import start from '../../docs/GETTING-STARTED.md?raw'
 import authoring from '../../docs/PLUGIN-AUTHORING.md?raw'
 import presets from '../../docs/PRESETS.md?raw'
 import cdn from '../../packages/cdn/README.md?raw'
+import captions from '../../packages/plugin-captions/README.md?raw'
 import grid from '../../packages/plugin-grid/README.md?raw'
 import pins from '../../packages/plugin-pins/README.md?raw'
 import thumbnails from '../../packages/plugin-thumbnails/README.md?raw'
@@ -39,6 +40,12 @@ const PAGES: Page[] = [
   },
   { slug: 'grid', title: 'Grid plugin', path: 'packages/plugin-grid/README.md', source: grid },
   { slug: 'pins', title: 'Pins plugin', path: 'packages/plugin-pins/README.md', source: pins },
+  {
+    slug: 'captions',
+    title: 'Captions plugin',
+    path: 'packages/plugin-captions/README.md',
+    source: captions,
+  },
   {
     slug: 'authoring',
     title: 'Writing a plugin',

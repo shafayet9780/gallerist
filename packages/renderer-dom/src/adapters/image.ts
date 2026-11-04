@@ -25,130 +25,130 @@ function applyPlaceholder(el: HTMLElement, placeholder: string): void {
 }
 
 export function imageAdapter(): MediaAdapter {
-  return {
-    type: 'image',
-    mount(item: Item, slot: HTMLElement, ctx: AdapterCtx): MountedMedia {
-      const img = document.createElement('img')
-      img.setAttribute('decoding', 'async')
-      img.setAttribute('fetchpriority', ctx.priority ?? 'auto')
-      img.className = 'gallerist-media gallerist-media-image'
-      if (item.alt !== undefined) img.alt = item.alt
-      if (item.placeholder) applyPlaceholder(img, item.placeholder)
-      slot.appendChild(img)
+  return { type: 'image', mount: mountImage }
+}
 
-      // A loader may resolve to a custom element instead of an <img>; track the live node.
-      let element: HTMLElement = img
+/** The built-in image adapter's mount; the renderer preloads only items it would mount. */
+export function mountImage(item: Item, slot: HTMLElement, ctx: AdapterCtx): MountedMedia {
+  const img = document.createElement('img')
+  img.setAttribute('decoding', 'async')
+  img.setAttribute('fetchpriority', ctx.priority ?? 'auto')
+  img.className = 'gallerist-media gallerist-media-image'
+  if (item.alt !== undefined) img.alt = item.alt
+  if (item.placeholder) applyPlaceholder(img, item.placeholder)
+  slot.appendChild(img)
 
-      // On load failure, show a centered error card (icon + the item's alt as a caption) instead
-      // of the browser's default top-left broken-image glyph, which overlapped the chrome (I-UX3).
-      let errorEl: HTMLElement | null = null
-      const showError = () => {
-        if (errorEl) return
-        img.setAttribute('data-gallerist-error', '') // keeps the img hidden + excludes it from shimmer
-        const card = document.createElement('div')
-        card.className = 'gallerist-media-error'
-        card.setAttribute('role', 'img')
-        if (item.alt) card.setAttribute('aria-label', item.alt)
-        const icon = document.createElement('div')
-        icon.className = 'gallerist-media-error-icon'
-        icon.setAttribute('aria-hidden', 'true')
-        icon.innerHTML = BROKEN_ICON // static markup only
-        card.appendChild(icon)
-        if (item.alt) {
-          const label = document.createElement('span')
-          label.className = 'gallerist-media-error-label'
-          label.textContent = item.alt // host-supplied → textContent, never innerHTML
-          card.appendChild(label)
-        }
-        slot.appendChild(card)
-        errorEl = card
+  // A loader may resolve to a custom element instead of an <img>; track the live node.
+  let element: HTMLElement = img
+
+  // On load failure, show a centered error card (icon + the item's alt as a caption) instead
+  // of the browser's default top-left broken-image glyph, which overlapped the chrome (I-UX3).
+  let errorEl: HTMLElement | null = null
+  const showError = () => {
+    if (errorEl) return
+    img.setAttribute('data-gallerist-error', '') // keeps the img hidden + excludes it from shimmer
+    const card = document.createElement('div')
+    card.className = 'gallerist-media-error'
+    card.setAttribute('role', 'img')
+    if (item.alt) card.setAttribute('aria-label', item.alt)
+    const icon = document.createElement('div')
+    icon.className = 'gallerist-media-error-icon'
+    icon.setAttribute('aria-hidden', 'true')
+    icon.innerHTML = BROKEN_ICON // static markup only
+    card.appendChild(icon)
+    if (item.alt) {
+      const label = document.createElement('span')
+      label.className = 'gallerist-media-error-label'
+      label.textContent = item.alt // host-supplied → textContent, never innerHTML
+      card.appendChild(label)
+    }
+    slot.appendChild(card)
+    errorEl = card
+  }
+
+  const ready = new Promise<void>((resolve, reject) => {
+    const abortErr = () => new DOMException('Image load aborted', 'AbortError')
+    if (ctx.signal.aborted) {
+      reject(abortErr())
+      return
+    }
+    const cleanup = () => {
+      img.removeEventListener('load', onLoad)
+      img.removeEventListener('error', onError)
+      ctx.signal.removeEventListener('abort', onAbort)
+    }
+    const onAbort = () => {
+      cleanup()
+      reject(abortErr())
+    }
+    const onLoad = async () => {
+      try {
+        if (typeof img.decode === 'function') await img.decode()
+      } catch {
+        // decode can reject on detached/aborted nodes — fall through and reveal anyway.
       }
+      cleanup()
+      img.setAttribute('data-gallerist-loaded', '')
+      resolve()
+    }
+    const onError = () => {
+      cleanup()
+      showError()
+      reject(new Error(`image load error: ${item.id}`))
+    }
+    img.addEventListener('load', onLoad)
+    img.addEventListener('error', onError)
+    ctx.signal.addEventListener('abort', onAbort)
 
-      const ready = new Promise<void>((resolve, reject) => {
-        const abortErr = () => new DOMException('Image load aborted', 'AbortError')
-        if (ctx.signal.aborted) {
-          reject(abortErr())
-          return
-        }
-        const cleanup = () => {
-          img.removeEventListener('load', onLoad)
-          img.removeEventListener('error', onError)
-          ctx.signal.removeEventListener('abort', onAbort)
-        }
-        const onAbort = () => {
-          cleanup()
-          reject(abortErr())
-        }
-        const onLoad = async () => {
-          try {
-            if (typeof img.decode === 'function') await img.decode()
-          } catch {
-            // decode can reject on detached/aborted nodes — fall through and reveal anyway.
+    const src = item.source
+    if (typeof src === 'string') {
+      img.src = src
+    } else if ('src' in src) {
+      img.src = src.src
+      if (src.srcset) img.setAttribute('srcset', src.srcset)
+      if (src.sizes) img.setAttribute('sizes', src.sizes)
+    } else if ('loader' in src) {
+      src
+        .loader(ctx.signal)
+        .then((res) => {
+          if (ctx.signal.aborted) return
+          if (typeof res === 'string') {
+            img.src = res // load/error handlers settle ready
+          } else {
+            // a custom element: swap it in, it is its own ready signal
+            cleanup()
+            img.remove()
+            slot.appendChild(res)
+            res.setAttribute('data-gallerist-loaded', '')
+            element = res
+            resolve()
           }
-          cleanup()
-          img.setAttribute('data-gallerist-loaded', '')
-          resolve()
-        }
-        const onError = () => {
+        })
+        .catch((err) => {
           cleanup()
           showError()
-          reject(new Error(`image load error: ${item.id}`))
-        }
-        img.addEventListener('load', onLoad)
-        img.addEventListener('error', onError)
-        ctx.signal.addEventListener('abort', onAbort)
+          reject(err instanceof Error ? err : new Error(String(err)))
+        })
+    }
+    // tiles (DZI) is a v2 seam — not handled here.
+  })
+  // Avoid unhandled-rejection noise if no one awaits ready on a canceled load.
+  ready.catch(() => {})
 
-        const src = item.source
-        if (typeof src === 'string') {
-          img.src = src
-        } else if ('src' in src) {
-          img.src = src.src
-          if (src.srcset) img.setAttribute('srcset', src.srcset)
-          if (src.sizes) img.setAttribute('sizes', src.sizes)
-        } else if ('loader' in src) {
-          src
-            .loader(ctx.signal)
-            .then((res) => {
-              if (ctx.signal.aborted) return
-              if (typeof res === 'string') {
-                img.src = res // load/error handlers settle ready
-              } else {
-                // a custom element: swap it in, it is its own ready signal
-                cleanup()
-                img.remove()
-                slot.appendChild(res)
-                res.setAttribute('data-gallerist-loaded', '')
-                element = res
-                resolve()
-              }
-            })
-            .catch((err) => {
-              cleanup()
-              showError()
-              reject(err instanceof Error ? err : new Error(String(err)))
-            })
-        }
-        // tiles (DZI) is a v2 seam — not handled here.
-      })
-      // Avoid unhandled-rejection noise if no one awaits ready on a canceled load.
-      ready.catch(() => {})
-
-      return {
-        get element() {
-          return element
-        },
-        ready,
-        supportsZoom: true,
-        naturalSize() {
-          if (item.naturalSize) return item.naturalSize
-          return img.naturalWidth ? { w: img.naturalWidth, h: img.naturalHeight } : null
-        },
-        destroy() {
-          img.removeAttribute('src')
-          element.remove()
-          errorEl?.remove() // the error card is a slot sibling, not `element`
-        },
-      }
+  return {
+    get element() {
+      return element
+    },
+    ready,
+    supportsZoom: true,
+    naturalSize() {
+      if (item.naturalSize) return item.naturalSize
+      return img.naturalWidth ? { w: img.naturalWidth, h: img.naturalHeight } : null
+    },
+    destroy() {
+      img.removeAttribute('src')
+      element.remove()
+      errorEl?.remove() // the error card is a slot sibling, not `element`
     },
   }
 }

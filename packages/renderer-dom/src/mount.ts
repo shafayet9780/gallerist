@@ -14,7 +14,7 @@ import type {
   ZoomState,
 } from '@gallerist/core'
 import { clampPanToBox, clampScale, getInternals } from '@gallerist/core/internal'
-import { imageAdapter } from './adapters/image'
+import { imageAdapter, mountImage } from './adapters/image'
 import { type Accent, type ColorScheme, type Skin, applyAppearance } from './appearance'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
@@ -41,7 +41,9 @@ export interface MountOptions {
    * Placement of the within-group ↑/↓ arrows, surfaced as `data-gallerist-arrows` for the theme
    * (UX-D). `pill-right` (default): ←/→ on the side edges, ↑/↓ as a stacked pill at right-center.
    * `corner-br`: ↑/↓ paired bottom-right. `dpad`: all four clustered as a d-pad. `split`: legacy
-   * ↑/↓ top/bottom-center.
+   * ↑/↓ top/bottom-center. `docked` (the `reviewer` preset): nothing over the media — the group
+   * arrows sit in gutters beside the stage, and the item navigator (↑ · `n / N` · ↓) docks as a
+   * header on the aside item column when it shows, else at the end of the caption row.
    */
   arrows?: ArrowLayout
   /**
@@ -52,8 +54,8 @@ export interface MountOptions {
   autoHide?: boolean
   /**
    * Named layout preset (UX-E) — sets `data-gallerist-preset` and supplies defaults for `arrows` and
-   * `autoHide` (both still overridable by explicit options above). The preset's preferred
-   * thumbnails() options are exposed via `resolvePreset(name).thumbnails` for the host to apply.
+   * `autoHide` (both still overridable by explicit options above). Plugin regions get the preset
+   * too: thumbnails() takes `resolvePreset(name).thumbnails` for the options it wasn't given.
    */
   preset?: PresetName
   /**
@@ -127,7 +129,7 @@ export interface MountOptions {
   returnFocus?: HTMLElement | (() => HTMLElement | null)
 }
 
-export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
+export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split' | 'docked'
 export type RailPlacement = 'bottom' | 'hidden' | 'left' | 'right'
 export type GroupAxis = 'horizontal' | 'vertical'
 
@@ -152,6 +154,11 @@ interface SlideRec {
 /** A plain URL for a media source (loader and tiled sources have none). */
 const sourceUrl = (source: MediaSource | undefined): string | null =>
   typeof source === 'string' ? source : source && 'src' in source ? source.src : null
+
+/** A text caption, or '' for anything else (untyped data may still hold an old caption object). */
+const str = (x: unknown): string => (typeof x === 'string' ? x : '')
+
+let mounts = 0 // ids for the caption, which describes the viewer (aria-describedby)
 
 function el(tag: string, className?: string, attrs?: Record<string, string>): HTMLElement {
   const node = document.createElement(tag)
@@ -245,7 +252,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const container = opts.container ?? null
   const controls = opts.controls ?? true
   const preload = opts.preload ?? { ahead: 2, behind: 1 }
-  const preset = opts.preset ? resolvePreset(opts.preset) : null
+  const preset = opts.preset ? resolvePreset(opts.preset) : undefined
   const arrows: ArrowLayout = opts.arrows ?? preset?.arrows ?? 'pill-right'
   const autoHide = opts.autoHide ?? preset?.autoHide ?? true
   const showNavigator = opts.navigator ?? preset?.navigator ?? false
@@ -265,7 +272,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     !arrowLabelsOpt || !controls || vertical || linear || arrows !== 'pill-right'
       ? null
       : arrowLabelsOpt === true
-        ? (group) => group.caption
+        ? (group) => str(group.caption)
         : arrowLabelsOpt
   // Default to the viewer's resolved loop so linear traversal and the slide window agree; an
   // explicit mount({ loop }) still overrides for the rare case they should differ (review #2).
@@ -348,7 +355,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // The root is a grid of areas (theme base.css): bar / main / aside / caption / footer / rail. Every
   // piece of chrome lives in its own area, so persistent chrome takes space instead of covering the
   // stage and nothing can collide; only the arrows and the item navigator sit over the stage, inside
-  // `main`. Presets and rail positions change the grid template, never the DOM.
+  // `main` (`docked` moves the navigator out). Presets and rail positions change the grid template.
   const root = el('div', 'gallerist')
   root.setAttribute('data-gallerist-mode', overlay ? 'overlay' : 'inline')
   root.setAttribute('data-gallerist-arrows', arrows)
@@ -391,11 +398,50 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     aside: el('div', 'gallerist-region gallerist-region-aside'),
     thumbnails: el('div', 'gallerist-region gallerist-region-thumbnails'),
     footer: el('div', 'gallerist-region gallerist-region-footer'),
+    caption: el('div', 'gallerist-region gallerist-region-caption'),
   }
+  // The caption bar holds the item's text caption, or a plugin's caption node in its region
+  // (plugin-captions), which then replaces the text. Either is the viewer's accessible description.
   const caption = el('div', 'gallerist-caption')
-  const captionText = el('span', 'gallerist-caption-text')
-  caption.appendChild(captionText)
+  const cid = `gallerist-caption-${++mounts}`
+  const captionText = el('span', 'gallerist-caption-text', { id: cid })
+  regionHosts.caption.id = `${cid}r`
+  // While a caption renderer's band overflows, its scroller (the band; in a placard, the region in
+  // its slot) takes focus and a name, so a keyboard can scroll it. Named by reference: an aria-label
+  // would also replace the region's text in the viewer's description.
+  const capLabel = el('span', '', { id: `${cid}l`, hidden: '' })
+  capLabel.textContent = ui.caption
+  const capScroll = placard ? regionHosts.caption : caption
+  const fitCaption = () => {
+    const on =
+      regionHosts.caption.hasChildNodes() && capScroll.scrollHeight > capScroll.clientHeight + 1
+    // a band that stops scrolling while focused hands focus back to the viewer (else it falls to
+    // <body> and the keyboard goes dead)
+    if (!on && document.activeElement === capScroll) root.focus({ preventScroll: true })
+    const set = on ? 'setAttribute' : 'removeAttribute'
+    capScroll[set]('tabindex', '0')
+    capScroll[set]('role', 'region')
+    capScroll[set]('aria-labelledby', capLabel.id)
+  }
+  const capObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fitCaption) : null
+  caption.append(captionText, regionHosts.caption)
   caption.hidden = true
+  let anyCaption = false
+  const syncCaption = () => {
+    const own = regionHosts.caption.hasChildNodes()
+    const { g, i } = viewer.getState().cursor
+    // the text caption (the theme clamps it), unless a caption region replaces it
+    captionText.textContent = own ? '' : str(viewer.getCollection().groups[g]?.items[i]?.caption)
+    // a placard is always up: it holds the item navigator as well as the caption
+    const hide = !(own || (controls && (anyCaption || placard)))
+    caption.hidden = hide
+    caption.toggleAttribute('data-gallerist-custom', own)
+    // described by the caption only while it shows (hidden text would still be read out)
+    root[hide ? 'removeAttribute' : 'setAttribute']('aria-describedby', `${cid} ${cid}r`)
+    // the band and its content resize as it grows or scrolls: check then (no layout read here)
+    for (const n of [capScroll, ...capScroll.children]) capObserver?.observe(n)
+    if (!own) fitCaption()
+  }
   root.append(
     regionHosts.backdrop,
     bar,
@@ -404,6 +450,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     caption,
     regionHosts.footer,
     regionHosts.thumbnails,
+    capLabel,
   )
 
   const live = el('div', 'gallerist-live', { 'aria-live': 'polite', role: 'status' })
@@ -488,8 +535,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     itemNav.append(prevItem, position, nextItem)
     controlsBox = el('div', 'gallerist-controls')
     controlsBox.append(prev, next)
-    // a placard carries the item navigator in the caption, under the label
+    // a placard carries the item navigator in the caption, under the label; docked, it is a grid
+    // item of its own (the theme puts it on the aside column or the caption row, off the media),
+    // after the caption it ends and before the item column it heads (tab order follows)
     if (placard) caption.appendChild(itemNav)
+    else if (arrows === 'docked') main.after(caption, itemNav)
     else controlsBox.appendChild(itemNav)
     if (showNavigator) {
       // a pointer aid only (keyboard users zoom and pan with the keys), so hidden from AT
@@ -693,21 +743,46 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.overlayItem = undefined
       }
     }
-    // Warm the cache for the images a step within the group lands on (spec §11: the slides above
-    // cover the neighbouring groups, showing their first item). Not mounted, so nothing to tear down.
+    // Warm the cache for the images `preload.ahead/behind` steps within the group land on (spec §11:
+    // the slides above cover the neighbouring groups, showing their first item). Only items the
+    // built-in image adapter would mount; low priority, and only once the current media is ready,
+    // so they don't compete with it. Ones no longer wanted are cancelled.
     const items = col.groups[cur.g]?.items ?? []
+    const want = new Map<string, Item>()
     for (let d = -preload.behind; d <= preload.ahead; d++) {
       const it = d ? items[cur.i + d] : undefined
-      const s = it?.type === 'image' ? it.source : undefined
-      if (!s || !(typeof s === 'string' || 'src' in s)) continue
-      const img = new Image()
-      if (typeof s === 'string') img.src = s
-      else {
-        img.sizes = s.sizes ?? ''
-        img.srcset = s.srcset ?? ''
-        img.src = s.src
+      if (it && sourceUrl(it.source) && pickAdapter(it.type, it)?.mount === mountImage)
+        want.set(it.id, it)
+    }
+    for (const [id, img] of warm) if (!want.has(id)) unwarm(id, img)
+    const run = ++warmRun
+    const start = () => {
+      if (run !== warmRun) return // the cursor moved on: a newer render owns the warm set
+      for (const [id, it] of want) {
+        const s = it.source as { srcset?: string; sizes?: string } // a string has neither
+        if (!warm.has(id)) {
+          warm.set(
+            id,
+            Object.assign(new Image(), {
+              fetchPriority: 'low',
+              sizes: s.sizes ?? '',
+              srcset: s.srcset ?? '',
+              src: sourceUrl(it.source),
+            }),
+          )
+        }
       }
     }
+    const ready = mounted.get(col.groups[cur.g]?.id ?? '')?.media?.ready
+    if (ready) ready.then(start, start)
+    else start()
+  }
+  // in-group warmers by item id; cancelling one drops its request
+  const warm = new Map<string, HTMLImageElement>()
+  let warmRun = 0
+  const unwarm = (id: string, img: HTMLImageElement) => {
+    img.srcset = img.src = ''
+    warm.delete(id)
   }
   // Guard against re-entrancy: emitting load/loaded updates state.loaded, whose store
   // notification re-enters sync()/renderWindow while we're mid-iteration over `mounted`.
@@ -801,11 +876,23 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (col !== chromeCol) {
       // Reserve the caption track for the whole collection when any item has a text caption, so
       // moving between captioned and uncaptioned items never resizes the stage.
-      const anyCaption = col.groups.some((grp) =>
-        grp.items.some((it) => typeof it.caption === 'string'),
+      anyCaption = col.groups.some((grp) => grp.items.some((it) => str(it.caption)))
+      // likewise the docked item navigator's room, while any group has several items; one group
+      // leaves the docked group arrows nowhere to go (the theme drops them and their gutters)
+      root.toggleAttribute(
+        'data-gallerist-multi',
+        col.groups.some((grp) => grp.items.length > 1),
       )
-      // a placard is always up: it holds the item navigator as well as the caption
-      caption.hidden = !(controls && (anyCaption || placard))
+      const one = col.groups.length < 2
+      // a focused docked group arrow goes with the second group: focus to the root, not <body>
+      if (
+        one &&
+        arrows === 'docked' &&
+        !linear &&
+        [prevArrow, nextArrow].includes(document.activeElement as HTMLElement)
+      )
+        root.focus({ preventScroll: true })
+      root.toggleAttribute('data-gallerist-one-group', one)
     }
     chromeCol = col
     chromeG = cur.g
@@ -818,8 +905,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const multi = !linear && itemCount > 1
     if (itemNav) setHiddenKeepingFocus(itemNav, !multi)
     if (title) {
-      title.textContent = group?.caption ?? ''
-      title.hidden = !group?.caption
+      title.textContent = str(group?.caption)
+      title.hidden = !title.textContent
     }
     if (arrowLabel) {
       const nameAt = (step: number) => {
@@ -830,9 +917,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       setArrowLabel(prevArrow, nameAt(-1), ui.previous, ui.previousTo)
       setArrowLabel(nextArrow, nameAt(1), ui.next, ui.nextTo)
     }
-    // Text captions go in the caption bar (the theme clamps them); an OverlaySpec caption isn't
-    // rendered by the DOM renderer yet (planned with the captions plugin).
-    captionText.textContent = typeof item?.caption === 'string' ? item.caption : ''
+    syncCaption()
     // Announce the item's own description alongside the position so SR users hear what they
     // navigated to, not just the index (S-UX4).
     const desc = item?.alt ? ` — ${item.alt}` : ''
@@ -1030,8 +1115,20 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   const onKey = (e: KeyboardEvent) => {
     // Don't hijack typing inside an embedded control (overlay input/textarea/etc); Escape still
-    // closes from anywhere (I-UX2).
+    // closes from anywhere (I-UX2), unless a handler before ours called preventDefault() on it
+    // (a host form keeping Escape for itself).
     if (isEditableTarget(e.target) && e.key !== 'Escape') return
+    // A focused caption band scrolls with ↑/↓/Home/End rather than navigating. Scrolled here, not
+    // left to the browser: WebKit on Linux (GTK/WPE) leaves the placard's band unscrolled.
+    const by =
+      e.target === capScroll && capScroll.hasAttribute('tabindex')
+        ? ({ ArrowUp: -40, ArrowDown: 40, Home: -1e9, End: 1e9 } as Record<string, number>)[e.key]
+        : 0
+    if (by) {
+      capScroll.scrollTop += by
+      e.preventDefault()
+      return
+    }
     // Focus trap: cycle Tab within the dialog so focus can't escape to the inert page (C5).
     if (e.key === 'Tab' && overlay) {
       const tabbables = focusableWithin(root)
@@ -1064,7 +1161,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         break
       }
       case 'Escape':
-        viewer.close()
+        if (!e.defaultPrevented) viewer.close()
         break
       case '+':
       case '=':
@@ -1334,7 +1431,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const offRefresh = internals.onRefresh(onStageResize)
 
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
-  const mountPluginRegions = createRegionMounter(regionHosts, { viewer })
+  const mountPluginRegions = createRegionMounter(regionHosts, { viewer, preset })
   const mountRegions = () => {
     pluginKeymap = aggregateKeymap(internals.getPlugins())
     mountPluginRegions(internals.getPlugins())
@@ -1345,6 +1442,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (!hasRail) railHandle.remove()
     else if (thumbs.firstChild !== railHandle) thumbs.prepend(railHandle)
     if (!controls) bar.hidden = regionHosts.toolbar.childElementCount === 0
+    syncCaption()
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
     if (cur) cur.overlayItem = undefined
@@ -1368,6 +1466,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       detachGestures()
       resizeObserver?.disconnect()
       bandObserver?.disconnect()
+      capObserver?.disconnect()
       if (insetFrame) cancelAnimationFrame(insetFrame)
       if (resizeFrame) cancelAnimationFrame(resizeFrame)
       idle?.destroy()
@@ -1375,6 +1474,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       root.removeEventListener('keydown', onKey)
       for (const rec of mounted.values()) teardownSlide(rec)
       mounted.clear()
+      warmRun++
+      for (const [id, img] of warm) unwarm(id, img)
       detach()
       if (!overlay) root.remove()
     },

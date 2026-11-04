@@ -8,20 +8,32 @@ import type { Group, Item, MediaAdapter, OverlaySpec } from '../types'
  * Named UI slots the renderer exposes; plugins inject Nodes into them. `toolbar` sits in the top
  * bar, `aside` is a side column at the stage's inline end (item stack, info or filter panels),
  * `thumbnails` is the rail, `footer` a band above it; all of them take space rather than covering
- * the stage. `stage` and `backdrop` are layers over and under the media.
+ * the stage. `caption` replaces the caption bar's text with the plugin's node (one owner;
+ * `@gallerist/plugin-captions`). `stage` and `backdrop` are layers over and under the media.
  */
 export type RegionName =
   | 'toolbar'
   | 'aside'
   | 'footer'
+  | 'caption'
   | 'stage'
   | 'thumbnails'
   | 'backdrop'
   | (string & {})
 
+/**
+ * A renderer's mounted layout preset, as defaults for plugins keyed by what they configure. Core
+ * doesn't know the presets: the renderer supplies this (the DOM renderer passes its resolved
+ * preset, so `thumbnails` holds `@gallerist/plugin-thumbnails` options) and a plugin reads its own
+ * key as defaults under the options it was given.
+ */
+export type PresetDefaults = { readonly [key: string]: unknown }
+
 /** Passed to a region renderer; the viewer is the handle for state/actions/subscription. */
 export interface RegionCtx {
-  viewer: ViewerApi
+  readonly viewer: ViewerApi
+  /** the mounted preset's layout defaults (frozen); undefined without a preset */
+  readonly preset?: PresetDefaults
 }
 
 /** Pluggable transition seam (spec §10.4) — minimal in Phase 1; full API is future work. */

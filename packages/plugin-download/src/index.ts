@@ -1,9 +1,9 @@
 // @gallerist/plugin-download — download the current item, a group, or a bulk zip (spec §14).
 // Single/group use anchor downloads (zero dep); bulk zip dynamically imports a tiny streaming
-// zip lib so it costs nothing until used (decision P1-H).
+// zip lib (client-zip, a regular dependency) so it costs nothing until used (decision P1-H).
 
 import type { Group, Item, MediaSource, Plugin } from '@gallerist/core'
-import { ICONS } from '@gallerist/core/internal'
+import { ICONS, safeUrl } from '@gallerist/core/internal'
 
 /** Resolve a MediaSource to a downloadable URL (string/responsive sync; loader async). */
 export async function urlOf(source: MediaSource): Promise<string | null> {
@@ -18,16 +18,11 @@ export async function urlOf(source: MediaSource): Promise<string | null> {
 
 // Security: only schemes that fetch/save inert media. Rejects javascript:/data:/file: etc., which
 // could navigate the host frame or exfiltrate. Relative URLs resolve to http(s) and are allowed.
-const SAFE_SCHEMES = new Set(['http:', 'https:', 'blob:'])
+const SAFE_SCHEMES = ['http:', 'https:', 'blob:']
 
-/** Return `url` if its scheme is download-safe, else null. */
+/** Return `url` if its scheme is download-safe (http(s), blob, or relative), else null. */
 export function safeHref(url: string): string | null {
-  try {
-    const base = typeof location !== 'undefined' ? location.href : 'http://localhost/'
-    return SAFE_SCHEMES.has(new URL(url, base).protocol) ? url : null
-  } catch {
-    return null
-  }
+  return safeUrl(url, SAFE_SCHEMES)
 }
 
 /** Strip path separators, traversal, and control chars so a filename can't escape its directory
@@ -50,6 +45,20 @@ export function filenameOf(item: Item, url?: string | null): string {
   return sanitizeName(base?.includes('.') ? base : item.id)
 }
 
+// A blob: URL is this document's own; anything else compares its origin with the document's.
+// Resolved like the anchor resolves it (against document.baseURI, so a <base href> counts), and
+// compared with the document's origin (globalThis.origin): location.origin is "null" in an
+// about:srcdoc frame, whose relative URLs would also throw against location.href.
+const crossOrigin = (url: string): boolean => {
+  if (typeof document === 'undefined') return false
+  try {
+    const u = new URL(url, document.baseURI)
+    return u.protocol !== 'blob:' && u.origin !== (globalThis.origin || location.origin)
+  } catch {
+    return false
+  }
+}
+
 function anchorDownload(url: string, filename: string): void {
   const safe = safeHref(url)
   if (!safe) return // reject javascript:/data:/file: — never click an unsafe scheme
@@ -57,13 +66,32 @@ function anchorDownload(url: string, filename: string): void {
   a.href = safe
   a.download = filename
   a.rel = 'noopener'
+  // Browsers ignore `download` on a cross-origin URL and follow the link instead: open it in a new
+  // tab so the host page isn't navigated away.
+  if (crossOrigin(safe)) a.target = '_blank'
   document.body.appendChild(a)
   a.click()
   a.remove()
 }
 
-export async function downloadItem(item: Item): Promise<void> {
-  const url = await urlOf(item.source)
+/**
+ * The file to save for an item, e.g. a full-resolution original where `source` is a display size.
+ * Return `null` when the item can't be downloaded, `undefined` to use its source.
+ */
+export type DownloadUrl = (item: Item) => string | null | undefined
+
+/** The safe URL a download of `item` saves (see `DownloadUrl`), or null when there is none. */
+export async function resolveDownloadUrl(
+  item: Item,
+  downloadUrl?: DownloadUrl,
+): Promise<string | null> {
+  const custom = downloadUrl?.(item)
+  const url = custom === undefined ? await urlOf(item.source) : custom
+  return url ? safeHref(url) : null
+}
+
+export async function downloadItem(item: Item, downloadUrl?: DownloadUrl): Promise<void> {
+  const url = await resolveDownloadUrl(item, downloadUrl)
   if (url) anchorDownload(url, filenameOf(item, url))
 }
 
@@ -72,30 +100,30 @@ export interface ZipOptions {
   zipName?: string
   /** aborts the in-flight zip fetches. */
   signal?: AbortSignal
+  /** the file to save per item (default: its source) */
+  downloadUrl?: DownloadUrl
 }
 
 export async function downloadItems(items: Item[], opts: ZipOptions = {}): Promise<void> {
-  if (!opts.zip) {
-    for (const item of items) await downloadItem(item)
-    return
+  const each = async () => {
+    for (const item of items) await downloadItem(item, opts.downloadUrl)
   }
+  if (!opts.zip) return each()
   let downloadZip: typeof import('client-zip').downloadZip
   try {
     ;({ downloadZip } = await import('client-zip'))
   } catch {
-    // optional dep not installed → degrade gracefully to per-file downloads
-    for (const item of items) await downloadItem(item)
-    return
+    // the chunk failed to load (offline, a CDN hiccup) → degrade to per-file downloads
+    return each()
   }
   const entries = (
     await Promise.all(
       items.map(async (item) => {
-        const url = await urlOf(item.source)
-        const safe = url ? safeHref(url) : null
+        const safe = await resolveDownloadUrl(item, opts.downloadUrl)
         if (!safe) return null
         const res = await fetch(safe, { signal: opts.signal })
         if (!res.ok) return null // skip failures instead of zipping an error body
-        return { name: filenameOf(item, url), input: res }
+        return { name: filenameOf(item, safe), input: res }
       }),
     )
   ).filter((e): e is { name: string; input: Response } => e !== null)
@@ -123,6 +151,22 @@ export interface DownloadOptions {
   key?: string
   /** UI text overrides, for translation; merged over English. */
   strings?: Partial<DownloadStrings>
+  /**
+   * The file to save for an item, e.g. the full-resolution original; `null` marks the item as not
+   * downloadable, `undefined` uses its source. Read for the current item on every navigation.
+   */
+  downloadUrl?: DownloadUrl
+}
+
+// Whether the item has something safe to save, known without loading: a loader source resolves on
+// click, so it counts as downloadable until then. Takes `downloadUrl(item)`'s result, so a click
+// calls the host's function once.
+const downloadable = (item: Item, custom: string | null | undefined): boolean => {
+  if (custom !== undefined) return !!custom && !!safeHref(custom)
+  const { source } = item
+  if (typeof source === 'string') return !!safeHref(source)
+  if ('src' in source) return !!safeHref(source.src)
+  return 'loader' in source
 }
 
 export function download(opts: DownloadOptions = {}): Plugin {
@@ -134,14 +178,35 @@ export function download(opts: DownloadOptions = {}): Plugin {
     }
     const run = () => {
       const item = current()
-      if (item) void downloadItem(item)
+      if (!item) return
+      const custom = opts.downloadUrl?.(item)
+      if (downloadable(item, custom)) void downloadItem(item, () => custom)
     }
+    let btn: HTMLButtonElement | null = null
+    let shown: Item | undefined | null = null
+    // An item without a safe URL (none, data:, javascript:, file:) disables the button rather than
+    // leaving a click that does nothing. aria-disabled, not disabled: the button keeps focus.
+    const update = () => {
+      const item = current()
+      if (!btn || item === shown) return
+      shown = item
+      const ok = !!item && downloadable(item, opts.downloadUrl?.(item))
+      btn.setAttribute('aria-disabled', String(!ok))
+    }
+    let off: (() => void) | undefined
     return {
       name: 'download',
+      init() {
+        off = viewer.subscribe(update)
+      },
+      destroy() {
+        off?.()
+        btn = null
+      },
       keymap: { [opts.key ?? 'd']: run },
       regions: {
         toolbar: () => {
-          const btn = document.createElement('button')
+          btn = document.createElement('button')
           btn.type = 'button'
           btn.className = 'gallerist-download-btn'
           btn.setAttribute(
@@ -150,6 +215,8 @@ export function download(opts: DownloadOptions = {}): Plugin {
           )
           btn.innerHTML = ICONS.download
           btn.addEventListener('click', run)
+          shown = null
+          update()
           return btn
         },
       },

@@ -11,7 +11,7 @@ distinct layout.
 | Preset      | Rail     | Arrows      | Auto-hide | For |
 |-------------|----------|-------------|-----------|-----|
 | `filmstrip` | `bottom` | `pill-right`| no        | Classic lightbox, persistent chrome (default). |
-| `reviewer`  | `bottom` | `corner-br` | no        | Time-series review: a timeline rail (a time over each group from `group.meta.time`), numbered items, the zoom navigator. Pairs with `skin: 'console'`. |
+| `reviewer`  | `bottom` | `docked`    | no        | Time-series review: a timeline rail (a time over each group from `group.meta.time`), numbered items, the zoom navigator, and no control over the media (`arrows: 'docked'`). Pairs with `skin: 'console'`. |
 | `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
 | `contact`   | `right`  | `pill-right`| no        | Browse-heavy; vertical rail on the right (pairs with `plugin-grid`). |
 | `editorial` | `bottom` | `pill-right`| no        | A gallery wall: the work framed with room around it (`frame`), a placard beside it holding the caption and the item navigator (`itemIndicator: 'placard'`), numbered items inline in the rail. Pairs with `skin: 'editorial'`. With a side rail the placard becomes the caption band under the stage. |
@@ -20,20 +20,33 @@ distinct layout.
 ```tsx
 // React
 <Gallerist preset="reviewer" skin="console" collection={c}
-        plugins={[thumbnails({ ...resolvePreset('reviewer').thumbnails }), grid(), fullscreen()]} />
+        plugins={[thumbnails(), grid(), fullscreen()]} />
 ```
 
 ```ts
-// Vanilla — mount() applies the preset's rail/arrows/auto-hide + data-gallerist-preset.
+// Vanilla — mount() applies the preset's rail/arrows/auto-hide + data-gallerist-preset, and the
+// thumbnails rail takes the preset's options (reviewer: a timeline, numbered items).
+const viewer = createViewer({ collection, plugins: [thumbnails()] })
 mount(viewer, { preset: 'reviewer' })
-// thumbnails() options aren't owned by mount; apply them from the resolver:
-const { thumbnails: t } = resolvePreset('reviewer')
-createViewer({ collection, plugins: [thumbnails(t)] })
+// an option you pass wins, key by key; the rest still come from the preset
+createViewer({ collection, plugins: [thumbnails({ timeline: false })] })
 ```
 
 `resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails,
 navigator?, frame?, itemIndicator?, groupAxis?, arrowLabels? }`. Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide`/`navigator`/
 `frame`/`itemIndicator`/`groupAxis`/`arrowLabels` options always win over the preset.
+
+The renderer hands the resolved preset to every plugin region (`RegionCtx.preset`), and
+`thumbnails()` takes its `thumbnails` entry for each option it wasn't given (`undefined` counts as
+not given). The rail settles its options when its region mounts, so this also holds for a
+`viewer.use(thumbnails())` after `mount()`. Each preset's rail:
+
+| Preset      | `thumbnails` defaults |
+|-------------|-----------------------|
+| `filmstrip`, `immersive`, `contact` | `itemAxis: 'vertical'` (the plugin's own defaults) |
+| `reviewer`  | `itemAxis: 'vertical'`, `timeline: true`, `numberItems: true` |
+| `editorial` | `itemAxis: 'horizontal'`, `numberItems: true` |
+| `tour`      | `groupDisplay: 'index'`, `itemAxis: 'horizontal'`, `numberItems: true` |
 
 ## Rail placement (`data-gallerist-rail-pos`)
 
@@ -56,8 +69,10 @@ arrow's accessible name with `strings.previousTo` / `strings.nextTo`.
 ## Group display (`thumbnails({ groupDisplay })`)
 
 A `thumbnails()` option (not a preset/rail field), so set it on the plugin. Presets default to
-`stacked` (`tour` uses `index`); opt into `flat` explicitly, e.g. `thumbnails({ ...resolvePreset('contact').thumbnails,
-groupDisplay: 'flat' })`.
+`stacked` (`tour` uses `index`); opt into `flat` explicitly, e.g. `thumbnails({ groupDisplay: 'flat' })`.
+A preset's `itemAxis`, `numberItems` and `timeline` belong to its own group display, so an explicit
+`groupDisplay` other than the preset's starts from the plugin's defaults for those (`tour` with
+`groupDisplay: 'stacked'` gets the plain vertical stack, unnumbered); pass them too to keep them.
 
 - `stacked` (default) — one collapsed card per group. Hover/focus a multi-item card to **peek** its
   items without navigating in (touch gets an expand affordance). The active group's items show as a
@@ -87,21 +102,44 @@ The ←/→ group arrows stay on the side edges; the option places the **item na
 - `corner-br` — a horizontal cluster in the bottom inline-end corner.
 - `dpad` — a keyboard-arrow cluster in the bottom inline-end corner: ↑ on top, ← ↓ → along the bottom.
 - `split` — ↑ at top-centre with the position under it, ↓ at bottom-centre.
+- `docked` (the `reviewer` preset) — nothing over the media, for review that needs every pixel,
+  corners included. The group arrows sit in gutters the stage leaves at its sides (on touch, where
+  swipes stand in for them, the stage takes the full width). The navigator leaves the stage: the
+  `n / N` count over ↑ ↓, as a header on the `aside` item column while that shows (a `stacked`
+  rail's vertical item stack, over 600px wide, rail expanded), otherwise at the end of the caption
+  row, beside a text caption or a designed one (`plugin-captions`, `<Gallerist.Caption>`), which make
+  room for it. It shows the count rather than pills or dots. While any group has several items it
+  keeps its room on a one-item group, so neither the stage nor the item column moves (not in
+  `linear` mode, which has no navigator). A one-group collection has no group arrows and no
+  gutters (in `linear` mode the arrows walk the items, so they stay). Keyboard order follows the
+  layout: the caption band, then the navigator, then the item column it heads. One exception, by
+  design: the zoom minimap (the `reviewer`'s zoom navigator) still sits in the stage's corner over
+  the media; it shows only while zoomed in and is the zoom tool itself. With other presets:
+  `editorial` without a placard ends its caption column with the navigator, under the caption;
+  `immersive`, whose stage runs under every band, puts it in the stage's bottom inline-end corner
+  above the caption band, as `corner-br` does, so there it sits over the media.
 
 The position inside the navigator follows `itemIndicator` (`mount` option / `<Gallerist itemIndicator>`):
 `pills` (default — numbered pills up to 8 items, then `n / N`), `dots` (plain dots plus the `n / N`
 count, up to 12 items), or `counter` (always `n / N`).
 
 On a touch screen the on-image arrows are visually hidden (swipes navigate; screen readers still
-reach them) and the navigator shows only the `n / N` position, at the bottom centre of the stage.
+reach them) and the navigator shows only the `n / N` position, at the bottom centre of the stage
+(`docked`: where it docks, with its ↑ ↓). A group arrow focused from a keyboard on a touch screen
+comes back over the stage edge while it has focus, `docked` included.
 
 ## Layout areas, rail collapse & idle auto-hide
 
 The viewer is a grid of areas: a **top bar** (counter → group title → plugin tools → zoom reset →
 close), the **stage**, an **`aside`** column at its inline end, a **caption** bar (the item's
-caption, shown only when it has one), a plugin **footer**, and the **rail**. Persistent chrome takes
-its own space instead of covering the image, so pieces can't collide. The `immersive` preset is the
-exception: the stage fills the viewer and the bar, caption and rail float over it.
+caption, shown only when the collection has one, or a designed caption from `plugin-captions` /
+`<Gallerist.Caption>`), a plugin **footer**, and the **rail**. Persistent chrome takes its own space
+instead of covering the image, so pieces can't collide. The `immersive` preset is the exception: the
+stage fills the viewer and the bar, caption and rail float over it.
+
+The stage gets what is left. A text caption is a fixed two-line band, but the `footer` region and a
+designed caption are as tall as their content, so the stage shrinks when they grow (and grows back
+when they shrink). Keep them a steady height if the image shouldn't move between items.
 
 - **Collapse the thumbnail rail** with the `t` key or the toggle button; tracked as
   `data-gallerist-rail="collapsed|expanded"`. The rail shrinks to its handle and the stage grows into

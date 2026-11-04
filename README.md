@@ -15,7 +15,7 @@ of groups (a single group draws all its item thumbs unless you use the `flat` ra
 
 **Look elsewhere if** you have one flat strip of photos and already have a lightbox you like, if you need
 Vue or Svelte today (React and plain DOM only; Vue is planned for 0.4), or if you want a stories player.
-Bundle size is also a real cost: core + renderer is about 15.5 KB gzipped, more than the smallest flat
+Bundle size is also a real cost: core + renderer is about 16 KB gzipped, more than the smallest flat
 lightboxes.
 
 ## Quick start
@@ -70,7 +70,7 @@ Try every combination on the docs site's playground (`pnpm --filter @gallerist/s
 | `pnpm e2e` | Browser tests (Playwright: gestures, a11y/axe, overlays) |
 | `pnpm typecheck` | TypeScript strict typecheck, all packages |
 | `pnpm lint` / `pnpm format` | Biome check / write |
-| `pnpm size` | size-limit budget gate (core ≤ 12 KB, core+renderer ≤ 16 KB gz) |
+| `pnpm size` | size-limit budget gate (core ≤ 12 KB, core+renderer ≤ 16.5 KB gz) |
 | `pnpm check:dist` | Checks on built output: the `"use client"` banner, the global build |
 
 ## Packages
@@ -81,7 +81,7 @@ Try every combination on the docs site's playground (`pnpm --filter @gallerist/s
 | `@gallerist/renderer-dom` | Default DOM renderer: windowed slides, image adapter, live gestures, image-space overlays, dialog a11y, chrome. The only ring that writes DOM. |
 | `@gallerist/theme-default` | Pure CSS driven by `--gallerist-*` tokens: a shared base plus skins (`gallery` default, `console`, `editorial`), each with accents and dark/light/auto schemes; distinct axis motion; reduced-motion safe. |
 | `@gallerist/react` | React adapter: `useGallerist()` hook, `<Gallerist>` component, `<Gallerist.Overlay>`/`<Gallerist.Region>` JSX portals. |
-| `@gallerist/plugin-*` | Tree-shakeable plugins: `fullscreen`, `hash`, `download`, `thumbnails` (grouped), `grid`, `pins` (comments, product tags, feature notes anchored to the image), `video`, `video-youtube`. |
+| `@gallerist/plugin-*` | Tree-shakeable plugins: `fullscreen`, `hash`, `download`, `thumbnails` (grouped), `grid`, `pins` (comments, product tags, feature notes anchored to the image), `captions` (designed captions, one render function per viewer), `video`, `video-youtube`. |
 
 ## Architecture
 

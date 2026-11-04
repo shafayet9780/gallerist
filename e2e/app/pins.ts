@@ -1,5 +1,6 @@
 // Pins fixture (e2e/tests/pins.spec.ts): one landscape item with three pins and one portrait item
-// (for the contained zoom bounds). Query: skin, scheme, preset, presentation.
+// (for the contained zoom bounds). Query: skin, scheme, preset, presentation, card (h: card=empty's
+// height), bg (the landscape image's colour), dir.
 import { type Collection, createViewer } from '@gallerist/core'
 import { type Pin, type PinPresentation, pins } from '@gallerist/plugin-pins'
 import { type ColorScheme, type PresetName, mount } from '@gallerist/renderer-dom'
@@ -8,6 +9,7 @@ import '@gallerist/theme-default/console.css'
 import '@gallerist/theme-default/editorial.css'
 
 const p = new URLSearchParams(location.search)
+if (p.get('dir') === 'rtl') document.documentElement.dir = 'rtl'
 const svg = (w: number, h: number, color: string) =>
   `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/><circle cx="${w / 4}" cy="${h / 4}" r="${w / 40}" fill="white"/></svg>`,
@@ -40,7 +42,7 @@ const collection: Collection = {
         {
           id: 'land',
           type: 'image',
-          source: svg(1600, 1000, '#2980b9'),
+          source: svg(1600, 1000, p.get('bg') ?? '#2980b9'),
           naturalSize: { w: 1600, h: 1000 },
           alt: 'landscape',
           meta: { pins: landscapePins },
@@ -58,12 +60,142 @@ const collection: Collection = {
   ],
 }
 const placed: Array<{ x: number; y: number }> = []
+// card=form: a host-rendered card, a form whose Save rewrites the pin and redraws (as an app saving a
+// comment would); `removed` counts the nodes handed back through onCardRemove
+const removed: string[] = []
+const formCard =
+  p.get('card') === 'form'
+    ? {
+        renderCard: (pin: Pin) => {
+          const form = document.createElement('form')
+          form.className = 'host-card'
+          const input = document.createElement('input')
+          input.setAttribute('aria-label', 'Comment')
+          input.value = pin.body ?? ''
+          const save = document.createElement('button')
+          save.type = 'button'
+          save.textContent = 'Save'
+          save.addEventListener('click', () => {
+            const list = collection.groups[0]?.items[0]?.meta as { pins: Pin[] }
+            list.pins = list.pins.map((q) => (q.id === pin.id ? { ...q, body: input.value } : q))
+            plugin.refresh()
+          })
+          form.append(input, save)
+          return form
+        },
+        onCardRemove: (pin: Pin) => removed.push(pin.id),
+      }
+    : {}
+// card=draft: a review app's comment draft: a host card taller than a landscape phone's stage (a
+// textarea, Save, Discard); a placed pin opens with focus, and one still without a body when its
+// card closes is dropped (onOpenChange by ctx.previous, then refresh(), as the README shows)
+const draft = p.get('card') === 'draft'
+const pinsOf = () => (collection.groups[0]?.items[0]?.meta as { pins: Pin[] }).pins
+const draftCard = draft
+  ? {
+      renderCard: (pin: Pin) => {
+        const form = document.createElement('form')
+        form.className = 'host-card'
+        const text = document.createElement('textarea')
+        text.setAttribute('aria-label', 'Comment')
+        text.style.cssText = 'display:block;box-sizing:border-box;width:220px;height:300px'
+        text.value = pin.body ?? ''
+        const button = (label: string, run: () => void) => {
+          const b = document.createElement('button')
+          b.type = 'button'
+          b.textContent = label
+          b.addEventListener('click', run)
+          form.append(b)
+        }
+        form.append(text)
+        button('Save', () => {
+          const list = pinsOf()
+          const at = list.findIndex((q) => q.id === pin.id)
+          list[at] = { ...pin, body: text.value }
+          plugin.refresh()
+        })
+        button('Discard', () => plugin.open(null, { focus: true }))
+        return form
+      },
+      onOpenChange: (_pin: Pin | null, { previous }: { previous: Pin | null }) => {
+        if (!previous?.id.startsWith('n') || previous.body) return
+        const list = pinsOf()
+        list.splice(
+          list.findIndex((q) => q.id === previous.id),
+          1,
+        )
+        plugin.refresh()
+      },
+    }
+  : {}
+// card=note: a short host card that is only a textarea whose text overflows it (it scrolls, the card
+// doesn't); card=shadow: the same textarea inside a web component's shadow root (as <sl-textarea>)
+const noteCard =
+  p.get('card') === 'note' || p.get('card') === 'shadow'
+    ? {
+        renderCard: () => {
+          const text = document.createElement('textarea')
+          text.setAttribute('aria-label', 'Note')
+          text.style.cssText = 'display:block;box-sizing:border-box;width:200px;height:64px'
+          text.value = Array.from({ length: 30 }, (_, k) => `Line ${k + 1}`).join('\n')
+          if (p.get('card') === 'note') return text
+          const field = document.createElement('x-field')
+          field.style.display = 'block'
+          field.attachShadow({ mode: 'open' }).append(text)
+          return field
+        },
+      }
+    : {}
+// card=frag: a host card returned as a DocumentFragment, unwrapped: a full-bleed lead paragraph
+// (positioned, under the close button), then inline siblings and a button directly in the card
+const fragCard =
+  p.get('card') === 'frag'
+    ? {
+        renderCard: () => {
+          const frag = document.createDocumentFragment()
+          const lead = document.createElement('p')
+          lead.className = 'lead'
+          lead.style.cssText = 'position:relative;margin-inline-end:-32px'
+          lead.textContent = 'A lead paragraph, wider than the line below it.'
+          const span = (text: string) => {
+            const s = document.createElement('span')
+            s.className = 'inline'
+            s.textContent = text
+            return s
+          }
+          const go = document.createElement('button')
+          go.type = 'button'
+          go.textContent = 'Go'
+          frag.append(lead, span('One'), ' ', span('Two'), ' ', go)
+          return frag
+        },
+      }
+    : {}
+// card=empty: a host card with no contents yet (or `h` px of them), as one filled later
+const emptyCard =
+  p.get('card') === 'empty'
+    ? {
+        renderCard: () => {
+          const div = document.createElement('div')
+          div.className = 'host-card'
+          div.style.height = `${Number(p.get('h') ?? 0)}px`
+          return div
+        },
+      }
+    : {}
 const plugin = pins({
+  ...emptyCard,
+  ...formCard,
+  ...draftCard,
+  ...noteCard,
+  ...fragCard,
   presentation: (p.get('presentation') ?? 'tag') as PinPresentation,
   onPlace: (at, { item }) => {
     placed.push(at)
-    ;(item.meta as { pins: Pin[] }).pins.push({ id: `n${placed.length}`, ...at, label: 'New' })
+    const id = `n${placed.length}`
+    ;(item.meta as { pins: Pin[] }).pins.push({ id, ...at, label: 'New' })
     plugin.refresh()
+    if (draft) plugin.open(id, { focus: true })
   },
 })
 const viewer = createViewer({ collection, plugins: [plugin] })
@@ -74,4 +206,4 @@ mount(viewer, {
   autoHide: false,
 })
 viewer.open({ g: 0, i: Number(p.get('i') ?? 0) })
-Object.assign(window, { viewer, placed })
+Object.assign(window, { viewer, placed, removed })

@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 
-import type { Collection, ViewerApi } from '@gallerist/core'
+import type { Collection, MediaAdapter, Plugin, RegionCtx, ViewerApi } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { StrictMode, createRef, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Gallerist } from './Gallerist'
 import { useViewerContext } from './context'
+import { useCurrentItem } from './useCurrentItem'
 import { useGallerist } from './useGallerist'
 
 const collection: Collection = {
@@ -31,7 +32,7 @@ describe('<Gallerist>', () => {
     )
     const root = document.querySelector('.gallerist') as HTMLElement
     expect(root.getAttribute('data-gallerist-preset')).toBe('reviewer')
-    expect(root.getAttribute('data-gallerist-arrows')).toBe('corner-br') // reviewer default
+    expect(root.getAttribute('data-gallerist-arrows')).toBe('docked') // reviewer default
     expect(root.getAttribute('data-gallerist-skin')).toBe('console')
     expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
     expect(root.hasAttribute('data-gallerist-scheme')).toBe(false) // the skin's own default
@@ -47,6 +48,21 @@ describe('<Gallerist>', () => {
     expect(root.getAttribute('data-gallerist-skin')).toBe('console')
     expect(root.getAttribute('data-gallerist-scheme')).toBe('light')
     expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
+  })
+
+  it('hands the preset to plugin regions (thumbnails() reads its rail defaults there)', () => {
+    const seen: RegionCtx['preset'][] = []
+    const probe: Plugin = () => ({
+      name: 'probe',
+      regions: {
+        footer: (ctx) => {
+          seen.push(ctx.preset)
+          return document.createElement('div')
+        },
+      },
+    })
+    render(<Gallerist collection={collection} open preset="reviewer" plugins={[probe]} />)
+    expect(seen[0]?.thumbnails).toEqual({ itemAxis: 'vertical', timeline: true, numberItems: true })
   })
 
   it('passes navigator to the renderer, overriding the preset', () => {
@@ -333,5 +349,221 @@ describe('portal bridge', () => {
       root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  describe('0.3 API', () => {
+    const three: Collection = {
+      groups: [
+        {
+          id: 'g0',
+          items: [
+            { id: 'a', type: 'image', source: 'a.jpg', caption: 'Text a' },
+            { id: 'a2', type: 'image', source: 'a2.jpg' },
+          ],
+        },
+        { id: 'g1', items: [{ id: 'b', type: 'image', source: 'b.jpg', caption: 'Text b' }] },
+        { id: 'g2', items: [{ id: 'c', type: 'image', source: 'c.jpg' }] },
+      ],
+    }
+    const counter = () => document.querySelector('.gallerist-counter')?.textContent
+
+    it('open={{ g, i }} opens at a position, and a new position while open moves the cursor', () => {
+      const ref = createRef<ViewerApi>()
+      const { rerender } = render(<Gallerist ref={ref} collection={three} open={{ g: 1 }} />)
+      expect(ref.current?.getState().phase).not.toBe('closed')
+      expect(ref.current?.getState().cursor).toEqual({ g: 1, i: 0 })
+      rerender(<Gallerist ref={ref} collection={three} open={{ g: 0, i: 1 }} />)
+      expect(ref.current?.getState().cursor).toEqual({ g: 0, i: 1 })
+      // the user navigates; an inline object with the same value doesn't snap back
+      act(() => ref.current?.next())
+      rerender(<Gallerist ref={ref} collection={three} open={{ g: 0, i: 1 }} />)
+      expect(ref.current?.getState().cursor.g).toBe(1)
+      rerender(<Gallerist ref={ref} collection={three} open={false} />)
+      expect(['closing', 'closed']).toContain(ref.current?.getState().phase)
+    })
+
+    it('forwards label, preload, adapters and returnFocus to the renderer', () => {
+      const back = document.createElement('button')
+      document.body.appendChild(back)
+      const returnFocus = vi.fn(() => back)
+      const mountMedia = vi.fn((_item: unknown, slot: HTMLElement) => {
+        const element = document.createElement('div')
+        element.className = 'custom-media'
+        slot.appendChild(element)
+        return {
+          element,
+          ready: Promise.resolve(),
+          supportsZoom: false,
+          destroy: () => element.remove(),
+        }
+      })
+      const adapter: MediaAdapter = { type: 'image', mount: mountMedia }
+      const { rerender } = render(
+        <Gallerist
+          collection={three}
+          open
+          label="Screenshots"
+          preload={{ ahead: 0, behind: 0 }}
+          adapters={[adapter]}
+          returnFocus={returnFocus}
+        />,
+      )
+      const root = document.querySelector('.gallerist') as HTMLElement
+      expect(root.getAttribute('aria-label')).toBe('Screenshots')
+      expect(document.querySelectorAll('.gallerist-slide')).toHaveLength(1)
+      expect(document.querySelector('.custom-media')).not.toBeNull()
+      expect(mountMedia).toHaveBeenCalled()
+      rerender(
+        <Gallerist
+          collection={three}
+          open={false}
+          label="Screenshots"
+          preload={{ ahead: 0, behind: 0 }}
+          adapters={[adapter]}
+          returnFocus={returnFocus}
+        />,
+      )
+      expect(document.querySelector('.gallerist')).toBeNull()
+      expect(returnFocus).toHaveBeenCalled()
+      expect(document.activeElement).toBe(back)
+      back.remove()
+    })
+
+    it('Gallerist.Caption renders the current item into the caption region', () => {
+      const ref = createRef<ViewerApi>()
+      render(
+        <Gallerist ref={ref} collection={three} open>
+          <Gallerist.Caption>
+            {({ item, group, cursor }) =>
+              item.id === 'b' ? null : (
+                <b>
+                  {group.id}:{item.id}@{cursor.i}
+                </b>
+              )
+            }
+          </Gallerist.Caption>
+        </Gallerist>,
+      )
+      const region = () => document.querySelector('.gallerist-region-caption') as HTMLElement
+      expect(region().textContent).toBe('g0:a@0')
+      expect(document.querySelector('.gallerist-caption-text')?.textContent).toBe('')
+      act(() => ref.current?.nextItem())
+      expect(region().textContent).toBe('g0:a2@1')
+      act(() => ref.current?.next())
+      expect(region().textContent).toBe('Text b') // null → the text caption
+      act(() => ref.current?.next())
+      expect(region().textContent).toBe('g2:c@0')
+    })
+
+    it('open goes { g: 1 } → true → false → { g: 1 }: opens there, stays put, closes, reopens there', () => {
+      const ref = createRef<ViewerApi>()
+      const { rerender } = render(<Gallerist ref={ref} collection={three} open={{ g: 1 }} />)
+      expect(ref.current?.getState().cursor).toEqual({ g: 1, i: 0 })
+      act(() => ref.current?.next())
+      rerender(<Gallerist ref={ref} collection={three} open />)
+      expect(ref.current?.getState().phase).not.toMatch(/clos/)
+      expect(ref.current?.getState().cursor).toEqual({ g: 2, i: 0 }) // true keeps the position
+      rerender(<Gallerist ref={ref} collection={three} open={false} />)
+      expect(ref.current?.getState().phase).toBe('closed')
+      rerender(<Gallerist ref={ref} collection={three} open={{ g: 1 }} />)
+      expect(ref.current?.getState().phase).not.toMatch(/clos/)
+      expect(ref.current?.getState().cursor).toEqual({ g: 1, i: 0 })
+    })
+
+    it('Gallerist.Caption under StrictMode mounts once and follows navigation', () => {
+      const ref = createRef<ViewerApi>()
+      render(
+        <StrictMode>
+          <Gallerist ref={ref} collection={three} open>
+            <Gallerist.Caption>{({ item }) => <b className="cap">{item.id}</b>}</Gallerist.Caption>
+          </Gallerist>
+        </StrictMode>,
+      )
+      const region = () => document.querySelector('.gallerist-region-caption') as HTMLElement
+      expect(document.querySelectorAll('.gallerist-region-caption')).toHaveLength(1)
+      expect(region().children).toHaveLength(1) // one portal host after the double effects
+      expect(document.querySelectorAll('.cap')).toHaveLength(1)
+      expect(region().textContent).toBe('a')
+      act(() => ref.current?.next())
+      expect(region().children).toHaveLength(1)
+      expect(document.querySelectorAll('.cap')).toHaveLength(1)
+      expect(region().textContent).toBe('b')
+    })
+
+    it('Gallerist.Caption shows the text caption in the theme span for false; an object caption is none', () => {
+      const ref = createRef<ViewerApi>()
+      const legacy: Collection = {
+        groups: [
+          {
+            id: 'g0',
+            items: [
+              { id: 'a', type: 'image', source: 'a.jpg', caption: 'Text a' },
+              // untyped data still carrying an old object-shaped caption
+              {
+                id: 'o',
+                type: 'image',
+                source: 'o.jpg',
+                caption: { text: 'x' } as unknown as string,
+              },
+            ],
+          },
+        ],
+      }
+      render(
+        <Gallerist ref={ref} collection={legacy} open>
+          <Gallerist.Caption>{({ item }) => item.id === 'zzz'}</Gallerist.Caption>
+        </Gallerist>,
+      )
+      const region = () => document.querySelector('.gallerist-region-caption') as HTMLElement
+      expect(region().querySelector('span.gallerist-caption-text')?.textContent).toBe('Text a')
+      expect(() => act(() => ref.current?.nextItem())).not.toThrow()
+      expect(ref.current?.getState().cursor.i).toBe(1)
+      expect(region().textContent).toBe('')
+      expect(region().querySelector('.gallerist-caption-text')).toBeNull()
+    })
+
+    it('removing Gallerist.Caption brings the text caption back', () => {
+      const { rerender } = render(
+        <Gallerist collection={three} open>
+          <Gallerist.Caption>{() => <i>custom</i>}</Gallerist.Caption>
+        </Gallerist>,
+      )
+      expect(document.querySelector('.gallerist-region-caption')?.textContent).toBe('custom')
+      rerender(<Gallerist collection={three} open />)
+      expect(document.querySelector('.gallerist-region-caption')?.childNodes).toHaveLength(0)
+      expect(document.querySelector('.gallerist-caption-text')?.textContent).toBe('Text a')
+    })
+
+    it('useCurrentItem() follows the cursor and ignores zoom', () => {
+      const ref = createRef<ViewerApi>()
+      let renders = 0
+      function Current() {
+        const { item, cursor } = useCurrentItem()
+        renders++
+        return (
+          <output data-testid="current">
+            {item?.id}:{cursor.g}.{cursor.i}
+          </output>
+        )
+      }
+      render(
+        <Gallerist ref={ref} collection={three} open>
+          <Current />
+        </Gallerist>,
+      )
+      expect(screen.getByTestId('current').textContent).toBe('a:0.0')
+      act(() => ref.current?.next())
+      expect(screen.getByTestId('current').textContent).toBe('b:1.0')
+      const before = renders
+      act(() => ref.current?.zoomTo(2))
+      expect(renders).toBe(before)
+    })
+
+    it('ref.current.open({ g, i }) opens at a position', () => {
+      const ref = createRef<ViewerApi>()
+      render(<Gallerist ref={ref} collection={three} />)
+      act(() => ref.current?.open({ g: 2 }))
+      expect(counter()).toContain('3 / 3')
+    })
   })
 })

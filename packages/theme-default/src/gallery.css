@@ -17,7 +17,7 @@
   .gallerist {
     color-scheme: dark;
     --gallerist-bg: #0b0b0c; /* the solid ground, also the gap inside a selection ring */
-    --gallerist-backdrop: rgb(11 11 12 / 0.98);
+    --gallerist-backdrop: rgb(11 11 12); /* opaque: a phone showed the page through */
     --gallerist-fg: #f4f4f2;
     --gallerist-fg-muted: #b9b9b4;
     --gallerist-chrome-bg: rgb(24 24 26 / 0.6);
@@ -116,7 +116,7 @@
   .gallerist[data-gallerist-scheme="light"] {
     color-scheme: light;
     --gallerist-bg: #f4f3ef;
-    --gallerist-backdrop: rgb(244 243 239 / 0.98);
+    --gallerist-backdrop: rgb(244 243 239);
     --gallerist-fg: #151515;
     --gallerist-fg-muted: #55554f;
     --gallerist-chrome-bg: rgb(255 255 255 / 0.85);
@@ -143,7 +143,7 @@
     .gallerist[data-gallerist-scheme="auto"] {
       color-scheme: light;
       --gallerist-bg: #f4f3ef;
-      --gallerist-backdrop: rgb(244 243 239 / 0.98);
+      --gallerist-backdrop: rgb(244 243 239);
       --gallerist-fg: #151515;
       --gallerist-fg-muted: #55554f;
       --gallerist-chrome-bg: rgb(255 255 255 / 0.85);

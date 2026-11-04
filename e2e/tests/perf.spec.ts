@@ -37,6 +37,8 @@ type Probe = {
   createdBy: Record<string, number>
   destroyedBy: Record<string, number>
   movedBy: Record<string, number>
+  /** the rail's drawn run changed (a card entered or left it) */
+  shifted: boolean
 }
 type Counts = {
   elements: number
@@ -145,7 +147,27 @@ const install = (page: Page) =>
         )
         if (!btn) return false
         btn.click()
-      } else if (action === 'startTour') {
+      } else if (action === 'toRailEnd') {
+        // the last card wholly inside the rail: a group step from there scrolls the rail, and the
+        // run follows (cards enter at one end and leave at the other)
+        const rail = root.querySelector<HTMLElement>('.gallerist-thumbs')
+        if (!rail) return false
+        const box = rail.getBoundingClientRect()
+        const down = getComputedStyle(rail).flexDirection.startsWith('column')
+        const cards = [
+          ...rail.querySelectorAll<HTMLElement>(
+            'button[data-group]:not(.gallerist-thumb-expand), button[data-item]',
+          ),
+        ].filter((c) => {
+          const r = c.getBoundingClientRect()
+          return r.width > 0 && (down ? r.bottom <= box.bottom : r.right <= box.right)
+        })
+        const last = cards.at(-1)
+        const id = last?.dataset.group ?? last?.dataset.item?.split('i')[0]
+        if (!id) return false
+        v.goTo(Number(id.slice(1)), 0)
+      } else if (action === 'nextPastEdge') v.next()
+      else if (action === 'startTour') {
         const btn = root.querySelector<HTMLElement>('.gallerist-grid-start')
         if (!btn) return false
         btn.click()
@@ -175,6 +197,15 @@ const install = (page: Page) =>
           }
         }
       }
+      // the drawn run: the first and last card in the rail
+      const runOf = () => {
+        const cards = root.querySelectorAll<HTMLElement>(
+          '.gallerist-thumbs [data-group]:not(.gallerist-thumb-expand), .gallerist-thumbs [data-item]',
+        )
+        const id = (c?: HTMLElement) => c?.dataset.item ?? c?.dataset.group
+        return `${id(cards[0])}..${id(cards[cards.length - 1])}`
+      }
+      const runBefore = runOf()
       const mo = new MutationObserver(take)
       mo.observe(root, { subtree: true, childList: true, attributes: true, characterData: true })
       const t0 = performance.now()
@@ -211,6 +242,7 @@ const install = (page: Page) =>
         createdBy: tally(created),
         destroyedBy: tally(destroyed),
         movedBy: tally(moved),
+        shifted: runOf() !== runBefore,
       }
     }
     const stats = (xs: number[]) => {
@@ -444,6 +476,13 @@ for (const config of CONFIGS) {
         await run('next') // across a group boundary
         await run('prev')
         await run('clickGroupThumb')
+        // two group steps from the end of what the rail shows: each scrolls the rail by about a
+        // card, so between them the run must shift (one alone may stop short of the next card).
+        // Far enough in that the run isn't held at the start of the collection.
+        await call(page, 'probe', `goTo:${Math.min(60, groupCount - 3)},0`)
+        await call(page, 'probe', 'toRailEnd')
+        await run('nextPastEdge')
+        await run('nextPastEdge')
       }
 
       // ── latency series (~50 steps each) ──
@@ -511,9 +550,19 @@ for (const config of CONFIGS) {
         // active state moves between two thumbs, whatever the group's size (was 10k writes at 1x10000)
         expect.soft(s.attrMutations, `${s.action} attribute writes`).toBeLessThanOrEqual(40)
       }
-      for (const s of steps.filter((x) => x.action === 'next' || x.action === 'prev')) {
+      for (const s of steps.filter((x) => /^(next|prev)$|PastEdge$/.test(x.action))) {
         // a group step inserts the cards that enter the rail; the ones that stay aren't re-appended
         expect.soft(s.moved, `${s.action} moved`).toBeLessThanOrEqual(8)
+      }
+      const pastEdge = steps.filter((x) => x.action === 'nextPastEdge')
+      if (pastEdge.length) {
+        // the gate above saw the rail's run actually move
+        expect
+          .soft(
+            pastEdge.some((s) => s.shifted),
+            'a step past the rail edge shifted the run',
+          )
+          .toBe(true)
       }
       const gridEls = (c: Counts) => c.regions['.gallerist-grid'] ?? 0
       if (config === 'tour') {

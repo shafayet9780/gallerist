@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolvePreset } from './presets'
+import { type ResolvedPreset, resolvePreset } from './presets'
 
 describe('resolvePreset', () => {
   it('filmstrip: bottom rail, side pill arrows, persistent chrome', () => {
@@ -18,9 +18,9 @@ describe('resolvePreset', () => {
     expect(p.rootAttrs['data-gallerist-preset']).toBe('immersive')
   })
 
-  it('reviewer: bottom timeline rail + corner arrows', () => {
+  it('reviewer: bottom timeline rail + docked arrows (nothing over the media)', () => {
     const p = resolvePreset('reviewer')
-    expect(p.arrows).toBe('corner-br')
+    expect(p.arrows).toBe('docked')
     expect(p.rail).toBe('bottom')
     expect(p.rootAttrs['data-gallerist-preset']).toBe('reviewer')
     expect(p.thumbnails).toMatchObject({ timeline: true, numberItems: true })
@@ -50,6 +50,28 @@ describe('resolvePreset', () => {
     expect(p.arrowLabels).toBe(true)
     expect(p.frame).toBe(true)
     expect(p.thumbnails.groupDisplay).toBe('index')
+  })
+
+  it('hands out frozen entries, so a plugin cannot change a preset for later mounts', () => {
+    for (const name of ['filmstrip', 'immersive', 'reviewer', 'editorial', 'tour', 'contact']) {
+      const p = resolvePreset(name)
+      expect(Object.isFrozen(p)).toBe(true)
+      expect(Object.isFrozen(p.thumbnails)).toBe(true)
+      expect(Object.isFrozen(p.rootAttrs)).toBe(true)
+      expect(() => {
+        ;(p.thumbnails as { numberItems?: boolean }).numberItems = false
+      }).toThrow(TypeError)
+    }
+    // …and typed read-only, so such a write fails at compile time (typecheck covers this file)
+    const write = (p: ResolvedPreset) => {
+      // @ts-expect-error a preset is read-only
+      p.autoHide = true
+      // @ts-expect-error its thumbnails defaults too
+      p.thumbnails.numberItems = false
+      // @ts-expect-error and its root attributes
+      p.rootAttrs['data-x'] = 'y'
+    }
+    expect(typeof write).toBe('function')
   })
 
   it('falls back to filmstrip for an unknown name (and warns)', () => {

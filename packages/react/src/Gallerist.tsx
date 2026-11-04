@@ -1,5 +1,6 @@
 import {
   type Collection,
+  type Cursor,
   type EventHandlers,
   type EventMap,
   type Group,
@@ -35,21 +36,32 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { GalleristContext, useViewerContext } from './context'
+import { useCurrentItem } from './useCurrentItem'
+
+/** A position to open at: group `g`, item `i` (default: the group's remembered item). */
+export interface GalleristOpenAt {
+  g: number
+  i?: number
+}
 
 /**
  * `items` / `groups` / `collection` and `on` are reactive. Changed data swaps the collection in
  * place (diffed by id, keeping the cursor); data rebuilt with the same content is ignored. Every other viewer option
  * (`loop`, `itemMemory`, `startAt`, `plugins`, `overlays`, …) and the layout props (`container`,
- * `preset`, `arrows`, `rail`, …) are read once; change the component's `key` to apply new ones.
- * `skin`, `accent`, `scheme` and `open` are reactive.
+ * `preset`, `arrows`, `rail`, `label`, `preload`, `adapters`, …) are read once; change the
+ * component's `key` to apply new ones. `skin`, `accent`, `scheme` and `open` are reactive.
  */
 export interface GalleristProps extends ViewerOptions {
-  /** controlled visibility. */
-  open?: boolean
+  /**
+   * Controlled visibility. `true` opens at the current position; `{ g, i }` opens there, and a new
+   * position while open moves the cursor (applied when the value changes, so the user can still
+   * navigate away from it); `false` closes. Leave it undefined to drive the viewer through the ref.
+   */
+  open?: boolean | GalleristOpenAt
   onClose?: () => void
   container?: HTMLElement | null
   controls?: boolean
-  /** layout preset (sets arrow placement, auto-hide, data-gallerist-preset) — UX-E. */
+  /** layout preset (arrow placement, auto-hide, data-gallerist-preset, the thumbnails() defaults) — UX-E. */
   preset?: PresetName
   /** visual skin, default `gallery`; other skins need their stylesheet (reactive). */
   skin?: Skin
@@ -77,6 +89,15 @@ export interface GalleristProps extends ViewerOptions {
   groupAxis?: MountOptions['groupAxis']
   /** name the group arrows after their target group (overrides the preset); read once at mount. */
   arrowLabels?: MountOptions['arrowLabels']
+  /** the overlay dialog's accessible name (default `strings.dialog`); read once at mount. */
+  label?: string
+  /** where focus returns when the overlay closes (default: what had focus when it opened); read
+   *  once at mount, so pass a getter for a target that changes. */
+  returnFocus?: MountOptions['returnFocus']
+  /** how many groups to keep mounted ahead of and behind the current one; read once at mount. */
+  preload?: MountOptions['preload']
+  /** media adapters, replacing the default image adapter; read once at mount. */
+  adapters?: MountOptions['adapters']
   children?: ReactNode
 }
 
@@ -169,6 +190,10 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     frame,
     groupAxis,
     arrowLabels,
+    label,
+    returnFocus,
+    preload,
+    adapters,
     children,
     ...options
   } = props
@@ -247,6 +272,10 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
       frame,
       groupAxis,
       arrowLabels,
+      label,
+      returnFocus,
+      preload,
+      adapters,
       skin,
       accent,
       scheme,
@@ -265,11 +294,16 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     if (root) applyAppearance(root, { skin, accent, scheme })
   }, [skin, accent, scheme])
 
+  // `open` is compared by value, so an inline `open={{ g: 2 }}` re-applies only when g or i change
+  const openG = typeof open === 'object' && open ? open.g : undefined
+  const openI = typeof open === 'object' && open ? open.i : undefined
+  const shown = open === undefined ? undefined : !!open
   useEffect(() => {
-    if (open === undefined) return
-    if (open) viewer.open()
+    if (shown === undefined) return
+    // open({ g, i }) on a viewer already showing is a navigation (core)
+    if (shown) viewer.open(openG === undefined ? undefined : { g: openG, i: openI })
     else viewer.close()
-  }, [open, viewer])
+  }, [shown, openG, openI, viewer])
 
   useEffect(() => {
     if (!onClose) return
@@ -353,4 +387,39 @@ function Region(props: GalleristRegionProps): ReactNode {
   return host ? createPortal(props.children, host) : null
 }
 
-export const Gallerist = Object.assign(GalleristBase, { Overlay, Region })
+export interface GalleristCaptionProps<GM = unknown, IM = unknown> {
+  /**
+   * the caption for the current item; `null`, `undefined`, `true` or `false` shows its text
+   * `caption` (in a `span.gallerist-caption-text`, the theme's caption type)
+   */
+  children: (current: {
+    item: Item<IM>
+    group: Group<GM, IM>
+    cursor: Readonly<Cursor>
+  }) => ReactNode
+}
+
+/**
+ * Render the caption for the current item with React, into the renderer's caption region (the
+ * caption bar, the editorial placard, wherever the preset puts it). Re-renders on navigation and
+ * collection changes. Its text is the viewer's accessible description, like a text caption.
+ */
+function Caption<GM = unknown, IM = unknown>(props: GalleristCaptionProps<GM, IM>): ReactNode {
+  const { item, group, cursor } = useCurrentItem<GM, IM>()
+  const out = item && group ? props.children({ item, group, cursor }) : null
+  return (
+    <Region name="caption">
+      {out == null || typeof out === 'boolean' ? text(item?.caption) : out}
+    </Region>
+  )
+}
+
+// The item's own text caption, styled like the bar's text. Untyped data (JSON, a CDN page) can still
+// carry an old object-shaped caption, which React would throw on: anything but a string is none.
+function text(caption: unknown): ReactNode {
+  return typeof caption === 'string' && caption ? (
+    <span className="gallerist-caption-text">{caption}</span>
+  ) : null
+}
+
+export const Gallerist = Object.assign(GalleristBase, { Overlay, Region, Caption })

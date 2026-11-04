@@ -55,6 +55,28 @@ const CONFIGS: Record<string, string> = {
   'tour-long-caption': 'preset=tour&captions=long&g=1',
   'axis-vertical-bottom-rail': 'axis=vertical',
   'scheme-auto-light': 'scheme=auto&accent=mint&captions=1', // run with the system in light mode
+  // a caption renderer (plugin-captions) owns the band: one line, and far more than 40vh of text
+  'custom-caption': 'custom=short',
+  'custom-caption-tall': 'custom=tall',
+  'reviewer-custom-caption': 'preset=reviewer&custom=short',
+  'reviewer-custom-caption-tall': 'preset=reviewer&custom=tall',
+  'editorial-custom-caption': 'preset=editorial&custom=short',
+  'editorial-custom-caption-tall': 'preset=editorial&custom=tall',
+  // docked controls (the reviewer's layout): gutter arrows, the item navigator on the item column or
+  // at the end of the caption row
+  'arrows-docked': 'arrows=docked&captions=1',
+  'docked-no-plugins': 'arrows=docked&plugins=0&captions=1', // no item column: the caption row
+  'docked-rail-left': 'arrows=docked&rail=left',
+  'docked-rail-hidden': 'arrows=docked&rail=hidden&captions=1',
+  'reviewer-wide': 'preset=reviewer&wide=1&custom=short',
+  'reviewer-large-group': 'preset=reviewer&g=5&captions=1',
+  // docked where the caption isn't a row under the stage: immersive (the stage's corner) and
+  // editorial without a placard (the end of the caption column); one group (no group arrows, no
+  // gutters); linear (no navigator, no room kept for it)
+  'docked-immersive': 'preset=immersive&arrows=docked&captions=1&railopen=1',
+  'docked-editorial': 'preset=editorial&arrows=docked&indicator=pills&captions=1',
+  'docked-one-group': 'arrows=docked&groups=1&g=0&captions=1',
+  'docked-linear': 'preset=reviewer&linear=1&captions=1',
 }
 
 // every configuration runs in every skin: skins set tokens (sizes included), so each needs the sweep
@@ -64,6 +86,8 @@ const VIEWPORTS = {
   desktop: { viewport: { width: 1280, height: 800 } },
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
   narrow: { viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true },
+  // a phone turned sideways: wide but short, so the bar, caption and rail compete for 390px of height
+  landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true },
 } as const
 
 // One entry per independently placed piece of chrome. Containers that merely group other atoms are
@@ -80,6 +104,7 @@ const ATOMS = [
   '.gallerist-item-next',
   '.gallerist-position',
   '.gallerist-caption-text', // the caption's text (a placard caption also holds the item navigator)
+  '.gallerist-captions', // a caption renderer's node, in place of the text
   '.gallerist-rail-toggle',
   '.gallerist-thumbs',
   '.gallerist-thumb-items:not(.gallerist-thumb-section > *)', // a section index holds its own, inside
@@ -167,6 +192,35 @@ async function installClip(page: Page) {
       if (x1 - x0 < 1 || y1 - y0 < 1) return null
       r = new DOMRect(x0, y0, x1 - x0, y1 - y0)
       return r
+    }
+  })
+}
+
+// The rail has drawn its cards and the layout has held still for two frames (rail contents and
+// scroll, stage and caption band size), rather than a fixed delay.
+async function railSettled(page: Page) {
+  await expect(page.locator('.gallerist-thumbs > *').first()).toBeAttached()
+  await page.evaluate(async () => {
+    const frame = () => new Promise((done) => requestAnimationFrame(done))
+    const snap = () => {
+      const rail = document.querySelector('.gallerist-thumbs')
+      const box = (sel: string) => document.querySelector(sel)?.getBoundingClientRect().height
+      return [
+        rail?.childElementCount,
+        rail?.scrollLeft,
+        rail?.scrollTop,
+        box('.gallerist-stage'),
+        box('.gallerist-caption'),
+      ].join()
+    }
+    let last = snap()
+    let still = 0
+    for (let n = 0; still < 2; n++) {
+      if (n === 120) throw new Error(`rail did not settle in 120 frames (${last})`)
+      await frame()
+      const now = snap()
+      still = now === last ? still + 1 : 0
+      last = now
     }
   })
 }
@@ -376,6 +430,217 @@ test.describe('layout lint', () => {
   }
 })
 
+// The reviewer preset (`arrows: 'docked'`): review needs every pixel, so no chrome control sits
+// over the painted image, at any size, with or without a caption band, in every skin, both engines.
+test.describe('reviewer: nothing over the media', () => {
+  const SHOTS = {
+    desktop: VIEWPORTS.desktop,
+    phone: VIEWPORTS.phone,
+    landscape: VIEWPORTS.landscape,
+  }
+  // the painted image (object-fit: contain inside the media element), in viewport px
+  const paintedMedia = (page: Page) =>
+    page.evaluate(() => {
+      const img = document.querySelector<HTMLImageElement>(
+        '.gallerist-content[data-gallerist-current] .gallerist-media-image',
+      )
+      if (!img?.naturalWidth) return null
+      const r = img.getBoundingClientRect()
+      const s = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight)
+      const w = img.naturalWidth * s
+      const h = img.naturalHeight * s
+      return { x: r.x + (r.width - w) / 2, y: r.y + (r.height - h) / 2, w, h }
+    })
+  const CHROME = [
+    '.gallerist-bar',
+    '.gallerist-region-toolbar > *',
+    '.gallerist-prev',
+    '.gallerist-next',
+    '.gallerist-itemnav',
+    '.gallerist-item-prev',
+    '.gallerist-item-next',
+    '.gallerist-position',
+    '.gallerist-caption',
+    '.gallerist-thumbs',
+    '.gallerist-thumb-items',
+    '.gallerist-rail-handle',
+  ]
+  for (const [vpName, vp] of Object.entries(SHOTS)) {
+    test.describe(vpName, () => {
+      test.use(vp)
+      for (const skin of SKINS)
+        for (const look of [
+          'g=1',
+          'g=1&custom=short',
+          'g=1&custom=tall',
+          'g=1&captions=1',
+          'g=1&custom=short&wide=1', // a panorama fills the stage's width: the arrows' gutters
+          'g=5&captions=1&dir=rtl',
+          'g=1&custom=short&rail=hidden', // no item column: the navigator ends the caption row
+          'g=1&captions=1&rail=left', // a side rail: a vertical group axis, both arrows at the end
+          'g=1&custom=short&rail=right',
+        ]) {
+          test(`${skin} ${look}`, async ({ page }) => {
+            await page.goto(`/layout.html?preset=reviewer&skin=${skin}&${look}`)
+            await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+            await expect(page.locator('.gallerist-itemnav')).toBeVisible()
+            await installClip(page)
+            const problems: string[] = []
+            // the first item, then the next one by its own ↓ (the item column and stage stay put)
+            for (const step of ['first', 'next']) {
+              if (step === 'next') await page.locator('.gallerist-item-next').click()
+              await expect(
+                page.locator('.gallerist-content[data-gallerist-current] .gallerist-media-image'),
+              ).toHaveAttribute('data-gallerist-loaded', '')
+              if (!look.includes('rail=hidden')) await railSettled(page)
+              // the item's own entrance (a skin's slide or fade) has ended; an endless animation (a
+              // loading shimmer, say) never finishes, so it isn't waited for
+              await page.evaluate(() =>
+                Promise.all(
+                  document
+                    .getAnimations()
+                    .filter((a) => a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY)
+                    .map((a) => a.finished.catch(() => null)),
+                ),
+              )
+              const media = await paintedMedia(page)
+              if (!media) {
+                problems.push(`${step}: no painted media`)
+                continue
+              }
+              const box = { sel: 'media', label: 'media', ...media, fw: 0, fh: 0 }
+              for (const c of await measure(page, CHROME)) {
+                if (overlap(c, { ...box, button: false, inStage: true }))
+                  problems.push(`${step}: ${c.label} over the media`)
+              }
+            }
+            expect(problems, problems.join('\n')).toEqual([])
+          })
+        }
+    })
+  }
+
+  test('the stage keeps its size between one-item and several-item groups', async ({ page }) => {
+    for (const vp of [VIEWPORTS.desktop.viewport, VIEWPORTS.phone.viewport]) {
+      await page.setViewportSize(vp)
+      const sizes: string[] = []
+      for (const g of [0, 1, 5]) {
+        await page.goto(`/layout.html?preset=reviewer&skin=console&g=${g}`)
+        await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+        await railSettled(page)
+        const box = await page.locator('.gallerist-stage').boundingBox()
+        sizes.push(`${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)}`)
+      }
+      expect(new Set(sizes).size, `${vp.width}px: ${sizes.join(' / ')}`).toBe(1)
+    }
+  })
+
+  test('the item navigator heads the item column, and moves to the caption row without it', async ({
+    page,
+  }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console&g=1&custom=short')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    await railSettled(page)
+    const where = () =>
+      page.evaluate(() => {
+        const box = (sel: string) =>
+          document.querySelector(sel)?.getBoundingClientRect() ?? new DOMRect()
+        const nav = box('.gallerist-itemnav')
+        const items = box('.gallerist-region-aside .gallerist-thumb-items')
+        const caption = box('.gallerist-caption')
+        const stage = box('.gallerist-stage')
+        return {
+          aboveItems: nav.bottom <= items.top + 0.5 && nav.left >= items.left - 12,
+          inCaptionRow:
+            nav.top >= stage.bottom - 0.5 &&
+            nav.top < caption.bottom &&
+            nav.left >= caption.right - 0.5,
+        }
+      })
+    expect(await where()).toEqual({ aboveItems: true, inCaptionRow: false })
+    await page.keyboard.press('t') // collapse the rail: the item column goes with it
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-rail', 'collapsed')
+    await expect.poll(async () => (await where()).inCaptionRow).toBe(true)
+  })
+
+  test('Tab reads the caption band, then the navigator that ends its row', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'Tab order is DOM order; runs once (chromium)')
+    // a tall caption renderer's band scrolls, so it takes focus
+    await page.goto('/layout.html?preset=reviewer&skin=console&g=1&custom=tall&rail=hidden')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    const band = page.locator('.gallerist-caption[tabindex="0"]')
+    await band.focus()
+    await page.keyboard.press('Tab')
+    await expect(page.locator('.gallerist-item-prev')).toBeFocused()
+  })
+
+  test('one group: no group arrows, and the stage takes their gutters', async ({ page }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console&groups=1&g=0&captions=1')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    await expect(page.locator('.gallerist-prev')).toBeHidden()
+    await expect(page.locator('.gallerist-next')).toBeHidden()
+    const [stage, main] = await Promise.all(
+      ['.gallerist-stage', '.gallerist-main'].map((s) => page.locator(s).boundingBox()),
+    )
+    expect(stage?.width).toBe(main?.width)
+  })
+
+  test('linear: the item column keeps no room for a navigator that never shows', async ({
+    page,
+  }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console&linear=1&captions=1')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    await railSettled(page)
+    await expect(page.locator('.gallerist-region-aside .gallerist-thumb-items')).toBeVisible()
+    await expect(page.locator('.gallerist-itemnav')).toBeHidden()
+    await expect(page.locator('.gallerist-region-aside')).toHaveCSS('padding-top', '0px')
+  })
+
+  test('the docked navigator is a box in every skin, never a pill', async ({ page }) => {
+    for (const skin of SKINS) {
+      await page.goto(`/layout.html?preset=reviewer&skin=${skin}&g=1&captions=1&rail=hidden`)
+      const nav = page.locator('.gallerist-itemnav')
+      await expect(nav).toBeVisible()
+      const { radius, h } = await nav.evaluate((n) => ({
+        radius: Number.parseFloat(getComputedStyle(n).borderTopLeftRadius),
+        h: n.getBoundingClientRect().height,
+      }))
+      expect(radius, skin).toBeLessThanOrEqual(h / 4)
+    }
+  })
+
+  test('docked in other presets: editorial without a placard, immersive', async ({ page }) => {
+    const box = (sel: string) =>
+      page.evaluate((s) => document.querySelector(s)?.getBoundingClientRect().toJSON(), sel)
+    // editorial: the navigator ends the caption column beside the work, under the caption
+    await page.goto('/layout.html?preset=editorial&arrows=docked&indicator=pills&g=1&captions=1')
+    await expect(page.locator('.gallerist-itemnav')).toBeVisible()
+    await railSettled(page)
+    let nav = await box('.gallerist-itemnav')
+    const stage = await box('.gallerist-stage')
+    const caption = await box('.gallerist-caption')
+    expect(nav.left).toBeGreaterThanOrEqual(stage.right)
+    expect(nav.top).toBeGreaterThanOrEqual(caption.bottom)
+    expect(nav.bottom).toBeLessThanOrEqual(stage.bottom + 0.5)
+    // immersive: the stage runs under every band; the navigator takes its bottom inline-end corner,
+    // clear of the bar and the caption band, which keeps its full width
+    await page.goto('/layout.html?preset=immersive&arrows=docked&g=1&captions=1&railopen=1')
+    await expect(page.locator('.gallerist-itemnav')).toBeVisible()
+    await railSettled(page)
+    nav = await box('.gallerist-itemnav')
+    const [bar, band, main] = await Promise.all(
+      ['.gallerist-bar', '.gallerist-caption', '.gallerist-main'].map(box),
+    )
+    expect(nav.top).toBeGreaterThanOrEqual(bar.bottom)
+    expect(nav.bottom).toBeLessThanOrEqual(band.top + 0.5)
+    expect(nav.right).toBeLessThanOrEqual(main.right)
+    expect(band.width).toBeCloseTo(main.width, 0)
+  })
+})
+
 test.describe('layout behaviour', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'runs once (chromium)')
 
@@ -458,6 +723,118 @@ test.describe('layout behaviour', () => {
       }
       expect(new Set(heights).size, heights.join(' / ')).toBe(1)
     })
+  }
+
+  // plugin-captions owns the caption band: from the two-line minimum it grows with its content up to
+  // 40vh (or until the stage is down to 36% of the viewer), then scrolls, and the stage gives up the
+  // room. Stage, caption band, rail and toolbar never overlap, in each preset with its paired skin,
+  // on a desktop and a phone.
+  for (const [preset, skin] of [
+    ['', 'gallery'],
+    ['preset=reviewer', 'console'],
+    ['preset=editorial', 'editorial'],
+  ] as const) {
+    for (const vp of [
+      { width: 1280, height: 800 },
+      { width: 390, height: 844 },
+      { width: 844, height: 390 }, // a phone turned sideways
+    ]) {
+      test(`a custom caption band grows, then scrolls (${preset || 'default'}, ${skin}, ${vp.width}×${vp.height})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(vp)
+        const look = async (size: 'short' | 'tall') => {
+          await page.goto(`/layout.html?skin=${skin}&${preset}&custom=${size}&g=1`)
+          await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+          await expect(page.locator('.gallerist-caption .fixture-caption')).toBeVisible()
+          await railSettled(page)
+          return page.evaluate(() => {
+            const box = (sel: string) => {
+              const el = document.querySelector<HTMLElement>(sel)
+              if (!el?.checkVisibility()) return null
+              const r = el.getBoundingClientRect()
+              return r.width < 1 || r.height < 1
+                ? null
+                : { sel, x: r.x, y: r.y, w: r.width, h: r.height }
+            }
+            const caption = document.querySelector('.gallerist-caption') as HTMLElement
+            // the band, or the caption region inside a placard, is what scrolls
+            const scroller = [caption, ...caption.querySelectorAll<HTMLElement>('*')].find((el) =>
+              /auto|scroll/.test(getComputedStyle(el).overflowY),
+            )
+            let scrolled = 0
+            if (scroller) {
+              scroller.scrollTop = 100_000
+              scrolled = scroller.scrollTop
+              scroller.scrollTop = 0
+            }
+            return {
+              boxes: [
+                box('.gallerist-stage'),
+                box('.gallerist-caption'),
+                box('.gallerist-region-thumbnails'),
+                box('.gallerist-bar'),
+              ],
+              placard:
+                document.querySelector('.gallerist')?.getAttribute('data-gallerist-indicator') ===
+                'placard',
+              lineHeight: Number.parseFloat(getComputedStyle(caption).lineHeight),
+              fontSize: Number.parseFloat(getComputedStyle(caption).fontSize),
+              overflows: scroller ? scroller.scrollHeight > scroller.clientHeight + 1 : false,
+              scrolled,
+              vh: innerHeight,
+            }
+          })
+        }
+        const problems: string[] = []
+        const stageH: Record<string, number> = {}
+        for (const size of ['short', 'tall'] as const) {
+          const got = await look(size)
+          const [stage, caption, rail, bar] = got.boxes
+          if (!stage || !caption) {
+            problems.push(`${size}: no ${stage ? 'caption band' : 'stage'}`)
+            continue
+          }
+          stageH[size] = stage.h
+          const present = got.boxes.filter((b) => b !== null)
+          for (let a = 0; a < present.length; a++)
+            for (let b = a + 1; b < present.length; b++) {
+              const p = present[a] as NonNullable<(typeof present)[number]>
+              const q = present[b] as NonNullable<(typeof present)[number]>
+              const ox = Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x)
+              const oy = Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y)
+              if (ox > 1 && oy > 1) problems.push(`${size}: ${p.sel} overlaps ${q.sel}`)
+            }
+          if (!rail) problems.push(`${size}: no rail`)
+          if (!bar) problems.push(`${size}: no toolbar`)
+          if (stage.h < 120) problems.push(`${size}: stage crushed to ${Math.round(stage.h)}px`)
+          if (got.placard) {
+            // a placard keeps its slot: tall content scrolls inside it
+            if (size === 'tall' && !(got.overflows && got.scrolled > 0))
+              problems.push('tall: the placard does not scroll its caption')
+            continue
+          }
+          if (size === 'short') {
+            // the band keeps the two-line minimum and has nothing to scroll
+            if (caption.h < 2 * got.lineHeight)
+              problems.push(`short: band ${caption.h}px < 2 lines`)
+            if (got.overflows) problems.push('short: band scrolls')
+          } else {
+            if (caption.h > got.vh * 0.4 + 1)
+              problems.push(`tall: band ${Math.round(caption.h)}px > 40vh (${got.vh * 0.4}px)`)
+            // it grows to 40vh, unless the stage reached its floor (36% of the viewer) first
+            if (caption.h < got.vh * 0.4 - 1 && stage.h > got.vh * 0.36 + 2)
+              problems.push(`tall: band ${Math.round(caption.h)}px stopped short of 40vh`)
+            if (!(got.overflows && got.scrolled > 0)) problems.push('tall: band does not scroll')
+          }
+        }
+        // the stage gives up the room a growing band takes (a placard keeps its size)
+        const placard = (await look('short')).placard
+        if (!placard && !((stageH.tall ?? 0) < (stageH.short ?? 0) - 10))
+          problems.push(`stage did not shrink: ${stageH.short} -> ${stageH.tall}`)
+        expect(problems, problems.join('\n')).toEqual([])
+      })
+    }
   }
 
   test('editorial with a side rail keeps a stage', async ({ page }) => {

@@ -6,6 +6,8 @@ export const GalleristContext = createContext<ViewerApi | null>(null)
 export function useViewerContext(): ViewerApi {
   const viewer = useContext(GalleristContext)
   if (!viewer)
-    throw new Error('Gallerist.Overlay / Gallerist.Region must be used inside <Gallerist>')
+    throw new Error(
+      'Gallerist.Overlay / Gallerist.Region / Gallerist.Caption must be used inside <Gallerist>',
+    )
   return viewer
 }

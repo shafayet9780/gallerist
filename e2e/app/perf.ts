@@ -18,6 +18,9 @@ import '@gallerist/theme-default/console.css'
 
 const p = new URLSearchParams(location.search)
 const config = p.get('config') ?? 'default'
+// ?dir=rtl lays the page out right to left; ?rail=left|right moves the default rail to a side
+document.documentElement.dir = p.get('dir') ?? 'ltr'
+const rail = (p.get('rail') ?? undefined) as 'left' | 'right' | undefined
 const [groupCount, perGroup] = (p.get('shape') ?? '2000x5').split('x').map(Number) as [
   number,
   number,
@@ -109,7 +112,7 @@ const viewer = createViewer({
 })
 if (reviewer) mount(viewer, { skin: 'console', preset: 'reviewer' })
 else if (config === 'tour') mount(viewer, { preset: 'tour', skin: 'gallery', scheme: 'light' })
-else mount(viewer, { autoHide: false, linear: config === 'flat' })
+else mount(viewer, { autoHide: false, linear: config === 'flat', rail })
 
 const w = window as unknown as { viewer: typeof viewer; __openClickAt?: number }
 w.viewer = viewer

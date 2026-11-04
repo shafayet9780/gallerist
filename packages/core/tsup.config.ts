@@ -15,8 +15,8 @@ export default defineConfig({
   minify: false,
   target: 'es2022',
   define: { __GALLERIST_VERSION__: JSON.stringify(version) },
-  // Don't embed the full TS source in the shipped maps (keeps the tarball lean).
+  // self-contained maps: they carry their sources, since the package doesn't ship src/
   esbuildOptions(options) {
-    options.sourcesContent = false
+    options.sourcesContent = true
   },
 })

@@ -8,6 +8,7 @@ import {
   downloadItem,
   downloadItems,
   filenameOf,
+  resolveDownloadUrl,
   safeHref,
   sanitizeName,
   urlOf,
@@ -49,6 +50,18 @@ describe('safeHref (scheme allowlist)', () => {
     expect(safeHref('javascript:alert(1)')).toBeNull()
     expect(safeHref('data:text/html,<script>alert(1)</script>')).toBeNull()
     expect(safeHref('file:///etc/passwd')).toBeNull()
+    expect(safeHref('mailto:a@b.c')).toBeNull()
+  })
+
+  it('keeps relative URLs on a page whose own URL is not http (file:, about:srcdoc)', () => {
+    for (const href of ['file:///app/index.html', 'about:srcdoc']) {
+      vi.stubGlobal('location', { href, protocol: `${href.split(':')[0]}:` })
+      try {
+        expect(safeHref('a0.jpg'), href).toBe('a0.jpg')
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
   })
 })
 
@@ -131,5 +144,183 @@ describe('plugin-download', () => {
     ;(document.querySelector('.gallerist-download-btn') as HTMLButtonElement).click()
     await new Promise((r) => setTimeout(r, 0)) // run() resolves urlOf asynchronously
     expect(click).toHaveBeenCalled()
+  })
+
+  const btn = () => document.querySelector('.gallerist-download-btn') as HTMLButtonElement
+  const tick = () => new Promise((r) => setTimeout(r, 0))
+
+  it('disables the button for an item without a safe URL, per item on navigation', async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const col: Collection = {
+      groups: [
+        {
+          id: 'g0',
+          items: [
+            item('ok', 'ok.jpg'),
+            item('data', 'data:image/png;base64,AAAA'),
+            item('js', 'javascript:alert(1)'),
+            item('tiles', { tiles: { url: 'x.dzi' } as never }),
+            item('loader', { loader: async () => 'later.jpg' }),
+          ],
+        },
+      ],
+    }
+    const v = createViewer({ collection: col, plugins: [download()] })
+    mount(v)
+    v.open()
+    expect(btn().getAttribute('aria-disabled')).toBe('false')
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('true')
+    btn().click()
+    document
+      .querySelector('.gallerist')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }))
+    await tick()
+    expect(click).not.toHaveBeenCalled() // neither the button nor the key does anything
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('true')
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('true')
+    v.nextItem() // a loader resolves on click: enabled until then
+    expect(btn().getAttribute('aria-disabled')).toBe('false')
+    v.goTo(0, 0)
+    expect(btn().getAttribute('aria-disabled')).toBe('false')
+    expect(btn().disabled).toBe(false) // stays focusable
+  })
+
+  it('downloadUrl picks the file to save; null marks the item not downloadable', async () => {
+    const hrefs: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      hrefs.push(this.getAttribute('href') ?? '')
+    })
+    const col: Collection = {
+      groups: [
+        {
+          id: 'g0',
+          items: [
+            { ...item('a', 'a-small.jpg'), meta: { original: 'https://cdn.test/a-full.png' } },
+            { ...item('b', 'data:image/png;base64,AAAA'), meta: { original: null } },
+            item('c', 'c.jpg'),
+          ],
+        },
+      ],
+    }
+    const downloadUrl = (it: Item) =>
+      (it.meta as { original?: string | null } | undefined)?.original
+    const v = createViewer({ collection: col, plugins: [download({ downloadUrl })] })
+    mount(v)
+    v.open()
+    expect(btn().getAttribute('aria-disabled')).toBe('false')
+    btn().click()
+    await tick()
+    expect(hrefs).toEqual(['https://cdn.test/a-full.png'])
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('true') // null: not downloadable
+    v.nextItem()
+    expect(btn().getAttribute('aria-disabled')).toBe('false') // undefined: its source
+    btn().click()
+    await tick()
+    expect(hrefs[1]).toBe('c.jpg')
+  })
+
+  it('opens a cross-origin URL in a new tab (download is ignored there); same-origin stays put', async () => {
+    const seen: { href: string; target: string; rel: string }[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      seen.push({ href: this.getAttribute('href') ?? '', target: this.target, rel: this.rel })
+    })
+    await downloadItem(item('a', 'https://cdn.test/a.png'))
+    await downloadItem(item('b', 'pics/b.jpg'))
+    await downloadItem(item('c', `${location.origin}/c.jpg`))
+    expect(seen).toEqual([
+      { href: 'https://cdn.test/a.png', target: '_blank', rel: 'noopener' },
+      { href: 'pics/b.jpg', target: '', rel: 'noopener' },
+      { href: `${location.origin}/c.jpg`, target: '', rel: 'noopener' },
+    ])
+  })
+
+  it('judges the origin the way the anchor resolves it: <base href>, about:srcdoc', async () => {
+    const seen: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      seen.push(this.target)
+    })
+    // a <base> pointing at another origin makes a relative URL cross-origin
+    const base = document.createElement('base')
+    base.href = 'https://cdn.test/'
+    document.head.append(base)
+    try {
+      await downloadItem(item('b', 'pics/b.jpg'))
+    } finally {
+      base.remove()
+    }
+    // an about:srcdoc frame: location.href can't resolve a relative URL and location.origin is
+    // "null" (the document's own origin is the parent's); the download neither throws nor counts
+    // as cross-origin
+    const own = location.origin
+    vi.stubGlobal('location', { href: 'about:srcdoc', protocol: 'about:', origin: 'null' })
+    vi.stubGlobal('origin', own)
+    try {
+      await expect(downloadItem(item('c', 'pics/c.jpg'))).resolves.toBeUndefined()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    expect(seen).toEqual(['_blank', ''])
+  })
+
+  it('a click calls downloadUrl once and saves what it returned', async () => {
+    const hrefs: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      hrefs.push(this.getAttribute('href') ?? '')
+    })
+    let n = 0
+    const downloadUrl = vi.fn(() => `full-${++n}.png`) // a fresh value per call
+    const v = createViewer({ collection: collection(), plugins: [download({ downloadUrl })] })
+    mount(v)
+    v.open()
+    downloadUrl.mockClear()
+    btn().click()
+    await tick()
+    expect(downloadUrl).toHaveBeenCalledOnce()
+    expect(hrefs).toEqual([`full-${n}.png`])
+  })
+
+  it('resolveDownloadUrl rejects an unsafe downloadUrl', async () => {
+    expect(await resolveDownloadUrl(item('a'), () => 'javascript:alert(1)')).toBeNull()
+    expect(await resolveDownloadUrl(item('a'), () => null)).toBeNull()
+    expect(await resolveDownloadUrl(item('a', 'a.jpg'), () => undefined)).toBe('a.jpg')
+  })
+
+  it('zip mode saves each item from downloadUrl', async () => {
+    const downloadZip = vi.fn((_entries: unknown) => ({ blob: async () => new Blob(['z']) }))
+    vi.doMock('client-zip', () => ({ downloadZip }))
+    const fetched: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        fetched.push(url)
+        return new Response('x')
+      }),
+    )
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const { downloadItems: di } = await import('./index')
+    await di([item('a'), item('b'), item('c')], {
+      zip: true,
+      downloadUrl: (it) => (it.id === 'b' ? null : `full/${it.id}.png`),
+    })
+    expect(fetched).toEqual(['full/a.png', 'full/c.png'])
+    expect(downloadZip.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({ name: 'a.png' }),
+      expect.objectContaining({ name: 'c.png' }),
+    ])
+    vi.unstubAllGlobals()
   })
 })

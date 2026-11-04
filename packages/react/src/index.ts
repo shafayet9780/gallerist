@@ -15,8 +15,11 @@ export {
 } from '@gallerist/renderer-dom'
 export { useViewerContext, GalleristContext } from './context'
 export { type UseGallerist, useGallerist } from './useGallerist'
+export { type CurrentItem, useCurrentItem } from './useCurrentItem'
 export {
   Gallerist,
+  type GalleristCaptionProps,
+  type GalleristOpenAt,
   type GalleristOverlayProps,
   type GalleristProps,
   type GalleristRegionProps,

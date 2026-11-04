@@ -29,12 +29,11 @@
   "peerDependencies": {
     "@gallerist/core": "workspace:^"
   },
-  "optionalDependencies": {
-    "client-zip": "2.5.0"
+  "dependencies": {
+    "client-zip": "^2.5.0"
   },
   "devDependencies": {
     "@gallerist/core": "workspace:*",
-    "client-zip": "2.5.0",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
   },

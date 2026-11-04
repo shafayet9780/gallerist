@@ -74,7 +74,8 @@ export interface Emitter<M> {
 // Surface a handler's exception without aborting the emit: by the time an event fires the state
 // change it describes has already happened, so the remaining handlers must still run (as DOM
 // event dispatch does). `reportError` reaches window.onerror in browsers; elsewhere, log it.
-const reportHandlerError = (error: unknown): void => {
+// Plugins that run host callbacks report through it too (`@gallerist/core/internal`).
+export const reportHandlerError = (error: unknown): void => {
   const report = (globalThis as { reportError?: (e: unknown) => void }).reportError
   if (typeof report === 'function') report(error)
   else console.error(error)

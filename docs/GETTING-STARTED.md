@@ -51,15 +51,15 @@ Skins other than the default need their stylesheet too.
 
 ```ts
 import { createViewer } from '@gallerist/core'
-import { mount, resolvePreset } from '@gallerist/renderer-dom'
+import { mount } from '@gallerist/renderer-dom'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
 
 const viewer = createViewer({
   collection,
-  // the renderer doesn't own the plugin, so hand it the preset's rail options
-  plugins: [thumbnails(resolvePreset('reviewer').thumbnails)],
+  // the preset sets the rail too (reviewer: a timeline, numbered items); options you pass win
+  plugins: [thumbnails()],
 })
 mount(viewer, { preset: 'reviewer', skin: 'console', accent: 'cyan', scheme: 'dark' })
 ```
@@ -74,7 +74,8 @@ See [Presets and layout](PRESETS.md) for every option, and restyle anything by o
 | [`plugin-thumbnails`](../packages/plugin-thumbnails/README.md) | The rail: stacked cards, flat, or a section index |
 | [`plugin-grid`](../packages/plugin-grid/README.md) | A contact sheet, or an overview to open on |
 | [`plugin-pins`](../packages/plugin-pins/README.md) | Comments, product tags and features pinned to the image |
-| `plugin-fullscreen`, `plugin-download`, `plugin-hash` | Fullscreen, downloads and zips, deep links |
+| [`plugin-captions`](../packages/plugin-captions/README.md) | Designed captions: your markup in the caption bar, per viewer |
+| [`plugin-fullscreen`](../packages/plugin-fullscreen/README.md), [`plugin-download`](../packages/plugin-download/README.md), `plugin-hash` | Fullscreen, downloads and zips, deep links |
 | `plugin-video`, `plugin-video-youtube` | HTML5 and YouTube video items |
 
 Writing your own: [Plugin authoring](PLUGIN-AUTHORING.md).
@@ -88,8 +89,11 @@ import '@gallerist/theme-default/gallerist.css'
 <Gallerist collection={collection} open={open} onClose={() => setOpen(false)} preset="filmstrip" />
 ```
 
-The build is marked `"use client"`, so it works from a Server Component tree. See
-[`@gallerist/react`](../packages/react/README.md) for which props update live.
+`plugins`, `on` and render props are functions, so use `<Gallerist>` from a client component. The
+build is marked `"use client"`, so you can import it from inside a client boundary (a Next.js App
+Router file that starts with `"use client"`), but a Server Component can't render it with those props.
+See [`@gallerist/react`](../packages/react/README.md) for which props update live, opening at a
+position, the imperative ref and `<Gallerist.Caption>`.
 
 ## Without a build step
 
@@ -109,3 +113,11 @@ The build is marked `"use client"`, so it works from a Server Component tree. Se
 
 Every label has an English default and is overridable: `strings` on `mount` and on the thumbnails, grid,
 download, fullscreen and pins plugins. Each plugin exports its defaults (`DEFAULT_GRID_STRINGS`…).
+
+## Forms inside the viewer
+
+Keys typed into a text field inside the viewer (a comment box in a pin card, a caption's input) stay
+with the field, except Escape, which closes the viewer from anywhere (in a pin card it closes the
+card and leaves the viewer open). To keep Escape for your form (clear the field, cancel a draft),
+call `event.preventDefault()` in your own `keydown` handler; the viewer leaves an Escape that was
+already handled alone.

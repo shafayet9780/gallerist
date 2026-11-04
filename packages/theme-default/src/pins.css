@@ -5,7 +5,8 @@
 
 /* ── pins (plugin-pins): points on the image that open a card ─────────────────────
    The overlay host is counter-scaled, so a pin keeps its screen size under zoom. The marker is a
-   44px hit area around a smaller dot; the card opens beside it, away from the image's near edges. */
+   44px hit area around a smaller dot; the card opens beside it, placed by the plugin (left, top,
+   max-width, max-height) inside the stage's free room. */
 .gallerist-pin {
   position: relative;
 }
@@ -66,17 +67,37 @@
 .gallerist-pin-marker:focus-visible {
   outline: none;
 }
+/* the ring over the image, whatever its colours (technique C40): a band of --gallerist-focus-halo
+   (black) and a white band around the dot, then the focus colour (the outline). Black and white are
+   21:1 apart, so one of the two reaches 3:1 (at least 4.58:1) against any media under it, whatever
+   the skin, scheme or accent; the focus colour alone can match the image. 3px each, so at least 2
+   whole screen pixels of each stay solid wherever the pin lands between pixels. In forced colours the
+   box-shadow bands go and the outline stays, in a system colour. */
 .gallerist-pin-marker:focus-visible .gallerist-pin-dot {
   outline: 2px solid var(--gallerist-focus);
-  outline-offset: 3px;
+  outline-offset: 6px;
+  box-shadow: 0 0 0 3px var(--gallerist-focus-halo), 0 0 0 6px #fff, 0 2px 8px rgb(0 0 0 / 0.35);
+}
+.gallerist-pin[data-presentation="tag"] .gallerist-pin-marker:focus-visible .gallerist-pin-dot {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.6), 0 0 0 3px var(--gallerist-focus-halo), 0 0 0
+    6px #fff, 0 2px 8px rgb(0 0 0 / 0.3);
 }
 .gallerist-pin-card {
   position: absolute;
+  top: 0;
+  left: calc(100% + 4px); /* until the plugin places it */
   z-index: 1;
-  box-sizing: border-box; /* the renderer's max-width is the room beside the pin, padding included */
+  /* block layout, so a host's contents lay out as on the page (inline siblings share a line, a
+     button keeps its width, margins collapse); the close button comes first and takes no room */
+  box-sizing: border-box; /* the plugin's max-width / max-height are the room in the stage, padding included */
   width: max-content;
   max-width: min(280px, 70vw);
-  padding: 12px 36px 12px 14px;
+  padding: 12px;
+  padding-inline: 14px 32px; /* the close button's room */
+  /* room for × however little the contents are (it reaches 20px into the content box: 28 - 8), so
+     an empty card never scrolls: 1 + 12 + 20 + 12 + 1 (border, padding, ×). Shorter, × overflowed
+     it, and the fade's 12px flipped it back each frame (tabindex and fade flickered). */
+  min-height: 46px;
   border: 1px solid var(--gallerist-hairline);
   border-radius: var(--gallerist-radius);
   background: var(--gallerist-pin-card-bg);
@@ -86,21 +107,46 @@
   font: 400 13px / 1.4 var(--gallerist-font);
   text-align: start;
   cursor: auto;
+  overflow: auto; /* a card taller than the room scrolls */
+  overscroll-behavior: contain;
+  /* a scroll container: the stage's touch-action: none stops at it, so a touch in the card would
+     pan or pinch-zoom the page. None here (the card's own controls still take taps) ... */
+  touch-action: none;
+}
+/* ... and a vertical pan while it scrolls (the plugin puts it in the tab order then) */
+.gallerist-pin-card[tabindex="0"] {
+  touch-action: pan-y;
+  scroll-padding-block-end: 24px; /* a control focused near the bottom clears the fade below */
+}
+/* a scrolling card says there's more below (a touch screen shows no scrollbar): its contents fade
+   out at its bottom edge. The fade sticks there as the card scrolls and, at the end, rests in the
+   room below the last control, where it covers nothing; it never takes a tap. */
+.gallerist-pin-card[tabindex="0"]::after {
+  content: "";
+  display: block;
+  position: sticky;
+  bottom: -12px; /* the card's edge: sticky insets count from its content box */
+  z-index: 1; /* over host contents that are positioned */
+  height: 24px;
+  margin-block: 0 -12px; /* below the contents: 12px of its own and the card's 12px padding */
+  margin-inline: -14px -32px; /* the card's full width */
+  background: linear-gradient(transparent, var(--gallerist-pin-card-bg));
+  pointer-events: none;
+}
+/* forced colours: no fade (the gradient would be a solid block of the system background) */
+@media (forced-colors: active) {
+  .gallerist-pin-card[tabindex="0"]::after {
+    display: none;
+  }
+}
+/* a host's field is a scroll container of its own, which the card's touch-action doesn't reach
+   into: a pinch starting on it would zoom the page. A vertical pan scrolls it; taps, the caret and
+   text selection are unaffected. */
+.gallerist-pin-card :is(textarea, select) {
+  touch-action: pan-y;
 }
 .gallerist-pin-card[hidden] {
   display: none;
-}
-.gallerist-pin[data-side="right"] .gallerist-pin-card {
-  left: calc(100% + 4px);
-}
-.gallerist-pin[data-side="left"] .gallerist-pin-card {
-  right: calc(100% + 4px);
-}
-.gallerist-pin[data-v="down"] .gallerist-pin-card {
-  top: 0;
-}
-.gallerist-pin[data-v="up"] .gallerist-pin-card {
-  bottom: 0;
 }
 .gallerist-pin-head {
   display: flex;
@@ -152,14 +198,31 @@
   text-underline-offset: 3px;
 }
 .gallerist-pin-link:focus-visible,
-.gallerist-pin-close:focus-visible {
+.gallerist-pin-close:focus-visible,
+.gallerist-pin-card:focus-visible {
   outline: 2px solid var(--gallerist-focus);
   outline-offset: 2px;
 }
+/* the card's ring falls outside it, on the image: banded like the pin's */
+.gallerist-pin-card:focus-visible {
+  outline-offset: 6px; /* 8px out in all: the plugin keeps the card 8px inside the stage */
+  box-shadow: 0 0 0 3px var(--gallerist-focus-halo), 0 0 0 6px #fff, var(--gallerist-shadow);
+}
 .gallerist-pin-close {
-  position: absolute;
-  top: 4px;
-  inset-inline-end: 4px;
+  /* first in the card (in reading and tab order too), 4px from its top and inline-end corner, and
+     held there as it scrolls (sticky insets count from the card's content box, inside its 12px
+     padding). It takes no room: it fills the inline-end padding but its last 4px, and its block
+     margins cancel its height, so the contents start at the top and a host's first block keeps its
+     own top margin (a positive one collapses with the -20px: 20 - 20 + m). A negative one collapses
+     with it too, the more negative winning, so the block starts at min(0, 20 + m): -10px has no
+     effect, -30px lifts it 10px. It starts where the
+     content box ends: Chromium counts an in-flow box from its start at least, plus the end padding,
+     in what scrolls, so one starting further in made every card scroll 4px sideways. */
+  position: sticky;
+  top: -8px;
+  z-index: 1; /* over host contents that are positioned */
+  margin-block: -8px -20px;
+  margin-inline: auto -28px;
   display: grid;
   place-items: center;
   width: 28px;
@@ -167,7 +230,7 @@
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: transparent;
+  background: var(--gallerist-pin-card-bg); /* contents scroll under it */
   color: var(--gallerist-fg-muted);
   cursor: pointer;
 }

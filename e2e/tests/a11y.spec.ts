@@ -93,3 +93,65 @@ for (const look of LOOKS) {
     expect(results.violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([])
   })
 }
+
+// A caption renderer's band taller than its room scrolls: it then takes focus and a name, so a
+// keyboard can scroll it (axe scrollable-region-focusable), and ↑/↓/Home/End scroll it, not move
+// the viewer. A band that fits stays out of the tab order. Default band, and the editorial placard
+// (where the region in the placard's slot is what scrolls).
+for (const [look, scroller] of [
+  ['skin=gallery', '.gallerist-caption'],
+  ['skin=editorial&preset=editorial', '.gallerist-region-caption'],
+] as const) {
+  test(`a tall custom caption band is keyboard-scrollable (${look})`, async ({ page }) => {
+    await page.goto(`/layout.html?${look}&custom=tall&g=1`)
+    await viewerSettled(page)
+    const band = page.locator(scroller)
+    await expect(band).toHaveAttribute('tabindex', '0')
+    await expect(band).toHaveAttribute('role', 'region')
+    await expect(band).toHaveAccessibleName('Caption')
+    const results = await new AxeBuilder({ page })
+      .include('.gallerist')
+      .withTags(['wcag2a', 'wcag2aa', 'best-practice'])
+      .analyze()
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([])
+    // the viewer is still described by the caption's text, not by the band's name
+    const described = await page.evaluate(() =>
+      (document.querySelector('.gallerist')?.getAttribute('aria-describedby') ?? '')
+        .split(' ')
+        .map((id) => document.getElementById(id)?.textContent ?? '')
+        .join(''),
+    )
+    expect(described).toContain('Activity line 60')
+    // the caption's first line names the item: it stays put while the band scrolls
+    const head = page.locator('.fixture-caption strong')
+    const item = await head.textContent()
+    await band.focus()
+    const top = () => band.evaluate((el) => el.scrollTop)
+    // the renderer scrolls the band itself, so every engine and platform agrees (Linux WebKit's own
+    // keyboard scrolling left the placard's band at 0)
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(top).toBeGreaterThan(0)
+    await page.keyboard.press('End')
+    const end = await band.evaluate((el) => el.scrollHeight - el.clientHeight)
+    await expect.poll(top).toBeGreaterThanOrEqual(end - 1)
+    await page.keyboard.press('Home')
+    await expect.poll(top).toBe(0)
+    await expect(head).toHaveText(item ?? '')
+    await expect(band).toBeFocused()
+  })
+
+  test(`a custom caption band that fits stays out of the tab order (${look})`, async ({ page }) => {
+    await page.goto(`/layout.html?${look}&custom=short&g=1`)
+    await viewerSettled(page)
+    await expect(page.locator('.gallerist-caption .fixture-caption')).toBeVisible()
+    const band = page.locator(scroller)
+    // the band's ResizeObserver has run (it runs within the frame after layout), and the band fits:
+    // otherwise the checks below would pass before the band was ever judged
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+    )
+    expect(await band.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true)
+    await expect(band).not.toHaveAttribute('tabindex', /.*/)
+    await expect(band).not.toHaveAttribute('role', /.*/)
+  })
+}

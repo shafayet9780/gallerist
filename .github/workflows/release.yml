@@ -29,6 +29,8 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # the packed packages hold what their manifests point at, with no workspace: ranges left
+      - run: pnpm check:dist
       # When changesets are present this opens/updates a version PR; when the version
       # PR merges, it runs `pnpm release` (changeset publish) to publish to npm.
       - uses: changesets/action@v1

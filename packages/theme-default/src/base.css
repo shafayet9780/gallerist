@@ -20,6 +20,9 @@
     --gallerist-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
     --gallerist-index-w: 280px; /* a section index (`groupDisplay: 'index'`) in a side rail */
     --gallerist-rail-w: 130px; /* vertical (left/right) rail width */
+    /* the docked item navigator (`arrows: 'docked'`): the count over ↑ ↓ */
+    --gallerist-dock-w: calc(2 * var(--gallerist-target) + 16px);
+    --gallerist-dock-h: calc(var(--gallerist-target) + 30px);
     --gallerist-speed: 300ms;
 
     /* motion (spec §27.2) — bezier approximations of the named springs */
@@ -42,6 +45,11 @@
     --gallerist-pin-resolved-bg: #5a6069; /* opaque: pins sit on photos of any brightness */
     --gallerist-pin-resolved-fg: #f0f1f3;
     --gallerist-pin-card-bg: var(--gallerist-panel); /* near-opaque: it sits on the image */
+    /* a focus ring drawn over the image (pins) is banded: this colour, then white, then the focus
+       colour. Black and white are 21:1 apart, so one of them reaches 3:1 against any media (WCAG
+       2.2 1.4.11 Non-text Contrast, 2.4.13 Focus Appearance; technique C40). An override must be
+       opaque and keep 9:1 or more against white (luminance 0.066 or less), or the guarantee goes. */
+    --gallerist-focus-halo: #000;
 
     /* bands and tools: a skin may give the bar and rail a solid band, tint the tools, and mark a
        pressed toggle with a shadow (an underline) as well as its fill */
@@ -87,12 +95,12 @@
 /* ── layout (base): the root is a grid of areas ───────────────────────────────
    bar / main / aside / caption / footer / rail. Persistent chrome gets its own track, so it takes
    space instead of covering the stage and pieces can't collide; only the arrows and the item
-   navigator sit over the stage, inside `main`. Rail position and presets swap the template, never
+   navigator sit over the stage, inside `main` (`arrows: 'docked'` takes both off it, at the end). Rail position and presets swap the template, never
    the DOM. Grid columns follow the inline direction, so RTL mirrors the whole layout. */
 .gallerist {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto auto;
   grid-template-areas:
     "bar bar"
     "main aside"
@@ -103,7 +111,7 @@
 }
 .gallerist[data-gallerist-rail-pos="left"] {
   grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto;
   grid-template-areas:
     "bar bar bar"
     "rail main aside"
@@ -112,7 +120,7 @@
 }
 .gallerist[data-gallerist-rail-pos="right"] {
   grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto;
   grid-template-areas:
     "bar bar bar"
     "main aside rail"
@@ -141,12 +149,21 @@
    stack column if any. Side rails keep their own template, with the placard as the caption band. */
 .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"] {
   grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto;
   grid-template-areas:
     "bar bar bar"
     "main caption aside"
     "footer footer footer"
     "rail rail rail";
+}
+/* The stage's row never shrinks below the floor. 0 normally; while a caption renderer's band grows
+   (plugin-captions), 36% of the viewer, so the band stops there and scrolls rather than crushing the
+   stage (before its own 40vh cap when the rail and bar are tall, e.g. on a phone). */
+.gallerist {
+  --gallerist-stage-floor: 0px;
+}
+.gallerist:has(> .gallerist-caption[data-gallerist-custom]:not([hidden])) {
+  --gallerist-stage-floor: 36%;
 }
 /* modes (data-attribute, not a class — avoids colliding with .gallerist-overlay elements) */
 .gallerist[data-gallerist-mode="overlay"] {
@@ -561,7 +578,7 @@
   box-shadow: var(--gallerist-item-ring);
 }
 /* each item contains its own layout and paint (it clips anyway): scrolling a long group's stack then
-   doesn't make WebKit revisit every item (~0.7 s a step at 10k items, ~0.1 s with this) */
+   doesn't make WebKit revisit every item (~0.66 s a step at 10k items, ~65 ms with this) */
 .gallerist-thumb-items[data-axis="vertical"] > .gallerist-thumb-item {
   contain: layout paint;
 }
@@ -805,6 +822,11 @@
 .gallerist-controls > button[hidden] {
   display: none;
 }
+/* a tool unavailable for this item (download without a safe URL): dimmed, still focusable */
+.gallerist-bar button[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 /* pressed (a toggle that is on) reads differently from focus: an accent fill vs a ring */
 .gallerist-bar button[aria-pressed="true"] {
   background: var(--gallerist-pressed-bg);
@@ -894,6 +916,36 @@
 .gallerist-caption-text {
   font-family: var(--gallerist-caption-font);
   font-style: var(--gallerist-caption-style);
+}
+/* a caption renderer (plugin-captions, React <Gallerist.Caption>) owns the band: it grows with its
+   content from the text band's height, and the stage gives up the room. A placard keeps its slot. */
+.gallerist:not([data-gallerist-indicator="placard"]) .gallerist-caption[data-gallerist-custom] {
+  display: block;
+  height: auto;
+  min-height: calc(2 * 1.4em + 16px);
+  max-height: 40vh;
+  overflow-y: auto;
+  -webkit-line-clamp: unset;
+  line-clamp: none;
+}
+.gallerist-caption[data-gallerist-custom] > .gallerist-caption-text {
+  display: none;
+}
+.gallerist-region-caption {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* a placard keeps its slot (the stage doesn't move), so a caption taller than it scrolls inside
+   rather than being cut off */
+.gallerist[data-gallerist-indicator="placard"] .gallerist-region-caption {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+}
+/* a band that scrolls takes focus (renderer: tabindex while it overflows): ring it inside its box */
+:is(.gallerist-caption, .gallerist-region-caption)[tabindex]:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: -2px;
 }
 
 /* ── arrows and the item navigator, over the stage (inside main) ────────────────── */
@@ -1477,9 +1529,10 @@
   .gallerist-items-toggle {
   display: none; /* chips don't expand their items */
 }
-/* an overview (`grid({ layout: 'sections' })`) is a whole screen: nothing stays over it */
+/* an overview (`grid({ layout: 'sections' })`) is a whole screen: nothing stays over or beside it
+   (a docked item navigator is a root grid item, outside the controls box) */
 .gallerist:has(.gallerist-grid[data-layout="sections"][aria-hidden="false"])
-  :is(.gallerist-controls, .gallerist-caption) {
+  :is(.gallerist-controls, .gallerist-caption, .gallerist-itemnav) {
   display: none;
 }
 
@@ -1725,6 +1778,9 @@
     .gallerist[data-gallerist-preset="tour"] {
       --gallerist-frame-inset: 12px;
     }
+  }
+  /* a narrow viewer, or a short one (a phone turned sideways) */
+  @media (max-width: 600px), (max-height: 500px) {
     .gallerist {
       --gallerist-thumb-h: 56px;
       --gallerist-toolbar-h: 52px;
@@ -1747,7 +1803,7 @@
   /* editorial: the placard drops under the work, as the caption band */
   .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"] {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto auto;
     grid-template-areas:
       "bar"
       "main"
@@ -1770,6 +1826,25 @@
   .gallerist-caption {
     padding: 6px 12px;
     font-size: 13px;
+  }
+}
+/* a short viewer (a phone turned sideways): compact caption type, and a bottom rail's handle sits
+   beside the strip instead of on top of it, so the stage keeps its share of the height. The rail keeps
+   its full height: a tall caption band scrolls rather than squeezing the strip off the screen. */
+@media (max-height: 500px) {
+  .gallerist-caption {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .gallerist[data-gallerist-orientation="horizontal"] .gallerist-region-thumbnails {
+    flex-direction: row;
+    min-height: auto;
+  }
+  .gallerist[data-gallerist-orientation="horizontal"] .gallerist-rail-handle {
+    height: auto;
+  }
+  .gallerist[data-gallerist-orientation="horizontal"] .gallerist-thumbs-region {
+    flex: 1 1 auto;
   }
 }
 @media (pointer: coarse) {
@@ -1842,7 +1917,7 @@
   }
   .gallerist[data-gallerist-rail-pos]:has(.gallerist-thumbs[data-display="index"]) {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto auto;
     grid-template-areas:
       "bar"
       "main"
@@ -1894,4 +1969,145 @@
     > .gallerist-thumb-items {
     display: none;
   }
+}
+
+/* ── docked controls (`arrows: 'docked'`, the reviewer preset): nothing over the media ─────────
+   Review needs every pixel, corners included. The group arrows sit in gutters the stage leaves at
+   its sides (none on touch, where swipes stand in for them). The item navigator is a grid item of
+   the root, the count over ↑ ↓: a header on the aside item column while that shows, else at the
+   end of the caption row, which makes room for it. While any group has several items it keeps its
+   room on a one-item group, so the stage and the item column hold still. Last in the file, so it
+   wins over the arrow layouts and the touch chip above. Where no row or column beside the stage is
+   free (immersive) it falls back to the stage's corner; the zoom minimap stays over the media (it
+   shows only while zoomed, and is the zoom tool itself). */
+.gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
+  inset-inline: calc(var(--gallerist-arrow-size) + 24px);
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-axis="vertical"] .gallerist-stage {
+  inset-inline-start: 0; /* both group arrows stack at the inline end */
+}
+@media (pointer: coarse) {
+  .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
+    inset-inline: 0;
+  }
+}
+/* one group (and no linear walk): the group arrows have nowhere to go, so they and their gutters go */
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-one-group]:not([data-gallerist-linear])
+  .gallerist-stage {
+  inset-inline: 0;
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-one-group]:not([data-gallerist-linear])
+  :is(.gallerist-prev, .gallerist-next) {
+  display: none;
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
+  > .gallerist-itemnav {
+  grid-area: caption;
+  align-self: start;
+  justify-self: end;
+  position: relative;
+  z-index: 3;
+  inset: auto;
+  transform: none;
+  box-sizing: border-box;
+  inline-size: var(--gallerist-dock-w);
+  block-size: var(--gallerist-dock-h);
+  margin: 4px 12px;
+  border-radius: min(var(--gallerist-itemnav-radius), var(--gallerist-radius)); /* a box, not a pill */
+  flex-flow: row wrap;
+  place-content: center;
+  gap: 2px 4px;
+  padding: 4px;
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-multi]:not([data-gallerist-linear])
+  > .gallerist-itemnav[hidden] {
+  display: flex;
+  visibility: hidden;
+}
+.gallerist[data-gallerist-arrows="docked"] > .gallerist-itemnav .gallerist-position {
+  order: -1;
+  flex-basis: 100%;
+  justify-content: center;
+  padding: 0;
+}
+.gallerist[data-gallerist-arrows="docked"]
+  > .gallerist-itemnav
+  :is(.gallerist-pill, .gallerist-dot) {
+  display: none;
+}
+.gallerist[data-gallerist-arrows="docked"] > .gallerist-itemnav .gallerist-position-text {
+  display: inline;
+}
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-multi]:not([data-gallerist-linear]):has(
+    > .gallerist-itemnav
+  )
+  > .gallerist-caption {
+  margin-inline-end: calc(var(--gallerist-dock-w) + 12px);
+}
+/* the navigator sets a floor under the caption row; a bottom rail keeps its full height beside it
+   (a tall caption band scrolls instead of pushing the strip off a small screen) */
+.gallerist[data-gallerist-arrows="docked"][data-gallerist-orientation="horizontal"]
+  .gallerist-region-thumbnails {
+  min-height: auto;
+}
+@media (min-width: 601px) {
+  /* editorial without a placard: the caption is a column beside the work; the navigator ends it */
+  .gallerist:where(
+      [data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"]
+    )[data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
+    > .gallerist-itemnav {
+    align-self: end;
+    justify-self: start;
+  }
+  .gallerist:where(
+      [data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"]
+    )[data-gallerist-arrows="docked"][data-gallerist-multi]:not([data-gallerist-linear]):has(
+      > .gallerist-itemnav
+    )
+    > .gallerist-caption {
+    margin: 0 0 calc(var(--gallerist-dock-h) + 8px);
+  }
+  /* the item column shows (a stacked rail's items beside the stage): the navigator heads it */
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-rail="collapsed"]):has(
+      > .gallerist-region-aside .gallerist-thumb-items
+    )
+    > .gallerist-itemnav {
+    grid-area: aside;
+    align-self: start;
+    justify-self: stretch;
+    inline-size: auto;
+    min-inline-size: var(--gallerist-dock-w);
+    contain: inline-size; /* as wide as the column, which it doesn't widen past its own minimum */
+    margin-block: 8px 0;
+    margin-inline: 0 8px;
+  }
+  .gallerist[data-gallerist-arrows="docked"][data-gallerist-multi]:not(
+      [data-gallerist-linear],
+      [data-gallerist-rail="collapsed"]
+    ):has(> .gallerist-region-aside .gallerist-thumb-items)
+    > .gallerist-region-aside {
+    padding-block-start: calc(var(--gallerist-dock-h) + 8px);
+  }
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-rail="collapsed"]):has(
+      > .gallerist-region-aside .gallerist-thumb-items
+    )
+    > .gallerist-caption {
+    margin: 0;
+  }
+}
+/* immersive: the stage runs under every band, so nothing beside it is free; the navigator takes the
+   stage's bottom inline-end corner, above the caption band (as `corner-br`) */
+.gallerist[data-gallerist-preset="immersive"][data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
+  > .gallerist-itemnav {
+  grid-area: main;
+  align-self: end;
+  justify-self: end;
+  inline-size: var(--gallerist-dock-w);
+  margin: 12px;
+}
+.gallerist[data-gallerist-preset="immersive"][data-gallerist-arrows="docked"][data-gallerist-multi]:has(
+    > .gallerist-itemnav
+  )
+  > .gallerist-caption {
+  margin: 0;
 }

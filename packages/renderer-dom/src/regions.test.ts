@@ -16,6 +16,7 @@ const hosts = (): RegionHosts =>
     aside: document.createElement('div'),
     thumbnails: document.createElement('div'),
     footer: document.createElement('div'),
+    caption: document.createElement('div'),
   }) as RegionHosts
 
 const node = (text: string) => () => {
