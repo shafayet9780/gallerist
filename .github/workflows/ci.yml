@@ -16,6 +16,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # one shared 0.x version for every published package, now and after the pending changesets
+      - run: pnpm check:versions
       - run: pnpm audit --prod || true # report known advisories; non-blocking
       - run: pnpm lint
       - run: pnpm typecheck

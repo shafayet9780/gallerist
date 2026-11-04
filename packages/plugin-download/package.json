@@ -27,7 +27,7 @@
     "prepack": "node ../../scripts/copy-license.mjs"
   },
   "peerDependencies": {
-    "@gallerist/core": "workspace:^"
+    "@gallerist/core": "workspace:>=0.3.0 <1"
   },
   "dependencies": {
     "client-zip": "^2.5.0"

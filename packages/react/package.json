@@ -27,8 +27,8 @@
     "prepack": "node ../../scripts/copy-license.mjs"
   },
   "peerDependencies": {
-    "@gallerist/core": "workspace:^",
-    "@gallerist/renderer-dom": "workspace:^",
+    "@gallerist/core": "workspace:>=0.3.0 <1",
+    "@gallerist/renderer-dom": "workspace:>=0.3.0 <1",
     "react": ">=18",
     "react-dom": ">=18"
   },

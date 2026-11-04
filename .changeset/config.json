@@ -32,5 +32,8 @@
     "@gallerist/example-tour",
     "@gallerist/example-vanilla",
     "@gallerist/site"
-  ]
+  ],
+  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
+    "onlyUpdatePeerDependentsWhenOutOfRange": true
+  }
 }
