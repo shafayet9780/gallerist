@@ -31,6 +31,8 @@ jobs:
       - run: pnpm build
       # the packed packages hold what their manifests point at, with no workspace: ranges left
       - run: pnpm check:dist
+      # refuse to version or publish anything at 1.0.0 or above, or at mismatched versions
+      - run: pnpm check:versions
       # When changesets are present this opens/updates a version PR; when the version
       # PR merges, it runs `pnpm release` (changeset publish) to publish to npm.
       - uses: changesets/action@v1

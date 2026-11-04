@@ -62,6 +62,6 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@gallerist/core": "workspace:^"
+    "@gallerist/core": "workspace:>=0.3.0 <1"
   }
 }

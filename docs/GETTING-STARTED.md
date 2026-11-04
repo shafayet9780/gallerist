@@ -9,6 +9,10 @@ Plugins and a React adapter are optional.
 npm i @gallerist/core @gallerist/renderer-dom @gallerist/theme-default
 ```
 
+Every `@gallerist/*` package is released together, at one shared version. Keep them all on the same
+version, and upgrade them together. Until 1.0, the plugins and the renderer accept any 0.x core from
+0.3 on, so npm won't warn you if the versions drift apart.
+
 ## A flat gallery
 
 ```ts
