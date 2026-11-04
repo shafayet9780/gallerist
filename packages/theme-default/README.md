@@ -25,8 +25,10 @@ Pick a skin, accent and colour scheme with the renderer's `skin`, `accent` and `
 | `console` | `amber`, `cyan`, `vermilion` |
 
 `scheme` is `dark` (default), `light` or `auto`. All visuals are driven by `--gallerist-*` CSS
-custom properties; override them to restyle the viewer. `base.css` is the shared structure on its
-own, for building a skin from scratch.
+custom properties; override them to restyle the viewer. `gallerist.css` bundles the shared
+structure (`base.css`), the Gallery skin (`gallery.css`) and the plugin add-ons (`grid.css` for
+plugin-grid, `pins.css` for plugin-pins). To build a skin from scratch, import `base.css` plus the
+add-ons for the plugins you use, then your own tokens.
 
 Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 

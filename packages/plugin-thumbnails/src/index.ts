@@ -38,6 +38,19 @@ export interface ThumbnailsOptions {
    * as you navigate. Ignored in `flat` mode (every item is already laid out).
    */
   expandActive?: boolean
+  /**
+   * A timeline over the rail (`stacked` mode): a label with a tick above each group card, joined
+   * by a track line, the current one in the accent. `true` reads the label from `group.meta.time`
+   * (a string); a function returns it. The label is part of the card's accessible name.
+   */
+  timeline?: boolean | ((group: Group, index: number) => string | undefined)
+  /** Number the item thumbs (1, 2, 3…) in the item stack and peek, so items can be referred to. */
+  numberItems?: boolean
+}
+
+const metaTime = (group: Group): string | undefined => {
+  const time = (group.meta as { time?: unknown } | undefined)?.time
+  return typeof time === 'string' ? time : undefined
 }
 
 function thumbUrl(source: MediaSource | undefined): string | null {
@@ -127,6 +140,12 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const itemAxis = opts.itemAxis ?? 'vertical'
     const groupDisplay = opts.groupDisplay ?? 'stacked'
     const expandActive = opts.expandActive ?? true
+    const timeLabel =
+      groupDisplay === 'stacked' && opts.timeline
+        ? opts.timeline === true
+          ? metaTime
+          : opts.timeline
+        : null
     // `regionEl` is the node handed to the renderer's `thumbnails` region; `root` (the scrollable
     // rail) lives inside it, and the floating panels (item column / peek) are siblings of `root`
     // inside `regionEl`. The renderer `replaceChildren()`s region hosts on every plugin-set change
@@ -188,6 +207,13 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       )
       btn.dataset.item = item.id
       btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
+      if (opts.numberItems) {
+        const num = document.createElement('span')
+        num.className = 'gallerist-thumb-num'
+        num.setAttribute('aria-hidden', 'true') // the label already says "Item n"
+        num.textContent = String(iIndex + 1)
+        btn.appendChild(num)
+      }
       appendCaption(btn, captionOf(item))
       return btn
     }
@@ -278,7 +304,30 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
       // peek wiring (multi-item groups only) — `host` is the node appended to the rail, so the
       // flyout anchors to it; on touch the card is wrapped so a sibling expand button is valid HTML.
+      // A timeline wraps every card, with its label above.
       let host: HTMLElement = btn
+      const time = timeLabel?.(group, gIndex)
+      const wrapCard = () => {
+        if (host !== btn) return host
+        const wrap = document.createElement('div')
+        wrap.className = 'gallerist-thumb-wrap'
+        wrap.dataset.group = group.id
+        wrap.appendChild(btn)
+        host = wrap
+        return wrap
+      }
+      if (timeLabel) {
+        const wrap = wrapCard()
+        const label = document.createElement('span')
+        label.className = 'gallerist-thumb-time'
+        label.setAttribute('aria-hidden', 'true') // folded into the card's name below
+        const text = document.createElement('span')
+        text.className = 'gallerist-thumb-time-text'
+        text.textContent = time ?? ''
+        label.appendChild(text)
+        wrap.prepend(label)
+        if (time) btn.setAttribute('aria-label', `Group ${gIndex + 1}, ${time}`)
+      }
       if (multi) {
         btn.addEventListener('focusin', () => openPeek(group, gIndex, host))
         btn.addEventListener('focusout', schedulePeekClose)
@@ -286,9 +335,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           btn.addEventListener('mouseenter', () => openPeek(group, gIndex, host))
           btn.addEventListener('mouseleave', schedulePeekClose)
         } else {
-          const wrap = document.createElement('div')
-          wrap.className = 'gallerist-thumb-wrap'
-          wrap.dataset.group = group.id
+          const wrap = wrapCard()
           const caret = document.createElement('button')
           caret.type = 'button'
           caret.className = 'gallerist-thumb-expand'
@@ -297,9 +344,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
             e.stopPropagation()
             openPeek(group, gIndex, wrap)
           })
-          wrap.appendChild(btn)
           wrap.appendChild(caret)
-          host = wrap
         }
       }
       cardHost.set(group.id, host)
@@ -384,7 +429,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const activeGroup = col.groups[g]
       const activeGroupId = activeGroup?.id ?? null
       const activeItemId = activeGroup?.items[i]?.id ?? null
-      for (const [id, btn] of groupBtns) setActiveAttr(btn, id === activeGroupId)
+      for (const [id, btn] of groupBtns) {
+        setActiveAttr(btn, id === activeGroupId)
+        const host = cardHost.get(id)
+        if (host && host !== btn) toggleAttr(host, 'data-active', id === activeGroupId)
+      }
       for (const [id, btn] of itemBtns) setActiveAttr(btn, id === activeItemId)
 
       // live-preview (UX-A): the active multi-item group's card mirrors the currently-viewed item;
@@ -638,6 +687,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         root.className = 'gallerist-thumbs'
         root.setAttribute('role', 'listbox')
         root.setAttribute('aria-label', 'Thumbnails')
+        if (timeLabel) root.setAttribute('data-timeline', '')
         regionEl.appendChild(root)
         if (groupDisplay === 'flat') {
           root.dataset.display = 'flat'

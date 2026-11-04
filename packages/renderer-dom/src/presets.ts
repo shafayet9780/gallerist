@@ -17,7 +17,14 @@ export interface ResolvedPreset {
   /** default thumbnail rail placement (overridable). */
   rail: RailPlacement
   /** preferred thumbnails() options for this preset. */
-  thumbnails: { itemAxis: 'vertical' | 'horizontal'; groupDisplay?: 'stacked' | 'flat' }
+  thumbnails: {
+    itemAxis: 'vertical' | 'horizontal'
+    groupDisplay?: 'stacked' | 'flat'
+    timeline?: boolean
+    numberItems?: boolean
+  }
+  /** turn on the zoom navigator by default (overridable). */
+  navigator?: boolean
 }
 
 const PRESETS: Record<PresetName, ResolvedPreset> = {
@@ -28,6 +35,7 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     autoHide: false,
     rail: 'bottom',
     thumbnails: { itemAxis: 'vertical' },
+    navigator: false,
   },
   // full-bleed: rail hidden by default, chrome auto-hides on idle, minimal UI.
   immersive: {
@@ -36,14 +44,17 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     autoHide: true,
     rail: 'hidden',
     thumbnails: { itemAxis: 'vertical' },
+    navigator: false,
   },
-  // time-series reviewer: bottom timeline rail with labels, corner arrow cluster.
+  // time-series reviewer: a bottom timeline rail (a time over each group, from group.meta.time),
+  // numbered items, a corner arrow cluster and the zoom navigator.
   reviewer: {
     rootAttrs: { 'data-gallerist-preset': 'reviewer' },
     arrows: 'corner-br',
     autoHide: false,
     rail: 'bottom',
-    thumbnails: { itemAxis: 'vertical' },
+    thumbnails: { itemAxis: 'vertical', timeline: true, numberItems: true },
+    navigator: true,
   },
   // browse-heavy: a vertical rail down the right edge (pairs well with the grid plugin).
   contact: {
@@ -52,6 +63,7 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     autoHide: false,
     rail: 'right',
     thumbnails: { itemAxis: 'vertical' },
+    navigator: false,
   },
 }
 

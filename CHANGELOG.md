@@ -31,6 +31,11 @@
   a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
 
 ### Added
+- **renderer-dom (M18)**: `navigator` option, a zoom navigator. While zoomed in, a minimap of the
+  image with a box for the visible part; click or drag to move around. On in the `reviewer` preset.
+- **plugin-thumbnails (M18)**: `timeline` (a time label and tick above each group card, joined
+  into a track; `true` reads `group.meta.time`) and `numberItems` (numbered item thumbs). The
+  `reviewer` preset turns both on.
 - **plugin-pins (M17)**: new `@gallerist/plugin-pins`. Pins are points on an item that follow pan
   and zoom at a constant size and open a card. Three presentations: `comment` (numbered threads
   with replies and a resolved state, plus `onPlace` to drop a new one with a click or `c`), `tag`
@@ -45,6 +50,18 @@
   stop, and double-clicking a control in the stage no longer zooms.
 
 ### Changed
+- **theme (M18)**: the Console skin is polished to its design canvas. The bar and rail are opaque
+  graphite bands with hairlines. Tools are flat until pressed, and a pressed toggle gets a raised
+  surface with an accent glyph and underline instead of an accent fill. Focus is a neutral ring, so
+  it never reads as selection. Idle thumbs recede a little, and the accents move to the canvas
+  values (amber `#f2a93b`, cyan `#3cc8dc`, vermilion `#ff6b4a`). Console now uses
+  `color-scheme: dark` (dark native scrollbars). New base tokens let any skin do the same:
+  `--gallerist-bar-bg`, `--gallerist-bar-border`, `--gallerist-rail-border`, `--gallerist-tool-fg`,
+  `--gallerist-pressed-shadow`. Gallery is unchanged.
+- **theme (M18)**: plugin-grid's styles move from `base.css` to `grid.css` (like `pins.css`);
+  `gallerist.css` includes both, so only a skin built on `base.css` alone needs to import them.
+- **examples/monitoring (M18)**: Console + `reviewer` with timeline times, numbered monitors, the
+  zoom navigator and comment pins (press C to add one).
 - **theme (M16)**: `theme-default` splits into `base.css` (structure: layout areas, reserved space,
   the mobile layer, RTL, reduced motion, every component rule) and skins that only set tokens.
   `gallerist.css` stays the zero-config entry (base + Gallery). New tokens let a skin give bar

@@ -116,7 +116,16 @@
   font-size: 12px;
 }
 .gallerist-pin-body {
+  /* a <p>: reset what host pages commonly style on paragraphs */
   margin: 4px 0 0;
+  padding: 0;
+  max-width: none;
+  color: inherit;
+  font: inherit;
+}
+.gallerist-pin-replies > li {
+  margin: 0;
+  padding: 0;
 }
 .gallerist-pin-badge {
   padding: 1px 6px;

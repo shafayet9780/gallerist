@@ -23,6 +23,9 @@ describe('resolvePreset', () => {
     expect(p.arrows).toBe('corner-br')
     expect(p.rail).toBe('bottom')
     expect(p.rootAttrs['data-gallerist-preset']).toBe('reviewer')
+    expect(p.thumbnails).toMatchObject({ timeline: true, numberItems: true })
+    expect(p.navigator).toBe(true)
+    expect(resolvePreset('filmstrip').navigator).toBe(false)
   })
 
   it('contact: right (vertical) rail', () => {

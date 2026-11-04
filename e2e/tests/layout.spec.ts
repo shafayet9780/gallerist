@@ -25,6 +25,7 @@ const CONFIGS: Record<string, string> = {
   'single-item-group': 'g=0',
   'large-group': 'g=5',
   zoomed: 'zoom=2',
+  'zoomed-navigator': 'preset=reviewer&zoom=2', // the zoom navigator, beside the corner cluster
   'controls-off': 'controls=0&plugins=0',
   'rtl-reviewer': 'preset=reviewer&dir=rtl&captions=1',
   'rtl-rail-left': 'rail=left&dir=rtl',
@@ -64,6 +65,7 @@ const ATOMS = [
   '.gallerist-rail-toggle',
   '.gallerist-thumbs',
   '.gallerist-thumb-items',
+  '.gallerist-navigator',
 ]
 // Persistent chrome the stage must not sit under (immersive overlays them by design).
 const RESERVED = [
@@ -384,6 +386,37 @@ test.describe('layout behaviour', () => {
     await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
     await expect(page.locator('.gallerist-region-aside .gallerist-thumb-items')).toBeVisible()
     await expect(page.locator('.gallerist-region-thumbnails .gallerist-thumb-items')).toHaveCount(0)
+  })
+
+  test('the zoom navigator appears when zoomed and pans where it is clicked', async ({ page }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    const navigator = page.locator('.gallerist-navigator')
+    await expect(navigator).toBeHidden()
+    await page.keyboard.press('+')
+    await page.keyboard.press('+')
+    await expect(navigator).toBeVisible()
+    const box = await navigator.boundingBox()
+    if (!box) throw new Error('no navigator')
+    // the painted image's left/right edges relative to the stage's (the image is letterboxed in the stage)
+    const imageEdgeGaps = () =>
+      page.evaluate(() => {
+        const img = document.querySelector(
+          '.gallerist-content[data-gallerist-current] img',
+        ) as HTMLImageElement
+        const stage = document.querySelector('.gallerist-stage') as HTMLElement
+        const r = img.getBoundingClientRect()
+        const s = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight)
+        const st = stage.getBoundingClientRect()
+        const left = r.left + (r.width - img.naturalWidth * s) / 2
+        return [left - st.left, st.right - (left + img.naturalWidth * s)]
+      })
+    await page.mouse.click(box.x + 2, box.y + box.height / 2) // the minimap's left edge
+    await expect.poll(async () => Math.abs((await imageEdgeGaps())[0] ?? 99)).toBeLessThan(1.5)
+    await page.mouse.click(box.x + box.width - 2, box.y + box.height / 2) // its right edge
+    await expect.poll(async () => Math.abs((await imageEdgeGaps())[1] ?? 99)).toBeLessThan(1.5)
+    await page.keyboard.press('0')
+    await expect(navigator).toBeHidden()
   })
 
   test('RTL: the group arrows point the reading direction', async ({ page }) => {

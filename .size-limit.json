@@ -46,5 +46,23 @@
     "ignore": ["@gallerist/core"],
     "limit": "4 kB",
     "gzip": true
+  },
+  {
+    "name": "theme base.css (gz)",
+    "path": "packages/theme-default/src/base.css",
+    "limit": "10 kB",
+    "gzip": true
+  },
+  {
+    "name": "theme gallery.css skin (gz)",
+    "path": "packages/theme-default/src/gallery.css",
+    "limit": "6 kB",
+    "gzip": true
+  },
+  {
+    "name": "theme console.css skin (gz)",
+    "path": "packages/theme-default/src/console.css",
+    "limit": "6 kB",
+    "gzip": true
   }
 ]

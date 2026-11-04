@@ -11,6 +11,7 @@
     "./gallery.css": "./src/gallery.css",
     "./console.css": "./src/console.css",
     "./pins.css": "./src/pins.css",
+    "./grid.css": "./src/grid.css",
     "./package.json": "./package.json"
   },
   "scripts": {

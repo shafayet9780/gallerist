@@ -399,6 +399,114 @@ describe('mount — zoom transform', () => {
   })
 })
 
+describe('mount — zoom navigator (M18)', () => {
+  const measure = (w: number, h: number) => {
+    const stage = document.querySelector('.gallerist-stage') as HTMLElement
+    vi.spyOn(stage, 'getBoundingClientRect').mockImplementation(
+      () => ({ width: w, height: h, left: 0, top: 0, right: w, bottom: h, x: 0, y: 0 }) as DOMRect,
+    )
+  }
+  const sized = (): Collection => ({
+    groups: [{ id: 'g', items: [{ ...item('a'), naturalSize: { w: 1000, h: 800 } }] }],
+  })
+  const nav = () => document.querySelector('.gallerist-navigator') as HTMLElement | null
+
+  it('is off by default and on with the option or the reviewer preset', () => {
+    mount(createViewer({ collection: sized() }))
+    expect(nav()).toBeNull()
+    document.body.innerHTML = ''
+    const v = createViewer({ collection: sized() })
+    mount(v, { preset: 'reviewer' })
+    v.open()
+    expect(nav()).not.toBeNull()
+  })
+
+  it('shows only while zoomed in, with a view box for the visible part', () => {
+    const v = createViewer({ collection: sized() })
+    mount(v, { navigator: true })
+    v.open()
+    measure(1000, 800)
+    expect(nav()?.hidden).toBe(true)
+    getInternals(v).setZoom({ scale: 2, x: -500, y: -400 }) // the centre quarter is visible
+    expect(nav()?.hidden).toBe(false)
+    const view = nav()?.querySelector('.gallerist-navigator-view') as HTMLElement
+    expect([view.style.left, view.style.top, view.style.width, view.style.height]).toEqual([
+      '25%',
+      '25%',
+      '50%',
+      '50%',
+    ])
+    expect(nav()?.getAttribute('aria-hidden')).toBe('true')
+    v.resetZoom()
+    expect(nav()?.hidden).toBe(true)
+  })
+
+  it('keeps no minimap for media that cannot zoom, and ignores secondary buttons', () => {
+    const v = createViewer({ collection: sized() })
+    mount(v, {
+      navigator: true,
+      adapters: [
+        {
+          type: 'image',
+          mount: (_it, slot) => {
+            const node = document.createElement('video')
+            node.className = 'gallerist-media'
+            slot.appendChild(node)
+            return {
+              element: node,
+              ready: Promise.resolve(),
+              naturalSize: () => ({ w: 1000, h: 800 }),
+              supportsZoom: false,
+              destroy: () => node.remove(),
+            }
+          },
+        },
+      ],
+    })
+    v.open()
+    measure(1000, 800)
+    getInternals(v).setZoom({ scale: 2, x: -500, y: -400 })
+    expect(nav()?.hidden).toBe(true)
+  })
+
+  it('a right-button press on the minimap does not pan', () => {
+    const v = createViewer({ collection: sized() })
+    mount(v, { navigator: true })
+    v.open()
+    measure(1000, 800)
+    getInternals(v).setZoom({ scale: 2, x: -500, y: -400 })
+    const n = nav() as HTMLElement
+    vi.spyOn(n, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 80,
+    } as DOMRect)
+    n.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, button: 2, clientX: 25, clientY: 20 }),
+    )
+    expect(v.getState().zoom).toEqual({ scale: 2, x: -500, y: -400 })
+  })
+
+  it('pointing at the minimap centres the view there', () => {
+    const v = createViewer({ collection: sized() })
+    mount(v, { navigator: true })
+    v.open()
+    measure(1000, 800)
+    getInternals(v).setZoom({ scale: 2, x: -500, y: -400 })
+    const n = nav() as HTMLElement
+    vi.spyOn(n, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 80,
+    } as DOMRect)
+    n.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 25, clientY: 20 }))
+    // the top-left quarter's centre (250, 200) at 2× is centred: x = 500 - 500, y = 400 - 400
+    expect(v.getState().zoom).toEqual({ scale: 2, x: 0, y: 0 })
+  })
+})
+
 describe('mount — motion axis', () => {
   const current = () => document.querySelector('.gallerist-slide[data-gallerist-current]')
   it('tags the current slide with the axis of motion (group vs item)', () => {

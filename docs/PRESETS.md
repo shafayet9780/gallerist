@@ -15,7 +15,7 @@ distinct layout.
 | Preset      | Rail     | Arrows      | Auto-hide | For |
 |-------------|----------|-------------|-----------|-----|
 | `filmstrip` | `bottom` | `pill-right`| no        | Classic lightbox, persistent chrome (default). |
-| `reviewer`  | `bottom` | `corner-br` | no        | Time-series review; labels under each screen. |
+| `reviewer`  | `bottom` | `corner-br` | no        | Time-series review: a timeline rail (a time over each group from `group.meta.time`), numbered items, the zoom navigator. Pairs with `skin: 'console'`. |
 | `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
 | `contact`   | `right`  | `pill-right`| no        | Browse-heavy; vertical rail on the right (pairs with `plugin-grid`). |
 
@@ -33,9 +33,9 @@ const { thumbnails: t } = resolvePreset('reviewer')
 createViewer({ collection, plugins: [thumbnails(t)] })
 ```
 
-`resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails }`.
-Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide` options always win over
-the preset.
+`resolvePreset(name)` is a pure function → `{ rootAttrs, arrows, autoHide, rail, thumbnails,
+navigator? }`. Unknown names fall back to `filmstrip`. Explicit `rail`/`arrows`/`autoHide`/`navigator`
+options always win over the preset.
 
 ## Rail placement (`data-gallerist-rail-pos`)
 
@@ -104,6 +104,11 @@ exception: the stage fills the viewer and the bar, caption and rail float over i
   `prefers-reduced-motion`**. The `immersive` preset additionally fades the rail + toolbar, and
   there the floating bar and caption let clicks through to the image except on their buttons.
 - **Zoom reset** appears only while zoomed in.
+- **Zoom navigator** (`navigator: true`, on in `reviewer`): while zoomed in, a minimap of the image
+  in the stage's bottom corner (top corner on narrow screens) with a box for the visible part;
+  click or drag it to move around. It is a pointer aid, hidden from assistive tech; the keys zoom
+  and pan as before. It belongs to the built-in controls (none with `controls: false`) and fades
+  with them on idle; it isn't shown for media that can't zoom (video).
 - **Phones:** under 600px wide the chrome compacts, the `aside` column and the items toggle are
   dropped and the bar's tools scroll sideways if they don't fit. On a touch screen every target is
   at least 44px, the ↑ · position · ↓ navigator stays visible (group arrows give way to swipes but
@@ -122,7 +127,7 @@ preset. The renderer reflects them as `data-gallerist-skin`, `data-gallerist-acc
 | `skin` | Stylesheet | Look | Accents (first is the default) |
 |--------|-----------|------|---------|
 | `gallery` (default) | `gallerist.css` | Quiet near-black or warm paper, round controls, sans numerals. The tint marks focus and progress only; selection and pressed toggles use the foreground. | `periwinkle`, `mint`, `amber`, `vermilion` |
-| `console` | `gallerist.css` + `console.css` | Pro review: warm graphite (or Paper), one signal accent that fills the current thumb and pressed toggles, monospaced counters. | `amber`, `cyan`, `vermilion` |
+| `console` | `gallerist.css` + `console.css` | Pro review: flat graphite (or Paper) bands with hairlines, one signal accent for what's current (the thumb ring, a pressed toggle's glyph and underline), a neutral focus ring, monospaced numerals. Uses IBM Plex when the page loads it. | `amber`, `cyan`, `vermilion` |
 
 `scheme` is `dark` (default), `light`, or `auto` (follows `prefers-color-scheme`). Each accent has a
 dark and a light value, so every accent works in both schemes.
