@@ -65,6 +65,50 @@ describe('<Gallerist>', () => {
     expect(seen[0]?.thumbnails).toEqual({ itemAxis: 'vertical', timeline: true, numberItems: true })
   })
 
+  it('linear: omitted, it follows the rail (on under a rail that asks); false and true fix it', () => {
+    // a flat thumbnails rail marks its region data-gallerist-linear; this one does the same
+    const flatRail: Plugin = () => ({
+      name: 'flat-rail',
+      regions: {
+        thumbnails: () => {
+          const node = document.createElement('div')
+          node.setAttribute('data-gallerist-linear', '')
+          return node
+        },
+      },
+    })
+    const twoItems: Collection = {
+      groups: [
+        {
+          id: 'g0',
+          items: [
+            { id: 'a', type: 'image', source: 'a.jpg' },
+            { id: 'a1', type: 'image', source: 'a1.jpg' },
+          ],
+        },
+        { id: 'g1', items: [{ id: 'b', type: 'image', source: 'b.jpg' }] },
+      ],
+    }
+    const linearOf = () =>
+      document.querySelector('.gallerist')?.getAttribute('data-gallerist-linear')
+    const counter = () => document.querySelector('.gallerist-counter')?.textContent
+    const first = render(<Gallerist collection={twoItems} open plugins={[flatRail]} />)
+    expect(linearOf()).toBe('true') // omitted: React passes nothing, so the rail decides
+    expect(counter()).toContain('1 / 3') // item 1 of 3, not group 1 of 2
+    first.unmount()
+    const off = render(<Gallerist collection={twoItems} open plugins={[flatRail]} linear={false} />)
+    expect(linearOf()).toBeNull()
+    expect(counter()).toContain('1 / 2')
+    off.unmount()
+    render(<Gallerist collection={twoItems} open linear />)
+    expect(linearOf()).toBe('true') // no rail at all
+  })
+
+  it('linear stays off when omitted and no rail asks for it', () => {
+    render(<Gallerist collection={collection} open />)
+    expect(document.querySelector('.gallerist')?.hasAttribute('data-gallerist-linear')).toBe(false)
+  })
+
   it('passes navigator to the renderer, overriding the preset', () => {
     render(<Gallerist collection={collection} open preset="reviewer" navigator={false} />)
     expect(document.querySelector('.gallerist-navigator')).toBeNull()

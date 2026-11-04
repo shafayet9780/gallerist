@@ -157,13 +157,67 @@ test.describe('flat rail (groupDisplay: flat)', () => {
     await expect(page.locator('.gallerist')).toBeVisible()
   })
 
-  test('renders every item bracketed per group and a card navigates', async ({ page }) => {
+  test('renders every item grouped and a card navigates', async ({ page }) => {
     const rail = page.locator('.gallerist-thumbs[data-display="flat"]')
     await expect(rail).toBeVisible()
     await expect(rail.locator('.gallerist-thumb-group')).toHaveCount(3)
     await expect(rail.locator('.gallerist-thumb-item')).toHaveCount(6) // 1 + 3 + 2
     await rail.locator('.gallerist-thumb-item[data-item="b2"]').click()
-    await expect(page.locator('.gallerist-counter')).toHaveText(/2 \/ 3/)
+    // a flat rail makes the walk linear: the counter is the item's place among all 6
+    await expect(page.locator('.gallerist-counter')).toHaveText(/4 \/ 6/)
+    await expect(rail.locator('.gallerist-thumb-group[data-active]')).toHaveAttribute(
+      'data-group',
+      'g1',
+    )
+  })
+
+  test('groups are split by a hairline, not boxed; only the current group is marked', async ({
+    page,
+  }) => {
+    const groups = page.locator('.gallerist-thumb-group')
+    const look = (k: number) =>
+      groups.nth(k).evaluate((el) => {
+        const s = getComputedStyle(el)
+        return {
+          start: s.borderInlineStartWidth,
+          end: s.borderInlineEndWidth,
+          top: s.borderTopWidth,
+          bg: s.backgroundColor,
+          radius: s.borderTopLeftRadius,
+        }
+      })
+    const none = { end: '0px', top: '0px', bg: 'rgba(0, 0, 0, 0)', radius: '0px' }
+    expect(await look(0)).toEqual({ start: '0px', ...none }) // the first group: nothing before it
+    expect(await look(1)).toEqual({ start: '1px', ...none }) // a divider between groups
+    expect(await look(2)).toEqual({ start: '1px', ...none })
+    await expect(page.locator('.gallerist-thumb-group[data-active]')).toHaveCount(1)
+    await expect(groups.first()).toHaveAttribute('data-active', '')
+  })
+
+  test('←/→ walk every item across group boundaries without passing linear', async ({ page }) => {
+    const root = page.locator('.gallerist')
+    await expect(root).toHaveAttribute('data-gallerist-linear', 'true')
+    await expect(page.locator('.gallerist-itemnav')).toBeHidden()
+    await root.focus()
+    const current = page.locator('.gallerist-thumb-group[data-active]')
+    await expect(page.locator('.gallerist-counter')).toHaveText(/1 \/ 6/) // a0
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('.gallerist-counter')).toHaveText(/2 \/ 6/) // b0: into g1
+    await expect(current).toHaveAttribute('data-group', 'g1')
+    await expect(page.locator('.gallerist-thumb-item[data-item="b0"]')).toHaveAttribute(
+      'data-active',
+      '',
+    )
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('ArrowRight') // b1, b2, then c0: into g2
+    await expect(page.locator('.gallerist-counter')).toHaveText(/5 \/ 6/)
+    await expect(current).toHaveAttribute('data-group', 'g2')
+    await page.keyboard.press('ArrowDown') // the item axis retires
+    await expect(page.locator('.gallerist-counter')).toHaveText(/5 \/ 6/)
+    await page.keyboard.press('ArrowLeft') // back across the boundary, to g1's last item
+    await expect(page.locator('.gallerist-counter')).toHaveText(/4 \/ 6/)
+    await expect(current).toHaveAttribute('data-group', 'g1')
   })
 
   test('no axe violations in flat mode', async ({ page }) => {
@@ -222,6 +276,89 @@ test.describe('linear flat traversal', () => {
     await expect(page.locator('.gallerist-thumbs[data-display="flat"]')).toBeVisible()
     await page.locator('.gallerist-thumb-item[data-item="b2"]').click() // b2 = 4th item overall
     await expect(page.locator('.gallerist-counter')).toHaveText(/4 \/ 6/)
+  })
+
+  test('flat rail + linear: false keeps the two axes', async ({ page }) => {
+    await page.goto('/plugins.html?display=flat&linear=0')
+    await page.click('#open')
+    const root = page.locator('.gallerist')
+    await expect(page.locator('.gallerist-thumbs[data-display="flat"]')).toBeVisible()
+    await expect(root).not.toHaveAttribute('data-gallerist-linear')
+    await root.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('.gallerist-counter')).toHaveText(/2 \/ 3/) // group 2 of 3
+    await page.keyboard.press('ArrowDown')
+    await expect(page.locator('.gallerist-thumb-item[data-item="b1"]')).toHaveAttribute(
+      'data-active',
+      '',
+    )
+  })
+})
+
+// The reviewer's timeline on a flat rail: each group headed by its time, the current one in the
+// accent, the rest muted; the times stay part of the groups' names.
+test.describe('flat rail with timeline labels (reviewer)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console&display=flat&captions=1')
+    await viewerSettled(page)
+  })
+
+  test('labels each group with its time and accents only the current one', async ({ page }) => {
+    const caps = page.locator('.gallerist-thumb-group-cap')
+    await expect(caps.first()).toHaveText('09:12')
+    await expect(page.locator('.gallerist-thumb-group[data-group="g1"]')).toHaveAttribute(
+      'aria-label',
+      'Group 2, 09:19',
+    )
+    const colours = () =>
+      page.evaluate(() => {
+        const root = document.querySelector('.gallerist') as HTMLElement
+        const probe = document.createElement('span')
+        root.appendChild(probe)
+        const resolve = (v: string) => {
+          probe.style.color = `var(${v})`
+          return getComputedStyle(probe).color
+        }
+        const tokens = {
+          accent: resolve('--gallerist-accent'),
+          muted: resolve('--gallerist-fg-muted'),
+        }
+        probe.remove()
+        const caps = [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-group')]
+          .filter((g) => g.querySelector('.gallerist-thumb-group-cap'))
+          .map((g) => ({
+            group: g.dataset.group,
+            active: g.hasAttribute('data-active'),
+            colour: getComputedStyle(g.querySelector('.gallerist-thumb-group-cap') as Element)
+              .color,
+          }))
+        return { tokens, caps }
+      })
+    const check = async (current: string) => {
+      const { tokens, caps } = await colours()
+      expect(tokens.accent).not.toBe(tokens.muted)
+      for (const cap of caps) {
+        expect(cap.active).toBe(cap.group === current)
+        expect(cap.colour).toBe(cap.active ? tokens.accent : tokens.muted)
+      }
+    }
+    await check('g1') // the fixture opens on group 2
+    const root = page.locator('.gallerist')
+    await root.focus()
+    for (let k = 0; k < 3; k++) await page.keyboard.press('ArrowRight') // g1's 3 items, then g2
+    await expect(page.locator('.gallerist-thumb-group[data-active]')).toHaveAttribute(
+      'data-group',
+      'g2',
+    )
+    await check('g2')
+  })
+
+  test('no axe violations with timeline labels on a flat rail', async ({ page }) => {
+    const results = await new AxeBuilder({ page })
+      .include('.gallerist')
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    expect(results.violations).toEqual([])
   })
 })
 

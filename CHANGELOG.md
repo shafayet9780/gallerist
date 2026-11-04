@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.3.1
+
+### The flat rail, completed
+- **theme (changed)**: the flat rail (`thumbnails({ groupDisplay: 'flat' })`) no longer draws each group
+  as a bordered, tinted box with an accent stripe down its side. That spent the accent on every group,
+  so it no longer said which one was current. Each group's items now sit under a small, muted label,
+  with a 1px hairline between neighbouring groups and the same space on both sides of it. Only the
+  current group's label takes the accent; the plugin marks that group `data-active`. A group that the
+  windowed rail draws only in part has no divider on the cut side, shows its label only when its start
+  is drawn, and its card at the cut is faded. The labels and dividers use each skin's existing tokens
+  and keep their contrast in every skin and scheme.
+- **theme (fixed)**: a flat rail in a side rail (`rail: 'left'` or `'right'`) runs its groups down the
+  rail with each group's items in a column, and the divider runs across the rail. Before, a group's
+  items stayed in a row wider than the rail and were cut off.
+- **plugin-thumbnails**: `timeline` works on a flat rail. Each group is headed by its timeline label
+  (`group.meta.time` with `timeline: true`, or what your function returns), and by its `caption` when
+  it has no label. The label is part of the group's accessible name (`strings.groupAt`), as it is for a
+  card in the stacked rail; a caption shown as a flat group's label now joins the name the same way.
+- **plugin-thumbnails (changed)**: a preset's `timeline` carries into an explicit
+  `groupDisplay: 'flat'`, so `thumbnails({ groupDisplay: 'flat' })` under the `reviewer` preset heads
+  each group with its time. Pass `timeline: false` to drop it. A preset's `itemAxis` and `numberItems`
+  still apply only to the preset's own group display.
+- **renderer-dom, react (changed)**: a flat rail now implies linear traversal. While a flat thumbnails
+  rail is mounted, ←/→ (↑/↓ beside a side rail) walk every item in rail order across groups, the
+  counter reads `item N / total`, the ↑/↓ item navigator and the within-group pills hide, and the
+  arrows walk the items, which is what `linear` already did. You no longer need to pass `linear`
+  alongside a flat rail. If you relied on the group and item axes with a flat rail, pass
+  `linear: false` to `mount()` or `linear={false}` to `<Gallerist>` to keep them. An explicit `linear`
+  still wins either way, and stacked and index rails, or no rail, are unchanged. The `linear` option
+  is now unset by default rather than `false`, and React passes nothing when the prop is omitted.
+- **renderer-dom**: how the rail asks for it is documented for plugin authors: a `thumbnails` region
+  node that carries (or holds an element with) `data-gallerist-linear` turns linear traversal on
+  unless `mount()` got an explicit `linear`. The renderer reads it whenever the plugin set changes,
+  so a rail added with `viewer.use()` after mount, or removed, updates the counter, the navigator and
+  the keys.
+
 ## v0.3.0
 
 ### Package name

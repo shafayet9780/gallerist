@@ -731,49 +731,61 @@
   content: "⊞";
 }
 
-/* ── flat rail (groupDisplay: flat): every item side-by-side, each group bracketed so it reads as
-   one group. The accent left-rule + border mark the group; partial flags fade the bracket at the
-   virtualization window edges. ───────────────────────────────────────────────────────────────── */
+/* ── flat rail (groupDisplay: flat): every item side by side, each group under its label, a
+   hairline between neighbouring groups. Only the current group's label takes the accent. A group
+   the drawn run cuts (its rest isn't drawn yet) has no divider on that side, no label when cut at
+   its start, and its card at the cut fades. */
 .gallerist-thumbs[data-display="flat"] {
   align-items: stretch;
+  gap: 12px;
 }
 .gallerist-thumb-group {
-  position: relative;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 8px;
-  border: 1px solid var(--gallerist-hairline);
-  border-left: 3px solid var(--gallerist-accent);
-  border-radius: var(--gallerist-radius);
-  background: var(--gallerist-group-bg);
+  justify-content: flex-end; /* the item rows line up, labelled or not */
+  gap: 6px;
 }
-/* a group continuing off-window: soften the bracket so it reads as "more before/after". */
-.gallerist-thumb-group[data-partial-start] {
-  border-left-color: var(--gallerist-hairline);
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-.gallerist-thumb-group[data-partial-end] {
-  border-right-style: dashed;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+/* the divider: the same room on both sides of it (the rail's gap, then this padding) */
+.gallerist-thumb-group + .gallerist-thumb-group {
+  padding-inline-start: 12px;
+  border-inline-start: 1px solid var(--gallerist-hairline);
 }
 .gallerist-thumb-group-cap {
-  font: 600 11px var(--gallerist-font);
-  line-height: 1.2;
-  color: var(--gallerist-fg);
-  opacity: 0.85;
+  contain: inline-size; /* a long label ends in an ellipsis instead of widening its group */
+  font: 500 11px / 14px var(--gallerist-font);
+  color: var(--gallerist-fg-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
+}
+.gallerist-thumbs[data-timeline] .gallerist-thumb-group-cap {
+  font-family: var(--gallerist-mono);
+}
+.gallerist-thumb-group[data-active] > .gallerist-thumb-group-cap {
+  color: var(--gallerist-accent);
 }
 .gallerist-thumb-group-row {
   display: flex;
   gap: 6px;
   align-items: center;
+}
+/* a group the drawn run cuts: its card at the cut fades (unless current or focused) */
+.gallerist-thumb-group[data-partial-start]
+  .gallerist-thumb-item:first-child:not([data-active], :focus-visible),
+.gallerist-thumb-group[data-partial-end]
+  .gallerist-thumb-item:last-child:not([data-active], :focus-visible) {
+  opacity: 0.4;
+}
+/* a side rail: the groups run down it, each one's items in a column, the divider across the rail */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group-row {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group + .gallerist-thumb-group {
+  padding: 12px 0 0;
+  border-inline-start: 0;
+  border-block-start: 1px solid var(--gallerist-hairline);
 }
 
 /* ── chrome buttons (one look for bar tools, arrows, item navigator, plugin buttons) ───────── */

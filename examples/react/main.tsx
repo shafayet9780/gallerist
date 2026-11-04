@@ -151,7 +151,8 @@ function App() {
   const [itemMemory, setItemMemory] = useState<ItemMemory>('reset')
   const [keepZoomOnNav, setKeepZoomOnNav] = useState(false)
   const [startGroup, setStartGroup] = useState(0)
-  // linear traversal: 'auto' couples it to the flat rail; 'on'/'off' force it.
+  // linear traversal: 'auto' leaves the prop out, so the rail decides (a flat rail turns it on);
+  // 'on'/'off' pass linear / linear={false}, which win over the rail.
   const [linearOpt, setLinearOpt] = useState<LinearOpt>('auto')
 
   // thumbnails plugin
@@ -170,8 +171,9 @@ function App() {
   const [showOverlay, setShowOverlay] = useState(false)
 
   const def = resolvePreset(preset)
-  // linear couples to the flat rail by default; the effective rail decides the on-screen axis labels.
+  // what the viewer will do, for the key hints below (the renderer itself decides 'auto')
   const linear = linearOpt === 'auto' ? groupDisplay === 'flat' : linearOpt === 'on'
+  // the effective rail decides the on-screen axis labels
   const effRail = rail === 'auto' ? def.rail : rail
   const vertical = effRail === 'left' || effRail === 'right'
 
@@ -410,7 +412,7 @@ function App() {
             Keep zoom on nav
           </label>
           <label className="field">
-            Linear traversal<span className="def">auto = on with flat</span>
+            Linear traversal<span className="def">auto: the rail decides (on when flat)</span>
             <select value={linearOpt} onChange={(e) => setLinearOpt(e.target.value as LinearOpt)}>
               <option value="auto">auto (flat)</option>
               <option value="on">on</option>
@@ -560,7 +562,7 @@ function App() {
             itemMemory,
             keepZoomOnNav,
             startGroup,
-            linear,
+            linearOpt,
             groupDisplay,
             itemAxis,
             overscan,
@@ -591,7 +593,8 @@ function App() {
         arrows={arrows === 'auto' ? undefined : arrows}
         rail={rail === 'auto' ? undefined : rail}
         autoHide={autoHide === 'auto' ? undefined : autoHide === 'on'}
-        linear={linear} // flat rail ⇒ linear by default; the Linear control can force it on/off
+        // omitted (auto), a flat rail makes it linear; the Linear control can force it on or off
+        linear={linearOpt === 'auto' ? undefined : linearOpt === 'on'}
         plugins={plugins}
       >
         <Gallerist.Region name="toolbar">
@@ -623,7 +626,7 @@ function usageSnippet(c: {
   itemMemory: ItemMemory
   keepZoomOnNav: boolean
   startGroup: number
-  linear: boolean
+  linearOpt: LinearOpt
   groupDisplay: GroupDisplay
   itemAxis: Opt<ItemAxis>
   overscan: number
@@ -662,7 +665,7 @@ function usageSnippet(c: {
     c.arrows !== 'auto' ? `arrows="${c.arrows}"` : null,
     c.rail !== 'auto' ? `rail="${c.rail}"` : null,
     c.autoHide !== 'auto' ? `autoHide={${c.autoHide === 'on'}}` : null,
-    c.linear ? 'linear' : null,
+    c.linearOpt === 'on' ? 'linear' : c.linearOpt === 'off' ? 'linear={false}' : null,
     c.controls ? null : 'controls={false}',
     'open={open}',
   ].filter(Boolean)

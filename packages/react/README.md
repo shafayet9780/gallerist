@@ -33,6 +33,11 @@ new values.
 rail options for any option you don't pass (`preset="reviewer"` gives the timeline and numbered items;
 `thumbnails({ timeline: false })` keeps the numbers and drops the timeline).
 
+`linear` follows the rail when you leave it out: with `thumbnails({ groupDisplay: 'flat' })` ←/→ walk
+every item in order across groups (the counter reads `item N / total`); with another rail, or none,
+they move between groups. `linear={false}` keeps the group and item axes under a flat rail, and
+`linear` turns linear traversal on whatever the rail.
+
 `plugins`, `on` and render props are functions, so `<Gallerist>` is used from a client component. The
 build carries a `"use client"` banner, so a Next.js App Router page can import it from inside a client
 boundary (a file that starts with `"use client"`); a Server Component can't pass it those props.

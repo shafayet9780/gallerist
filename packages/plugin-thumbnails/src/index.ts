@@ -6,8 +6,10 @@
 //    OTHER multi-item card opens a transient *peek* flyout of its items — preview without
 //    navigating in. Touch (no hover) gets an explicit expand affordance on the card.
 //  • 'flat': every item of every group renders side-by-side as its own card, each group's run
-//    wrapped in a bordered container so it reads as one group. Item-windowed so it stays bounded
-//    even for huge galleries or one giant group.
+//    wrapped in a group (its label over its items, a divider between groups) so it reads as one
+//    group. Item-windowed so it stays bounded even for huge galleries or one giant group. The rail
+//    marks its region `data-gallerist-linear`, which turns the renderer's linear traversal on by
+//    default (←/→ walk the items in rail order).
 //  • 'index': a section index. One row per group (cover, `group.caption`, `group.meta.subtitle`, item
 //    count); the active group's items expand in place under its row. On a bottom rail, or any rail at
 //    900px wide or less, the rows become a strip of chips.
@@ -57,8 +59,9 @@ export interface ThumbnailsOptions {
   /**
    * How multi-item groups are shown in the rail. `stacked` (default) collapses each group to one
    * card (hover/focus to peek its items, or tap the expand affordance on touch); `flat` lays every
-   * item out side-by-side with each group wrapped in a bordered container; `index` lists named
-   * sections with their counts and expands the active one (its items always run as a row).
+   * item out side-by-side, each group under its label with a divider between groups, and makes the
+   * renderer's `linear` traversal the default; `index` lists named sections with their counts and
+   * expands the active one (its items always run as a row).
    */
   groupDisplay?: 'stacked' | 'flat' | 'index'
   /**
@@ -68,9 +71,11 @@ export interface ThumbnailsOptions {
    */
   expandActive?: boolean
   /**
-   * A timeline over the rail (`stacked` mode): a label with a tick above each group card, joined
-   * by a track line, the current one in the accent. `true` reads the label from `group.meta.time`
-   * (a string); a function returns it. The label is part of the card's accessible name.
+   * Time labels on the rail (`stacked` and `flat` modes), the current group's in the accent.
+   * Stacked: a label with a tick above each group card, joined by a track line. Flat: the label
+   * heads each group, in place of its `caption` (which still shows where a group has no label).
+   * `true` reads the label from `group.meta.time` (a string); a function returns it. The label is
+   * part of the card's (flat: the group's) accessible name.
    */
   timeline?: boolean | ((group: Group, index: number) => string | undefined)
   /** Number the item thumbs (1, 2, 3…) in the item stack and peek, so items can be referred to. */
@@ -84,7 +89,7 @@ export interface ThumbnailsStrings {
   rail: string
   /** an unnamed group's name, and a group card's accessible name */
   group: (n: number) => string
-  /** a group card's accessible name with its timeline label */
+  /** a group's accessible name with its label: the timeline's, or on a flat rail its caption */
   groupAt: (n: number, time: string) => string
   /** an index row's accessible name */
   section: (name: string, subtitle: string | undefined, count: number) => string
@@ -235,8 +240,9 @@ function canHover(): boolean {
 
 const DISPLAYS = ['stacked', 'flat', 'index'] as const
 const AXES = ['vertical', 'horizontal'] as const
-// a preset's options that only make sense with the group display it was designed for
-const LAYOUT_KEYS = ['itemAxis', 'numberItems', 'timeline'] as const
+// a preset's options that only make sense with the group display it was designed for (its
+// `timeline` is not one: stacked and flat both draw it)
+const LAYOUT_KEYS = ['itemAxis', 'numberItems'] as const
 /** `value` if it is one of `known`, else the first (the default). */
 const oneOf = <T extends string>(known: readonly T[], value: unknown): T =>
   known.includes(value as T) ? (value as T) : (known[0] as T)
@@ -264,7 +270,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const configure = (defaults?: unknown) => {
       const preset = (defaults && typeof defaults === 'object' ? defaults : {}) as ThumbnailsOptions
       o = { ...preset }
-      // The preset's item axis, numbering and timeline belong to its own group display: an explicit
+      // The preset's item axis and numbering belong to its own group display: an explicit
       // `groupDisplay` that differs from it starts from the plugin's defaults for those instead.
       if (
         opts.groupDisplay !== undefined &&
@@ -278,11 +284,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       isFlat = groupDisplay === 'flat'
       itemAxis = isIndex ? 'horizontal' : oneOf(AXES, o.itemAxis)
       timeLabel =
-        groupDisplay === 'stacked' && o.timeline
-          ? typeof o.timeline === 'function'
-            ? o.timeline
-            : metaTime
-          : null
+        !isIndex && o.timeline ? (typeof o.timeline === 'function' ? o.timeline : metaTime) : null
       panelOpen = o.expandActive ?? true
     }
     configure()
@@ -651,7 +653,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const activeGroupId = activeGroup?.id ?? null
       const activeItemId = activeGroup?.items[i]?.id ?? null
       const card = activeGroupId ? groupBtns.get(activeGroupId) : undefined
-      const host = activeGroupId ? cardHost.get(activeGroupId) : undefined
+      // a card's wrapper, or (flat) the group the current item sits in
+      const host = activeGroupId
+        ? (cardHost.get(activeGroupId) ?? groupWraps.get(activeGroupId))
+        : undefined
       const next = [card, host, activeItemId ? itemBtns.get(activeItemId) : undefined].filter(
         (el): el is HTMLElement => !!el,
       )
@@ -715,12 +720,21 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       })
     }
 
+    // A group's label (the timeline's, else its caption) heads it and joins its accessible name.
     const buildGroupWrapper = (group: Group, gIndex: number): HTMLElement => {
       const wrap = document.createElement('div')
       wrap.className = 'gallerist-thumb-group'
       wrap.dataset.group = group.id
       wrap.setAttribute('role', 'group')
-      wrap.setAttribute('aria-label', t.group(gIndex + 1))
+      const label = timeLabel?.(group, gIndex) ?? captionOf(group)
+      wrap.setAttribute('aria-label', label ? t.groupAt(gIndex + 1, label) : t.group(gIndex + 1))
+      if (label) {
+        const cap = document.createElement('span')
+        cap.className = 'gallerist-thumb-group-cap'
+        cap.setAttribute('aria-hidden', 'true') // already in the group's name
+        cap.textContent = label
+        wrap.appendChild(cap)
+      }
       const row = document.createElement('div')
       row.className = 'gallerist-thumb-group-row'
       wrap.appendChild(row)
@@ -789,7 +803,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         place(row, ib, prevBtn)
         prevBtn = ib
       }
-      // per-wrapper caption header + partial-edge flags
+      // partial-edge flags (a group the drawn run cuts); the label shows only over a group's start
       for (const [id, wrap] of groupWraps) {
         const gi = groupIndexById.get(id)
         if (gi == null) continue
@@ -799,17 +813,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         const mx = maxI.get(id) ?? 0
         toggleAttr(wrap, 'data-partial-start', mn > 0)
         toggleAttr(wrap, 'data-partial-end', mx < grp.items.length - 1)
-        const wantCap = typeof grp.caption === 'string' && mn === 0
-        const first = wrap.firstElementChild
-        const hasCap = !!first && first.classList.contains('gallerist-thumb-group-cap')
-        if (wantCap && !hasCap) {
-          const cap = document.createElement('span')
-          cap.className = 'gallerist-thumb-group-cap'
-          cap.textContent = grp.caption as string
-          wrap.insertBefore(cap, wrap.firstChild)
-        } else if (!wantCap && hasCap && first) {
-          first.remove()
-        }
+        const cap = wrap.querySelector<HTMLElement>('.gallerist-thumb-group-cap')
+        if (cap) cap.hidden = mn > 0
       }
     }
 
@@ -1025,6 +1030,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
       if (isFlat) {
         root.dataset.display = 'flat'
+        // a flat rail runs item by item: the renderer walks it that way unless told otherwise
+        regionEl.setAttribute('data-gallerist-linear', '')
       } else {
         if (isIndex) root.dataset.display = 'index'
         if (itemAxis === 'vertical') {

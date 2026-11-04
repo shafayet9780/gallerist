@@ -7,8 +7,9 @@ so a 10k-group gallery keeps about 20 cards in the document. One group's item st
 items; for a single huge group use `flat`, which is windowed by item.
 
 Three display modes via `groupDisplay`: **`stacked`** (default — collapsed group cards, with a peek
-flyout to preview a group without navigating in) and **`flat`** (every image side-by-side, each
-group bracketed), and **`index`** (a section index with names and counts). All stay windowed + lazy.
+flyout to preview a group without navigating in), **`flat`** (every image side-by-side, each group
+under its label, a hairline between groups), and **`index`** (a section index with names and counts).
+All stay windowed + lazy.
 
 ```ts
 import { createViewer } from '@gallerist/core'
@@ -44,10 +45,18 @@ mount(viewer)
   (every item is already visible); for the active group it defers to the panel unless that panel is
   hidden, in which case hovering the active card peeks too.
 - **Flat mode** (`groupDisplay: 'flat'`). Every item of every group renders side-by-side as its own
-  card, each group's run wrapped in a bordered container (left accent rule + optional caption
-  header) so it reads as one group. **Item-windowed**, so it stays bounded for huge galleries *and*
-  for a single giant group; the bracket fades at the window edges (`data-partial-start` /
-  `data-partial-end`). `itemAxis` is ignored here.
+  card, each group's run wrapped in a `role="group"` element with its label above the items (the
+  `timeline` label, else `group.caption`) and a hairline between neighbouring groups; on a side rail
+  the groups run down the rail, the items in a column. The group holding the current item is marked
+  `data-active`, and only its label takes the accent. The label is part of the group's accessible
+  name (`strings.groupAt`), and the visible text is `aria-hidden` so it isn't read twice.
+  **Item-windowed**, so it stays bounded for huge galleries *and* for a single giant group; a group
+  the drawn run cuts is flagged `data-partial-start` / `data-partial-end` (no divider or label on
+  the cut side, its card there faded). `itemAxis` is ignored here.
+- **Flat means linear.** A flat rail marks its region `data-gallerist-linear`, so the DOM renderer
+  defaults to linear traversal while it is mounted: ←/→ walk every item in rail order across groups,
+  the counter reads `item N / total` and the ↑/↓ item navigator hides. Pass `linear: false` to
+  `mount()` (`linear={false}` in React) to keep the group/item axes.
 
 ## Options
 
@@ -64,17 +73,18 @@ thumbnails({
 |----------------|------------------------------|-------------|-------|
 | `overscan`     | `number`                     | measured    | Cards drawn each side of the card in the middle of the rail; scrolling draws the ones it reaches. A jump past the drawn run first draws around the new current card, then the scroll that reveals it trims the run back to the middle. By default what fits plus 3 each side (8 each side before the rail has a layout); a number below half of what fits is raised to it. Group cards in `stacked`/`index`, item cards in `flat`. |
 | `itemAxis`     | `'vertical' \| 'horizontal'` | `'vertical'`| `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. Ignored in `flat`. |
-| `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, bracketed per group. |
+| `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, grouped under each group's label with a hairline between groups, and makes the renderer's traversal linear by default. |
 | `expandActive` | `boolean`                    | `true`      | `stacked` and `index`. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |
-| `timeline`     | `boolean \| (group, index) => string` | off | `stacked` only. A label with a tick above each card, joined into a track, the current one in the accent. `true` reads `group.meta.time`. The label joins the card's accessible name. |
+| `timeline`     | `boolean \| (group, index) => string` | off | `stacked` and `flat`, the current group's label in the accent. Stacked: a label with a tick above each card, joined into a track. Flat: the label heads each group in place of its caption (a group whose label is `undefined` shows its caption). `true` reads `group.meta.time`. The label joins the card's (flat: the group's) accessible name. |
 | `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 
 Presets configure these for you: with `mount(viewer, { preset })` (or React's `preset` prop) every
 option you leave unset takes the preset's value, so `thumbnails()` under `preset: 'reviewer'` gets the
 timeline and numbered items; an option you pass wins, key by key (`undefined` counts as unset). One
-exception: the preset's `itemAxis`, `numberItems` and `timeline` belong to its own group display, so
-an explicit `groupDisplay` other than the preset's starts from the plugin's defaults for those. The
+exception: the preset's `itemAxis` and `numberItems` belong to its own group display, so an explicit
+`groupDisplay` other than the preset's starts from the plugin's defaults for those. Its `timeline`
+carries over (`groupDisplay: 'flat'` under `reviewer` heads each group with its time). The
 options settle when the rail mounts (and again for each new mount, with its preset). See [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md)
 for each preset's values. The rail's **position** (bottom/top/hidden) is a renderer option (`rail`),
 not a thumbnails option.

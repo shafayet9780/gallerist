@@ -20,6 +20,11 @@ const CONFIGS: Record<string, string> = {
   'rail-right': 'rail=right',
   'rail-hidden': 'rail=hidden',
   'linear-flat': 'linear=1&display=flat',
+  // a flat rail on its own (linear by default), with the reviewer's times, down a side rail, in RTL
+  flat: 'display=flat&captions=1',
+  'flat-reviewer': 'preset=reviewer&display=flat&captions=1',
+  'flat-rail-left': 'display=flat&rail=left&captions=1',
+  'flat-rtl-rail-right': 'display=flat&rail=right&dir=rtl&captions=1',
   captions: 'captions=1',
   'long-caption': 'captions=long',
   'single-item-group': 'g=0',

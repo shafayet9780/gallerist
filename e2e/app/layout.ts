@@ -122,7 +122,8 @@ mount(viewer, {
   preset: (p.get('preset') ?? undefined) as PresetName | undefined,
   arrows: (p.get('arrows') ?? undefined) as ArrowLayout | undefined,
   rail,
-  linear: p.get('linear') === '1',
+  // linear=1 / linear=0 force it; unset, it follows the rail (on with a flat one)
+  linear: p.get('linear') ? p.get('linear') === '1' : undefined,
   itemIndicator: (p.get('indicator') ?? undefined) as ItemIndicator | undefined,
   controls: p.get('controls') !== '0',
   autoHide: false, // deterministic: chrome never fades mid-measurement

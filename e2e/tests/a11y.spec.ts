@@ -94,6 +94,26 @@ for (const look of LOOKS) {
   })
 }
 
+// the flat rail in every look: the group labels (muted, the current one in the accent) and the
+// dividers hold their contrast; with the reviewer, the labels are its times
+for (const look of [
+  ...LOOKS,
+  'skin=console&preset=reviewer',
+  'skin=console&preset=reviewer&scheme=light',
+]) {
+  test(`no axe violations on a flat rail in ${look}`, async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'axe runs once (chromium)')
+    await page.goto(`/layout.html?${look}&captions=1&display=flat`)
+    await expect(page.locator('.gallerist-thumb-group[data-active]')).toHaveCount(1)
+    await viewerSettled(page)
+    const results = await new AxeBuilder({ page })
+      .include('.gallerist')
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([])
+  })
+}
+
 // A caption renderer's band taller than its room scrolls: it then takes focus and a name, so a
 // keyboard can scroll it (axe scrollable-region-focusable), and ↑/↓/Home/End scroll it, not move
 // the viewer. A band that fits stays out of the tab order. Default band, and the editorial placard

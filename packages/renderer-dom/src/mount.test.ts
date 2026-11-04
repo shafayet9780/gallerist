@@ -1297,6 +1297,111 @@ describe('mount — linear flat traversal', () => {
   })
 })
 
+describe('mount — linear follows the rail (a flat rail asks for it)', () => {
+  // The contract a flat thumbnails rail uses: its `thumbnails` region node carries
+  // data-gallerist-linear. A plain rail region doesn't.
+  const rail = (flat: boolean) => () => ({
+    name: 'rail',
+    regions: {
+      thumbnails: () => {
+        const node = document.createElement('div')
+        if (flat) node.setAttribute('data-gallerist-linear', '')
+        return node
+      },
+    },
+  })
+  const openWith = (
+    plugins: Array<ReturnType<typeof rail>>,
+    opts?: Parameters<typeof mount>[1],
+  ) => {
+    const v = createViewer({ collection: collection(), plugins })
+    mount(v, opts)
+    v.open()
+    return v
+  }
+  const root = () => document.querySelector('.gallerist') as HTMLElement
+  const press = (k: string) => root().dispatchEvent(key({ key: k }))
+  const counter = () => document.querySelector('.gallerist-counter')?.textContent
+
+  it('defaults on while the rail asks for it: ←/→ walk the items across groups', () => {
+    const v = openWith([rail(true)])
+    expect(root().getAttribute('data-gallerist-linear')).toBe('true')
+    expect(counter()).toContain('1 / 6')
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 }) // the next item, same group
+    press('ArrowDown') // the item axis retires
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    expect(counter()).toContain('3 / 6')
+    expect((document.querySelector('.gallerist-itemnav') as HTMLElement).hidden).toBe(true)
+  })
+
+  it('stays off without a rail, or with a rail that does not ask', () => {
+    for (const plugins of [[], [rail(false)]]) {
+      const v = openWith(plugins)
+      expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+      v.goTo(1, 0)
+      press('ArrowRight')
+      expect(v.getState().cursor).toEqual({ g: 2, i: 0 }) // next group
+      document.body.innerHTML = ''
+    }
+  })
+
+  it('an explicit linear: false wins over the rail; an explicit true needs no rail', () => {
+    const v = openWith([rail(true)], { linear: false })
+    expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+    v.goTo(1, 0)
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+    document.body.innerHTML = ''
+    const w = openWith([rail(false)], { linear: true })
+    expect(root().getAttribute('data-gallerist-linear')).toBe('true')
+    w.goTo(1, 2)
+    press('ArrowRight')
+    expect(w.getState().cursor).toEqual({ g: 2, i: 0 })
+  })
+
+  it('follows a rail added and removed after mount, chrome included', () => {
+    const v = openWith([])
+    v.goTo(1, 1)
+    expect(counter()).toContain('2 / 3')
+    expect((document.querySelector('.gallerist-itemnav') as HTMLElement).hidden).toBe(false)
+    const dispose = v.use(rail(true))
+    expect(root().getAttribute('data-gallerist-linear')).toBe('true')
+    expect(counter()).toContain('3 / 6') // b1, item 3 of 6
+    expect((document.querySelector('.gallerist-itemnav') as HTMLElement).hidden).toBe(true)
+    dispose()
+    expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+    expect(counter()).toContain('2 / 3')
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+  })
+
+  it('the arrows stop naming groups while linear (they walk the items)', () => {
+    const v = createViewer({
+      collection: {
+        groups: [
+          { id: 'a', caption: 'Hall', items: [item('a0'), item('a1')] },
+          { id: 'b', caption: 'Kitchen', items: [item('b0')] },
+        ],
+      },
+    })
+    mount(v, { arrowLabels: true })
+    v.open()
+    const next = () => document.querySelector('.gallerist-next') as HTMLElement
+    expect(next().getAttribute('aria-label')).toBe('Next: Kitchen')
+    expect(root().hasAttribute('data-gallerist-arrow-labels')).toBe(true)
+    const dispose = v.use(rail(true))
+    expect(next().getAttribute('aria-label')).toBe('Next')
+    expect(next().querySelector('.gallerist-arrow-label')?.hasAttribute('hidden')).toBe(true)
+    expect(root().hasAttribute('data-gallerist-arrow-labels')).toBe(false)
+    dispose()
+    expect(next().getAttribute('aria-label')).toBe('Next: Kitchen')
+    expect(root().hasAttribute('data-gallerist-arrow-labels')).toBe(true)
+  })
+})
+
 describe('mount — vertical rail (left/right) axis remap', () => {
   const openV = (rail: 'left' | 'right') => {
     const v = createViewer({ collection: collection() })
