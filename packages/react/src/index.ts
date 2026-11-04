@@ -1,10 +1,13 @@
 // @gallerist/react — React adapter (spec §16). Thin binding over the headless store.
 export {
+  type Accent,
   type ArrowLayout,
+  type ColorScheme,
   type ItemIndicator,
   type PresetName,
   type RailPlacement,
   type ResolvedPreset,
+  type Skin,
   type Strings,
   DEFAULT_STRINGS,
   resolvePreset,

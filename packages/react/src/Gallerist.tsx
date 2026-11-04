@@ -11,11 +11,15 @@ import {
   createViewer,
 } from '@gallerist/core'
 import {
+  type Accent,
   type ArrowLayout,
+  type ColorScheme,
   type ItemIndicator,
   type PresetName,
   type RailPlacement,
+  type Skin,
   type Strings,
+  applyAppearance,
   mount,
 } from '@gallerist/renderer-dom'
 import {
@@ -36,7 +40,7 @@ import { GalleristContext, useViewerContext } from './context'
  * place (diffed by id, keeping the cursor); data rebuilt with the same content is ignored. Every other viewer option
  * (`loop`, `itemMemory`, `startAt`, `plugins`, `overlays`, …) and the layout props (`container`,
  * `preset`, `arrows`, `rail`, …) are read once; change the component's `key` to apply new ones.
- * `theme` and `open` are reactive.
+ * `skin`, `accent`, `scheme` and `open` are reactive.
  */
 export interface GalleristProps extends ViewerOptions {
   /** controlled visibility. */
@@ -46,8 +50,12 @@ export interface GalleristProps extends ViewerOptions {
   controls?: boolean
   /** layout preset (sets arrow placement, auto-hide, data-gallerist-preset) — UX-E. */
   preset?: PresetName
-  /** accent variant, applied as data-gallerist-theme (reactive) — UX-I. */
-  theme?: 'amber' | 'cyan' | 'vermilion'
+  /** visual skin, default `gallery`; other skins need their stylesheet (reactive). */
+  skin?: Skin
+  /** the skin's accent by name, e.g. `mint` (Gallery) or `cyan` (Console) (reactive). */
+  accent?: Accent
+  /** colour scheme: `dark` (default), `light` or `auto` (reactive). */
+  scheme?: ColorScheme
   /** within-group arrow placement (overrides the preset default) — UX-D. */
   arrows?: ArrowLayout
   /** thumbnail rail placement (overrides the preset default) — UX-E. */
@@ -139,7 +147,9 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     container,
     controls,
     preset,
-    theme,
+    skin,
+    accent,
+    scheme,
     arrows,
     rail,
     autoHide,
@@ -220,6 +230,9 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
       linear,
       strings,
       itemIndicator,
+      skin,
+      accent,
+      scheme,
       loop: options.loop,
     })
     rootRef.current = handle.root
@@ -229,13 +242,11 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     }
   }, [viewer])
 
-  // theme is reactive — reflect it as data-gallerist-theme on the mounted root.
+  // The appearance is reactive: the skin files key off root attributes, so no remount is needed.
   useEffect(() => {
     const root = rootRef.current
-    if (!root) return
-    if (theme) root.setAttribute('data-gallerist-theme', theme)
-    else root.removeAttribute('data-gallerist-theme')
-  }, [theme])
+    if (root) applyAppearance(root, { skin, accent, scheme })
+  }, [skin, accent, scheme])
 
   useEffect(() => {
     if (open === undefined) return

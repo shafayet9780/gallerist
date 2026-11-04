@@ -199,7 +199,7 @@ afterSlide`, **cancelable** `beforeSlide`), item axis (`beforeItem/item/afterIte
 
 - **`pointer-events` inherits.** A `pointer-events:none` rule on an ancestor disables the whole
   subtree. Root mode is a `data-gallerist-mode` attribute precisely to avoid colliding with the
-  `.gallerist-overlay` element class. (See `packages/theme-default/src/gallerist.css`.)
+  `.gallerist-overlay` element class. (See `packages/theme-default/src/base.css`.)
 - **Gesture commit reads the pointer-up event's own coordinates**, not the last stored pointer
   position — Chromium coalesces `pointermove`s, so a fast flick may fire none before `pointerup`.
   Using the up-event coords makes flicks commit reliably (`gestures.ts` `onUp`).

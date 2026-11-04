@@ -3,6 +3,7 @@
 import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { applyAppearance } from './appearance'
 import { mount } from './mount'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg`, alt: id })
@@ -799,6 +800,39 @@ describe('mount — review fixes (M15)', () => {
     expect((document.querySelector('.gallerist-bar') as HTMLElement).hidden).toBe(true)
     v.use(() => ({ name: 'tool', regions: { toolbar: () => document.createElement('button') } }))
     expect((document.querySelector('.gallerist-bar') as HTMLElement).hidden).toBe(false)
+  })
+
+  it('reflects skin, accent and scheme as root attributes (M16)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-skin')).toBe('gallery')
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('dark')
+    expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
+  })
+
+  it('takes a skin, accent and scheme from the options', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v, { skin: 'console', accent: 'cyan', scheme: 'auto' })
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-skin')).toBe('console')
+    expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('auto')
+  })
+
+  it('applyAppearance changes only the options it is given', () => {
+    const v = createViewer({ collection: collection() })
+    const { root } = mount(v, { skin: 'console', scheme: 'light' })
+    applyAppearance(root, { accent: 'cyan' })
+    expect(root.getAttribute('data-gallerist-skin')).toBe('console')
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('light')
+    expect(root.getAttribute('data-gallerist-accent')).toBe('cyan')
+    applyAppearance(root, { scheme: undefined, accent: undefined })
+    expect(root.getAttribute('data-gallerist-scheme')).toBe('dark')
+    expect(root.hasAttribute('data-gallerist-accent')).toBe(false)
+    expect(root.getAttribute('data-gallerist-skin')).toBe('console')
   })
 
   it('marks the reading direction for the theme', () => {

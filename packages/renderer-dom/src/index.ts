@@ -7,6 +7,13 @@ export const VERSION =
 
 export { imageAdapter } from './adapters/image'
 export {
+  type Accent,
+  type Appearance,
+  applyAppearance,
+  type ColorScheme,
+  type Skin,
+} from './appearance'
+export {
   type ArrowLayout,
   type ItemIndicator,
   type MountOptions,

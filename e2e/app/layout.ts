@@ -7,12 +7,14 @@ import { grid } from '@gallerist/plugin-grid'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import {
   type ArrowLayout,
+  type ColorScheme,
   type ItemIndicator,
   type PresetName,
   type RailPlacement,
   mount,
 } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
+import '@gallerist/theme-default/console.css'
 
 const svg = (color: string, label: string) =>
   `data:image/svg+xml,${encodeURIComponent(
@@ -77,6 +79,9 @@ mount(viewer, {
   itemIndicator: (p.get('indicator') ?? undefined) as ItemIndicator | undefined,
   controls: p.get('controls') !== '0',
   autoHide: false, // deterministic: chrome never fades mid-measurement
+  skin: p.get('skin') ?? undefined,
+  accent: p.get('accent') ?? undefined,
+  scheme: (p.get('scheme') ?? undefined) as ColorScheme | undefined,
 })
 ;(window as unknown as { viewer: typeof viewer }).viewer = viewer
 viewer.open()
