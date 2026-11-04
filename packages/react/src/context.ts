@@ -1,10 +1,11 @@
-import type { ViewerApi } from '@visora/core'
+import type { ViewerApi } from '@gallerist/core'
 import { createContext, useContext } from 'react'
 
-export const VisoraContext = createContext<ViewerApi | null>(null)
+export const GalleristContext = createContext<ViewerApi | null>(null)
 
 export function useViewerContext(): ViewerApi {
-  const viewer = useContext(VisoraContext)
-  if (!viewer) throw new Error('Visora.Overlay / Visora.Region must be used inside <Visora>')
+  const viewer = useContext(GalleristContext)
+  if (!viewer)
+    throw new Error('Gallerist.Overlay / Gallerist.Region must be used inside <Gallerist>')
   return viewer
 }

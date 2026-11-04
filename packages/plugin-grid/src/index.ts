@@ -1,9 +1,9 @@
-// @visora/plugin-grid — in-viewer contact-sheet grid (spec §14, decision P1-I). Renders into the
+// @gallerist/plugin-grid — in-viewer contact-sheet grid (spec §14, decision P1-I). Renders into the
 // `stage` region, covering the stage; grouped with interval headers, windowed + lazy. Toggle with
 // the toolbar button or `g`; clicking a cell navigates and hides the grid.
 
-import type { Item, MediaSource, Plugin, ViewerApi } from '@visora/core'
-import { windowIndices } from '@visora/core'
+import type { Item, MediaSource, Plugin, ViewerApi } from '@gallerist/core'
+import { windowIndices } from '@gallerist/core'
 
 export interface GridOptions {
   /** groups rendered on each side of the active group (default 12). */
@@ -21,7 +21,7 @@ function thumbUrl(source: MediaSource | undefined): string | null {
 
 function lazyImg(src: string | null, observer: IntersectionObserver | null): HTMLElement {
   const img = document.createElement('img')
-  img.className = 'visora-grid-img'
+  img.className = 'gallerist-grid-img'
   img.decoding = 'async'
   img.loading = 'lazy'
   img.alt = '' // decorative — the enclosing cell carries the accessible name
@@ -73,17 +73,17 @@ export function grid(opts: GridOptions = {}): Plugin {
         const group = col.groups[g]
         if (!group) continue
         const header = document.createElement('div')
-        header.className = 'visora-grid-header'
+        header.className = 'gallerist-grid-header'
         header.textContent = typeof group.meta === 'string' ? group.meta : `Group ${g + 1}`
         root.appendChild(header)
 
         const cells = document.createElement('div')
-        cells.className = 'visora-grid-cells'
+        cells.className = 'gallerist-grid-cells'
         cells.setAttribute('role', 'listbox')
         group.items.forEach((item: Item, i: number) => {
           const cell = document.createElement('button')
           cell.type = 'button'
-          cell.className = 'visora-grid-cell'
+          cell.className = 'gallerist-grid-cell'
           cell.setAttribute('role', 'option')
           cell.setAttribute('aria-label', `${header.textContent}, item ${i + 1}`)
           const selected = g === cur.g && i === cur.i
@@ -120,12 +120,12 @@ export function grid(opts: GridOptions = {}): Plugin {
       name: 'grid',
       init() {
         root = document.createElement('div')
-        root.className = 'visora-grid'
+        root.className = 'gallerist-grid'
         root.setAttribute('aria-label', 'Grid')
         root.style.display = 'none'
         root.setAttribute('aria-hidden', 'true')
         toolbarBtn = document.createElement('button')
-        toolbarBtn.className = 'visora-grid-toggle'
+        toolbarBtn.className = 'gallerist-grid-toggle'
         ;(toolbarBtn as HTMLButtonElement).type = 'button'
         toolbarBtn.setAttribute('aria-label', 'Toggle grid')
         toolbarBtn.setAttribute('aria-pressed', 'false')

@@ -6,7 +6,7 @@
 
 ## Context
 
-`@visora/core` is headless and DOM-free at runtime (zero deps, no `document` access). But two
+`@gallerist/core` is headless and DOM-free at runtime (zero deps, no `document` access). But two
 *type-level* members of the public contract name DOM types directly:
 
 - `OverlaySpec.render: (ctx) => HTMLElement | string | Node`
@@ -19,7 +19,7 @@ hypothetical future canvas / native / SSR-string renderer could not satisfy `ren
 ## Decision
 
 For v1, the core overlay and media-adapter contract is **explicitly DOM-targeted**. We accept that
-the only shipped renderer is `@visora/renderer-dom` and that overlays/adapters return DOM nodes.
+the only shipped renderer is `@gallerist/renderer-dom` and that overlays/adapters return DOM nodes.
 
 We are launching at **0.x** (see the version decision), so the public surface is not yet frozen:
 if and when a non-DOM renderer is built, we can generalize the contract (e.g. parameterize as

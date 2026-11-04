@@ -9,7 +9,7 @@ export default defineConfig({
   sourcemap: true,
   minify: false,
   target: 'es2022',
-  external: ['@visora/core', 'client-zip'],
+  external: ['@gallerist/core', 'client-zip'],
   tsconfig: 'tsconfig.build.json',
   esbuildOptions(options) {
     options.sourcesContent = false

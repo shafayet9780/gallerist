@@ -1,7 +1,7 @@
-// @visora/plugin-hash — deep-link the cursor to the URL hash `#g=<groupId>&i=<itemId>` (spec §14, §16).
+// @gallerist/plugin-hash — deep-link the cursor to the URL hash `#g=<groupId>&i=<itemId>` (spec §14, §16).
 // Client-only (SSR-guarded); reflects nav into the URL and applies the URL on load + back/forward.
 
-import type { Plugin } from '@visora/core'
+import type { Plugin } from '@gallerist/core'
 
 export interface HashOptions {
   /** open the viewer on load if a hash is present (default true). */

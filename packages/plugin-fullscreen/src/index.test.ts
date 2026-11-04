@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { mount } from '@gallerist/renderer-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fullscreen } from './index'
 
@@ -35,52 +35,52 @@ describe('plugin-fullscreen', () => {
 
   it('mounts a labelled toolbar button', () => {
     openViewer()
-    const btn = document.querySelector('.visora-fullscreen-btn') as HTMLButtonElement
+    const btn = document.querySelector('.gallerist-fullscreen-btn') as HTMLButtonElement
     expect(btn).not.toBeNull()
     expect(btn.getAttribute('aria-label')).toBe('Toggle fullscreen')
   })
 
   it('the button requests fullscreen on the viewer root when not fullscreen', () => {
     openViewer()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     const req = vi.fn(() => Promise.resolve())
     root.requestFullscreen = req as never
-    ;(document.querySelector('.visora-fullscreen-btn') as HTMLButtonElement).click()
+    ;(document.querySelector('.gallerist-fullscreen-btn') as HTMLButtonElement).click()
     expect(req).toHaveBeenCalled()
   })
 
   it('exits fullscreen when already fullscreen', () => {
     openViewer()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     fsEl = root // currently fullscreen
     const exit = vi.fn(() => Promise.resolve())
     document.exitFullscreen = exit as never
-    ;(document.querySelector('.visora-fullscreen-btn') as HTMLButtonElement).click()
+    ;(document.querySelector('.gallerist-fullscreen-btn') as HTMLButtonElement).click()
     expect(exit).toHaveBeenCalled()
   })
 
   it('the f key toggles fullscreen', () => {
     openViewer()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     const req = vi.fn(() => Promise.resolve())
     root.requestFullscreen = req as never
     root.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }))
     expect(req).toHaveBeenCalled()
   })
 
-  it('fullscreens the bound viewer root, not the first .visora, across viewers (I-PL4)', () => {
+  it('fullscreens the bound viewer root, not the first .gallerist, across viewers (I-PL4)', () => {
     const a = createViewer({ collection: collection(), plugins: [fullscreen()] })
     mount(a)
     a.open()
     const b = createViewer({ collection: collection(), plugins: [fullscreen()] })
     mount(b)
     b.open()
-    const roots = document.querySelectorAll('.visora')
+    const roots = document.querySelectorAll('.gallerist')
     const reqA = vi.fn(() => Promise.resolve())
     const reqB = vi.fn(() => Promise.resolve())
     ;(roots[0] as HTMLElement).requestFullscreen = reqA as never
     ;(roots[1] as HTMLElement).requestFullscreen = reqB as never
-    const btns = document.querySelectorAll('.visora-fullscreen-btn')
+    const btns = document.querySelectorAll('.gallerist-fullscreen-btn')
     ;(btns[1] as HTMLButtonElement).click() // B's button → must fullscreen B, not A
     expect(reqB).toHaveBeenCalled()
     expect(reqA).not.toHaveBeenCalled()
@@ -88,13 +88,13 @@ describe('plugin-fullscreen', () => {
 
   it('falls back to the webkit-prefixed request on Safari (S-PL1)', () => {
     openViewer()
-    const root = document.querySelector('.visora') as HTMLElement & {
+    const root = document.querySelector('.gallerist') as HTMLElement & {
       webkitRequestFullscreen?: () => Promise<void>
     }
     root.requestFullscreen = undefined as never
     const req = vi.fn(() => Promise.resolve())
     root.webkitRequestFullscreen = req
-    ;(document.querySelector('.visora-fullscreen-btn') as HTMLButtonElement).click()
+    ;(document.querySelector('.gallerist-fullscreen-btn') as HTMLButtonElement).click()
     expect(req).toHaveBeenCalled()
   })
 
@@ -102,7 +102,7 @@ describe('plugin-fullscreen', () => {
     const v = openViewer()
     const onChange = vi.fn()
     v.on('fullscreenChange', onChange)
-    fsEl = document.querySelector('.visora')
+    fsEl = document.querySelector('.gallerist')
     document.dispatchEvent(new Event('fullscreenchange'))
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ fullscreen: true }))
   })

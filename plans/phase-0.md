@@ -1,6 +1,6 @@
-# Visora — Phase 0 Implementation Plan
+# Gallerist — Phase 0 Implementation Plan
 
-Source of truth: `docs/VISORA_SPEC.md` (v1.1). This plan covers **Phase 0** only:
+Source of truth: `docs/GALLERIST_SPEC.md` (v1.1). This plan covers **Phase 0** only:
 engine MVP + `renderer-dom` + `theme-default` + core image adapter + vanilla API.
 Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
 
@@ -16,7 +16,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
 | F | Region contract | abstract in core; renderer-dom implements |
 | G | Overlay render | `(ctx) => HTMLElement\|string\|Node`, signature frozen |
 | H | Motion | spring→keyframe sampler in core; tokens + bezier fallbacks in theme-default |
-| I | Token prefix | `--visora-*` (classes `.visora-*`) |
+| I | Token prefix | `--gallerist-*` (classes `.gallerist-*`) |
 | J | Placeholder | caller LQIP (`Item.placeholder`); BlurHash decoder = opt-in util, out of core |
 | K | Phase 0 chrome | minimal: backdrop, close, group arrows, item affordance, counter, aria-live, zoom-reset |
 | L | Lint/format | Biome |
@@ -60,7 +60,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
   *Verify:* Playwright visual regression at multiple zoom levels.
 
 - [x] **M5 — Motion.** (spring sampler + axis-distinct transitions + reduced-motion + tokens; FLIP shared-element open/close & full interruptible hero deferred as polish) core spring→keyframe sampler (interruptible re-base) → Element.animate;
-  theme-default `--visora-*` tokens + bezier fallbacks, chrome material, auto-hide, backdrop;
+  theme-default `--gallerist-*` tokens + bezier fallbacks, chrome material, auto-hide, backdrop;
   shared-element FLIP open/close; depth-flip vs horizontal-slide axis distinction;
   prefers-reduced-motion → ≤140ms cross-fades.
   *Verify:* Playwright visual-regression (axis distinction) + reverse-mid-flight (no snap).
@@ -72,7 +72,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
 
 ## Risks
 
-1. 16KB budget → size-limit gate from M0; motion sampler demotes to `@visora/motion` if needed.
+1. 16KB budget → size-limit gate from M0; motion sampler demotes to `@gallerist/motion` if needed.
 2. Arbitration correctness → pure reducer + exhaustive matrix + real-pointer Playwright.
 3. Overlay precision → single shared matrix, RAF-coupled; visual regression.
 4. Re-render storms → imperative zoom + store selector eq guards.
@@ -82,7 +82,7 @@ Out of scope: plugins, framework adapters, video, DZI (v2 seam only).
 
 - **Region/slot contract belongs in core (decision F).** Phase 0 has no plugins, so the abstract
   `RegionName` + slot contract isn't built yet. Before the first plugin (thumbnails/grid/…),
-  define it in `@visora/core` so plugins target the abstract contract and survive a renderer
+  define it in `@gallerist/core` so plugins target the abstract contract and survive a renderer
   swap — building plugins against a `renderer-dom`-specific region API would break the headless
   moat. (Review finding I5, deferred deliberately — a hollow type now adds nothing.)
 

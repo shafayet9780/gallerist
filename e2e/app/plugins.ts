@@ -1,11 +1,11 @@
-import { type Collection, type Item, createViewer } from '@visora/core'
-import { download } from '@visora/plugin-download'
-import { fullscreen } from '@visora/plugin-fullscreen'
-import { grid } from '@visora/plugin-grid'
-import { hash } from '@visora/plugin-hash'
-import { thumbnails } from '@visora/plugin-thumbnails'
-import { mount } from '@visora/renderer-dom'
-import '@visora/theme-default/visora.css'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { download } from '@gallerist/plugin-download'
+import { fullscreen } from '@gallerist/plugin-fullscreen'
+import { grid } from '@gallerist/plugin-grid'
+import { hash } from '@gallerist/plugin-hash'
+import { thumbnails } from '@gallerist/plugin-thumbnails'
+import { mount } from '@gallerist/renderer-dom'
+import '@gallerist/theme-default/gallerist.css'
 
 const svg = (color: string, label: string) =>
   `data:image/svg+xml,${encodeURIComponent(

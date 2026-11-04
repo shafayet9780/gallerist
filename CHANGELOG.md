@@ -2,6 +2,11 @@
 
 ## v0.2.0 — first public release
 
+> **Renamed before first publish:** the project was developed as *Visora* (`@visora/*`); the
+> `@visora` npm scope belongs to an unrelated publisher, so every package ships as `@gallerist/*`.
+> CSS tokens are `--gallerist-*`, attributes `data-gallerist-*`, and the React API is
+> `<Gallerist>` / `useGallerist()`.
+
 This is the first version published to npm. Alongside the UX overhaul below, a multi-axis
 publish-readiness review drove a hardening pass (all critical + important findings fixed):
 
@@ -18,7 +23,7 @@ publish-readiness review drove a hardening pass (all critical + important findin
   its blob revoke; the YouTube adapter declines unparseable URLs and sets `playerVars.origin`.
 - **Performance**: wheel/trackpad zoom is RAF-coalesced and committed once per burst; the renderer
   skips the window diff on zoom/pan-only commits; React no longer leaks plugins across remounts and
-  `useVisora` returns stable action identities.
+  `useGallerist` returns stable action identities.
 - **Release**: every package ships at `0.2.0` with a `VERSION` derived from `package.json`, a
   LICENSE, a README, lean sourcemaps (no embedded source), correct ESM/CJS types (attw-clean), and
   full npm metadata; CI gains an attw gate and a changesets release workflow.
@@ -39,10 +44,10 @@ reproducible via token overrides).
   cards, render-only-if-present (no `alt` fallback).
 - **renderer-dom**: real inline **SVG chrome icons** (replacing Unicode glyphs); configurable
   **arrow placement** (`arrows`: `pill-right` default · `corner-br` · `dpad` · `split`) via
-  `data-visora-arrows`; **rail placement** (`rail`: `bottom` default · `top` · `hidden`) via
-  `data-visora-rail-pos`; **rail collapse** (`t` key + a top-right toggle button +
-  collapsed-by-default in fullscreen, `data-visora-rail`); **idle auto-hide** of chrome (`autoHide`,
-  `data-visora-idle`, inert under `prefers-reduced-motion`); **layout presets** (`resolvePreset`,
+  `data-gallerist-arrows`; **rail placement** (`rail`: `bottom` default · `top` · `hidden`) via
+  `data-gallerist-rail-pos`; **rail collapse** (`t` key + a top-right toggle button +
+  collapsed-by-default in fullscreen, `data-gallerist-rail`); **idle auto-hide** of chrome (`autoHide`,
+  `data-gallerist-idle`, inert under `prefers-reduced-motion`); **layout presets** (`resolvePreset`,
   `preset` option) that resolve a **visibly distinct** layout — `filmstrip` (bottom rail),
   `reviewer` (bottom timeline + corner arrows), `immersive` (rail hidden + auto-hide), `contact`
   (top rail); **segmented position indicator** (pills ≤8 items, mono `n / N` fallback).
@@ -50,7 +55,7 @@ reproducible via token overrides).
   optional **`caption`** rendered as a single label band **beneath each thumbnail** (group + item),
   shown only when provided.
 - **theme-default**: graphite + signal-amber identity, mono tabular numerals, **accent variants**
-  via `data-visora-theme` (`amber` default · `cyan` · `vermilion`).
+  via `data-gallerist-theme` (`amber` default · `cyan` · `vermilion`).
 - **react**: `preset`, `theme` (reactive), `arrows`, `rail`, `autoHide` props; re-exports
   `resolvePreset` and the preset/arrow/rail types.
 
@@ -99,7 +104,7 @@ From an end-to-end five-axis review of Phase 1 (0 critical, 8 important + sugges
 - **renderer-dom**: resolve `mediaAdapters` live — a plugin added via `viewer.use()` after mount now
   contributes its adapter, matching overlays/regions.
 - **react**: create the viewer with lazy `useState` and stop destroying it in the adapter — fixes
-  `<Visora.Overlay>`/`<Visora.Region>` vanishing and nav no-op under StrictMode; deterministic
+  `<Gallerist.Overlay>`/`<Gallerist.Region>` vanishing and nav no-op under StrictMode; deterministic
   overlay ids via `useId` (no SSR hydration mismatch).
 - **plugin-thumbnails / plugin-grid**: rebuild only on cursor/collection change (skip unrelated
   commits); thumbnails item row uses `role=group` (valid nested ARIA).
@@ -116,12 +121,12 @@ From an end-to-end five-axis review of Phase 1 (0 critical, 8 important + sugges
 
 ### Added
 - **Plugin architecture** (spec §13): `Plugin` / `PluginInstance` / `RegionName` / `RegionCtx`
-  contract in `@visora/core`; named region hosts (toolbar/footer/thumbnails/stage/backdrop) in
-  `@visora/renderer-dom`; `viewer.use()`, `getPlugins()`, `onPluginsChanged()`. See
+  contract in `@gallerist/core`; named region hosts (toolbar/footer/thumbnails/stage/backdrop) in
+  `@gallerist/renderer-dom`; `viewer.use()`, `getPlugins()`, `onPluginsChanged()`. See
   `docs/PLUGIN-AUTHORING.md`.
-- **`@visora/react`** — `useVisora()` hook (`useSyncExternalStore`), `<Visora>` component
+- **`@gallerist/react`** — `useGallerist()` hook (`useSyncExternalStore`), `<Gallerist>` component
   (controlled `open`/`onClose` + imperative ref, SSR-safe), and the JSX portal bridge
-  `<Visora.Overlay>` / `<Visora.Region>`.
+  `<Gallerist.Overlay>` / `<Gallerist.Region>`.
 - **Plugins** (each its own tree-shakeable package): `plugin-fullscreen`, `plugin-hash`
   (deep-link `#g=&i=`), `plugin-download` (single/group/zip), `plugin-thumbnails` (grouped,
   windowed), `plugin-grid` (in-viewer contact sheet), `plugin-video` (HTML5),
@@ -130,7 +135,7 @@ From an end-to-end five-axis review of Phase 1 (0 critical, 8 important + sugges
 ### Changed
 - `viewer.use()` now returns a disposer; the renderer recomputes plugin overlays live and
   repaints on plugin changes (enables React overlays/regions to mount/unmount dynamically).
-- `windowIndices` / `reconcileKeys` moved to `@visora/core` (pure logic plugins reuse).
+- `windowIndices` / `reconcileKeys` moved to `@gallerist/core` (pure logic plugins reuse).
 - The renderer calls `MountedMedia.activate()` / `deactivate()` on slide enter/leave (play/pause).
 
 ### Size (gz)
@@ -140,6 +145,6 @@ From an end-to-end five-axis review of Phase 1 (0 critical, 8 important + sugges
 ## v0.0.0-phase0 — Engine MVP
 
 ### Added
-- Headless `@visora/core` (data model, store, FSM, two-axis nav, zoom/gesture math, events,
-  spring sampler), `@visora/renderer-dom` (windowing, image adapter, gestures, overlays, a11y),
-  `@visora/theme-default`, and the vanilla API. See `docs/IMPLEMENTATION.md`.
+- Headless `@gallerist/core` (data model, store, FSM, two-axis nav, zoom/gesture math, events,
+  spring sampler), `@gallerist/renderer-dom` (windowing, image adapter, gestures, overlays, a11y),
+  `@gallerist/theme-default`, and the vanilla API. See `docs/IMPLEMENTATION.md`.

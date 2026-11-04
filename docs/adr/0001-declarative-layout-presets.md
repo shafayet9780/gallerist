@@ -15,13 +15,13 @@ into JS.
 
 ## Decision
 
-1. **Layout is driven by root `data-visora-*` attributes**, consumed entirely by the theme CSS:
-   `data-visora-arrows`, `data-visora-rail`, `data-visora-idle`, `data-visora-preset`,
-   `data-visora-theme` (+ the thumbnails rail's `data-axis` / `data-ticks`). JS only *sets*
+1. **Layout is driven by root `data-gallerist-*` attributes**, consumed entirely by the theme CSS:
+   `data-gallerist-arrows`, `data-gallerist-rail`, `data-gallerist-idle`, `data-gallerist-preset`,
+   `data-gallerist-theme` (+ the thumbnails rail's `data-axis` / `data-ticks`). JS only *sets*
    attributes and builds the item-column DOM; all positioning/appearance lives in CSS, so it is
    overridable without forking and adds no per-frame JS.
 
-2. **Presets are a pure resolver** in `@visora/renderer-dom`: `resolvePreset(name)` →
+2. **Presets are a pure resolver** in `@gallerist/renderer-dom`: `resolvePreset(name)` →
    `{ rootAttrs, arrows, autoHide, thumbnails }`, no DOM, unit-tested. `mount()` accepts `preset`
    and applies the arrow/auto-hide defaults + root attrs (explicit options win). The preset's
    preferred thumbnails options are **returned for the host to apply** rather than auto-injected,
@@ -33,8 +33,8 @@ into JS.
 
 ## Consequences
 
-- Restyling/repositioning is CSS-only; consumers override `--visora-*` tokens or the `data-*`
-  selectors. The same attributes work identically in vanilla and React (`<Visora preset theme>`
+- Restyling/repositioning is CSS-only; consumers override `--gallerist-*` tokens or the `data-*`
+  selectors. The same attributes work identically in vanilla and React (`<Gallerist preset theme>`
   just fans out to `mount()` options + the theme attribute).
 - A preset cannot, by itself, configure the thumbnails plugin or open the grid — the host wires
   `resolvePreset(name).thumbnails` into `thumbnails()` (and opens `plugin-grid` for `contact`).

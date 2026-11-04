@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createIdleController } from './idle'
 
-const ATTR = 'data-visora-idle'
+const ATTR = 'data-gallerist-idle'
 
 beforeEach(() => {
   vi.useFakeTimers()

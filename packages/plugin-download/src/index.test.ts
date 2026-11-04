@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   download,
@@ -128,7 +128,7 @@ describe('plugin-download', () => {
     const v = createViewer({ collection: collection(), plugins: [download()] })
     mount(v)
     v.open()
-    ;(document.querySelector('.visora-download-btn') as HTMLButtonElement).click()
+    ;(document.querySelector('.gallerist-download-btn') as HTMLButtonElement).click()
     await new Promise((r) => setTimeout(r, 0)) // run() resolves urlOf asynchronously
     expect(click).toHaveBeenCalled()
   })

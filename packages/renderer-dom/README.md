@@ -1,28 +1,28 @@
-# @visora/renderer-dom
+# @gallerist/renderer-dom
 
-Default DOM renderer for Visora — the only ring that touches the DOM.
+Default DOM renderer for Gallerist — the only ring that touches the DOM.
 
-Part of [Visora](https://github.com/shafayet9780/visora#readme) — a headless, framework-agnostic media viewer for grouped / nested galleries with image-space overlays and virtualized rendering.
+Part of [Gallerist](https://github.com/shafayet9780/gallerist#readme) — a headless, framework-agnostic media viewer for grouped / nested galleries with image-space overlays and virtualized rendering.
 
 ## Install
 
 ```bash
-npm i @visora/renderer-dom
+npm i @gallerist/renderer-dom
 ```
 
 ## Usage
 
 ```ts
-import { createViewer } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
-import '@visora/theme-default/visora.css'
+import { createViewer } from '@gallerist/core'
+import { mount } from '@gallerist/renderer-dom'
+import '@gallerist/theme-default/gallerist.css'
 
 const viewer = createViewer({ items: [{ id: 'a', type: 'image', source: 'a.jpg' }] })
 mount(viewer) // overlay/lightbox mode; pass { container } for inline
 viewer.open()
 ```
 
-Full docs: the [monorepo README](https://github.com/shafayet9780/visora#readme) and [`docs/`](https://github.com/shafayet9780/visora/tree/main/docs).
+Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 
 ## License
 

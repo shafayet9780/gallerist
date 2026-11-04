@@ -1,4 +1,4 @@
-// @visora/plugin-thumbnails — windowed thumbnail rail (spec §10.3, §14).
+// @gallerist/plugin-thumbnails — windowed thumbnail rail (spec §10.3, §14).
 //
 // Two display modes (`groupDisplay`):
 //  • 'stacked' (default): one card per group; multi-item groups stack with a count badge. The
@@ -13,8 +13,8 @@
 // the collection or the visible window changes; cursor moves just flip `data-active` and scroll the
 // active node into view — no DOM churn, no scroll reset.
 
-import type { Group, Item, MediaSource, Plugin, PluginInstance, ViewerApi } from '@visora/core'
-import { windowIndices } from '@visora/core'
+import type { Group, Item, MediaSource, Plugin, PluginInstance, ViewerApi } from '@gallerist/core'
+import { windowIndices } from '@gallerist/core'
 
 export interface ThumbnailsOptions {
   /** group thumbs rendered on each side of the active group (default 24). In `flat` mode this is
@@ -55,7 +55,7 @@ function groupThumb(group: Group): string | null {
 
 function lazyImg(src: string | null, observer: IntersectionObserver | null): HTMLImageElement {
   const img = document.createElement('img')
-  img.className = 'visora-thumb-img'
+  img.className = 'gallerist-thumb-img'
   img.decoding = 'async'
   img.loading = 'lazy'
   img.alt = '' // decorative — the enclosing button carries the accessible name
@@ -77,7 +77,7 @@ function captionOf(x: { caption?: string | { id: string } }): string | undefined
 function appendCaption(btn: HTMLElement, text: string | undefined): void {
   if (!text) return
   const cap = document.createElement('span')
-  cap.className = 'visora-thumb-caption'
+  cap.className = 'gallerist-thumb-caption'
   cap.textContent = text
   btn.appendChild(cap)
 }
@@ -180,7 +180,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         : null
 
     const buildItemButton = (item: Item, gIndex: number, iIndex: number): HTMLButtonElement => {
-      const btn = thumbButton(`Item ${iIndex + 1}`, 'visora-thumb-item', () =>
+      const btn = thumbButton(`Item ${iIndex + 1}`, 'gallerist-thumb-item', () =>
         viewer.goTo(gIndex, iIndex),
       )
       btn.dataset.item = item.id
@@ -232,14 +232,14 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       cancelPeekClose()
       removePeek()
       const col = document.createElement('div')
-      col.className = 'visora-thumb-peek'
+      col.className = 'gallerist-thumb-peek'
       // its own listbox (a sibling of the rail on the region host, not nested in it) → valid `option`
       // children. aria-label distinguishes it from the rail's "Thumbnails" listbox.
       col.setAttribute('role', 'listbox')
       col.setAttribute('aria-label', `Group ${gIndex + 1} preview`)
       col.dataset.axis = itemAxis
       fillColumn(col, group, gIndex, false)
-      // Mount in `regionEl` (a sibling of the rail), not inside `.visora-thumbs`: the rail's overflow
+      // Mount in `regionEl` (a sibling of the rail), not inside `.gallerist-thumbs`: the rail's overflow
       // + backdrop-filter makes it a clipping containing block. `regionEl` is positioned + unclipped
       // and is preserved across region remounts, so the flyout shows, stays clickable, and survives.
       const mountEl = regionEl ?? root
@@ -258,7 +258,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const multi = group.items.length > 1
       const btn = thumbButton(
         `Group ${gIndex + 1}`,
-        `visora-thumb${multi ? ' visora-thumb-stacked' : ''}`,
+        `gallerist-thumb${multi ? ' gallerist-thumb-stacked' : ''}`,
         () => viewer.goTo(gIndex),
       )
       btn.dataset.group = group.id
@@ -267,7 +267,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       btn.appendChild(lazyImg(cover, observer))
       if (multi) {
         const badge = document.createElement('span')
-        badge.className = 'visora-thumb-count'
+        badge.className = 'gallerist-thumb-count'
         badge.textContent = String(group.items.length)
         btn.appendChild(badge)
       }
@@ -284,11 +284,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           btn.addEventListener('mouseleave', schedulePeekClose)
         } else {
           const wrap = document.createElement('div')
-          wrap.className = 'visora-thumb-wrap'
+          wrap.className = 'gallerist-thumb-wrap'
           wrap.dataset.group = group.id
           const caret = document.createElement('button')
           caret.type = 'button'
-          caret.className = 'visora-thumb-expand'
+          caret.className = 'gallerist-thumb-expand'
           caret.setAttribute('aria-label', `Preview group ${gIndex + 1}`)
           caret.addEventListener('click', (e) => {
             e.stopPropagation()
@@ -333,8 +333,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     // Build/show the active group's item panel when `panelOpen`. Mounted on the region host (not
-    // `.visora-thumbs`, whose overflow + backdrop-filter would clip it) so it's visible + clickable
-    // in every rail position; CSS flips its open direction per `data-visora-rail-pos`.
+    // `.gallerist-thumbs`, whose overflow + backdrop-filter would clip it) so it's visible + clickable
+    // in every rail position; CSS flips its open direction per `data-gallerist-rail-pos`.
     const rebuildItemColumn = (activeGroup: Group | undefined, gIndex: number) => {
       if (!root) return
       itemBtns.clear()
@@ -342,7 +342,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (panelOpen && activeGroup && activeGroup.items.length > 1) {
         if (!itemRow) {
           itemRow = document.createElement('div')
-          itemRow.className = 'visora-thumb-items'
+          itemRow.className = 'gallerist-thumb-items'
           // its own listbox (host-mounted sibling of the rail, not nested) → valid `option` children
           itemRow.setAttribute('role', 'listbox')
           itemRow.setAttribute('aria-label', 'Group items')
@@ -362,7 +362,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // (`img.src`, not a navigation/script sink), so no scheme allowlist by design; `data:` LQIP
     // thumbs are intentionally allowed. The `live` flag pins the src against the lazy observer.
     const setCardImage = (card: HTMLElement, url: string | null) => {
-      const img = card.querySelector<HTMLImageElement>('.visora-thumb-img')
+      const img = card.querySelector<HTMLImageElement>('.gallerist-thumb-img')
       if (!img) return
       img.dataset.live = '1'
       img.src = url ?? ''
@@ -427,12 +427,12 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     const buildGroupWrapper = (group: Group, gIndex: number): HTMLElement => {
       const wrap = document.createElement('div')
-      wrap.className = 'visora-thumb-group'
+      wrap.className = 'gallerist-thumb-group'
       wrap.dataset.group = group.id
       wrap.setAttribute('role', 'group')
       wrap.setAttribute('aria-label', `Group ${gIndex + 1}`)
       const row = document.createElement('div')
-      row.className = 'visora-thumb-group-row'
+      row.className = 'gallerist-thumb-group-row'
       wrap.appendChild(row)
       return wrap
     }
@@ -486,7 +486,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           ib = buildItemButton(item, e.g, e.i)
           itemBtns.set(e.itemId, ib)
         }
-        ;(wrap.querySelector('.visora-thumb-group-row') ?? wrap).appendChild(ib)
+        ;(wrap.querySelector('.gallerist-thumb-group-row') ?? wrap).appendChild(ib)
       }
       // per-wrapper caption header + partial-edge flags
       for (const [id, wrap] of groupWraps) {
@@ -500,10 +500,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         toggleAttr(wrap, 'data-partial-end', mx < grp.items.length - 1)
         const wantCap = typeof grp.caption === 'string' && mn === 0
         const first = wrap.firstElementChild
-        const hasCap = !!first && first.classList.contains('visora-thumb-group-cap')
+        const hasCap = !!first && first.classList.contains('gallerist-thumb-group-cap')
         if (wantCap && !hasCap) {
           const cap = document.createElement('span')
-          cap.className = 'visora-thumb-group-cap'
+          cap.className = 'gallerist-thumb-group-cap'
           cap.textContent = grp.caption as string
           wrap.insertBefore(cap, wrap.firstChild)
         } else if (!wantCap && hasCap && first) {
@@ -609,9 +609,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       init() {
         hoverCapable = canHover()
         regionEl = document.createElement('div')
-        regionEl.className = 'visora-thumbs-region'
+        regionEl.className = 'gallerist-thumbs-region'
         root = document.createElement('div')
-        root.className = 'visora-thumbs'
+        root.className = 'gallerist-thumbs'
         root.setAttribute('role', 'listbox')
         root.setAttribute('aria-label', 'Thumbnails')
         regionEl.appendChild(root)
@@ -620,7 +620,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         } else {
           toolbarBtn = document.createElement('button')
           toolbarBtn.type = 'button'
-          toolbarBtn.className = 'visora-items-toggle'
+          toolbarBtn.className = 'gallerist-items-toggle'
           toolbarBtn.setAttribute('aria-label', 'Toggle group items')
           toolbarBtn.setAttribute('aria-pressed', String(panelOpen))
           toolbarBtn.textContent = '▤'

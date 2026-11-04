@@ -1,7 +1,7 @@
-import type { ViewerApi, ViewerState } from '@visora/core'
+import type { ViewerApi, ViewerState } from '@gallerist/core'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
-export interface UseVisora {
+export interface UseGallerist {
   state: Readonly<ViewerState>
   viewer: ViewerApi
   open: ViewerApi['open']
@@ -17,7 +17,7 @@ export interface UseVisora {
 }
 
 /** Bind a React component to a viewer's state (useSyncExternalStore) + its actions. */
-export function useVisora(viewer: ViewerApi): UseVisora {
+export function useGallerist(viewer: ViewerApi): UseGallerist {
   const subscribe = useCallback((cb: () => void) => viewer.subscribe(cb), [viewer])
   const getSnapshot = useCallback(() => viewer.getState(), [viewer])
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)

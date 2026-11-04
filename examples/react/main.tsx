@@ -1,24 +1,24 @@
-import type { Collection, Item, ItemMemory } from '@visora/core'
-import { download } from '@visora/plugin-download'
-import { fullscreen } from '@visora/plugin-fullscreen'
-import { grid } from '@visora/plugin-grid'
-import { hash } from '@visora/plugin-hash'
-import { thumbnails } from '@visora/plugin-thumbnails'
-import { video } from '@visora/plugin-video'
-import { videoYouTube } from '@visora/plugin-video-youtube'
+import type { Collection, Item, ItemMemory } from '@gallerist/core'
+import { download } from '@gallerist/plugin-download'
+import { fullscreen } from '@gallerist/plugin-fullscreen'
+import { grid } from '@gallerist/plugin-grid'
+import { hash } from '@gallerist/plugin-hash'
+import { thumbnails } from '@gallerist/plugin-thumbnails'
+import { video } from '@gallerist/plugin-video'
+import { videoYouTube } from '@gallerist/plugin-video-youtube'
 import {
   type ArrowLayout,
+  Gallerist,
   type PresetName,
   type RailPlacement,
-  Visora,
   resolvePreset,
-} from '@visora/react'
-import '@visora/theme-default/visora.css'
+} from '@gallerist/react'
+import '@gallerist/theme-default/gallerist.css'
 import { StrictMode, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
-// A single playground for every Visora knob. Groups are time buckets (the ←/→ axis); items are the
-// screens captured then (the ↑/↓ axis). Each control maps to a real option on <Visora>, the core
+// A single playground for every Gallerist knob. Groups are time buckets (the ←/→ axis); items are the
+// screens captured then (the ↑/↓ axis). Each control maps to a real option on <Gallerist>, the core
 // viewer, or the thumbnails plugin — flip them and re-open to feel the difference.
 
 type Theme = 'amber' | 'cyan' | 'vermilion'
@@ -28,15 +28,23 @@ type AutoHide = 'auto' | 'on' | 'off'
 type LinearOpt = 'auto' | 'on' | 'off'
 type Opt<T> = T | 'auto'
 
-const shot = (seed: string, alt: string, caption?: string): Item => ({
-  id: seed,
-  type: 'image',
-  source: `https://picsum.photos/seed/${seed}/1600/1000`,
-  thumb: `https://picsum.photos/seed/${seed}/360/225`,
-  alt,
-  caption,
-  naturalSize: { w: 1600, h: 1000 },
-})
+// Local tech photos (served from examples/react/public/photos) so the playground works fully
+// offline — no dependency on an external image service. Cycled across items at module load.
+const PHOTOS = ['tech-01', 'tech-02', 'tech-03', 'tech-04', 'tech-05', 'tech-06']
+let photoN = 0
+
+const shot = (seed: string, alt: string, caption?: string): Item => {
+  const photo = PHOTOS[photoN++ % PHOTOS.length]
+  return {
+    id: seed,
+    type: 'image',
+    source: `/photos/${photo}.jpg`,
+    thumb: `/photos/${photo}-thumb.jpg`,
+    alt,
+    caption,
+    naturalSize: { w: 1600, h: 1000 },
+  }
+}
 
 const bucket = (
   id: string,
@@ -86,7 +94,7 @@ const mediaGroup: Collection['groups'][number] = {
       id: 'mp4',
       type: 'video',
       source: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-      thumb: 'https://picsum.photos/seed/bunny/360/225',
+      thumb: '/photos/tech-06-thumb.jpg',
       alt: 'MP4 clip',
       caption: 'MP4 file',
     },
@@ -167,7 +175,7 @@ function App() {
     return list
   }, [groupDisplay, itemAxis, overscan, expandActive, pGrid, pFullscreen, pDownload, pHash, pMedia])
 
-  // <Visora> reads collection / core options / plugins / layout at construction + mount time, so a
+  // <Gallerist> reads collection / core options / plugins / layout at construction + mount time, so a
   // change to any of them needs a fresh instance. theme + open stay reactive (no remount).
   const mountKey = [
     preset,
@@ -231,7 +239,7 @@ function App() {
   return (
     <main>
       <p className="eyebrow">Headless · framework-agnostic · 60fps</p>
-      <h1>Visora playground</h1>
+      <h1>Gallerist playground</h1>
       <p className="lede">
         A nested media viewer for grouped collections. Every control below maps to a real option —
         flip them, hit <strong>Open</strong>, and feel the difference. Walk the timeline with ←/→,
@@ -442,10 +450,10 @@ function App() {
               checked={showOverlay}
               onChange={(e) => setShowOverlay(e.target.checked)}
             />
-            Viewport overlay (&lt;Visora.Overlay&gt;)
+            Viewport overlay (&lt;Gallerist.Overlay&gt;)
           </label>
           <p className="def" style={{ opacity: 0.7 }}>
-            The toolbar badge is a &lt;Visora.Region name="toolbar"&gt; portal — always on.
+            The toolbar badge is a &lt;Gallerist.Region name="toolbar"&gt; portal — always on.
           </p>
         </fieldset>
       </div>
@@ -499,7 +507,7 @@ function App() {
         </pre>
       </div>
 
-      <Visora
+      <Gallerist
         key={mountKey}
         collection={collection}
         startAt={{ g: startGroup }}
@@ -517,15 +525,15 @@ function App() {
         linear={linear} // flat rail ⇒ linear by default; the Linear control can force it on/off
         plugins={plugins}
       >
-        <Visora.Region name="toolbar">
+        <Gallerist.Region name="toolbar">
           <span className="vbadge">{preset}</span>
-        </Visora.Region>
+        </Gallerist.Region>
         {showOverlay && (
-          <Visora.Overlay anchor={{ kind: 'viewport', at: 'bottom', offset: [0, -84] }}>
+          <Gallerist.Overlay anchor={{ kind: 'viewport', at: 'bottom', offset: [0, -84] }}>
             <span className="vchip">overlay · {theme}</span>
-          </Visora.Overlay>
+          </Gallerist.Overlay>
         )}
-      </Visora>
+      </Gallerist>
     </main>
   )
 }
@@ -583,7 +591,7 @@ function usageSnippet(c: {
     c.controls ? null : 'controls={false}',
     'open={open}',
   ].filter(Boolean)
-  return `<Visora\n  ${props.join('\n  ')}\n  plugins={[\n    ${plugins.join(',\n    ')},\n  ]}\n/>`
+  return `<Gallerist\n  ${props.join('\n  ')}\n  plugins={[\n    ${plugins.join(',\n    ')},\n  ]}\n/>`
 }
 
 const root = document.getElementById('root')

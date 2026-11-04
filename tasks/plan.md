@@ -1,18 +1,18 @@
-# Visora — Phase 1 Plan (parity + first consumer)
+# Gallerist — Phase 1 Plan (parity + first consumer)
 
 > Strategic plan. Executable checklist: `tasks/todo.md`. Design source of truth:
-> `docs/VISORA_SPEC.md`. As-built Phase 0: `docs/IMPLEMENTATION.md`.
+> `docs/GALLERIST_SPEC.md`. As-built Phase 0: `docs/IMPLEMENTATION.md`.
 
 ## Context
 
-Phase 0 shipped the engine MVP — headless `@visora/core`, `@visora/renderer-dom`,
-`@visora/theme-default`, image adapter, vanilla API (tag `v0.0.0-phase0`; 173 unit + 11 e2e green;
+Phase 0 shipped the engine MVP — headless `@gallerist/core`, `@gallerist/renderer-dom`,
+`@gallerist/theme-default`, image adapter, vanilla API (tag `v0.0.0-phase0`; 173 unit + 11 e2e green;
 core 3.07 KB, core+renderer 6.75 KB / 16 KB). Phase 1 (spec §25) makes the engine adoptable: a
 **plugin architecture**, the **React adapter** (dogfood-first), and the first official **plugins**,
 so Apploye (separate private package) can rebuild its reviewer and general users reach parity.
 
 Phase 0 review finding **I5**: the named-region plugin contract must live abstractly in
-`@visora/core` so plugins survive a renderer swap. Phase 1 builds it first.
+`@gallerist/core` so plugins survive a renderer swap. Phase 1 builds it first.
 
 ## Locked decisions
 
@@ -22,9 +22,9 @@ Phase 0 review finding **I5**: the named-region plugin contract must live abstra
 | P1-B | Scope | **Full §25**: thumbnails(grouped), grid, download, fullscreen, hash, video(HTML5)+youtube, React |
 | P1-C | Plugin registration | **Register on core** (`createViewer({plugins})` + `viewer.use()`); renderer pulls regions at mount |
 | P1-D | Region contract | **Abstract `RegionName` in core** (spec §13); renderer-dom implements mounts; regions return `Node` |
-| P1-E | React UI authoring | **JSX portal bridge** — `<Visora.Overlay>`/`<Visora.Region>` portal React children into host nodes (P0-G) |
-| P1-F | React API shape | **Compound components** + headless **`useVisora()`**; `useSyncExternalStore` |
-| P1-G | Video packaging | **Split sub-plugins** (D8): `@visora/plugin-video` (HTML5) + `@visora/plugin-video-youtube` |
+| P1-E | React UI authoring | **JSX portal bridge** — `<Gallerist.Overlay>`/`<Gallerist.Region>` portal React children into host nodes (P0-G) |
+| P1-F | React API shape | **Compound components** + headless **`useGallerist()`**; `useSyncExternalStore` |
+| P1-G | Video packaging | **Split sub-plugins** (D8): `@gallerist/plugin-video` (HTML5) + `@gallerist/plugin-video-youtube` |
 | P1-H | Download | single + group (no dep); bulk **zip via dynamic `import()`** of a tiny streaming zip lib |
 | P1-I | Grid | **In-viewer grid mode** — `stage`-region contact sheet; click cell → `goTo` + hide |
 | P1-J | React peer | `react >= 18`; component tests via @testing-library/react + happy-dom |
@@ -32,16 +32,16 @@ Phase 0 review finding **I5**: the named-region plugin contract must live abstra
 ## New packages
 
 ```
-packages/react                     @visora/react
-packages/plugin-fullscreen         @visora/plugin-fullscreen
-packages/plugin-hash               @visora/plugin-hash
-packages/plugin-thumbnails         @visora/plugin-thumbnails
-packages/plugin-grid               @visora/plugin-grid
-packages/plugin-download           @visora/plugin-download
-packages/plugin-video              @visora/plugin-video           (HTML5)
-packages/plugin-video-youtube      @visora/plugin-video-youtube
+packages/react                     @gallerist/react
+packages/plugin-fullscreen         @gallerist/plugin-fullscreen
+packages/plugin-hash               @gallerist/plugin-hash
+packages/plugin-thumbnails         @gallerist/plugin-thumbnails
+packages/plugin-grid               @gallerist/plugin-grid
+packages/plugin-download           @gallerist/plugin-download
+packages/plugin-video              @gallerist/plugin-video           (HTML5)
+packages/plugin-video-youtube      @gallerist/plugin-video-youtube
 ```
-Each: own package, `sideEffects:false`, tree-shakeable, depends on `@visora/core` types only.
+Each: own package, `sideEffects:false`, tree-shakeable, depends on `@gallerist/core` types only.
 
 ## Dependency graph / build order
 
@@ -49,7 +49,7 @@ Each: own package, `sideEffects:false`, tree-shakeable, depends on `@visora/core
 core: Plugin/PluginInstance/RegionName contract + registry        (F1)
   └─ renderer-dom: region hosts + plugin consumption              (F2)
        ├─ plugin-fullscreen   (thin slice — proves the contract)  [M7]
-       ├─ @visora/react (hook → component → portal bridge)        [M8]
+       ├─ @gallerist/react (hook → component → portal bridge)        [M8]
        ├─ plugin-hash, plugin-download                            [M9]
        ├─ plugin-thumbnails (grouped; reuses windowing)           [M10]
        ├─ plugin-grid (in-viewer mode; reuses windowing)          [M11]
@@ -69,7 +69,7 @@ core: Plugin/PluginInstance/RegionName contract + registry        (F1)
 ## Key contracts to add (spec §13/§16)
 
 ```ts
-// @visora/core
+// @gallerist/core
 type RegionName = 'toolbar' | 'footer' | 'stage' | 'thumbnails' | 'backdrop' | (string & {})
 type Plugin = (viewer: ViewerApi, opts?: unknown) => PluginInstance
 interface PluginInstance {
@@ -125,14 +125,14 @@ tree-shakeable. Full plan + the locked UX interview decisions (UX-A … UX-J) li
   no longer drifts horizontally; the active group card live-previews the current item.
 - **Vertical item column** for the ↑/↓ axis (input ↔ visual match); optional captions; opt-in
   time-ribbon ticks from `group.meta`.
-- **Configurable chrome**: SVG icons, `data-visora-arrows` placement, rail collapse (`t` / toggle /
+- **Configurable chrome**: SVG icons, `data-gallerist-arrows` placement, rail collapse (`t` / toggle /
   fullscreen), idle auto-hide (reduced-motion inert), segmented position pills.
 - **Presets** (`resolvePreset`: filmstrip/immersive/reviewer/contact) + **theme variants**
-  (`data-visora-theme`: amber/cyan/vermilion) on a new graphite + signal-amber identity.
+  (`data-gallerist-theme`: amber/cyan/vermilion) on a new graphite + signal-amber identity.
 - **React**: `preset`/`theme`/`arrows`/`autoHide` props. **Docs**: CHANGELOG v0.2.0,
   thumbnails README, `docs/PRESETS.md`, ADR `docs/adr/0001-declarative-layout-presets.md`.
 
 ## Architecture
-Declarative layout via root `data-visora-*` attributes consumed by theme CSS (JS only sets
+Declarative layout via root `data-gallerist-*` attributes consumed by theme CSS (JS only sets
 attributes); presets are a pure resolver; idle/collapse owned by renderer-dom (no new core state,
 only an additive `Group.caption`). See ADR 0001.

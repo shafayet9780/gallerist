@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@visora/core'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from './mount'
 
@@ -24,16 +24,16 @@ describe('mount — overlay lifecycle', () => {
   it('does not attach to the DOM until open()', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
-    expect(document.querySelector('.visora')).toBeNull()
+    expect(document.querySelector('.gallerist')).toBeNull()
     v.open()
-    expect(document.querySelector('.visora')).not.toBeNull()
+    expect(document.querySelector('.gallerist')).not.toBeNull()
   })
 
   it('open() sets dialog semantics and locks page scroll', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     expect(root.getAttribute('role')).toBe('dialog')
     expect(root.getAttribute('aria-modal')).toBe('true')
     expect(document.body.style.overflow).toBe('hidden')
@@ -44,7 +44,7 @@ describe('mount — overlay lifecycle', () => {
     mount(v)
     v.open()
     expect(document.querySelector('img')).not.toBeNull()
-    expect(document.querySelector('.visora-counter')?.textContent).toContain('1 / 3')
+    expect(document.querySelector('.gallerist-counter')?.textContent).toContain('1 / 3')
   })
 
   it('close() detaches and restores scroll', () => {
@@ -52,7 +52,7 @@ describe('mount — overlay lifecycle', () => {
     mount(v)
     v.open()
     v.close()
-    expect(document.querySelector('.visora')).toBeNull()
+    expect(document.querySelector('.gallerist')).toBeNull()
     expect(document.body.style.overflow).not.toBe('hidden')
   })
 })
@@ -63,8 +63,8 @@ describe('mount — navigation reflects in the DOM', () => {
     mount(v)
     v.open()
     v.next()
-    expect(document.querySelector('.visora-counter')?.textContent).toContain('2 / 3')
-    expect(document.querySelector('.visora-live')?.textContent).toMatch(/group 2 of 3/i)
+    expect(document.querySelector('.gallerist-counter')?.textContent).toContain('2 / 3')
+    expect(document.querySelector('.gallerist-live')?.textContent).toMatch(/group 2 of 3/i)
   })
 
   it('announces the secondary axis position in grouped items', () => {
@@ -72,7 +72,7 @@ describe('mount — navigation reflects in the DOM', () => {
     mount(v)
     v.open({ g: 1 })
     v.nextItem()
-    expect(document.querySelector('.visora-live')?.textContent).toMatch(/screen 2 of 3/i)
+    expect(document.querySelector('.gallerist-live')?.textContent).toMatch(/screen 2 of 3/i)
   })
 })
 
@@ -82,7 +82,7 @@ describe('mount — chrome + keyboard', () => {
     const spy = vi.spyOn(v, 'close')
     mount(v)
     v.open()
-    ;(document.querySelector('.visora-close') as HTMLButtonElement).click()
+    ;(document.querySelector('.gallerist-close') as HTMLButtonElement).click()
     expect(spy).toHaveBeenCalled()
   })
 
@@ -90,9 +90,9 @@ describe('mount — chrome + keyboard', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    ;(document.querySelector('.visora-next') as HTMLButtonElement).click()
+    ;(document.querySelector('.gallerist-next') as HTMLButtonElement).click()
     expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
-    ;(document.querySelector('.visora-prev') as HTMLButtonElement).click()
+    ;(document.querySelector('.gallerist-prev') as HTMLButtonElement).click()
     expect(v.getState().cursor).toEqual({ g: 0, i: 0 })
   })
 
@@ -101,12 +101,12 @@ describe('mount — chrome + keyboard', () => {
     mount(v)
     v.open()
     for (const cls of [
-      '.visora-close',
-      '.visora-prev',
-      '.visora-next',
-      '.visora-item-prev',
-      '.visora-item-next',
-      '.visora-zoom-reset',
+      '.gallerist-close',
+      '.gallerist-prev',
+      '.gallerist-next',
+      '.gallerist-item-prev',
+      '.gallerist-item-next',
+      '.gallerist-zoom-reset',
     ]) {
       const btn = document.querySelector(cls) as HTMLElement
       expect(btn, cls).not.toBeNull()
@@ -119,26 +119,30 @@ describe('mount — chrome + keyboard', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    expect(document.querySelector('.visora')?.getAttribute('data-visora-arrows')).toBe('pill-right')
+    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-arrows')).toBe(
+      'pill-right',
+    )
   })
 
   it('reflects a configured arrow layout on the root', () => {
     const v = createViewer({ collection: collection() })
     mount(v, { arrows: 'corner-br' })
     v.open()
-    expect(document.querySelector('.visora')?.getAttribute('data-visora-arrows')).toBe('corner-br')
+    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-arrows')).toBe(
+      'corner-br',
+    )
   })
 
   it("the 't' key toggles rail collapse on the root", () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
-    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
     root.dispatchEvent(key({ key: 't' }))
-    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('collapsed')
     root.dispatchEvent(key({ key: 't' }))
-    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
   })
 
   it('mounts a rail pull-handle inside the rail region; it toggles collapse', () => {
@@ -150,14 +154,14 @@ describe('mount — chrome + keyboard', () => {
     const v = createViewer({ collection: collection(), plugins: [railPlugin] })
     mount(v)
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     const btn = document.querySelector(
-      '.visora-region-thumbnails .visora-rail-handle .visora-rail-toggle',
+      '.gallerist-region-thumbnails .gallerist-rail-handle .gallerist-rail-toggle',
     ) as HTMLButtonElement
     expect(btn).not.toBeNull()
     expect(btn.getAttribute('aria-pressed')).toBe('false')
     btn.click()
-    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('collapsed')
     expect(btn.getAttribute('aria-pressed')).toBe('true')
   })
 
@@ -165,49 +169,49 @@ describe('mount — chrome + keyboard', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    expect(document.querySelector('.visora-rail-handle')).toBeNull()
+    expect(document.querySelector('.gallerist-rail-handle')).toBeNull()
   })
 
   it('collapses the rail on entering fullscreen and restores on exit', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: root })
     document.dispatchEvent(new Event('fullscreenchange'))
-    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('collapsed')
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
     document.dispatchEvent(new Event('fullscreenchange'))
-    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
   })
 
-  it('applies a preset: sets data-visora-preset and its default arrow layout', () => {
+  it('applies a preset: sets data-gallerist-preset and its default arrow layout', () => {
     const v = createViewer({ collection: collection() })
     mount(v, { preset: 'reviewer' })
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
-    expect(root.getAttribute('data-visora-preset')).toBe('reviewer')
-    expect(root.getAttribute('data-visora-arrows')).toBe('corner-br') // reviewer default
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-preset')).toBe('reviewer')
+    expect(root.getAttribute('data-gallerist-arrows')).toBe('corner-br') // reviewer default
   })
 
   it('an explicit arrows option overrides the preset default', () => {
     const v = createViewer({ collection: collection() })
     mount(v, { preset: 'reviewer', arrows: 'dpad' })
     v.open()
-    expect(document.querySelector('.visora')?.getAttribute('data-visora-arrows')).toBe('dpad')
+    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-arrows')).toBe('dpad')
   })
 
   it('shows segmented position pills for small multi-item groups (≤8)', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open({ g: 1 }) // g1 has 3 items
-    const pos = document.querySelector('.visora-position') as HTMLElement
+    const pos = document.querySelector('.gallerist-position') as HTMLElement
     expect(pos.getAttribute('data-mode')).toBe('pills')
-    const pills = pos.querySelectorAll('.visora-pill')
+    const pills = pos.querySelectorAll('.gallerist-pill')
     expect(pills.length).toBe(3)
-    expect(pos.querySelector('.visora-pill[data-active]')?.textContent).toBe('1')
+    expect(pos.querySelector('.gallerist-pill[data-active]')?.textContent).toBe('1')
     v.nextItem()
-    expect(pos.querySelector('.visora-pill[data-active]')?.textContent).toBe('2')
+    expect(pos.querySelector('.gallerist-pill[data-active]')?.textContent).toBe('2')
     ;(pills[2] as HTMLButtonElement).click()
     expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
   })
@@ -219,7 +223,7 @@ describe('mount — chrome + keyboard', () => {
     const v = createViewer({ collection: big })
     mount(v)
     v.open()
-    const pos = document.querySelector('.visora-position') as HTMLElement
+    const pos = document.querySelector('.gallerist-position') as HTMLElement
     expect(pos.getAttribute('data-mode')).toBe('counter')
     expect(pos.textContent).toContain('1 / 12')
   })
@@ -228,37 +232,41 @@ describe('mount — chrome + keyboard', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open() // g0 → single item
-    expect((document.querySelector('.visora-position') as HTMLElement).hidden).toBe(true)
+    expect((document.querySelector('.gallerist-position') as HTMLElement).hidden).toBe(true)
   })
 
   it('defaults the rail position to bottom', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    expect(document.querySelector('.visora')?.getAttribute('data-visora-rail-pos')).toBe('bottom')
+    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-rail-pos')).toBe(
+      'bottom',
+    )
   })
 
   it('reflects rail:"left" on the root', () => {
     const v = createViewer({ collection: collection() })
     mount(v, { rail: 'left' })
     v.open()
-    expect(document.querySelector('.visora')?.getAttribute('data-visora-rail-pos')).toBe('left')
+    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-rail-pos')).toBe(
+      'left',
+    )
   })
 
   it('rail:"hidden" starts collapsed at the bottom', () => {
     const v = createViewer({ collection: collection() })
     mount(v, { rail: 'hidden' })
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
-    expect(root.getAttribute('data-visora-rail-pos')).toBe('bottom')
-    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-rail-pos')).toBe('bottom')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('collapsed')
   })
 
   it('ArrowRight navigates, Escape closes', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     root.dispatchEvent(key({ key: 'ArrowRight' }))
     expect(v.getState().cursor.g).toBe(1)
     root.dispatchEvent(key({ key: 'Escape' }))
@@ -273,8 +281,8 @@ describe('mount — inline mode', () => {
     const v = createViewer({ collection: collection() })
     mount(v, { container: host })
     v.open()
-    expect(host.querySelector('.visora')).not.toBeNull()
-    expect(host.querySelector('.visora')?.getAttribute('aria-modal')).toBeNull()
+    expect(host.querySelector('.gallerist')).not.toBeNull()
+    expect(host.querySelector('.gallerist')?.getAttribute('aria-modal')).toBeNull()
     expect(document.body.style.overflow).not.toBe('hidden')
   })
 })
@@ -285,24 +293,26 @@ describe('mount — zoom transform', () => {
     mount(v)
     v.open()
     v.zoomTo(2, { x: 10, y: 20 })
-    const content = document.querySelector('.visora-content[data-visora-current]') as HTMLElement
+    const content = document.querySelector(
+      '.gallerist-content[data-gallerist-current]',
+    ) as HTMLElement
     expect(content.style.transform).toContain('scale(2)')
     expect(content.style.transform).toContain('translate(10px, 20px)')
   })
 })
 
 describe('mount — motion axis', () => {
-  const current = () => document.querySelector('.visora-slide[data-visora-current]')
+  const current = () => document.querySelector('.gallerist-slide[data-gallerist-current]')
   it('tags the current slide with the axis of motion (group vs item)', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open({ g: 1 })
     v.next() // group axis
-    expect(current()?.getAttribute('data-visora-enter')).toBe('group')
+    expect(current()?.getAttribute('data-gallerist-enter')).toBe('group')
     v.prev()
     v.open({ g: 1 })
     v.nextItem() // item axis
-    expect(current()?.getAttribute('data-visora-enter')).toBe('item')
+    expect(current()?.getAttribute('data-gallerist-enter')).toBe('item')
   })
 })
 
@@ -354,7 +364,7 @@ describe('mount — destroy', () => {
     const handle = mount(v)
     v.open()
     handle.destroy()
-    expect(document.querySelector('.visora')).toBeNull()
+    expect(document.querySelector('.gallerist')).toBeNull()
   })
 })
 
@@ -367,12 +377,12 @@ describe('mount — linear flat traversal', () => {
     return v
   }
   const press = (k: string) =>
-    (document.querySelector('.visora') as HTMLElement).dispatchEvent(key({ key: k }))
+    (document.querySelector('.gallerist') as HTMLElement).dispatchEvent(key({ key: k }))
 
-  it('sets data-visora-linear and hides the within-group pills', () => {
+  it('sets data-gallerist-linear and hides the within-group pills', () => {
     openLinear()
-    expect(document.querySelector('.visora')?.getAttribute('data-visora-linear')).toBe('true')
-    expect((document.querySelector('.visora-position') as HTMLElement)?.hidden).toBe(true)
+    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-linear')).toBe('true')
+    expect((document.querySelector('.gallerist-position') as HTMLElement)?.hidden).toBe(true)
   })
 
   it('ArrowRight walks the flattened item sequence across groups (1a,1b,2a…)', () => {
@@ -398,7 +408,7 @@ describe('mount — linear flat traversal', () => {
   it('the counter shows the running item position / total', () => {
     const v = openLinear()
     v.goTo(1, 1) // b1 = flat index 2 of 6
-    expect(document.querySelector('.visora-counter')?.textContent).toContain('3 / 6')
+    expect(document.querySelector('.gallerist-counter')?.textContent).toContain('3 / 6')
   })
 
   it('ArrowUp/ArrowDown are inert (the item axis retires)', () => {
@@ -430,7 +440,7 @@ describe('mount — linear flat traversal', () => {
     const v = createViewer({ collection: collection() })
     mount(v) // no linear
     v.open()
-    expect(document.querySelector('.visora')?.hasAttribute('data-visora-linear')).toBe(false)
+    expect(document.querySelector('.gallerist')?.hasAttribute('data-gallerist-linear')).toBe(false)
     v.goTo(1, 0)
     press('ArrowRight')
     expect(v.getState().cursor).toEqual({ g: 2, i: 0 }) // group axis, skips g1's remaining items
@@ -445,13 +455,13 @@ describe('mount — vertical rail (left/right) axis remap', () => {
     return v
   }
   const press = (k: string) =>
-    (document.querySelector('.visora') as HTMLElement).dispatchEvent(key({ key: k }))
+    (document.querySelector('.gallerist') as HTMLElement).dispatchEvent(key({ key: k }))
 
-  it('sets data-visora-rail-pos and orientation=vertical', () => {
+  it('sets data-gallerist-rail-pos and orientation=vertical', () => {
     openV('right')
-    const root = document.querySelector('.visora')
-    expect(root?.getAttribute('data-visora-rail-pos')).toBe('right')
-    expect(root?.getAttribute('data-visora-orientation')).toBe('vertical')
+    const root = document.querySelector('.gallerist')
+    expect(root?.getAttribute('data-gallerist-rail-pos')).toBe('right')
+    expect(root?.getAttribute('data-gallerist-orientation')).toBe('vertical')
   })
 
   it('↑/↓ drive the group axis and ←/→ drive the item axis', () => {
@@ -473,7 +483,7 @@ describe('mount — vertical rail (left/right) axis remap', () => {
     const v = createViewer({ collection: collection() })
     mount(v, { rail: 'bottom' })
     v.open()
-    expect(document.querySelector('.visora')?.getAttribute('data-visora-orientation')).toBe(
+    expect(document.querySelector('.gallerist')?.getAttribute('data-gallerist-orientation')).toBe(
       'horizontal',
     )
     v.goTo(1, 0)
@@ -483,12 +493,12 @@ describe('mount — vertical rail (left/right) axis remap', () => {
 
   it('collapses/expands a vertical rail with the t key (slide direction is CSS)', () => {
     openV('left')
-    const root = document.querySelector('.visora') as HTMLElement
-    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    const root = document.querySelector('.gallerist') as HTMLElement
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
     press('t')
-    expect(root.getAttribute('data-visora-rail')).toBe('collapsed')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('collapsed')
     press('t')
-    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
   })
 
   it('vertical + linear: ↑/↓ walk the flattened sequence, ←/→ stay inert', () => {
@@ -527,7 +537,7 @@ describe('mount — linear Home/End (S-R3)', () => {
     const v = createViewer({ collection: collection() }) // last flat item is g2/i1 (c1)
     mount(v, { linear: true })
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     root.dispatchEvent(key({ key: 'End' }))
     expect(v.getState().cursor).toEqual({ g: 2, i: 1 })
     root.dispatchEvent(key({ key: 'Home' }))
@@ -555,7 +565,7 @@ describe('mount — resize re-clamp (C2)', () => {
       const v = createViewer({ collection: collection() })
       const h = mount(v)
       v.open()
-      const stage = document.querySelector('.visora-stage') as HTMLElement
+      const stage = document.querySelector('.gallerist-stage') as HTMLElement
       let w = 1000
       vi.spyOn(stage, 'getBoundingClientRect').mockImplementation(
         () =>
@@ -586,7 +596,7 @@ describe('mount — modal accessibility (WS-3)', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    expect(document.querySelector('.visora')?.getAttribute('aria-label')).toBe('Media viewer')
+    expect(document.querySelector('.gallerist')?.getAttribute('aria-label')).toBe('Media viewer')
   })
 
   it('inerts the rest of the page while open and restores on close (C5)', () => {
@@ -604,12 +614,12 @@ describe('mount — modal accessibility (WS-3)', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     const input = document.createElement('input')
     root.appendChild(input)
     input.focus()
     input.dispatchEvent(key({ key: 't' })) // would toggle the rail if not guarded
-    expect(root.getAttribute('data-visora-rail')).toBe('expanded')
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
     input.dispatchEvent(key({ key: 'Escape' })) // Escape still closes from a field
     expect(v.getState().phase).toBe('closed')
   })
@@ -618,14 +628,14 @@ describe('mount — modal accessibility (WS-3)', () => {
     const v = createViewer({ collection: collection() }) // items carry alt = id
     mount(v)
     v.open({ g: 1 }) // b0
-    expect(document.querySelector('.visora-live')?.textContent).toContain('b0')
+    expect(document.querySelector('.gallerist-live')?.textContent).toContain('b0')
   })
 
   it('flips the horizontal arrow keys in an RTL document (S-UX3)', () => {
     const v = createViewer({ collection: collection() })
     mount(v)
     v.open()
-    const root = document.querySelector('.visora') as HTMLElement
+    const root = document.querySelector('.gallerist') as HTMLElement
     root.setAttribute('dir', 'rtl')
     root.dispatchEvent(key({ key: 'ArrowLeft' })) // RTL: left advances
     expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
@@ -641,7 +651,7 @@ describe('mount — degenerate collections (#61)', () => {
       mount(v)
       v.open()
     }).not.toThrow()
-    expect(document.querySelector('.visora')).not.toBeNull()
+    expect(document.querySelector('.gallerist')).not.toBeNull()
     expect(document.querySelector('img')).toBeNull()
   })
 })

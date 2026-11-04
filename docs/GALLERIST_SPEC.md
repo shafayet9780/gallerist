@@ -1,6 +1,6 @@
-# Visora — Technical Specification
+# Gallerist — Technical Specification
 
-> **Name:** Visora (locked) — `vis-`, vision/viewing. Namespace `@visora/*` · GitHub `visora` · `visora.dev`.
+> **Name:** Gallerist (locked) — the person who runs galleries. Namespace `@gallerist/*` · GitHub `galleristjs` · `gallerist.dev`.
 > A headless, framework-agnostic media viewer for **grouped / nested** galleries, with **image-space overlays** and **virtualized rendering** at scale.
 > License: MIT (clean-room; no lightGallery source consulted at any point).
 > Status: design spec, **v1.1** — all 14 decisions locked (logged in §24). Implementation-ready.
@@ -41,12 +41,12 @@
 
 ## 1. Vision, scope, non-goals
 
-**Vision.** The viewer for *structured* media. Every existing lightbox models a gallery as a flat 1-D strip; the real web is galleries-of-galleries (product variants × angles, posts × images, moments × monitors, documents × pages). Visora makes nesting a first-class primitive, lets you anchor interactive content to points *on the image*, and holds 60fps across thousands of items.
+**Vision.** The viewer for *structured* media. Every existing lightbox models a gallery as a flat 1-D strip; the real web is galleries-of-galleries (product variants × angles, posts × images, moments × monitors, documents × pages). Gallerist makes nesting a first-class primitive, lets you anchor interactive content to points *on the image*, and holds 60fps across thousands of items.
 
 **In scope (v1):** image/video/iframe/audio/html/custom media; two-axis navigation; zoom/pan with gesture arbitration; image-space + viewport overlays; virtualized slides and thumbnails; full keyboard + a11y; headless core + optional default theme; vanilla + React/Vue/Svelte adapters; SSR-safe; tree-shakeable plugin system.
 
 **Non-goals (explicit):**
-- Not a **grid/masonry gallery layout** engine (that's the *page*; Visora is the *viewer*). A thumbnail/grid plugin exists, but Visora does not compete with Masonry/Isotope for page layout.
+- Not a **grid/masonry gallery layout** engine (that's the *page*; Gallerist is the *viewer*). A thumbnail/grid plugin exists, but Gallerist does not compete with Masonry/Isotope for page layout.
 - Not an **image editor** (crop/filters). Redaction/annotation overlays are display-layer only.
 - Not a **video player**; it embeds providers/`<video>`, it does not reimplement playback UI.
 - No jQuery. No IE.
@@ -58,11 +58,11 @@
 
 ## 2. Naming & identity
 
-The library is **Visora** (`vis-`, sight/vision). It was chosen for one decisive reason: of every candidate evaluated — Facet, Prism, Photon, Luma, Loupe, Tessera, Sheaf, Riffle — it was the only one with a genuinely open namespace. Evocative real words are uniformly squatted on npm in 2026; the reliable path to an ownable name is a coined one, the pattern the modern tooling ecosystem follows (Vite, Zod, Bun, Drizzle, Hono). Visora keeps an on-theme root (vision/viewing) while reading as a product brand that can scale past a single package.
+The library is **Gallerist**: a gallerist runs galleries and curates their collections, which is what the library does for galleries of galleries. It was renamed from the working name *Visora* before first publish (Oct 2026), because the `@visora` npm scope belongs to an unrelated publisher. The criteria, in order: understandable on first hearing, not generic-sounding, and no overlap with a direct competitor. That ruled out Foldview (generic), Enfilade (obscure), anything with "reel" (`@reelkit/*` is a direct competitor), and Loupe (chai's `loupe`).
 
-**Namespace:** npm scope `@visora` — `@visora/core`, `@visora/react`, `@visora/plugin-*`; GitHub org `visora`; primary domain `visora.dev`.
+**Namespace:** npm scope `@gallerist` — `@gallerist/core`, `@gallerist/react`, `@gallerist/plugin-*`; GitHub org `galleristjs` (`gallerist` is held by an empty org); primary domain `gallerist.dev` (`.com` and `.io` are taken).
 
-**Claim checklist (before any public release):** npm `visora` (bare) + the `@visora` org; the `visora` GitHub org; `visora.dev` (and `.com` if available); a trademark glance in software/SaaS classes.
+**Claim checklist (before any public release):** the `@gallerist` npm org ✅; npm `gallerist` (bare); the `galleristjs` GitHub org; `gallerist.dev`; a trademark glance in software/SaaS classes.
 
 ---
 
@@ -72,7 +72,7 @@ Four concentric rings, each independently consumable:
 
 ```
             ┌─────────────────────────────────────────────┐
-            │  Framework adapters (@visora/react, /vue…)   │  ← thin bindings
+            │  Framework adapters (@gallerist/react, /vue…)   │  ← thin bindings
             │  ┌───────────────────────────────────────┐  │
             │  │   Official plugins (tree-shakeable)    │  │  ← opt-in features
             │  │  ┌─────────────────────────────────┐  │  │
@@ -504,15 +504,15 @@ Core differentiators (`thumbnails` grouped mode, `timeline`, `filter`, `redactio
 Three tiers, opt-in:
 
 1. **Headless** (`controls:false`, no theme CSS) — core renders structural DOM only; you bring all UI via regions/overlays. This is how Apploye builds its bespoke admin reviewer.
-2. **Default theme** (`@visora/theme-default`, pure CSS, no JS dep) — a clean, modern skin driven entirely by CSS custom properties.
-3. **Tokens** — every color/size/timing is a `--visora-*` variable; dark mode via `prefers-color-scheme` and a `[data-visora-theme]` override. No hardcoded colors anywhere.
+2. **Default theme** (`@gallerist/theme-default`, pure CSS, no JS dep) — a clean, modern skin driven entirely by CSS custom properties.
+3. **Tokens** — every color/size/timing is a `--gallerist-*` variable; dark mode via `prefers-color-scheme` and a `[data-gallerist-theme]` override. No hardcoded colors anywhere.
 
 ```css
-.visora { --visora-backdrop: rgb(0 0 0 / .9); --visora-fg:#fff; --visora-accent:#378add;
-          --visora-radius:8px; --visora-speed:300ms; --visora-thumb-h:80px; /* … */ }
+.gallerist { --gallerist-backdrop: rgb(0 0 0 / .9); --gallerist-fg:#fff; --gallerist-accent:#378add;
+          --gallerist-radius:8px; --gallerist-speed:300ms; --gallerist-thumb-h:80px; /* … */ }
 ```
 
-Class hooks are stable and documented (`.visora-stage`, `.visora-slide`, `.visora-thumb`, `.visora-overlay-*`). No inline styles for theming (only for computed transforms). RTL via `[dir=rtl]` flips axis math and layout.
+Class hooks are stable and documented (`.gallerist-stage`, `.gallerist-slide`, `.gallerist-thumb`, `.gallerist-overlay-*`). No inline styles for theming (only for computed transforms). RTL via `[dir=rtl]` flips axis math and layout.
 
 ---
 
@@ -521,8 +521,8 @@ Class hooks are stable and documented (`.visora-stage`, `.visora-slide`, `.visor
 Thin bindings over the headless store. Build order (locked): **vanilla → React → Vue → Svelte** — React first, to dogfood Apploye.
 
 - **Vanilla** — `createViewer()` (the reference).
-- **React** — `<Visora>` component (controlled `open`/`onClose`, or imperative ref) **and** a headless `useVisora()` hook returning state + actions for fully custom UI. Uses `useSyncExternalStore`.
-- **Vue 3** — `<Visora>` SFC + `useVisora()` composable; `v-model:open`.
+- **React** — `<Gallerist>` component (controlled `open`/`onClose`, or imperative ref) **and** a headless `useGallerist()` hook returning state + actions for fully custom UI. Uses `useSyncExternalStore`.
+- **Vue 3** — `<Gallerist>` SFC + `useGallerist()` composable; `v-model:open`.
 - **Svelte** — component + a store conforming to Svelte's contract + an `action` for triggers.
 
 **SSR:** the core does zero DOM work at import or construction; all DOM access is deferred to `open()`/mount and guarded for `typeof window`. Components render a stable placeholder server-side and hydrate on mount. Deep-link (`plugin-hash`) reads the URL only client-side.
@@ -564,7 +564,7 @@ overlayClick                             (id of clicked interactive overlay)
 
 ## 19. Configuration reference
 
-Full option list with defaults lives in §8.1; defaults summary: `loop:true`, `itemMemory:'reset'`, `keepZoomOnNav:false`, `preload:{ahead:2,behind:1}`, `controls:true`, `container:null` (overlay mode), transitions on, motion-safe. Mobile overrides are merged from a `mobile` block (unlike lightGallery, Visora **merges** mobile over defaults rather than replacing the whole object — fixes a known footgun).
+Full option list with defaults lives in §8.1; defaults summary: `loop:true`, `itemMemory:'reset'`, `keepZoomOnNav:false`, `preload:{ahead:2,behind:1}`, `controls:true`, `container:null` (overlay mode), transitions on, motion-safe. Mobile overrides are merged from a `mobile` block (unlike lightGallery, Gallerist **merges** mobile over defaults rather than replacing the whole object — fixes a known footgun).
 
 ---
 
@@ -572,7 +572,7 @@ Full option list with defaults lives in §8.1; defaults summary: `loop:true`, `i
 
 | Metric | Target |
 |---|---|
-| Core (`@visora/core` + `renderer-dom`, gz) | ≤ 16 KB |
+| Core (`@gallerist/core` + `renderer-dom`, gz) | ≤ 16 KB |
 | Core + thumbnails + image, gz | ≤ 24 KB (≈ lighter than lightGallery+plugins and ~PhotoSwipe) |
 | Cold open → first slide painted | < 100 ms (cached) |
 | Navigation frame rate | 60 fps (no long tasks > 50 ms) |
@@ -590,7 +590,7 @@ Budgets are gates: a PR that exceeds size or drops frames fails CI (size-limit +
 - **Monorepo:** pnpm workspaces + Changesets for versioning/release. (locked)
 
 ```
-visora/
+gallerist/
 ├─ packages/
 │  ├─ core/                 # engine: model, FSM, store, nav, zoom math, a11y, events
 │  ├─ renderer-dom/         # the DOM renderer (default)
@@ -631,13 +631,13 @@ All forks are locked. Recorded here for provenance.
 
 | # | Decision | Locked choice | Why |
 |---|---|---|---|
-| D1 | Name & scope | **Visora**, `@visora/*` | Only candidate with a genuinely open namespace; on-theme (`vis-`); scales as a brand. |
+| D1 | Name & scope | **Gallerist**, `@gallerist/*` | Renamed from Visora (its npm scope was taken). Understandable at first hearing, on-theme (galleries of galleries), and the npm scope and bare name were free. |
 | D2 | Language | **TypeScript**, strict, ships `.d.ts` | A typed grouped model is a selling point. |
 | D3 | Core store | **Custom ~40-line zero-dep** signal store | Protects the zero-dependency promise and bundle budget. |
 | D4 | `itemMemory` default | **`reset`** (Apploye ships `preserve`) | Matches general galleries; monitoring keeps the same monitor across moments. |
 | D5 | Styling | **Headless core + optional default theme** | Widest appeal; serves community and Apploye's custom UI alike. |
 | D6 | Framework order | **vanilla → React → Vue → Svelte** | React first, to dogfood Apploye. |
-| D7 | Contribution model | **Pure MIT + DCO** (no CLA) | Moat is the domain layer + category ownership, not relicensing the core; MIT already allows Apploye's closed plugins; DCO gives provenance without an ownership grab; on-message for why Visora exists. |
+| D7 | Contribution model | **Pure MIT + DCO** (no CLA) | Moat is the domain layer + category ownership, not relicensing the core; MIT already allows Apploye's closed plugins; DCO gives provenance without an ownership grab; on-message for why Gallerist exists. |
 | D8 | Video providers | **Split provider sub-plugins** | Bundle hygiene — ship only the providers you use. |
 | D9 | Deep-zoom (DZI) | **v2**, seams in v1 | Heavy; most users don't need 100MP tiling; v1 leaves a non-breaking hook. |
 | D10 | Browser floor | **Evergreen + iOS 15+** | Admin-facing dashboard; required APIs baseline since ~2020; no IE. |
@@ -654,7 +654,7 @@ Note on D7: pure MIT + DCO means the open core cannot be *unilaterally* re-licen
 ## 25. Roadmap & phasing
 
 **Phase 0 — Engine MVP (the foundation, ~the half-the-project the spec buys).**
-Core: data model + normalization, FSM, store, two-axis nav, zoom/pan + arbitration, overlay layer (both anchor types), slide windowing, a11y baseline, events. Renderer-dom + default theme. Image adapter. Vanilla API. → *At this point Visora already does something nobody else does: native grouped navigation with image-space overlays.*
+Core: data model + normalization, FSM, store, two-axis nav, zoom/pan + arbitration, overlay layer (both anchor types), slide windowing, a11y baseline, events. Renderer-dom + default theme. Image adapter. Vanilla API. → *At this point Gallerist already does something nobody else does: native grouped navigation with image-space overlays.*
 
 **Phase 1 — Parity + first consumer.**
 `plugin-thumbnails` (grouped), `plugin-grid`, `plugin-download`, `plugin-fullscreen`, `plugin-hash`, `plugin-video` + HTML5/YouTube. React adapter (first, per the locked order). Apploye reviewer rebuilt on top — dogfood-first. → *Replaces lightGallery for Apploye; reaches feature-parity for general users.*
@@ -670,16 +670,16 @@ Plugin authoring guide, third-party adapter examples (3D/PDF/maps), perf hardeni
 ## 26. Licensing & contribution model
 
 - **License:** MIT for the entire public project — core, renderer, theme, all official plugins, and adapters.
-- **Contributions:** accepted under a **DCO** (Developer Certificate of Origin), not a CLA. Contributors attest they have the right to submit their work; no copyright assignment, no ownership transfer. Maximises community trust and matches the reason Visora exists.
-- **No dual-licensing of the core.** Visora is pure MIT with no CLA, so the open core cannot be unilaterally re-licensed later. Deliberate (D7): value capture lives in the Apploye layer, not in relicensing generic features.
-- **Clean-room discipline (non-negotiable):** no lightGallery (or other GPL lightbox) source is read, ported, or referenced during implementation. Design derives only from public behavior, this spec, and original work. This keeps Visora free of copyleft obligations and lets Apploye use it commercially with zero friction — the entire point.
-- **Apploye layer:** a separate *private* package consuming `@visora/*` through public APIs. MIT permits proprietary downstream use, so there is no conflict and no CLA is needed to keep Apploye's domain logic closed.
+- **Contributions:** accepted under a **DCO** (Developer Certificate of Origin), not a CLA. Contributors attest they have the right to submit their work; no copyright assignment, no ownership transfer. Maximises community trust and matches the reason Gallerist exists.
+- **No dual-licensing of the core.** Gallerist is pure MIT with no CLA, so the open core cannot be unilaterally re-licensed later. Deliberate (D7): value capture lives in the Apploye layer, not in relicensing generic features.
+- **Clean-room discipline (non-negotiable):** no lightGallery (or other GPL lightbox) source is read, ported, or referenced during implementation. Design derives only from public behavior, this spec, and original work. This keeps Gallerist free of copyleft obligations and lets Apploye use it commercially with zero friction — the entire point.
+- **Apploye layer:** a separate *private* package consuming `@gallerist/*` through public APIs. MIT permits proprietary downstream use, so there is no conflict and no CLA is needed to keep Apploye's domain logic closed.
 
 ---
 
 ## 27. UI/UX & motion design
 
-Visora ships a default theme + motion layer that any adopter inherits for free; every value below is a `--vis-*` token, and headless mode (`controls:false`, no theme CSS) opts out entirely. The stance: **the content is the UI, chrome is a guest that fades, and every interaction follows the finger.**
+Gallerist ships a default theme + motion layer that any adopter inherits for free; every value below is a `--vis-*` token, and headless mode (`controls:false`, no theme CSS) opts out entirely. The stance: **the content is the UI, chrome is a guest that fades, and every interaction follows the finger.**
 
 ### 27.1 Principles (binding)
 1. **Direct manipulation, 1:1.** Pan/zoom/drag track input exactly; animations are interruptible mid-flight.
@@ -735,7 +735,7 @@ Named springs (physical intent; sampled to keyframes for WAAPI, approximated by 
 - **Haptics:** optional Vibration API taps on zoom-snap and slide-commit; off by default (`haptics:false`).
 
 ### 27.9 Theming & escape hatch
-- Everything above ships in `@visora/theme-default` plus a motion module in core; all values are `--vis-*` tokens.
+- Everything above ships in `@gallerist/theme-default` plus a motion module in core; all values are `--vis-*` tokens.
 - Headless mode opts out of theme and motion entirely.
 - Apploye sets `--vis-accent` and a density token and inherits the rest.
 
@@ -753,4 +753,4 @@ Named springs (physical intent; sampled to keyframes for WAAPI, approximated by 
 
 ---
 
-*End of spec v1.1 — all decisions locked, Visora threaded, UI/UX formalized. Next: Phase 0 implementation, starting with the core data model (§4) and state machine (§6) as the first slice.*
+*End of spec v1.1 — all decisions locked, Gallerist threaded, UI/UX formalized. Next: Phase 0 implementation, starting with the core data model (§4) and state machine (§6) as the first slice.*

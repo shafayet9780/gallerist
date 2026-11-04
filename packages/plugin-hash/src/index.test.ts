@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@visora/core'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { formatHash, hash, parseHash } from './index'
 

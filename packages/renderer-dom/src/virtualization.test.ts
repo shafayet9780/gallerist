@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@visora/core'
+import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { mount } from './mount'
 
@@ -20,7 +20,7 @@ describe('virtualization (spec §20: bounded DOM at scale)', () => {
     const v = createViewer({ collection: bigCollection(10_000) })
     mount(v)
     v.open()
-    expect(document.querySelectorAll('.visora-slide').length).toBeLessThan(10)
+    expect(document.querySelectorAll('.gallerist-slide').length).toBeLessThan(10)
   })
 
   it('preloads the wrap-around neighbor at the last group when loop is on (C4)', () => {
@@ -39,7 +39,7 @@ describe('virtualization (spec §20: bounded DOM at scale)', () => {
     v.open()
     for (let i = 0; i < 500; i++) v.next()
     expect(v.getState().cursor.g).toBe(500)
-    expect(document.querySelectorAll('.visora-slide').length).toBeLessThan(10)
+    expect(document.querySelectorAll('.gallerist-slide').length).toBeLessThan(10)
     // only one image (the current slide's active item) is mounted at a time per slide
     expect(document.querySelectorAll('img').length).toBeLessThan(10)
   })

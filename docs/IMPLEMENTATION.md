@@ -1,6 +1,6 @@
-# Visora — Phase 0 Implementation (as-built)
+# Gallerist — Phase 0 Implementation (as-built)
 
-> Companion to `docs/VISORA_SPEC.md` (the design source of truth) and `plans/phase-0.md`
+> Companion to `docs/GALLERIST_SPEC.md` (the design source of truth) and `plans/phase-0.md`
 > (the milestone tracker). This document explains **how Phase 0 is actually built and why** —
 > the decisions, the coordinate model, the data flow, the gotchas, and the extension seams.
 > Status: Phase 0 complete (M0–M6). 173 unit tests + 11 Playwright e2e, all gates green.
@@ -19,16 +19,16 @@ react/vue/svelte (P1) ────┘
 
 | Package | Role | Touches DOM? | Bundle (gz) |
 |---|---|---|---|
-| `@visora/core` | Headless engine: model, store, FSM, nav, zoom/arbitration math, events, spring sampler, `createViewer` | **No** | 3.07 KB |
-| `@visora/renderer-dom` | The only DOM ring: windowing, image adapter, gestures, overlays, a11y, chrome | Yes | core+renderer 6.75 KB / 16 KB budget |
-| `@visora/theme-default` | Pure-CSS skin, `--visora-*` tokens, motion | n/a (CSS) | shipped separately |
+| `@gallerist/core` | Headless engine: model, store, FSM, nav, zoom/arbitration math, events, spring sampler, `createViewer` | **No** | 3.07 KB |
+| `@gallerist/renderer-dom` | The only DOM ring: windowing, image adapter, gestures, overlays, a11y, chrome | Yes | core+renderer 6.75 KB / 16 KB budget |
+| `@gallerist/theme-default` | Pure-CSS skin, `--gallerist-*` tokens, motion | n/a (CSS) | shipped separately |
 
 **Dependency direction:** `renderer-dom → core` (type-only, plus the runtime spring/zoom math).
 `theme-default` has no JS dependency. `core` depends on nothing.
 
 ### The headless invariant (load-bearing)
 
-`@visora/core` never touches the DOM — not at import, not at construction, not ever. DOM types
+`@gallerist/core` never touches the DOM — not at import, not at construction, not ever. DOM types
 (`HTMLElement`, `Node`, `AbortSignal`) appear in core **only as type annotations** (e.g.
 `OverlaySpec.render: (ctx) => Node`); core never calls them. This is what lets a consumer build a
 fully custom UI on the same engine, and it's verified structurally: core has zero DOM access and
@@ -107,8 +107,8 @@ adjusts point counter-scale and `visibleAt` visibility in place — no `render()
 
 ### 3.5 Mode is a data attribute, not a class
 
-The viewer root carries `data-visora-mode="overlay" | "inline"`, **not** a `visora-overlay` class.
-`visora-overlay` is also the class for overlay *elements* (`.visora-overlay { pointer-events: none }`),
+The viewer root carries `data-gallerist-mode="overlay" | "inline"`, **not** a `gallerist-overlay` class.
+`gallerist-overlay` is also the class for overlay *elements* (`.gallerist-overlay { pointer-events: none }`),
 and `pointer-events` **inherits** — a class collision once put the whole tree to
 `pointer-events: none` and killed all gestures. See §6 (gotchas).
 
@@ -144,7 +144,7 @@ pure mapping; `render.ts` paints/updates.
 ### 4.5 Motion — `packages/core/src/motion/spring.ts` + theme
 `sampleSpring` turns a damped oscillator into progress keyframes + a clamped duration; `SPRINGS`
 ships the named presets (spec §27.2). The default theme drives the **axis distinction** (time =
-horizontal slide, screen = depth pop) with CSS keyframes toggled by `data-visora-enter`, and honors
+horizontal slide, screen = depth pop) with CSS keyframes toggled by `data-gallerist-enter`, and honors
 `prefers-reduced-motion`. FLIP shared-element open/close and full interruptible-hero re-basing are
 deferred (the sampler is in place for them).
 
@@ -188,8 +188,8 @@ afterSlide`, **cancelable** `beforeSlide`), item axis (`beforeItem/item/afterIte
 ## 6. Known gotchas (read before editing)
 
 - **`pointer-events` inherits.** A `pointer-events:none` rule on an ancestor disables the whole
-  subtree. Root mode is a `data-visora-mode` attribute precisely to avoid colliding with the
-  `.visora-overlay` element class. (See `packages/theme-default/src/visora.css`.)
+  subtree. Root mode is a `data-gallerist-mode` attribute precisely to avoid colliding with the
+  `.gallerist-overlay` element class. (See `packages/theme-default/src/gallerist.css`.)
 - **Gesture commit reads the pointer-up event's own coordinates**, not the last stored pointer
   position — Chromium coalesces `pointermove`s, so a fast flick may fire none before `pointerup`.
   Using the up-event coords makes flicks commit reliably (`gestures.ts` `onUp`).
@@ -211,7 +211,7 @@ afterSlide`, **cancelable** `beforeSlide`), item axis (`beforeItem/item/afterIte
   `string | Node`, `interactive`, `visibleAt`, `layer`, `scaleWithImage`). String render uses
   `textContent` (no XSS); `placeholder` is treated as trusted input.
 - **Phase 1 prerequisite:** the **region/slot plugin contract** must be defined abstractly in
-  `@visora/core` before the first plugin, so plugins survive a renderer swap (the headless moat).
+  `@gallerist/core` before the first plugin, so plugins survive a renderer swap (the headless moat).
   Not built in Phase 0 — see `plans/phase-0.md` (review finding I5).
 
 ---
@@ -247,9 +247,9 @@ items are deferred with rationale (we launch at 0.x, so none is frozen):
   reveal letterbox area and anchor to the stage box rather than the painted image box. The true
   contained-rect mapping is the spec's M4 work; until then, pass `item.naturalSize` for best results
   and avoid anchored overlays on extreme ratios.
-- **Public surface breadth (review S-A1).** `@visora/core` still re-exports some engine internals
+- **Public surface breadth (review S-A1).** `@gallerist/core` still re-exports some engine internals
   (FSM reducer, store factory, spring tables, raw nav). At 0.x this is harmless; the surface will be
-  split to a deep `@visora/core/internal` entry before 1.0 so the frozen root stays minimal.
+  split to a deep `@gallerist/core/internal` entry before 1.0 so the frozen root stays minimal.
 - **Gesture discoverability (review S-UX2).** There is no first-run hint for swipe / pinch /
   swipe-to-dismiss. Planned as an opt-in coachmark; for now, document the gestures in your UI.
 - **Cross-browser e2e.** The Playwright suite runs on chromium + webkit. Five synthetic-input/

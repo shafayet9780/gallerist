@@ -22,12 +22,12 @@ async function drag(page: Page, x0: number, y0: number, x1: number, y1: number, 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
   await page.click('#open')
-  await expect(page.locator('.visora')).toBeVisible()
+  await expect(page.locator('.gallerist')).toBeVisible()
 })
 
 test('opens and shows the first image with a counter', async ({ page }) => {
-  await expect(page.locator('.visora-counter')).toHaveText(/1 \/ 3/)
-  await expect(page.locator('.visora-slide[data-visora-current] img')).toBeVisible()
+  await expect(page.locator('.gallerist-counter')).toHaveText(/1 \/ 3/)
+  await expect(page.locator('.gallerist-slide[data-gallerist-current] img')).toBeVisible()
 })
 
 test('a failed image shows a centered error card with its alt (I-UX3)', async ({ page }) => {
@@ -43,24 +43,24 @@ test('a failed image shows a centered error card with its alt (I-UX3)', async ({
       ],
     }),
   )
-  const card = page.locator('.visora-media-error')
+  const card = page.locator('.gallerist-media-error')
   await expect(card).toBeVisible()
-  await expect(card.locator('.visora-media-error-label')).toHaveText('Burndown chart')
+  await expect(card.locator('.gallerist-media-error-label')).toHaveText('Burndown chart')
 })
 
 test('keyboard ArrowRight navigates groups; Escape closes', async ({ page }) => {
-  await page.locator('.visora').focus()
+  await page.locator('.gallerist').focus()
   await page.keyboard.press('ArrowRight')
-  await expect(page.locator('.visora-counter')).toHaveText(/2 \/ 3/)
+  await expect(page.locator('.gallerist-counter')).toHaveText(/2 \/ 3/)
   await page.keyboard.press('Escape')
-  await expect(page.locator('.visora')).toHaveCount(0)
+  await expect(page.locator('.gallerist')).toHaveCount(0)
 })
 
 test('next/prev chrome buttons drive the group axis', async ({ page }) => {
-  await page.click('.visora-next')
-  await expect(page.locator('.visora-counter')).toHaveText(/2 \/ 3/)
-  await page.click('.visora-prev')
-  await expect(page.locator('.visora-counter')).toHaveText(/1 \/ 3/)
+  await page.click('.gallerist-next')
+  await expect(page.locator('.gallerist-counter')).toHaveText(/2 \/ 3/)
+  await page.click('.gallerist-prev')
+  await expect(page.locator('.gallerist-counter')).toHaveText(/1 \/ 3/)
 })
 
 // Playwright/WebKit's synthetic mouse coalesces/drops pointermove+up during a capture-based drag
@@ -72,11 +72,11 @@ test('horizontal swipe navigates to the next group (arbitration: navigate)', asy
     test.info().project.name === 'webkit',
     'WebKit synthetic mouse drops drag pointer events',
   )
-  const box = await page.locator('.visora-stage').boundingBox()
+  const box = await page.locator('.gallerist-stage').boundingBox()
   if (!box) throw new Error('no stage box')
   const cy = box.y + box.height / 2
   await drag(page, box.x + box.width * 0.75, cy, box.x + box.width * 0.2, cy)
-  await expect(page.locator('.visora-counter')).toHaveText(/2 \/ 3/)
+  await expect(page.locator('.gallerist-counter')).toHaveText(/2 \/ 3/)
 })
 
 test('drag downward dismisses the viewer (arbitration: close)', async ({ page }) => {
@@ -84,15 +84,15 @@ test('drag downward dismisses the viewer (arbitration: close)', async ({ page })
     test.info().project.name === 'webkit',
     'WebKit synthetic mouse drops drag pointer events',
   )
-  const box = await page.locator('.visora-stage').boundingBox()
+  const box = await page.locator('.gallerist-stage').boundingBox()
   if (!box) throw new Error('no stage box')
   const cx = box.x + box.width / 2
   await drag(page, cx, box.y + box.height * 0.3, cx, box.y + box.height * 0.3 + 240)
-  await expect(page.locator('.visora')).toHaveCount(0)
+  await expect(page.locator('.gallerist')).toHaveCount(0)
 })
 
 test('wheel zooms in past fit (arbitration: zoom)', async ({ page }) => {
-  const box = await page.locator('.visora-stage').boundingBox()
+  const box = await page.locator('.gallerist-stage').boundingBox()
   if (!box) throw new Error('no stage box')
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.wheel(0, -400)

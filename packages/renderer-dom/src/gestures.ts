@@ -12,7 +12,7 @@ import {
   fitScale,
   focalZoom,
   toggleZoom,
-} from '@visora/core'
+} from '@gallerist/core'
 
 export interface Geometry {
   stageRect: { left: number; top: number; width: number; height: number }
@@ -72,7 +72,7 @@ export function attachGestures(opts: GestureOptions): () => void {
 
   // The drag-to-dismiss progress var lives on the root (not the stage) so sibling layers like the
   // backdrop — which are not descendants of the stage — can consume it via inheritance (S-R1).
-  const dismissEl = (stage.closest('.visora') as HTMLElement | null) ?? stage
+  const dismissEl = (stage.closest('.gallerist') as HTMLElement | null) ?? stage
 
   const pointers = new Map<number, Pt>()
   let start: Pt | null = null
@@ -154,7 +154,7 @@ export function attachGestures(opts: GestureOptions): () => void {
     flushWheel() // commit a pending wheel zoom before snapshotting startZoom from the store
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
     // NB: do NOT capture the pointer here. The stage hosts interactive overlay/plugin UI (e.g. the
-    // grid cells, which live inside .visora-stage); capturing on every pointerdown would redirect
+    // grid cells, which live inside .gallerist-stage); capturing on every pointerdown would redirect
     // the pointerup and swallow their click. Capture only once a real drag/pinch is recognized
     // (in onMove, and the pinch branch below), so a tap still delivers its click to the target (C3).
     startZoom = { ...viewer.getState().zoom }
@@ -216,7 +216,7 @@ export function attachGestures(opts: GestureOptions): () => void {
       const k = Math.max(0.5, 1 - Math.abs(dy) / 1000)
       live = { scale: startZoom.scale * k, x: startZoom.x + dx, y: startZoom.y + dy }
       dismissEl.style.setProperty(
-        '--visora-dismiss',
+        '--gallerist-dismiss',
         String(Math.min(1, Math.abs(dy) / closeDismiss)),
       )
       schedule()
@@ -270,7 +270,7 @@ export function attachGestures(opts: GestureOptions): () => void {
         if (Math.abs(dx) >= commitNav) dx < 0 ? nav.next() : nav.prev()
         break
       case 'close':
-        dismissEl.style.removeProperty('--visora-dismiss')
+        dismissEl.style.removeProperty('--gallerist-dismiss')
         if (Math.abs(dy) >= closeDismiss) viewer.close()
         else viewer.zoomTo(startZoom.scale, { x: startZoom.x, y: startZoom.y })
         break

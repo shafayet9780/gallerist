@@ -1,12 +1,12 @@
 {
-  "name": "@visora/theme-default",
+  "name": "@gallerist/theme-default",
   "version": "0.2.0",
-  "description": "Default Visora theme — pure CSS, no JS dependency. Driven by --visora-* custom properties.",
+  "description": "Default Gallerist theme — pure CSS, no JS dependency. Driven by --gallerist-* custom properties.",
   "license": "MIT",
   "sideEffects": ["*.css"],
   "files": ["src", "LICENSE", "README.md"],
   "exports": {
-    "./visora.css": "./src/visora.css",
+    "./gallerist.css": "./src/gallerist.css",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -16,12 +16,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shafayet9780/visora.git",
+    "url": "git+https://github.com/shafayet9780/gallerist.git",
     "directory": "packages/theme-default"
   },
-  "homepage": "https://github.com/shafayet9780/visora#readme",
+  "homepage": "https://github.com/shafayet9780/gallerist#readme",
   "bugs": {
-    "url": "https://github.com/shafayet9780/visora/issues"
+    "url": "https://github.com/shafayet9780/gallerist/issues"
   },
   "author": "Shafayet Ahmmed",
   "keywords": [

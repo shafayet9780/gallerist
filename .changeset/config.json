@@ -7,5 +7,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@visora/example-vanilla", "@visora/example-monitoring", "@visora/e2e"]
+  "ignore": ["@gallerist/example-vanilla", "@gallerist/example-monitoring", "@gallerist/e2e"]
 }

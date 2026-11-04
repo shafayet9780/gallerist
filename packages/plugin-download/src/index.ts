@@ -1,8 +1,8 @@
-// @visora/plugin-download — download the current item, a group, or a bulk zip (spec §14).
+// @gallerist/plugin-download — download the current item, a group, or a bulk zip (spec §14).
 // Single/group use anchor downloads (zero dep); bulk zip dynamically imports a tiny streaming
 // zip lib so it costs nothing until used (decision P1-H).
 
-import type { Group, Item, MediaSource, Plugin } from '@visora/core'
+import type { Group, Item, MediaSource, Plugin } from '@gallerist/core'
 
 /** Resolve a MediaSource to a downloadable URL (string/responsive sync; loader async). */
 export async function urlOf(source: MediaSource): Promise<string | null> {
@@ -101,7 +101,7 @@ export async function downloadItems(items: Item[], opts: ZipOptions = {}): Promi
   if (entries.length === 0) return // nothing fetched → don't produce an empty archive
   const blob = await downloadZip(entries).blob()
   const objectUrl = URL.createObjectURL(blob)
-  anchorDownload(objectUrl, opts.zipName ?? 'visora.zip')
+  anchorDownload(objectUrl, opts.zipName ?? 'gallerist.zip')
   // Defer the revoke: revoking the blob URL synchronously can cancel the still-starting download
   // in some browsers (notably older Firefox). One tick lets the download begin first (I-PL5).
   setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
@@ -133,7 +133,7 @@ export function download(opts: DownloadOptions = {}): Plugin {
         toolbar: () => {
           const btn = document.createElement('button')
           btn.type = 'button'
-          btn.className = 'visora-download-btn'
+          btn.className = 'gallerist-download-btn'
           btn.setAttribute('aria-label', 'Download')
           btn.textContent = '⬇'
           btn.addEventListener('click', run)

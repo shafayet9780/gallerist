@@ -1,5 +1,5 @@
 {
-  "name": "@visora/core",
+  "name": "@gallerist/core",
   "version": "0.2.0",
   "description": "Headless, framework-agnostic media viewer engine — nested galleries, image-space overlays, virtualization.",
   "license": "MIT",
@@ -32,12 +32,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shafayet9780/visora.git",
+    "url": "git+https://github.com/shafayet9780/gallerist.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/shafayet9780/visora#readme",
+  "homepage": "https://github.com/shafayet9780/gallerist#readme",
   "bugs": {
-    "url": "https://github.com/shafayet9780/visora/issues"
+    "url": "https://github.com/shafayet9780/gallerist/issues"
   },
   "author": "Shafayet Ahmmed",
   "keywords": [

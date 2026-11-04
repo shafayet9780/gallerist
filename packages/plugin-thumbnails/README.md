@@ -1,6 +1,6 @@
-# @visora/plugin-thumbnails
+# @gallerist/plugin-thumbnails
 
-Windowed thumbnail rail for [Visora](https://github.com/shafayet9780/visora#readme). One card per group along the primary (←/→)
+Windowed thumbnail rail for [Gallerist](https://github.com/shafayet9780/gallerist#readme). One card per group along the primary (←/→)
 axis; the active multi-item group expands into its item thumbs along the secondary (↑/↓) axis.
 Windowed + lazy, so 10k-item galleries stay bounded (≤ ~200 live nodes).
 
@@ -9,9 +9,9 @@ flyout to preview a group without navigating in) and **`flat`** (every image sid
 group bracketed). Both stay windowed + lazy.
 
 ```ts
-import { createViewer } from '@visora/core'
-import { mount } from '@visora/renderer-dom'
-import { thumbnails } from '@visora/plugin-thumbnails'
+import { createViewer } from '@gallerist/core'
+import { mount } from '@gallerist/renderer-dom'
+import { thumbnails } from '@gallerist/plugin-thumbnails'
 
 const viewer = createViewer({ collection, plugins: [thumbnails()] })
 mount(viewer)
@@ -64,7 +64,7 @@ thumbnails({
 | `groupDisplay` | `'stacked' \| 'flat'`        | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, bracketed per group. |
 | `expandActive` | `boolean`                    | `true`      | `stacked` only. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |
 
-Presets configure these for you — see [layout presets](https://github.com/shafayet9780/visora/blob/main/docs/PRESETS.md). The rail's **position**
+Presets configure these for you — see [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md). The rail's **position**
 (bottom/top/hidden) is a renderer option (`rail`), not a thumbnails option.
 
 ## Data

@@ -1,7 +1,14 @@
-// @visora/plugin-video — HTML5 <video> media adapter (spec §12/§14). The renderer calls
+// @gallerist/plugin-video — HTML5 <video> media adapter (spec §12/§14). The renderer calls
 // activate/deactivate on slide enter/leave (play/pause); "advance on ended" drives navigation.
 
-import type { AdapterCtx, Item, MediaAdapter, MediaSource, Plugin, ViewerApi } from '@visora/core'
+import type {
+  AdapterCtx,
+  Item,
+  MediaAdapter,
+  MediaSource,
+  Plugin,
+  ViewerApi,
+} from '@gallerist/core'
 
 export interface VideoOptions {
   controls?: boolean
@@ -24,7 +31,7 @@ export function videoAdapter(viewer: ViewerApi, opts: VideoOptions = {}): MediaA
     match: (item) => item.type === 'video',
     mount(item: Item, slot: HTMLElement, ctx: AdapterCtx) {
       const video = document.createElement('video')
-      video.className = 'visora-media visora-media-video'
+      video.className = 'gallerist-media gallerist-media-video'
       video.controls = opts.controls ?? true
       video.muted = opts.muted ?? false
       video.playsInline = true

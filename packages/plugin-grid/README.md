@@ -1,28 +1,28 @@
-# @visora/plugin-grid
+# @gallerist/plugin-grid
 
-Visora plugin — in-viewer contact-sheet grid (grouped, windowed); click a cell to jump.
+Gallerist plugin — in-viewer contact-sheet grid (grouped, windowed); click a cell to jump.
 
-Part of [Visora](https://github.com/shafayet9780/visora#readme) — a headless, framework-agnostic media viewer for grouped / nested galleries with image-space overlays and virtualized rendering.
+Part of [Gallerist](https://github.com/shafayet9780/gallerist#readme) — a headless, framework-agnostic media viewer for grouped / nested galleries with image-space overlays and virtualized rendering.
 
 ## Install
 
 ```bash
-npm i @visora/plugin-grid
+npm i @gallerist/plugin-grid
 ```
 
 ## Usage
 
-Tree-shakeable Visora plugin. Register it when you create the viewer:
+Tree-shakeable Gallerist plugin. Register it when you create the viewer:
 
 ```ts
-import { createViewer } from '@visora/core'
+import { createViewer } from '@gallerist/core'
 // import the plugin's factory from this package and pass it to `plugins`
 const viewer = createViewer({ items, plugins: [/* plugin() */] })
 ```
 
-See [Plugin authoring](https://github.com/shafayet9780/visora/blob/main/docs/PLUGIN-AUTHORING.md).
+See [Plugin authoring](https://github.com/shafayet9780/gallerist/blob/main/docs/PLUGIN-AUTHORING.md).
 
-Full docs: the [monorepo README](https://github.com/shafayet9780/visora#readme) and [`docs/`](https://github.com/shafayet9780/visora/tree/main/docs).
+Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 
 ## License
 

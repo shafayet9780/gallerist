@@ -20,8 +20,8 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@visora/core": ["./packages/core/src/index.ts"],
-      "@visora/renderer-dom": ["./packages/renderer-dom/src/index.ts"]
+      "@gallerist/core": ["./packages/core/src/index.ts"],
+      "@gallerist/renderer-dom": ["./packages/renderer-dom/src/index.ts"]
     }
   }
 }

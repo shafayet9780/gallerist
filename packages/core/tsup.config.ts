@@ -14,7 +14,7 @@ export default defineConfig({
   sourcemap: true,
   minify: false,
   target: 'es2022',
-  define: { __VISORA_VERSION__: JSON.stringify(version) },
+  define: { __GALLERIST_VERSION__: JSON.stringify(version) },
   // Don't embed the full TS source in the shipped maps (keeps the tarball lean).
   esbuildOptions(options) {
     options.sourcesContent = false
