@@ -10,3 +10,6 @@ playwright-report/
 
 # LICENSE is copied into each package at pack time (scripts/copy-license.mjs)
 packages/*/LICENSE
+
+# Local design reference (rendered prototypes); not part of the repo
+design/
