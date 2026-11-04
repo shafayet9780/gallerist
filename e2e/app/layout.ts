@@ -45,11 +45,13 @@ const palette = ['#c0392b', '#2980b9', '#27ae60', '#f39c12', '#8e44ad', '#16a085
 // 12 groups with mixed sizes: singles, small multi-item groups, and one large group (> 8 items)
 const sizes = [1, 3, 2, 1, 5, 12, 1, 4, 2, 1, 3, 2]
 const collection: Collection = {
+  meta: { title: 'Fixture house' },
   groups: sizes.map((n, g) => ({
     id: `g${g}`,
     caption: captionMode === '1' ? `Group ${g + 1} title` : undefined,
     // the reviewer timeline's labels: 09:12, 09:19, … every 7 minutes
     meta: {
+      subtitle: captionMode === '1' ? `Floor ${(g % 3) + 1}` : undefined,
       time: `${String(9 + Math.floor((12 + g * 7) / 60)).padStart(2, '0')}:${String((12 + g * 7) % 60).padStart(2, '0')}`,
     },
     items: Array.from({ length: n }, (_, i) =>
@@ -73,10 +75,14 @@ const viewer = createViewer({
       : [
           thumbnails({
             ...(p.get('preset') ? resolvePreset(p.get('preset') as string).thumbnails : {}),
-            groupDisplay: p.get('display') === 'flat' ? 'flat' : 'stacked',
+            ...(p.get('display') ? { groupDisplay: p.get('display') as 'flat' | 'index' } : {}),
             ...(p.get('items') ? { itemAxis: p.get('items') as 'vertical' | 'horizontal' } : {}),
           }),
-          grid(),
+          grid(
+            p.get('overview') === '1'
+              ? { layout: 'sections', startOpen: true, startLabel: 'Start tour' }
+              : {},
+          ),
           fullscreen(),
           download(),
         ],
@@ -92,6 +98,7 @@ mount(viewer, {
   skin: p.get('skin') ?? undefined,
   accent: p.get('accent') ?? undefined,
   scheme: (p.get('scheme') ?? undefined) as ColorScheme | undefined,
+  groupAxis: (p.get('axis') ?? undefined) as 'horizontal' | 'vertical' | undefined,
 })
 ;(window as unknown as { viewer: typeof viewer }).viewer = viewer
 // late=1: open a moment after mount, as a page does on a click (the overlay root isn't in the

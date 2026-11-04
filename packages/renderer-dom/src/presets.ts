@@ -3,9 +3,9 @@
 // name. Pure resolver (no DOM): the renderer applies `rootAttrs` + `arrows`/`autoHide`, and a host
 // (or the React adapter) spreads `thumbnails` into the thumbnails() plugin.
 
-import type { ArrowLayout, ItemIndicator, RailPlacement } from './mount'
+import type { ArrowLayout, GroupAxis, ItemIndicator, RailPlacement } from './mount'
 
-export type PresetName = 'filmstrip' | 'immersive' | 'reviewer' | 'contact' | 'editorial'
+export type PresetName = 'filmstrip' | 'immersive' | 'reviewer' | 'contact' | 'editorial' | 'tour'
 
 export interface ResolvedPreset {
   /** data-* attributes the renderer sets on the root (drives the theme). */
@@ -19,7 +19,7 @@ export interface ResolvedPreset {
   /** preferred thumbnails() options for this preset. */
   thumbnails: {
     itemAxis: 'vertical' | 'horizontal'
-    groupDisplay?: 'stacked' | 'flat'
+    groupDisplay?: 'stacked' | 'flat' | 'index'
     timeline?: boolean
     numberItems?: boolean
   }
@@ -29,6 +29,10 @@ export interface ResolvedPreset {
   frame?: boolean
   /** default item indicator (overridable). */
   itemIndicator?: ItemIndicator
+  /** which arrow keys and on-screen arrows move between groups, if not the rail's own (overridable). */
+  groupAxis?: GroupAxis
+  /** name the group arrows after the group they go to (overridable). */
+  arrowLabels?: boolean
 }
 
 const PRESETS: Record<PresetName, ResolvedPreset> = {
@@ -70,6 +74,20 @@ const PRESETS: Record<PresetName, ResolvedPreset> = {
     thumbnails: { itemAxis: 'horizontal', numberItems: true },
     frame: true,
     itemIndicator: 'placard',
+  },
+  // a walkthrough of named sections: a section index down the side (names, counts, the active section
+  // expanded), ←/→ between sections on labelled arrows, ↑/↓ within one, and framed media so nothing
+  // covers the photo. Pairs with `grid({ layout: 'sections', startOpen: true })`.
+  tour: {
+    rootAttrs: { 'data-gallerist-preset': 'tour' },
+    arrows: 'pill-right',
+    autoHide: false,
+    rail: 'left',
+    thumbnails: { itemAxis: 'horizontal', groupDisplay: 'index', numberItems: true },
+    frame: true,
+    itemIndicator: 'dots',
+    groupAxis: 'horizontal',
+    arrowLabels: true,
   },
   // browse-heavy: a vertical rail down the right edge (pairs well with the grid plugin).
   contact: {

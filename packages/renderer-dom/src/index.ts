@@ -15,6 +15,7 @@ export {
 } from './appearance'
 export {
   type ArrowLayout,
+  type GroupAxis,
   type ItemIndicator,
   type MountOptions,
   mount,

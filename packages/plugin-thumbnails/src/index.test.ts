@@ -669,4 +669,87 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
     )
     expect(nums).toEqual(['1', '2'])
   })
+
+  describe('section index (groupDisplay: index)', () => {
+    const named = (): Collection => ({
+      groups: [
+        { id: 'g0', caption: 'Exterior', meta: { subtitle: 'Outside' }, items: [item('a0')] },
+        { id: 'g1', caption: 'Kitchen', items: [item('b0'), item('b1'), item('b2')] },
+        { id: 'g2', items: [item('c0'), item('c1')] },
+      ],
+    })
+    const openIndex = (col = named()) => {
+      const v = createViewer({
+        collection: col,
+        plugins: [thumbnails({ groupDisplay: 'index', numberItems: true })],
+      })
+      mount(v, { rail: 'left' })
+      v.open()
+      return v
+    }
+    const rows = () => [...document.querySelectorAll<HTMLButtonElement>('.gallerist-thumb-row')]
+
+    it('lists a row per group with name, subtitle and count', () => {
+      openIndex()
+      expect(rows().length).toBe(3)
+      expect(rows()[0]?.querySelector('.gallerist-thumb-row-name')?.textContent).toBe('Exterior')
+      expect(rows()[0]?.querySelector('.gallerist-thumb-row-sub')?.textContent).toBe('Outside')
+      expect(rows()[1]?.querySelector('.gallerist-thumb-row-count')?.textContent).toBe('3')
+      expect(rows()[2]?.querySelector('.gallerist-thumb-row-name')?.textContent).toBe('Group 3')
+      expect(rows()[0]?.getAttribute('aria-label')).toBe('Exterior, Outside (1)')
+    })
+
+    it('rows are current, not selected options, so the item listbox can sit among them', () => {
+      openIndex()
+      expect(document.querySelector('.gallerist-thumbs')?.getAttribute('role')).toBe('group')
+      expect(rows()[0]?.hasAttribute('role')).toBe(false)
+      expect(rows()[0]?.hasAttribute('aria-selected')).toBe(false)
+      expect(rows()[0]?.getAttribute('aria-current')).toBe('true')
+      expect(rows()[1]?.hasAttribute('aria-current')).toBe(false)
+    })
+
+    it('expands the active multi-item group under its own row, as a row', () => {
+      const v = openIndex()
+      expect(document.querySelector('.gallerist-thumb-items')).toBeNull() // one item: nothing to expand
+      v.next()
+      const panel = document.querySelector(
+        '.gallerist-thumb-section[data-group="g1"] .gallerist-thumb-items',
+      )
+      expect(panel?.querySelectorAll('.gallerist-thumb-item').length).toBe(3)
+      expect(panel?.getAttribute('data-axis')).toBe('horizontal')
+      expect(panel?.querySelector('.gallerist-thumb-num')?.textContent).toBe('1')
+      v.next()
+      expect(document.querySelectorAll('.gallerist-thumb-items').length).toBe(1)
+      expect(
+        document.querySelector('.gallerist-thumb-section[data-group="g2"] .gallerist-thumb-items'),
+      ).not.toBeNull()
+    })
+
+    it('a row navigates to its group; an item button to its item', () => {
+      const v = openIndex()
+      rows()[1]?.click()
+      expect(v.getState().cursor.g).toBe(1)
+      ;(document.querySelectorAll('.gallerist-thumb-item')[2] as HTMLButtonElement).click()
+      expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+    })
+
+    it('the cover stays when moving through the items, and there is no peek', () => {
+      const v = openIndex()
+      v.goTo(1, 2)
+      const img = rows()[1]?.querySelector('img') as HTMLImageElement
+      expect(img.dataset.live).toBeUndefined()
+      rows()[2]?.dispatchEvent(new MouseEvent('mouseenter'))
+      expect(document.querySelector('.gallerist-thumb-peek')).toBeNull()
+    })
+
+    it('the e key hides the expanded items; nothing goes to the aside column', () => {
+      const v = openIndex()
+      v.next()
+      document
+        .querySelector('.gallerist')
+        ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', bubbles: true }))
+      expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
+      expect(document.querySelector('.gallerist-thumbs-aside')).toBeNull()
+    })
+  })
 })

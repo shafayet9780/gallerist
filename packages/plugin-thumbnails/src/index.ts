@@ -1,6 +1,6 @@
 // @gallerist/plugin-thumbnails — windowed thumbnail rail (spec §10.3, §14).
 //
-// Two display modes (`groupDisplay`):
+// Three display modes (`groupDisplay`):
 //  • 'stacked' (default): one card per group; multi-item groups stack with a count badge. The
 //    active multi-item group expands its item thumbs (secondary axis), and hovering/focusing any
 //    OTHER multi-item card opens a transient *peek* flyout of its items — preview without
@@ -8,6 +8,9 @@
 //  • 'flat': every item of every group renders side-by-side as its own card, each group's run
 //    wrapped in a bordered container so it reads as one group. Item-windowed so it stays bounded
 //    even for huge galleries or one giant group.
+//  • 'index': a section index. One row per group (cover, `group.caption`, `group.meta.subtitle`, item
+//    count); the active group's items expand in place under its row. On a bottom rail, or any rail at
+//    900px wide or less, the rows become a strip of chips.
 //
 // Reconcile-in-place (M14 UX-B): the rail is NOT torn down on cursor moves. It is rebuilt only when
 // the collection or the visible window changes; cursor moves just flip `data-active` and scroll the
@@ -29,11 +32,12 @@ export interface ThumbnailsOptions {
   /**
    * How multi-item groups are shown in the rail. `stacked` (default) collapses each group to one
    * card (hover/focus to peek its items, or tap the expand affordance on touch); `flat` lays every
-   * item out side-by-side with each group wrapped in a bordered container.
+   * item out side-by-side with each group wrapped in a bordered container; `index` lists named
+   * sections with their counts and expands the active one (its items always run as a row).
    */
-  groupDisplay?: 'stacked' | 'flat'
+  groupDisplay?: 'stacked' | 'flat' | 'index'
   /**
-   * Auto-expand the active multi-item group's item panel (`stacked` mode). Default `true`. Users
+   * Auto-expand the active multi-item group's item panel (`stacked` and `index` modes). Default `true`. Users
    * can hide/show it with the toolbar items-toggle button or the `e` key; the chosen state persists
    * as you navigate. Ignored in `flat` mode (every item is already laid out).
    */
@@ -51,6 +55,11 @@ export interface ThumbnailsOptions {
 const metaTime = (group: Group): string | undefined => {
   const time = (group.meta as { time?: unknown } | undefined)?.time
   return typeof time === 'string' ? time : undefined
+}
+
+const metaSubtitle = (group: Group): string | undefined => {
+  const subtitle = (group.meta as { subtitle?: unknown } | undefined)?.subtitle
+  return typeof subtitle === 'string' ? subtitle : undefined
 }
 
 function thumbUrl(source: MediaSource | undefined): string | null {
@@ -95,10 +104,17 @@ function appendCaption(btn: HTMLElement, text: string | undefined): void {
   btn.appendChild(cap)
 }
 
+function toggleAriaCurrent(btn: HTMLElement, on: boolean): void {
+  if (on) btn.setAttribute('aria-current', 'true')
+  else btn.removeAttribute('aria-current')
+}
+
 function setActiveAttr(btn: HTMLElement, active: boolean): void {
   if (active) btn.setAttribute('data-active', '')
   else btn.removeAttribute('data-active')
-  btn.setAttribute('aria-selected', String(active))
+  // index rows are plain buttons (their list holds a listbox of items, which can't nest in another)
+  if (btn.getAttribute('role') === 'option') btn.setAttribute('aria-selected', String(active))
+  else toggleAriaCurrent(btn, active)
 }
 
 function toggleAttr(el: HTMLElement, name: string, on: boolean): void {
@@ -137,8 +153,9 @@ interface FlatEntry {
 export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
   return (viewer: ViewerApi) => {
     const overscan = opts.overscan ?? 24
-    const itemAxis = opts.itemAxis ?? 'vertical'
     const groupDisplay = opts.groupDisplay ?? 'stacked'
+    const isIndex = groupDisplay === 'index'
+    const itemAxis = isIndex ? 'horizontal' : (opts.itemAxis ?? 'vertical')
     const expandActive = opts.expandActive ?? true
     const timeLabel =
       groupDisplay === 'stacked' && opts.timeline
@@ -252,7 +269,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       peekTimer = setTimeout(closePeek, 120)
     }
     const openPeek = (group: Group, gIndex: number, host: HTMLElement) => {
-      if (!root || groupDisplay === 'flat') return
+      if (!root || groupDisplay !== 'stacked') return
       if (group.items.length <= 1) return // nothing to preview
       // skip only when the active group's own panel is already showing it (avoids a double panel);
       // if that panel is hidden/dismissed, hovering the active card peeks like any other (point 1).
@@ -283,7 +300,44 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     // ── stacked mode ─────────────────────────────────────────────────────────
+    // ── index mode ───────────────────────────────────────────────────────────
+    const buildIndexRow = (group: Group, gIndex: number): HTMLButtonElement => {
+      const name = group.caption ?? `Group ${gIndex + 1}`
+      const subtitle = metaSubtitle(group)
+      const count = group.items.length
+      const label = `${name}${subtitle ? `, ${subtitle}` : ''} (${count})`
+      const btn = thumbButton(label, 'gallerist-thumb-row', () => viewer.goTo(gIndex))
+      btn.removeAttribute('role')
+      btn.removeAttribute('aria-selected')
+      btn.dataset.group = group.id
+      btn.appendChild(lazyImg(groupThumb(group), observer))
+      const text = document.createElement('span')
+      text.className = 'gallerist-thumb-row-text'
+      const nameEl = document.createElement('span')
+      nameEl.className = 'gallerist-thumb-row-name'
+      nameEl.textContent = name
+      text.appendChild(nameEl)
+      if (subtitle) {
+        const sub = document.createElement('span')
+        sub.className = 'gallerist-thumb-row-sub'
+        sub.textContent = subtitle
+        text.appendChild(sub)
+      }
+      btn.appendChild(text)
+      const badge = document.createElement('span')
+      badge.className = 'gallerist-thumb-row-count'
+      badge.textContent = String(count)
+      btn.appendChild(badge)
+      const wrap = document.createElement('div')
+      wrap.className = 'gallerist-thumb-section'
+      wrap.dataset.group = group.id
+      wrap.appendChild(btn)
+      cardHost.set(group.id, wrap)
+      return btn
+    }
+
     const buildGroupCard = (group: Group, gIndex: number): HTMLButtonElement => {
+      if (isIndex) return buildIndexRow(group, gIndex)
       const multi = group.items.length > 1
       const btn = thumbButton(
         `Group ${gIndex + 1}`,
@@ -391,7 +445,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // the aside column when the renderer hosts one (asideEl is in the document); otherwise fall
       // back to the rail region rather than letting the stack silently disappear
       const mountEl =
-        (itemAxis === 'vertical' && asideEl?.parentNode ? asideEl : null) ?? regionEl ?? root
+        (isIndex && activeGroup ? cardHost.get(activeGroup.id) : null) ??
+        (itemAxis === 'vertical' && asideEl?.parentNode ? asideEl : null) ??
+        regionEl ??
+        root
       const show =
         panelOpen &&
         !!activeGroup &&
@@ -443,7 +500,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         if (prev) setCardImage(prev, coverUrls.get(liveCardId) ?? null)
         liveCardId = null
       }
-      if (activeGroupId && activeGroup && activeGroup.items.length > 1) {
+      // an index row keeps its section's cover: the expanded items below it show the current one
+      if (!isIndex && activeGroupId && activeGroup && activeGroup.items.length > 1) {
         const card = groupBtns.get(activeGroupId)
         const it = activeGroup.items[i]
         const url =
@@ -670,8 +728,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
     }
     const keymap: PluginInstance['keymap'] = {}
-    // the item panel + its toggle only exist in stacked mode (flat lays every item out already).
-    if (groupDisplay === 'stacked') {
+    // the item panel + its toggle don't exist in flat mode (it lays every item out already).
+    if (groupDisplay !== 'flat') {
       regions.toolbar = () => toolbarBtn ?? document.createElement('button')
       keymap.e = () => toggleActivePanel()
       keymap.E = () => toggleActivePanel()
@@ -685,13 +743,14 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         regionEl.className = 'gallerist-thumbs-region'
         root = document.createElement('div')
         root.className = 'gallerist-thumbs'
-        root.setAttribute('role', 'listbox')
+        root.setAttribute('role', isIndex ? 'group' : 'listbox')
         root.setAttribute('aria-label', 'Thumbnails')
         if (timeLabel) root.setAttribute('data-timeline', '')
         regionEl.appendChild(root)
         if (groupDisplay === 'flat') {
           root.dataset.display = 'flat'
         } else {
+          if (isIndex) root.dataset.display = 'index'
           if (itemAxis === 'vertical') {
             asideEl = document.createElement('div')
             asideEl.className = 'gallerist-thumbs-aside'

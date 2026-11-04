@@ -15,6 +15,7 @@ import {
   type ArrowLayout,
   type ColorScheme,
   type ItemIndicator,
+  type MountOptions,
   type PresetName,
   type RailPlacement,
   type Skin,
@@ -72,6 +73,10 @@ export interface GalleristProps extends ViewerOptions {
   navigator?: boolean
   /** framed media: the work hangs with room around it (overrides the preset); read once at mount. */
   frame?: boolean
+  /** which arrows move between groups (overrides the rail and preset default); read once at mount. */
+  groupAxis?: MountOptions['groupAxis']
+  /** name the group arrows after their target group (overrides the preset); read once at mount. */
+  arrowLabels?: MountOptions['arrowLabels']
   children?: ReactNode
 }
 
@@ -162,6 +167,8 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     itemIndicator,
     navigator,
     frame,
+    groupAxis,
+    arrowLabels,
     children,
     ...options
   } = props
@@ -238,6 +245,8 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
       itemIndicator,
       navigator,
       frame,
+      groupAxis,
+      arrowLabels,
       skin,
       accent,
       scheme,

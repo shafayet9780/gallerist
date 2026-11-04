@@ -27,7 +27,7 @@ import { createRoot } from 'react-dom/client'
 type SkinName = 'gallery' | 'console' | 'editorial'
 // '' = the skin's own default scheme (dark for Gallery and Console, the light wall for Editorial)
 type SchemeOpt = ColorScheme | ''
-type GroupDisplay = 'stacked' | 'flat'
+type GroupDisplay = 'stacked' | 'flat' | 'index'
 type ItemAxis = 'vertical' | 'horizontal'
 type AutoHide = 'auto' | 'on' | 'off'
 type LinearOpt = 'auto' | 'on' | 'off'
@@ -106,7 +106,7 @@ const mediaGroup: Collection['groups'][number] = {
   ],
 }
 
-const PRESETS: PresetName[] = ['reviewer', 'filmstrip', 'immersive', 'contact', 'editorial']
+const PRESETS: PresetName[] = ['reviewer', 'filmstrip', 'immersive', 'contact', 'editorial', 'tour']
 const SKINS: SkinName[] = ['gallery', 'console', 'editorial']
 // accents are named per skin; the first one is the skin's default
 const ACCENTS: Record<SkinName, string[]> = {
@@ -118,7 +118,7 @@ const SCHEMES: SchemeOpt[] = ['', 'dark', 'light', 'auto']
 const ARROWS: ArrowLayout[] = ['pill-right', 'corner-br', 'dpad', 'split']
 const RAILS: RailPlacement[] = ['bottom', 'left', 'right', 'hidden']
 const MEMORIES: ItemMemory[] = ['reset', 'preserve', 'clamp']
-const GROUP_DISPLAYS: GroupDisplay[] = ['stacked', 'flat']
+const GROUP_DISPLAYS: GroupDisplay[] = ['stacked', 'flat', 'index']
 const AXES: ItemAxis[] = ['vertical', 'horizontal']
 
 const BLURB: Record<PresetName, string> = {
@@ -128,6 +128,7 @@ const BLURB: Record<PresetName, string> = {
   contact: 'vertical rail on the right · pairs with the grid (press g)',
   editorial:
     'framed work on a wall · a placard with the item navigator · pairs with skin editorial',
+  tour: 'section index beside the stage · labelled ←/→ between sections · framed photos',
 }
 
 function App() {
@@ -267,7 +268,14 @@ function App() {
           <legend>Preset &amp; accent</legend>
           <label className="field">
             Preset
-            <select value={preset} onChange={(e) => setPreset(e.target.value as PresetName)}>
+            <select
+              value={preset}
+              onChange={(e) => {
+                const next = e.target.value as PresetName
+                setPreset(next)
+                setGroupDisplay(resolvePreset(next).thumbnails.groupDisplay ?? 'stacked')
+              }}
+            >
               {PRESETS.map((p) => (
                 <option key={p} value={p}>
                   {p}

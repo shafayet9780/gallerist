@@ -44,6 +44,16 @@ const CONFIGS: Record<string, string> = {
   'editorial-rail-left': 'preset=editorial&rail=left&captions=1',
   'editorial-rail-right-rtl': 'preset=editorial&rail=right&dir=rtl&captions=1',
   'editorial-vertical-items': 'preset=editorial&captions=1&items=vertical',
+  'preset-tour': 'preset=tour&captions=1',
+  'tour-first-group': 'preset=tour&captions=1&g=0', // no previous arrow label
+  'tour-large-group': 'preset=tour&captions=1&g=5',
+  'tour-zoomed': 'preset=tour&captions=1&zoom=2',
+  'tour-rtl': 'preset=tour&captions=1&dir=rtl',
+  'tour-rail-right': 'preset=tour&captions=1&rail=right',
+  'tour-rail-bottom': 'preset=tour&captions=1&rail=bottom',
+  'tour-overview': 'preset=tour&captions=1&overview=1&g=0',
+  'tour-long-caption': 'preset=tour&captions=long&g=1',
+  'axis-vertical-bottom-rail': 'axis=vertical',
   'scheme-auto-light': 'scheme=auto&accent=mint&captions=1', // run with the system in light mode
 }
 
@@ -72,7 +82,7 @@ const ATOMS = [
   '.gallerist-caption-text', // the caption's text (a placard caption also holds the item navigator)
   '.gallerist-rail-toggle',
   '.gallerist-thumbs',
-  '.gallerist-thumb-items',
+  '.gallerist-thumb-items:not(.gallerist-thumb-section > *)', // a section index holds its own, inside
   '.gallerist-navigator',
 ]
 // Persistent chrome the stage must not sit under (immersive overlays them by design).

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Added
+- **renderer-dom (M20)**: the `tour` preset: a section index beside the stage, ←/→ between sections on
+  labelled arrows, ↑/↓ within one, framed media. Options: `groupAxis` (which arrows move between
+  groups, independent of the rail) and `arrowLabels` (name the group arrows after their target), with
+  `strings.previousTo` / `nextTo`. Both are React props too.
+- **plugin-thumbnails (M20)**: `groupDisplay: 'index'`, a section index with names, subtitles and
+  counts, the active section expanded; chips on a bottom rail or at 900px wide or less.
+- **plugin-grid (M20)**: `layout: 'sections'` (an overview, one card per group), `startOpen` and
+  `startLabel`. Hiding the grid now hands focus to the viewer, so keys keep working after a cell click.
+- **renderer-dom (M20)**: the overlay's Tab trap skips hidden controls, so Tab can't leave the dialog
+  past one.
+- **examples/tour**: a listing page using all of the above.
+
 ### Breaking
 - **renderer-dom (M19)**: without a `scheme` option the root no longer carries
   `data-gallerist-scheme="dark"`. Each skin applies its own default (Gallery and Console dark,

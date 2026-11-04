@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, createViewer } from '@gallerist/core'
+import { type Collection, type Group, type Item, createViewer } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyAppearance } from './appearance'
@@ -1385,5 +1385,129 @@ describe('mount — degenerate collections (#61)', () => {
     }).not.toThrow()
     expect(document.querySelector('.gallerist')).not.toBeNull()
     expect(document.querySelector('img')).toBeNull()
+  })
+})
+
+describe('groupAxis and arrowLabels', () => {
+  const key = (k: string) =>
+    document
+      .querySelector('.gallerist')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }))
+  const rooms = (): Collection => ({
+    groups: [
+      { id: 'a', caption: 'Hall', items: [{ id: 'a0', type: 'image', source: 'a0.jpg' }] },
+      {
+        id: 'b',
+        caption: 'Kitchen',
+        items: [
+          { id: 'b0', type: 'image', source: 'b0.jpg' },
+          { id: 'b1', type: 'image', source: 'b1.jpg' },
+        ],
+      },
+      { id: 'c', items: [{ id: 'c0', type: 'image', source: 'c0.jpg' }] },
+    ],
+  })
+  const label = (cls: string) => document.querySelector(`${cls} .gallerist-arrow-label`)
+  const open = (opts: Parameters<typeof mount>[1], loop = false) => {
+    const v = createViewer({ collection: rooms(), loop })
+    mount(v, opts)
+    v.open()
+    return v
+  }
+
+  it('a side rail keeps its default vertical group axis', () => {
+    const v = open({ rail: 'left' })
+    const root = document.querySelector('.gallerist')
+    expect(root?.getAttribute('data-gallerist-axis')).toBe('vertical')
+    key('ArrowDown')
+    expect(v.getState().cursor.g).toBe(1)
+  })
+
+  it('groupAxis: horizontal beside a side rail: left/right for groups, up/down for items', () => {
+    const v = open({ rail: 'left', groupAxis: 'horizontal' })
+    const root = document.querySelector('.gallerist')
+    expect(root?.getAttribute('data-gallerist-orientation')).toBe('vertical') // the rail still runs down
+    expect(root?.getAttribute('data-gallerist-axis')).toBe('horizontal')
+    key('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    key('ArrowDown')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+  })
+
+  it('the tour preset labels its arrows with the groups they go to', () => {
+    const v = open({ preset: 'tour' })
+    expect(label('.gallerist-next')?.textContent).toBe('Kitchen')
+    expect(document.querySelector('.gallerist-next')?.getAttribute('aria-label')).toBe(
+      'Next: Kitchen',
+    )
+    expect(label('.gallerist-prev')?.hasAttribute('hidden')).toBe(true) // at the first group
+    expect(document.querySelector('.gallerist-prev')?.getAttribute('aria-label')).toBe('Previous')
+    v.next()
+    expect(label('.gallerist-prev')?.textContent).toBe('Hall')
+    expect(label('.gallerist-next')?.hasAttribute('hidden')).toBe(true) // the next group has no name
+  })
+
+  it('labels wrap with a looping viewer', () => {
+    const v = open({ preset: 'tour' }, true)
+    v.goTo(2)
+    expect(label('.gallerist-next')?.textContent).toBe('Hall') // past the end, back to the first
+    expect(label('.gallerist-prev')?.textContent).toBe('Kitchen')
+  })
+
+  it('a looping viewer with one group has nowhere to name', () => {
+    const v = createViewer({ collection: { groups: [rooms().groups[0] as Group] }, loop: true })
+    mount(v, { preset: 'tour' })
+    v.open()
+    expect(label('.gallerist-next')?.hasAttribute('hidden')).toBe(true)
+    expect(document.querySelector('.gallerist-next')?.getAttribute('aria-label')).toBe('Next')
+  })
+
+  it('labels follow a replaced collection', () => {
+    const v = open({ preset: 'tour' })
+    v.setCollection({
+      groups: [
+        { id: 'x', items: [{ id: 'x0', type: 'image', source: 'x0.jpg' }] },
+        { id: 'y', caption: 'Attic', items: [{ id: 'y0', type: 'image', source: 'y0.jpg' }] },
+      ],
+    })
+    expect(label('.gallerist-next')?.textContent).toBe('Attic')
+  })
+
+  it('in RTL the horizontal group axis mirrors beside a side rail; items never flip', () => {
+    document.documentElement.dir = 'rtl'
+    try {
+      const v = open({ rail: 'left', groupAxis: 'horizontal' })
+      key('ArrowLeft')
+      expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+      key('ArrowDown')
+      expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    } finally {
+      document.documentElement.removeAttribute('dir')
+    }
+  })
+
+  it('a function names them, and strings translate the accessible name', () => {
+    open({
+      arrowLabels: (_g, i) => `Room ${i + 1}`,
+      strings: { nextTo: (name) => `Weiter: ${name}` },
+    })
+    expect(label('.gallerist-next')?.textContent).toBe('Room 2')
+    expect(document.querySelector('.gallerist-next')?.getAttribute('aria-label')).toBe(
+      'Weiter: Room 2',
+    )
+  })
+
+  it('needs horizontal pill-right arrows; an explicit false beats the preset', () => {
+    open({ arrowLabels: true, rail: 'right' })
+    expect(label('.gallerist-next')).toBeNull()
+    document.body.innerHTML = ''
+    open({ arrowLabels: true, arrows: 'dpad' })
+    expect(label('.gallerist-next')).toBeNull()
+    document.body.innerHTML = ''
+    open({ preset: 'tour', arrowLabels: false })
+    expect(label('.gallerist-next')).toBeNull()
+    expect(document.querySelector('.gallerist')?.hasAttribute('data-gallerist-arrow-labels')).toBe(
+      false,
+    )
   })
 })

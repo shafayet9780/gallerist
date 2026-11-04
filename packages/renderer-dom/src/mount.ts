@@ -108,6 +108,18 @@ export interface MountOptions {
    * (the `editorial` preset turns it on).
    */
   frame?: boolean
+  /**
+   * Which arrow keys and on-screen arrows move between groups. Default: follows the rail (`horizontal`
+   * with a bottom rail, `vertical` with a side rail). The `tour` preset keeps `horizontal` beside a
+   * side rail, so ←/→ moves between sections while ↑/↓ moves within one.
+   */
+  groupAxis?: GroupAxis
+  /**
+   * Name the group arrows after the group they go to: `true` uses `group.caption`, a function returns
+   * the label. Needs horizontal group arrows in the `pill-right` layout; otherwise ignored. The name
+   * also goes into the arrow's accessible name (`strings.previousTo` / `nextTo`).
+   */
+  arrowLabels?: boolean | ((group: Group, index: number) => string | undefined)
   /** Accessible name for the overlay dialog (default 'Media viewer'); sets aria-label. */
   label?: string
   /** Element (or getter) to return focus to when the overlay closes. Falls back to whatever
@@ -117,6 +129,7 @@ export interface MountOptions {
 
 export type ArrowLayout = 'pill-right' | 'corner-br' | 'dpad' | 'split'
 export type RailPlacement = 'bottom' | 'hidden' | 'left' | 'right'
+export type GroupAxis = 'horizontal' | 'vertical'
 
 export interface RendererHandle {
   root: HTMLElement
@@ -152,7 +165,9 @@ const FOCUSABLE_SELECTOR =
 /** Tabbable descendants of `root`, in DOM order (used by the dialog focus trap). */
 function focusableWithin(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter(
-    (node) => node.tabIndex !== -1 && !node.hasAttribute('disabled'),
+    // a hidden control can't take focus: counted as the last one, it would let Tab out of the trap
+    (node) =>
+      node.tabIndex !== -1 && !node.hasAttribute('disabled') && node.checkVisibility?.() !== false,
   )
 }
 /** True when the key event originates from a control where typing must not be hijacked. */
@@ -242,8 +257,16 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // swipes stay conventional (horizontal = group, swipe-down = dismiss) — only keys/arrows/layout flip.
   const orientation: 'horizontal' | 'vertical' =
     rail === 'left' || rail === 'right' ? 'vertical' : 'horizontal'
-  const vertical = orientation === 'vertical'
+  const groupAxis: GroupAxis = opts.groupAxis ?? preset?.groupAxis ?? orientation
+  const vertical = groupAxis === 'vertical'
   const linear = opts.linear ?? false
+  const arrowLabelsOpt = opts.arrowLabels ?? preset?.arrowLabels ?? false
+  const arrowLabel: ((group: Group, index: number) => string | undefined) | null =
+    !arrowLabelsOpt || !controls || vertical || linear || arrows !== 'pill-right'
+      ? null
+      : arrowLabelsOpt === true
+        ? (group) => group.caption
+        : arrowLabelsOpt
   // Default to the viewer's resolved loop so linear traversal and the slide window agree; an
   // explicit mount({ loop }) still overrides for the rare case they should differ (review #2).
   const loop = opts.loop ?? viewer.loop
@@ -331,6 +354,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   root.setAttribute('data-gallerist-arrows', arrows)
   root.setAttribute('data-gallerist-rail-pos', railPos)
   root.setAttribute('data-gallerist-orientation', orientation)
+  root.setAttribute('data-gallerist-axis', groupAxis)
+  if (arrowLabel) root.setAttribute('data-gallerist-arrow-labels', '')
   root.setAttribute('data-gallerist-rail', railHidden ? 'collapsed' : 'expanded')
   if (linear) root.setAttribute('data-gallerist-linear', 'true')
   if (frame) root.setAttribute('data-gallerist-frame', '')
@@ -415,6 +440,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   let reset: HTMLElement | undefined
   let navigatorEl: HTMLElement | undefined
   let navigatorView: HTMLElement | undefined
+  let prevArrow: HTMLElement | undefined
+  let nextArrow: HTMLElement | undefined
   // segmented pills are rebuilt only when the active group / its size changes (UX-H)
   let posG = -1
   let posM = -1
@@ -433,7 +460,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     bar.append(counter, title, regionHosts.toolbar, reset, close)
 
     // over the stage: group arrows and the item navigator (↑ · position · ↓) as one cluster, so
-    // each arrow layout places it as a unit. Icons follow the orientation: horizontal → group ←/→,
+    // each arrow layout places it as a unit. Icons follow the group axis: horizontal → group ←/→,
     // item ↑/↓; vertical (side rail) → group ↑/↓, item ←/→.
     const prev = el('button', 'gallerist-prev', { type: 'button', 'aria-label': ui.previous })
     prev.innerHTML = vertical ? ICONS.itemPrev : ICONS.prev
@@ -441,6 +468,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const next = el('button', 'gallerist-next', { type: 'button', 'aria-label': ui.next })
     next.innerHTML = vertical ? ICONS.itemNext : ICONS.next
     next.addEventListener('click', () => nav.next())
+    prevArrow = prev
+    nextArrow = next
     const prevItem = el('button', 'gallerist-item-prev', {
       type: 'button',
       'aria-label': ui.previousItem,
@@ -728,6 +757,24 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     node.hidden = hidden
   }
 
+  // A labelled group arrow names where it goes; at an end of the collection it has no name to show.
+  const setArrowLabel = (
+    arrow: HTMLElement | undefined,
+    name: string | undefined,
+    plain: string,
+    named: (name: string) => string,
+  ) => {
+    if (!arrow) return
+    let label = arrow.querySelector<HTMLElement>('.gallerist-arrow-label')
+    if (!label) {
+      label = el('span', 'gallerist-arrow-label', { 'aria-hidden': 'true' })
+      arrow.appendChild(label)
+    }
+    label.textContent = name ?? ''
+    label.hidden = !name
+    arrow.setAttribute('aria-label', name ? named(name) : plain)
+  }
+
   // gate chrome updates to cursor/collection changes — skip zoom/pan commits (mirrors the rail)
   let chromeG = -1
   let chromeI = -1
@@ -758,6 +805,15 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     if (title) {
       title.textContent = group?.caption ?? ''
       title.hidden = !group?.caption
+    }
+    if (arrowLabel) {
+      const nameAt = (step: number) => {
+        const n = viewer.loop && G > 1 ? (cur.g + step + G) % G : cur.g + step
+        const target = col.groups[n]
+        return target ? arrowLabel(target, n) : undefined
+      }
+      setArrowLabel(prevArrow, nameAt(-1), ui.previous, ui.previousTo)
+      setArrowLabel(nextArrow, nameAt(1), ui.next, ui.nextTo)
     }
     // Text captions go in the caption bar (the theme clamps them); an OverlaySpec caption isn't
     // rendered by the DOM renderer yet (planned with the captions plugin).
@@ -929,7 +985,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const zoomAroundCenter = (factor: number) => viewer.zoomTo(viewer.zoom.scale * factor)
 
   // ── keyboard (spec §5) ───────────────────────────────────────────────────────
-  // Which physical arrow drives which axis depends on orientation (point 5): a vertical (left/right)
+  // Which physical arrow drives which axis depends on the group axis (point 5): by default a side
   // rail makes ↑/↓ the group axis and ←/→ the item axis; horizontal keeps the classic mapping.
   const arrowNav: Record<string, () => void> = vertical
     ? {
