@@ -524,7 +524,7 @@ Three tiers, opt-in:
 
 1. **Headless** (`controls:false`, no theme CSS) — core renders structural DOM only; you bring all UI via regions/overlays. This is how Apploye builds its bespoke admin reviewer.
 2. **Default theme** (`@gallerist/theme-default`, pure CSS, no JS dep) — a clean, modern skin driven entirely by CSS custom properties.
-3. **Tokens** — every color/size/timing is a `--gallerist-*` variable. Skins (`gallery` default, `console`) set tokens on a shared `base.css`, selected with `[data-gallerist-skin]`; the accent (`[data-gallerist-accent]`) and the dark/light/auto scheme (`[data-gallerist-scheme]`) are independent of the skin (D18). No hardcoded colors anywhere.
+3. **Tokens** — every color/size/timing is a `--gallerist-*` variable. Skins (`gallery` default, `console`, `editorial`) set tokens on a shared `base.css`, selected with `[data-gallerist-skin]`; the accent (`[data-gallerist-accent]`) and the dark/light/auto scheme (`[data-gallerist-scheme]`) are independent of the skin (D18); an unset scheme is the skin's own default. No hardcoded colors anywhere.
 
 ```css
 .gallerist { --gallerist-backdrop: rgb(0 0 0 / .9); --gallerist-fg:#fff; --gallerist-accent:#378add;

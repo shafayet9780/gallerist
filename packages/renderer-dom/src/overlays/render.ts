@@ -22,6 +22,8 @@ export interface OverlayPaintCtx {
   zoom: ZoomState
   stage: Size
   natural: Size
+  /** the painted media box in content space (framed media insets it) */
+  box?: { x: number; y: number; w: number; h: number }
 }
 
 /** A painted overlay, retained so zoom-only updates can adjust it without re-rendering. */
@@ -109,7 +111,7 @@ export function paintOverlays(
       Object.assign(host.style, viewportAnchorStyle(spec.anchor.at, spec.anchor.offset))
       viewportHost.appendChild(host)
     } else {
-      const box = contentAnchorBox(spec.anchor, ctx.stage, ctx.natural)
+      const box = contentAnchorBox(spec.anchor, ctx.stage, ctx.natural, ctx.box)
       host.style.left = `${box.left}px`
       host.style.top = `${box.top}px`
       if (box.width !== null) host.style.width = `${box.width}px`

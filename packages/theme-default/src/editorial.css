@@ -1,0 +1,191 @@
+/*
+ * @gallerist/theme-default — editorial.css: the Editorial skin ("white cube"). Load it after
+ * gallerist.css and set `skin: 'editorial'`; pair it with the `editorial` preset (framed work,
+ * a placard beside it). A warm gallery wall, ink type, a serif for titles and captions, one red
+ * for what's current. Set `font-family: "Hanken Grotesk"` / `"Newsreader"` on the page for the
+ * drawn faces (the theme downloads no fonts).
+ *   accents: vermilion (default), cobalt   (data-gallerist-accent)
+ *   schemes: light = Wall (this skin's default), dark = Night, auto   (data-gallerist-scheme)
+ */
+
+/* Token declarations sit in cascade layers so a page's own --gallerist-* overrides always win,
+   whatever the skin, scheme or accent, and so the skins apply in a fixed order whatever order the
+   files load in. Component rules stay unlayered, so a page's element resets can't strip them. */
+@layer gallerist.base, gallerist.gallery, gallerist.console, gallerist.editorial, gallerist.compact;
+
+@layer gallerist.editorial {
+  /* Wall: the default, also with scheme="light" */
+  .gallerist[data-gallerist-skin="editorial"] {
+    color-scheme: light;
+    --gallerist-bg: #f3f0e9;
+    --gallerist-backdrop: rgb(243 240 233 / 0.99);
+    --gallerist-fg: #1c1b18;
+    --gallerist-fg-muted: #58544b;
+    --gallerist-chrome-bg: #f3f0e9;
+    --gallerist-hairline: #dad4c7;
+    --gallerist-surface: #fbfaf6;
+    --gallerist-cell-bg: #fbfaf6;
+    --gallerist-panel: rgb(243 240 233 / 0.98);
+    --gallerist-scrim: rgb(243 240 233 / 0.85);
+    --gallerist-badge-bg: #fbfaf6;
+    --gallerist-shadow: 0 1px 1px rgb(60 45 20 / 0.06), 0 10px 24px -8px rgb(60 45 20 / 0.22), 0
+      34px 60px -30px rgb(60 45 20 / 0.35);
+    --gallerist-stack-shadow: 3px 3px 0 -1px #dad4c7, 6px 6px 0 -2px #bdb5a4;
+    --gallerist-tool-hover-bg: #eae6dc;
+    --gallerist-arrow-border: 1px solid #bdb5a4;
+    --gallerist-arrow-bg: rgb(243 240 233 / 0.72); /* legible when a zoomed work runs under it */
+    --gallerist-arrow-hover-bg: #eae6dc;
+    --gallerist-itemnav-button-hover-bg: #eae6dc;
+    --gallerist-frame-mat: #fbfaf6;
+    --gallerist-frame-shadow: 0 1px 1px rgb(60 45 20 / 0.06), 0 10px 24px -8px rgb(60 45 20 / 0.22),
+      0 34px 60px -30px rgb(60 45 20 / 0.35);
+    --gallerist-accent: var(--gallerist-accent-light);
+    --gallerist-accent-fg: var(--gallerist-accent-light-fg);
+    --gallerist-radius: 2px;
+    --gallerist-font: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+    --gallerist-mono: var(--gallerist-font); /* tabular sans numerals */
+    --gallerist-title-font: "Newsreader", Georgia, "Times New Roman", serif;
+    --gallerist-caption-font: "Newsreader", Georgia, "Times New Roman", serif;
+    --gallerist-caption-style: italic;
+    --gallerist-caption-size: 26px;
+    --gallerist-caption-align: start;
+    --gallerist-title-size: 21px;
+    --gallerist-title-weight: 400;
+    --gallerist-toolbar-h: 72px;
+    --gallerist-thumb-h: 66px;
+    --gallerist-blur: none;
+    --gallerist-caption-band: transparent;
+    --gallerist-group-bg: transparent;
+    --gallerist-placeholder: rgb(127 120 100 / 0.08);
+    --gallerist-shimmer: rgb(255 255 255 / 0.35);
+
+    /* bands: the wall runs under the bar and rail, divided by a rule */
+    --gallerist-bar-bg: transparent;
+    --gallerist-bar-border: 1px solid var(--gallerist-hairline);
+    --gallerist-rail-bg: transparent;
+    --gallerist-rail-border: 1px solid var(--gallerist-hairline);
+
+    /* controls: flat ink tools, outlined round arrows; a pressed toggle is filled with ink */
+    --gallerist-control-bg: transparent;
+    --gallerist-control-border: 0 solid transparent;
+    --gallerist-control-radius: 2px;
+    --gallerist-counter-font: var(--gallerist-font);
+    --gallerist-counter-bg: transparent;
+    --gallerist-counter-fg: var(--gallerist-fg);
+    --gallerist-tool-bg: transparent;
+    --gallerist-tool-border: 0 solid transparent;
+    --gallerist-tool-fg: var(--gallerist-fg);
+    --gallerist-arrow-size: 56px;
+    --gallerist-arrow-radius: 999px;
+    --gallerist-itemnav-bg: transparent;
+    --gallerist-itemnav-border: none;
+    --gallerist-itemnav-radius: 0;
+    --gallerist-itemnav-padding: 0;
+    --gallerist-itemnav-button-bg: transparent;
+    --gallerist-itemnav-button-border: 0 solid transparent;
+    --gallerist-position-bg: transparent;
+    --gallerist-position-font: var(--gallerist-font);
+    --gallerist-position-size: 13px;
+    --gallerist-position-fg: var(--gallerist-fg);
+    --gallerist-dot-opacity: 0.35;
+    --gallerist-dot-active-along: 9px;
+    --gallerist-dot-active-across: 9px;
+
+    /* thumbnails: prints on the wall; the current one is ringed in ink */
+    --gallerist-thumb-radius: 0;
+    --gallerist-panel-bg: transparent;
+    --gallerist-flyout-bg: var(--gallerist-surface);
+    --gallerist-thumb-active-border: var(--gallerist-bg);
+    --gallerist-thumb-ring: 0 0 0 1px var(--gallerist-fg);
+    --gallerist-item-ring: 0 0 0 1px var(--gallerist-fg);
+    --gallerist-thumb-idle-opacity: 1;
+
+    /* framed media: the work hangs with room around it */
+    --gallerist-frame-inset: 56px;
+    --gallerist-frame-inset-compact: 16px;
+    --gallerist-placard-w: 300px;
+
+    /* motion: works fade in on the wall rather than slide; items settle in */
+    --gallerist-enter-group: gallerist-fade;
+    --gallerist-enter-item: gallerist-fade-settle; /* the item axis settles in: never the group's motion */
+    --gallerist-dur-snappy: 420ms;
+
+    /* the red marks what's current and progress; selection and pressed use ink */
+    --gallerist-accent-light: #b0361f;
+    --gallerist-accent-light-fg: #fff;
+    --gallerist-accent-dark: #e06a50;
+    --gallerist-accent-dark-fg: #191816;
+    --gallerist-focus: var(--gallerist-fg);
+    --gallerist-selection: var(--gallerist-fg);
+    --gallerist-selection-fg: var(--gallerist-bg);
+    --gallerist-pressed-bg: var(--gallerist-fg);
+    --gallerist-pressed-fg: var(--gallerist-bg);
+    --gallerist-pressed-shadow: none;
+    --gallerist-pin-ring: var(--gallerist-bg);
+  }
+
+  /* accents */
+  .gallerist[data-gallerist-skin="editorial"][data-gallerist-accent="cobalt"] {
+    --gallerist-accent-light: #2e4fa3;
+    --gallerist-accent-dark: #8fa8f0;
+  }
+
+  /* Night */
+  .gallerist[data-gallerist-skin="editorial"][data-gallerist-scheme="dark"] {
+    color-scheme: dark;
+    --gallerist-bg: #191816;
+    --gallerist-backdrop: rgb(25 24 22 / 0.99);
+    --gallerist-fg: #ede9e0;
+    --gallerist-fg-muted: #aba597;
+    --gallerist-chrome-bg: #191816;
+    --gallerist-hairline: #36332e;
+    --gallerist-surface: #262421;
+    --gallerist-cell-bg: #262421;
+    --gallerist-panel: rgb(25 24 22 / 0.98);
+    --gallerist-scrim: rgb(25 24 22 / 0.85);
+    --gallerist-badge-bg: #262421;
+    --gallerist-shadow: 0 1px 1px rgb(0 0 0 / 0.3), 0 14px 30px -10px rgb(0 0 0 / 0.6), 0 40px 70px
+      -30px rgb(0 0 0 / 0.7);
+    --gallerist-stack-shadow: 3px 3px 0 -1px #36332e, 6px 6px 0 -2px #4e4a43;
+    --gallerist-tool-hover-bg: #25231f;
+    --gallerist-arrow-border: 1px solid #4e4a43;
+    --gallerist-arrow-bg: rgb(25 24 22 / 0.72);
+    --gallerist-arrow-hover-bg: #25231f;
+    --gallerist-itemnav-button-hover-bg: #25231f;
+    --gallerist-frame-mat: #262421;
+    --gallerist-frame-shadow: 0 1px 1px rgb(0 0 0 / 0.3), 0 14px 30px -10px rgb(0 0 0 / 0.6), 0 40px
+      70px -30px rgb(0 0 0 / 0.7);
+    --gallerist-accent: var(--gallerist-accent-dark);
+    --gallerist-accent-fg: var(--gallerist-accent-dark-fg);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .gallerist[data-gallerist-skin="editorial"][data-gallerist-scheme="auto"] {
+      color-scheme: dark;
+      --gallerist-bg: #191816;
+      --gallerist-backdrop: rgb(25 24 22 / 0.99);
+      --gallerist-fg: #ede9e0;
+      --gallerist-fg-muted: #aba597;
+      --gallerist-chrome-bg: #191816;
+      --gallerist-hairline: #36332e;
+      --gallerist-surface: #262421;
+      --gallerist-cell-bg: #262421;
+      --gallerist-panel: rgb(25 24 22 / 0.98);
+      --gallerist-scrim: rgb(25 24 22 / 0.85);
+      --gallerist-badge-bg: #262421;
+      --gallerist-shadow: 0 1px 1px rgb(0 0 0 / 0.3), 0 14px 30px -10px rgb(0 0 0 / 0.6), 0 40px
+        70px -30px rgb(0 0 0 / 0.7);
+      --gallerist-stack-shadow: 3px 3px 0 -1px #36332e, 6px 6px 0 -2px #4e4a43;
+      --gallerist-tool-hover-bg: #25231f;
+      --gallerist-arrow-border: 1px solid #4e4a43;
+      --gallerist-arrow-bg: rgb(25 24 22 / 0.72);
+      --gallerist-arrow-hover-bg: #25231f;
+      --gallerist-itemnav-button-hover-bg: #25231f;
+      --gallerist-frame-mat: #262421;
+      --gallerist-frame-shadow: 0 1px 1px rgb(0 0 0 / 0.3), 0 14px 30px -10px rgb(0 0 0 / 0.6), 0
+        40px 70px -30px rgb(0 0 0 / 0.7);
+      --gallerist-accent: var(--gallerist-accent-dark);
+      --gallerist-accent-fg: var(--gallerist-accent-dark-fg);
+    }
+  }
+}

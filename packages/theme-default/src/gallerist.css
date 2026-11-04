@@ -3,6 +3,7 @@
  * default look). For another skin, load its file after this one and set the `skin` option:
  *   import '@gallerist/theme-default/gallerist.css'
  *   import '@gallerist/theme-default/console.css'   // mount(viewer, { skin: 'console' })
+ *   import '@gallerist/theme-default/editorial.css' // mount(viewer, { skin: 'editorial', preset: 'editorial' })
  */
 @import "./base.css";
 @import "./gallery.css";

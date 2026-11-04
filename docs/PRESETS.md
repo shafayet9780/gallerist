@@ -18,6 +18,7 @@ distinct layout.
 | `reviewer`  | `bottom` | `corner-br` | no        | Time-series review: a timeline rail (a time over each group from `group.meta.time`), numbered items, the zoom navigator. Pairs with `skin: 'console'`. |
 | `immersive` | `hidden` | `pill-right`| yes       | Full-bleed viewing; rail hidden, chrome fades on idle. |
 | `contact`   | `right`  | `pill-right`| no        | Browse-heavy; vertical rail on the right (pairs with `plugin-grid`). |
+| `editorial` | `bottom` | `pill-right`| no        | A gallery wall: the work framed with room around it (`frame`), a placard beside it holding the caption and the item navigator (`itemIndicator: 'placard'`), numbered items inline in the rail. Pairs with `skin: 'editorial'`. With a side rail the placard becomes the caption band under the stage. |
 
 ```tsx
 // React
@@ -104,6 +105,15 @@ exception: the stage fills the viewer and the bar, caption and rail float over i
   `prefers-reduced-motion`**. The `immersive` preset additionally fades the rail + toolbar, and
   there the floating bar and caption let clicks through to the image except on their buttons.
 - **Zoom reset** appears only while zoomed in.
+- **Framed media** (`frame: true`, on in `editorial`): the work hangs inside the stage with room
+  around it (the skin's `--gallerist-frame-inset`), and the media element is sized to the image so
+  the skin's mat (`--gallerist-frame-mat`) and shadow (`--gallerist-frame-shadow`) hug it. Zoom
+  bounds, overlays and pins follow the framed box.
+- **Placard** (`itemIndicator: 'placard'`, on in `editorial`): the item navigator moves from over
+  the stage into the caption, with a tick per item. Under the stage the placard is one band of
+  fixed height (the caption on one line), so the stage keeps its size; the editorial preset sets it
+  as a column beside the work on wide screens. It stays up even with no caption and a one-item group,
+  so the layout never shifts.
 - **Zoom navigator** (`navigator: true`, on in `reviewer`): while zoomed in, a minimap of the image
   in the stage's bottom corner (top corner on narrow screens) with a box for the visible part;
   click or drag it to move around. It is a pointer aid, hidden from assistive tech; the keys zoom
@@ -127,9 +137,11 @@ preset. The renderer reflects them as `data-gallerist-skin`, `data-gallerist-acc
 | `skin` | Stylesheet | Look | Accents (first is the default) |
 |--------|-----------|------|---------|
 | `gallery` (default) | `gallerist.css` | Quiet near-black or warm paper, round controls, sans numerals. The tint marks focus and progress only; selection and pressed toggles use the foreground. | `periwinkle`, `mint`, `amber`, `vermilion` |
+| `editorial` | `gallerist.css` + `editorial.css` | A warm gallery wall (light by default) or Night, ink type, a serif for titles and captions, one red for what's current; works fade in rather than slide. Uses Hanken Grotesk and Newsreader when the page loads them. | `vermilion`, `cobalt` |
 | `console` | `gallerist.css` + `console.css` | Pro review: flat graphite (or Paper) bands with hairlines, one signal accent for what's current (the thumb ring, a pressed toggle's glyph and underline), a neutral focus ring, monospaced numerals. Uses IBM Plex when the page loads it. | `amber`, `cyan`, `vermilion` |
 
-`scheme` is `dark` (default), `light`, or `auto` (follows `prefers-color-scheme`). Each accent has a
+`scheme` is `dark`, `light`, or `auto` (follows `prefers-color-scheme`). Unset, each skin uses its
+own default: Gallery and Console dark, Editorial the light wall (`dark` is its Night). Each accent has a
 dark and a light value, so every accent works in both schemes.
 
 ```ts

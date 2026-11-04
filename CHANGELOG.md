@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Breaking
+- **renderer-dom (M19)**: without a `scheme` option the root no longer carries
+  `data-gallerist-scheme="dark"`. Each skin applies its own default (Gallery and Console dark,
+  Editorial light), so the look is unchanged; only CSS that selected `[data-gallerist-scheme="dark"]`
+  by default needs `:not([data-gallerist-scheme])` too.
 - **theme + renderer-dom + react (M16)**: the default look is now the **Gallery** skin: quiet
   near-black surfaces, round controls, sans numerals, and a periwinkle tint for focus only.
   The previous graphite + amber look is the **Console** skin. It is unchanged, verified as a zero
@@ -31,6 +35,17 @@
   a full transform with `getInternals(viewer).setZoom({ scale, x, y })`.
 
 ### Added
+- **theme (M19)**: the **Editorial** skin (`editorial.css`, `skin: 'editorial'`). A warm gallery
+  wall, with a Night scheme, ink type, serif titles and captions, outlined round arrows, and
+  `vermilion` / `cobalt` accents. Works fade in rather than slide: the slide animations are now
+  tokens (`--gallerist-enter-group`, `--gallerist-enter-item`); items settle in (a fade with a
+  slight scale) so the two axes never share a motion.
+- **renderer-dom (M19)**: `frame` option. The work hangs inside the stage with room around it, and
+  the media element is sized to the image, so a skin's mat and shadow hug it. Zoom bounds,
+  overlays, pins and the navigator follow the framed box. `itemIndicator: 'placard'` moves the item
+  navigator into the caption, as ticks and `n / N` under the item's caption.
+- **renderer-dom (M19)**: the `editorial` preset: framed media, a placard caption beside the work,
+  and numbered items inline in a bottom rail.
 - **renderer-dom (M18)**: `navigator` option, a zoom navigator. While zoomed in, a minimap of the
   image with a box for the visible part; click or drag to move around. On in the `reviewer` preset.
 - **plugin-thumbnails (M18)**: `timeline` (a time label and tick above each group card, joined
