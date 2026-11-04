@@ -1,24 +1,27 @@
 # Gallerist
 
-A **headless, framework-agnostic media viewer** for grouped / nested galleries, with image-space
-overlays and virtualized rendering at scale. MIT licensed; zero runtime dependencies in the core.
+A media viewer for galleries that have galleries in them: product colours with their angles, review
+moments with their screens, listings with their rooms. Each group is a place you move between (←/→),
+each item a place inside it (↑/↓), and you can pin content to a point on the image.
 
-Every other lightbox models a gallery as a flat 1-D strip. The real web is galleries-of-galleries
-— product variants × angles, posts × images, moments × monitors, documents × pages. Gallerist makes
-**nesting a first-class primitive**, lets you anchor interactive content to points *on the image*,
-and holds 60fps across thousands of items.
+MIT licensed. The core has no runtime dependencies and doesn't touch the DOM. **Pre-1.0:** the API can
+still change between minor versions.
 
-> **Status:** Phase 1 in progress — engine MVP (Phase 0) + plugin architecture + React adapter +
-> the first plugins (fullscreen, hash, download, thumbnails, grid, video). See
-> `docs/IMPLEMENTATION.md` (as-built engine), `docs/PLUGIN-AUTHORING.md` (writing plugins), and
-> `tasks/plan.md` / `tasks/todo.md` (Phase 1 tracker). `CHANGELOG.md` lists what shipped.
+## Is it the right tool?
+
+**A good fit if** your media is really two-level, or people review it: comments pinned to a screenshot, a
+timeline of captures, rooms in a listing. Rendering is windowed, so the DOM stays bounded with thousands
+of groups (a single group draws all its item thumbs unless you use the `flat` rail), and it ships keyboard, touch, RTL and screen-reader support.
+
+**Look elsewhere if** you have one flat strip of photos and already have a lightbox you like, if you need
+Vue or Svelte today (React and plain DOM only; Vue is planned for 0.4), or if you want a stories player.
+Bundle size is also a real cost: core + renderer is about 15.5 KB gzipped, more than the smallest flat
+lightboxes.
 
 ## Quick start
 
 ```bash
-pnpm install
-pnpm --filter @gallerist/example-monitoring dev   # grouped reviewer demo (nested, overlays)
-pnpm --filter @gallerist/example-vanilla dev      # flat gallery demo
+npm i @gallerist/core @gallerist/renderer-dom @gallerist/theme-default
 ```
 
 ```ts
@@ -26,30 +29,37 @@ import { createViewer } from '@gallerist/core'
 import { mount } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 
-// flat gallery — items[] is normalized to singleton groups internally
-const viewer = createViewer({ items: [{ id: 'a', type: 'image', source: 'a.jpg' }] })
-mount(viewer)            // overlay/lightbox mode; pass { container } for inline
-viewer.open()
-```
-
-Grouped (two-axis) — the reason Gallerist exists:
-
-```ts
 const viewer = createViewer({
   collection: {
     groups: [
-      { id: 'moment-1', items: [screenA, screenB, screenC] }, // ← swipe ↑/↓ between screens
-      { id: 'moment-2', items: [screenD] },                   // ← swipe ←/→ between moments
+      { id: 'moment-1', items: [screenA, screenB, screenC] }, // ↑/↓ between screens
+      { id: 'moment-2', items: [screenD] },                   // ←/→ between moments
     ],
   },
-  itemMemory: 'preserve', // stay on the same screen index across moments
+  itemMemory: 'preserve', // stay on the same screen across moments
 })
 mount(viewer)
+viewer.open()
 ```
 
-## No build step
+No bundler? One script tag and `data-gallerist` links: see [`@gallerist/cdn`](packages/cdn/README.md).
+Using React: [`@gallerist/react`](packages/react/README.md). More in
+[Getting started](docs/GETTING-STARTED.md).
 
-One script tag and `data-gallerist` links: see [`@gallerist/cdn`](packages/cdn/README.md).
+## One engine, several looks
+
+Three layers that combine freely: a **skin** sets colour, type and motion, a **preset** sets the layout,
+and **plugins** add behaviour.
+
+| Pairing | For |
+|---|---|
+| `gallery` + `filmstrip` | The default: a quiet lightbox for photos and products |
+| `console` + `reviewer` | Reviewing captures: timeline rail, numbered items, zoom navigator, comment pins |
+| `editorial` + `editorial` | Art and portfolios: framed work on a wall, with a placard |
+| `gallery` (light) + `tour` | Listings: a section index, labelled arrows, an overview to start from |
+
+Try every combination on the docs site's playground (`pnpm --filter @gallerist/site dev`), or run
+`pnpm --filter @gallerist/example-tour dev` (also `monitoring`, `hotspots`, `react`, `vanilla`).
 
 ## Commands
 
@@ -61,6 +71,7 @@ One script tag and `data-gallerist` links: see [`@gallerist/cdn`](packages/cdn/R
 | `pnpm typecheck` | TypeScript strict typecheck, all packages |
 | `pnpm lint` / `pnpm format` | Biome check / write |
 | `pnpm size` | size-limit budget gate (core ≤ 12 KB, core+renderer ≤ 16 KB gz) |
+| `pnpm check:dist` | Checks on built output: the `"use client"` banner, the global build |
 
 ## Packages
 
@@ -83,7 +94,7 @@ in [`docs/GALLERIST_SPEC.md`](docs/GALLERIST_SPEC.md).
 ```
 theme-default (CSS) ─┐
 renderer-dom ────────┼─► core   (zero runtime deps, DOM-free)
-react/vue/svelte (P1)┘
+react ───────────────┘
 ```
 
 ## License

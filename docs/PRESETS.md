@@ -3,10 +3,6 @@
 Gallerist's chrome layout is **declarative**: the renderer sets `data-gallerist-*` attributes on the root
 and the theme reacts. Presets bundle coherent defaults; everything is overridable.
 
-> **Breaking (unreleased):** the `top` rail position was removed — `RailPlacement` is now
-> `bottom | left | right | hidden`. The `contact` preset, which defaulted to `top`, now defaults to
-> `right` (a vertical rail, so its group axis is ↑/↓). To keep a horizontal rail, pass `rail="bottom"`.
-
 ## Presets
 
 A preset bundles a **rail placement**, arrow placement, and chrome auto-hide into a visibly

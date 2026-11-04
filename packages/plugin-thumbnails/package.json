@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-thumbnails",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Gallerist plugin — windowed thumbnail rail with grouped stacked cards and lazy thumbs.",
   "license": "MIT",
   "type": "module",

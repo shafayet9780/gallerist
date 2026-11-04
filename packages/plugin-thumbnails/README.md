@@ -19,7 +19,7 @@ mount(viewer)
 
 ## Behaviour
 
-- **Reconciles in place.** Cursor moves flip `data-active` and `scrollIntoView` the active node —
+- **Reconciles in place.** Cursor moves flip `data-active` and scroll the active node into view (inside the viewer's panels only, never the page) —
   the rail is never torn down on navigation (rebuilt only when the collection or visible window
   changes). This keeps node identity stable and the scroll position steady.
 - **Live-preview card.** The active multi-item group's card mirrors the currently-viewed item's

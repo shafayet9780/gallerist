@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Headless, framework-agnostic media viewer engine — nested galleries, image-space overlays, virtualization.",
   "license": "MIT",
   "type": "module",

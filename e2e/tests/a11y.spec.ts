@@ -1,10 +1,13 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { viewerSettled } from './settled'
 
 test('open viewer has no axe violations', async ({ page }) => {
   await page.goto('/')
   await page.click('#open')
   await expect(page.locator('.gallerist')).toBeVisible()
+
+  await viewerSettled(page)
 
   const results = await new AxeBuilder({ page })
     .include('.gallerist')
@@ -82,6 +85,7 @@ for (const look of LOOKS) {
     test.skip(browserName !== 'chromium', 'axe runs once (chromium)')
     await page.goto(`/layout.html?${look}&captions=1&indicator=pills`)
     await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+    await viewerSettled(page)
     const results = await new AxeBuilder({ page })
       .include('.gallerist')
       .withTags(['wcag2a', 'wcag2aa'])

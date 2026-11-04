@@ -16,10 +16,18 @@ export default defineConfig({
     // can't exercise. iPhone element-fullscreen has no equivalent and stays a documented limitation.
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
-  webServer: {
-    command: 'pnpm exec vite --config e2e/app/vite.config.ts',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: 'pnpm exec vite --config e2e/app/vite.config.ts',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+    {
+      command: 'pnpm --filter @gallerist/site exec vite --port 5174 --strictPort',
+      url: 'http://localhost:5174/index.html',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 })

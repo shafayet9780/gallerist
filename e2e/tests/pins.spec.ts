@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { type Page, expect, test } from '@playwright/test'
+import { viewerSettled } from './settled'
 
 // plugin-pins in a real browser: pins hold their image point and screen size under zoom, cards open
 // and close by mouse and keyboard, placing reports the clicked point, and (M17) a zoomed portrait
@@ -140,6 +141,7 @@ test.describe('pins', () => {
     test(`an open card has no axe violations (${look})`, async ({ page }) => {
       await ready(page, `${look}&presentation=comment`)
       await page.locator('[data-pin="c"] .gallerist-pin-marker').click()
+      await viewerSettled(page)
       const results = await new AxeBuilder({ page })
         .include('.gallerist-pin')
         .withTags(['wcag2a', 'wcag2aa'])

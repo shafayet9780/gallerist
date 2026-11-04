@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { viewerSettled } from './settled'
 
 // The tour preset end to end: labelled arrows, ←/→ between sections beside a side rail, the section
 // index, and the overview it can open on.
@@ -104,6 +105,17 @@ for (const width of [768, 920, 1280]) {
   })
 }
 
+test('an inline viewer below the fold does not scroll its host page', async ({ page }) => {
+  await page.goto('http://localhost:5174/index.html')
+  await expect(page.locator('#stage .gallerist-thumb').first()).toBeVisible()
+  await page.locator('input[name="preset"][value="tour"]').evaluate((el) => {
+    window.scrollTo(0, 0)
+    ;(el as HTMLInputElement).click()
+  })
+  await expect(page.locator('#stage .gallerist-thumb-row').first()).toBeVisible()
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+})
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
@@ -114,6 +126,12 @@ test.describe('on a phone', () => {
     const box = await chip.boundingBox()
     expect(box && stage && box.y >= stage.y + stage.height).toBe(true)
     await expect(page.locator('.gallerist-thumb-row .gallerist-thumb-img').first()).toBeHidden()
+  })
+
+  test('the rail still scrolls: the active chip of a far section shows', async ({ page }) => {
+    await page.goto('/layout.html?preset=tour&captions=1&g=11')
+    const chip = page.locator('.gallerist-thumb-row[aria-current]')
+    await expect(chip).toBeInViewport({ ratio: 0.95 }) // scroll offsets round to whole pixels
   })
 
   test('Tab wraps past the hidden items of a last section, staying in the dialog', async ({
@@ -136,6 +154,7 @@ for (const [name, query] of [
   test(`no axe violations: ${name}`, async ({ page }) => {
     await page.goto(`/layout.html?${query}`)
     await expect(page.locator('.gallerist')).toBeVisible()
+    await viewerSettled(page)
     const { violations } = await new AxeBuilder({ page })
       .include('.gallerist')
       .disableRules(['color-contrast'])
