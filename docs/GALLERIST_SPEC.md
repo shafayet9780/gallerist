@@ -504,7 +504,7 @@ Tree-shakeable, each its own package:
 | `plugin-video` (+ provider subs) | HTML5 + YouTube/Vimeo/Wistia adapters. |
 | `plugin-fullscreen` | Native Fullscreen API. |
 | `plugin-hash` | Deep-link `#g=&i=`, back/forward nav, shareable URLs. |
-| `plugin-download` | Single / "all items in group" / bulk-range → zip. |
+| `plugin-save` | Single / "all items in group" / bulk-range → zip. |
 | `plugin-share` | Social + custom share targets. |
 | `plugin-slideshow` | Autoplay with progress bar; stop-on-interaction. |
 | `plugin-rotate` | Rotate/flip (display transform). |
@@ -684,7 +684,7 @@ Note on D7: pure MIT + DCO means the open core cannot be *unilaterally* re-licen
 Core: data model + normalization, FSM, store, two-axis nav, zoom/pan + arbitration, overlay layer (both anchor types), slide windowing, a11y baseline, events. Renderer-dom + default theme. Image adapter. Vanilla API. → *At this point Gallerist already does something nobody else does: native grouped navigation with image-space overlays.*
 
 **Phase 1 — Parity + first consumer.**
-`plugin-thumbnails` (grouped), `plugin-grid`, `plugin-download`, `plugin-fullscreen`, `plugin-hash`, `plugin-video` + HTML5/YouTube. React adapter (first, per the locked order). Apploye reviewer rebuilt on top — dogfood-first. → *Replaces lightGallery for Apploye; reaches feature-parity for general users.*
+`plugin-thumbnails` (grouped), `plugin-grid`, `plugin-save`, `plugin-fullscreen`, `plugin-hash`, `plugin-video` + HTML5/YouTube. React adapter (first, per the locked order). Apploye reviewer rebuilt on top — dogfood-first. → *Replaces lightGallery for Apploye; reaches feature-parity for general users.*
 
 **Phase 2 — Differentiators + reach.**
 `plugin-timeline`, `plugin-filter`, `plugin-redaction`, `plugin-compare`, `plugin-triage`, `plugin-exif`, remaining video providers, remaining framework adapters, DZI hooks. Docs site with live playground. → *Now it's clearly the "structured media viewer," not just another lightbox.*

@@ -15,7 +15,7 @@ export default defineConfig({
       '@gallerist/plugin-thumbnails': r('../../packages/plugin-thumbnails/src/index.ts'),
       '@gallerist/plugin-grid': r('../../packages/plugin-grid/src/index.ts'),
       '@gallerist/plugin-fullscreen': r('../../packages/plugin-fullscreen/src/index.ts'),
-      '@gallerist/plugin-download': r('../../packages/plugin-download/src/index.ts'),
+      '@gallerist/plugin-save': r('../../packages/plugin-save/src/index.ts'),
       '@gallerist/plugin-hash': r('../../packages/plugin-hash/src/index.ts'),
       '@gallerist/plugin-video': r('../../packages/plugin-video/src/index.ts'),
       '@gallerist/plugin-video-youtube': r('../../packages/plugin-video-youtube/src/index.ts'),

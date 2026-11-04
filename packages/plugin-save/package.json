@@ -1,5 +1,5 @@
 {
-  "name": "@gallerist/plugin-download",
+  "name": "@gallerist/plugin-save",
   "version": "0.3.0",
   "description": "Gallerist plugin — download the current item, a whole group, or a bulk zip.",
   "license": "MIT",
@@ -40,7 +40,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shafayet9780/gallerist.git",
-    "directory": "packages/plugin-download"
+    "directory": "packages/plugin-save"
   },
   "homepage": "https://github.com/shafayet9780/gallerist#readme",
   "bugs": {

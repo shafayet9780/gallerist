@@ -5,10 +5,10 @@
 // this runs before the packages are built.
 import { type Collection, type Plugin, createViewer } from '@gallerist/core'
 import { afterEach, describe, expect, it } from 'vitest'
-import { DEFAULT_DOWNLOAD_STRINGS, download } from '../../plugin-download/src/index'
 import { DEFAULT_FULLSCREEN_STRINGS, fullscreen } from '../../plugin-fullscreen/src/index'
 import { DEFAULT_GRID_STRINGS, grid } from '../../plugin-grid/src/index'
 import { DEFAULT_PINS_STRINGS, type Pin, pins } from '../../plugin-pins/src/index'
+import { DEFAULT_DOWNLOAD_STRINGS, download } from '../../plugin-save/src/index'
 import { DEFAULT_THUMBNAILS_STRINGS, thumbnails } from '../../plugin-thumbnails/src/index'
 import { DEFAULT_STRINGS, type MountOptions, mount } from '../../renderer-dom/src/index'
 

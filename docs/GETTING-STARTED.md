@@ -79,7 +79,7 @@ See [Presets and layout](PRESETS.md) for every option, and restyle anything by o
 | [`plugin-grid`](../packages/plugin-grid/README.md) | A contact sheet, or an overview to open on |
 | [`plugin-pins`](../packages/plugin-pins/README.md) | Comments, product tags and features pinned to the image |
 | [`plugin-captions`](../packages/plugin-captions/README.md) | Designed captions: your markup in the caption bar, per viewer |
-| [`plugin-fullscreen`](../packages/plugin-fullscreen/README.md), [`plugin-download`](../packages/plugin-download/README.md), `plugin-hash` | Fullscreen, downloads and zips, deep links |
+| [`plugin-fullscreen`](../packages/plugin-fullscreen/README.md), [`plugin-save`](../packages/plugin-save/README.md), `plugin-hash` | Fullscreen, downloads and zips, deep links |
 | `plugin-video`, `plugin-video-youtube` | HTML5 and YouTube video items |
 
 Writing your own: [Plugin authoring](PLUGIN-AUTHORING.md).

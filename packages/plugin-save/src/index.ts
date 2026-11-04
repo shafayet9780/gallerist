@@ -1,4 +1,4 @@
-// @gallerist/plugin-download — download the current item, a group, or a bulk zip (spec §14).
+// @gallerist/plugin-save — download the current item, a group, or a bulk zip (spec §14).
 // Single/group use anchor downloads (zero dep); bulk zip dynamically imports a tiny streaming
 // zip lib (client-zip, a regular dependency) so it costs nothing until used (decision P1-H).
 

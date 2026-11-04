@@ -2,6 +2,12 @@
 
 ## v0.3.0
 
+### Package name
+- **plugin-save**: the download plugin ships as `@gallerist/plugin-save`, not
+  `@gallerist/plugin-download`, because npm doesn't allow the word "download" in package names.
+  Only the name changed: import `download`, `downloadGroup` and the rest from
+  `@gallerist/plugin-save`. The API is unchanged.
+
 ### Reviewer controls and pin cards (from the Apploye reviewer)
 - **renderer-dom, theme (breaking for `reviewer`)**: a new arrow layout, `arrows: 'docked'`, puts no
   control over the media. The group arrows sit in gutters the stage leaves at its sides (none on
@@ -149,7 +155,7 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **renderer-dom**: ↑/↓/Home/End on a focused caption band scroll it by the renderer's hand (a 40px
   line, or to the top or bottom) instead of being left to the browser: WebKit on Linux didn't scroll
   the editorial placard's band at all. The step is immediate, not smooth.
-- **plugin-download**: whether a URL is cross-origin is judged the way the link resolves it (against
+- **plugin-save**: whether a URL is cross-origin is judged the way the link resolves it (against
   `document.baseURI`, so a `<base href>` counts) and against the document's origin: in an
   `about:srcdoc` frame a relative URL no longer throws (no download, an unhandled rejection), and a
   relative URL that a `<base>` sends to another origin opens in a new tab instead of navigating the
@@ -179,7 +185,7 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   it overflows it is focusable (`tabindex="0"`), a `region` named by `strings.caption` ("Caption"), and
   ↑/↓/Home/End scroll it instead of moving the viewer. A band that fits stays out of the tab order.
 - **plugin-grid**: each group's `listbox` in the `cells` layout is named after its header.
-- **plugin-pins, plugin-download**: relative URLs are judged against a fixed http base rather than the
+- **plugin-pins, plugin-save**: relative URLs are judged against a fixed http base rather than the
   page's own URL, so they keep their link / download on `file:`, app-scheme (`capacitor:`) and
   `about:srcdoc` pages (resolving against `about:srcdoc` threw). Pins also link `tel:` URLs. Both use
   one check (`safeUrl` in `@gallerist/core/internal`) with their own scheme lists.
@@ -206,7 +212,7 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **plugin-captions, react**: the item's text caption, shown when `render` / `<Gallerist.Caption>`
   returns nothing, sits in a `span.gallerist-caption-text`, so it keeps the theme's caption font.
   `<Gallerist.Caption>` treats `true` / `false` like `null`.
-- **plugin-download**: a cross-origin `downloadUrl` opens in a new tab (`target="_blank"`,
+- **plugin-save**: a cross-origin `downloadUrl` opens in a new tab (`target="_blank"`,
   `rel="noopener"`; browsers ignore `download` there) instead of navigating the host page away, and
   `downloadUrl(item)` is called once per click.
 - **build**: `pnpm check:dist` also fails when a packed package lacks a file its `package.json`
@@ -226,7 +232,7 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
 - **plugin-pins**: the default card links only to `http:`, `https:`, `mailto:`, `tel:` and relative URLs; a
   pin whose `href` is `javascript:`, `data:` or any other scheme gets no link (pin data can come from
   users).
-- **plugin-download**: an item with nothing safe to save (no URL, or a `data:`, `javascript:` or
+- **plugin-save**: an item with nothing safe to save (no URL, or a `data:`, `javascript:` or
   `file:` one) marks the button unavailable (`aria-disabled`, dimmed; it stays focusable) instead of a
   click that does nothing, per item as you navigate. `client-zip` is a regular dependency (`^2.5.0`),
   so an install without optional dependencies can't break a bundler on zip mode's `import()`.
@@ -256,11 +262,11 @@ Measured with `e2e/tests/perf.spec.ts`, now part of the e2e suite as a count-bas
   `returnFocus`, `preload` and `adapters`, which were dropped before.
 - **plugin-pins**: `renderCard` returning `null` keeps the default card for that pin; the default card
   is exported as `defaultPinCard(pin, { presentation, strings })`.
-- **plugin-download**: `downloadUrl(item)`, the file to save (e.g. the full-resolution original), or
+- **plugin-save**: `downloadUrl(item)`, the file to save (e.g. the full-resolution original), or
   `null` for an item that can't be downloaded; zip mode honours it too.
 - **renderer-dom**: Escape still closes from anywhere, including a text field, but not when a handler
   before the viewer's called `preventDefault()` on it, so a host form can keep Escape.
-- **docs**: real READMEs for plugin-download and plugin-fullscreen; the React README documents the
+- **docs**: real READMEs for plugin-save and plugin-fullscreen; the React README documents the
   imperative ref, `open` positions, captions and hooks.
 - **renderer-dom (M21)**: `bind()` and `collectionFromLinks()`: open a viewer from `data-gallerist`
   links, with groups, captions and thumbnails read from attributes; links added later join in.

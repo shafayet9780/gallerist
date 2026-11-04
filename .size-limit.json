@@ -56,8 +56,8 @@
     "gzip": true
   },
   {
-    "name": "@gallerist/plugin-download (gz)",
-    "path": "packages/plugin-download/dist/index.js",
+    "name": "@gallerist/plugin-save (gz)",
+    "path": "packages/plugin-save/dist/index.js",
     "import": "{ download }",
     "ignore": ["@gallerist/core", "client-zip"],
     "limit": "1.2 kB",
