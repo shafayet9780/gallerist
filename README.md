@@ -47,6 +47,10 @@ const viewer = createViewer({
 mount(viewer)
 ```
 
+## No build step
+
+One script tag and `data-gallerist` links: see [`@gallerist/cdn`](packages/cdn/README.md).
+
 ## Commands
 
 | Command | Description |

@@ -31,7 +31,7 @@ MIT © Shafayet Ahmmed
 ## Overview (`layout: 'sections'`)
 
 ```ts
-grid({ layout: 'sections', startOpen: true, startLabel: 'Start tour' })
+grid({ layout: 'sections', startOpen: true, strings: { start: 'Start tour' } })
 ```
 
 - **`layout: 'sections'`** draws one card per group: `group.caption`, `group.meta.subtitle`, the item
@@ -42,4 +42,5 @@ grid({ layout: 'sections', startOpen: true, startLabel: 'Start tour' })
 - **`startOpen`** shows the grid whenever the viewer opens on its first item. Opening at any other
   item (a tapped photo, a deep link) goes straight there. `viewer.open()` resumes at the last item, so
   call `viewer.open({ g: 0, i: 0 })` to come back to the overview.
-- **`startLabel`** is the start button's text (default `Start`).
+- **`strings`** overrides every label for translation, the start button's included (`strings.start`,
+  default `Start`). The defaults are exported as `DEFAULT_GRID_STRINGS`.

@@ -1,0 +1,63 @@
+{
+  "name": "@gallerist/cdn",
+  "version": "0.2.0",
+  "description": "Gallerist as one <script>: the core, DOM renderer and plugins on a global `Gallerist`, for pages with no build step.",
+  "license": "MIT",
+  "sideEffects": false,
+  "files": ["dist", "LICENSE", "README.md"],
+  "main": "./dist/gallerist.umd.js",
+  "unpkg": "./dist/gallerist.umd.js",
+  "jsdelivr": "./dist/gallerist.umd.js",
+  "exports": {
+    ".": "./dist/gallerist.umd.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../../scripts/copy-license.mjs"
+  },
+  "devDependencies": {
+    "@gallerist/core": "workspace:*",
+    "@gallerist/renderer-dom": "workspace:*",
+    "@gallerist/plugin-download": "workspace:*",
+    "@gallerist/plugin-fullscreen": "workspace:*",
+    "@gallerist/plugin-grid": "workspace:*",
+    "@gallerist/plugin-hash": "workspace:*",
+    "@gallerist/plugin-pins": "workspace:*",
+    "@gallerist/plugin-thumbnails": "workspace:*",
+    "@gallerist/plugin-video": "workspace:*",
+    "@gallerist/plugin-video-youtube": "workspace:*",
+    "client-zip": "2.5.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shafayet9780/gallerist.git",
+    "directory": "packages/cdn"
+  },
+  "homepage": "https://github.com/shafayet9780/gallerist#readme",
+  "bugs": {
+    "url": "https://github.com/shafayet9780/gallerist/issues"
+  },
+  "author": "Shafayet Ahmmed",
+  "keywords": [
+    "lightbox",
+    "gallery",
+    "image-viewer",
+    "media-viewer",
+    "photo-gallery",
+    "carousel",
+    "zoom",
+    "pan",
+    "overlays",
+    "headless",
+    "framework-agnostic",
+    "virtualized",
+    "nested-gallery"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

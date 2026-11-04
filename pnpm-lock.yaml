@@ -67,6 +67,48 @@ importers:
 
   examples/vanilla: {}
 
+  packages/cdn:
+    devDependencies:
+      '@gallerist/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gallerist/plugin-download':
+        specifier: workspace:*
+        version: link:../plugin-download
+      '@gallerist/plugin-fullscreen':
+        specifier: workspace:*
+        version: link:../plugin-fullscreen
+      '@gallerist/plugin-grid':
+        specifier: workspace:*
+        version: link:../plugin-grid
+      '@gallerist/plugin-hash':
+        specifier: workspace:*
+        version: link:../plugin-hash
+      '@gallerist/plugin-pins':
+        specifier: workspace:*
+        version: link:../plugin-pins
+      '@gallerist/plugin-thumbnails':
+        specifier: workspace:*
+        version: link:../plugin-thumbnails
+      '@gallerist/plugin-video':
+        specifier: workspace:*
+        version: link:../plugin-video
+      '@gallerist/plugin-video-youtube':
+        specifier: workspace:*
+        version: link:../plugin-video-youtube
+      '@gallerist/renderer-dom':
+        specifier: workspace:*
+        version: link:../renderer-dom
+      client-zip:
+        specifier: 2.5.0
+        version: 2.5.0
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/core:
     devDependencies:
       tsup:
@@ -2521,8 +2563,7 @@ snapshots:
     dependencies:
       readdirp: 4.1.2
 
-  client-zip@2.5.0:
-    optional: true
+  client-zip@2.5.0: {}
 
   commander@4.1.1: {}
 

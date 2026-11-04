@@ -2,7 +2,23 @@
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@gallerist/core",
+      "@gallerist/renderer-dom",
+      "@gallerist/react",
+      "@gallerist/theme-default",
+      "@gallerist/cdn",
+      "@gallerist/plugin-download",
+      "@gallerist/plugin-fullscreen",
+      "@gallerist/plugin-grid",
+      "@gallerist/plugin-hash",
+      "@gallerist/plugin-pins",
+      "@gallerist/plugin-thumbnails",
+      "@gallerist/plugin-video",
+      "@gallerist/plugin-video-youtube"
+    ]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",

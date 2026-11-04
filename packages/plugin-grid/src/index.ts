@@ -30,8 +30,32 @@ export interface GridOptions {
    * (a tapped photo, a deep link) goes straight there.
    */
   startOpen?: boolean
-  /** Text of the `sections` start button (default 'Start'); it hides the grid. */
-  startLabel?: string
+  /** UI text overrides, for translation; merged over English. */
+  strings?: Partial<GridStrings>
+}
+
+export interface GridStrings {
+  /** accessible name of the grid */
+  grid: string
+  /** the toolbar button's label */
+  toggle: string
+  /** an unnamed group's name */
+  group: (n: number) => string
+  /** a cell's accessible name */
+  cell: (groupName: string, n: number) => string
+  /** the last cell of a capped `sections` card: its name, and how many items it stands for */
+  cellMore: (groupName: string, n: number, more: number) => string
+  /** the `sections` start button, which hides the grid */
+  start: string
+}
+
+export const DEFAULT_GRID_STRINGS: GridStrings = {
+  grid: 'Grid',
+  toggle: 'Toggle grid',
+  group: (n) => `Group ${n}`,
+  cell: (groupName, n) => `${groupName}, item ${n}`,
+  cellMore: (groupName, n, more) => `${groupName}, item ${n}, ${more} more`,
+  start: 'Start',
 }
 
 /** Items drawn on one `sections` card; the rest are counted on the last thumbnail. */
@@ -70,6 +94,7 @@ const textSpan = (className: string, text: string): HTMLElement => {
 export function grid(opts: GridOptions = {}): Plugin {
   return (viewer: ViewerApi) => {
     const overscan = opts.overscan ?? 12
+    const t: GridStrings = { ...DEFAULT_GRID_STRINGS, ...opts.strings }
     let root: HTMLElement | null = null
     let toolbarBtn: HTMLElement | null = null
     let open = false
@@ -110,7 +135,7 @@ export function grid(opts: GridOptions = {}): Plugin {
         if (!group) continue
         const header = document.createElement('div')
         header.className = 'gallerist-grid-header'
-        header.textContent = typeof group.meta === 'string' ? group.meta : `Group ${g + 1}`
+        header.textContent = typeof group.meta === 'string' ? group.meta : t.group(g + 1)
         root.appendChild(header)
 
         const cells = document.createElement('div')
@@ -135,7 +160,7 @@ export function grid(opts: GridOptions = {}): Plugin {
       cell.type = 'button'
       cell.className = 'gallerist-grid-cell'
       cell.setAttribute('role', 'option')
-      cell.setAttribute('aria-label', `${name}, item ${i + 1}`)
+      cell.setAttribute('aria-label', t.cell(name, i + 1))
       const selected = g === cur.g && i === cur.i
       cell.setAttribute('aria-selected', String(selected))
       if (selected) cell.setAttribute('data-active', '')
@@ -158,7 +183,7 @@ export function grid(opts: GridOptions = {}): Plugin {
       const start = document.createElement('button')
       start.type = 'button'
       start.className = 'gallerist-grid-start'
-      start.textContent = opts.startLabel ?? 'Start'
+      start.textContent = t.start
       start.addEventListener('click', () => setOpen(false))
       top.appendChild(start)
       host.appendChild(top)
@@ -171,7 +196,7 @@ export function grid(opts: GridOptions = {}): Plugin {
       for (const g of windowIndices(cur.g, col.groups.length, span, span, false)) {
         const group = col.groups[g]
         if (!group) continue
-        const name = group.caption ?? `Group ${g + 1}`
+        const name = group.caption ?? t.group(g + 1)
         const section = document.createElement('section')
         section.className = 'gallerist-grid-section'
         section.setAttribute('aria-label', name)
@@ -194,7 +219,7 @@ export function grid(opts: GridOptions = {}): Plugin {
           const cell = buildCell(group, item, g, i, name, cur)
           if (more > 0 && i === shown.length - 1) {
             cell.appendChild(textSpan('gallerist-grid-more', `+${more}`))
-            cell.setAttribute('aria-label', `${name}, item ${i + 1}, +${more}`)
+            cell.setAttribute('aria-label', t.cellMore(name, i + 1, more))
           }
           cells.appendChild(cell)
         })
@@ -239,14 +264,14 @@ export function grid(opts: GridOptions = {}): Plugin {
       init() {
         root = document.createElement('div')
         root.className = 'gallerist-grid'
-        root.setAttribute('aria-label', 'Grid')
+        root.setAttribute('aria-label', t.grid)
         if (opts.layout) root.dataset.layout = opts.layout
         root.style.display = 'none'
         root.setAttribute('aria-hidden', 'true')
         toolbarBtn = document.createElement('button')
         toolbarBtn.className = 'gallerist-grid-toggle'
         ;(toolbarBtn as HTMLButtonElement).type = 'button'
-        toolbarBtn.setAttribute('aria-label', 'Toggle grid')
+        toolbarBtn.setAttribute('aria-label', t.toggle)
         toolbarBtn.setAttribute('aria-pressed', 'false')
         toolbarBtn.innerHTML = ICONS.grid
         toolbarBtn.addEventListener('click', toggle)

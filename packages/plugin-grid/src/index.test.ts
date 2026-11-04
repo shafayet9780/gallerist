@@ -197,8 +197,8 @@ describe('plugin-grid', () => {
       expect(gridEl().style.display).toBe('none')
     })
 
-    it('the start button uses startLabel and keeps focus inside the viewer', () => {
-      openSections(named(), { startLabel: 'Start tour' })
+    it('the start button uses strings.start and keeps focus inside the viewer', () => {
+      openSections(named(), { strings: { start: 'Start tour' } })
       const start = gridEl().querySelector('.gallerist-grid-start') as HTMLButtonElement
       expect(start.textContent).toBe('Start tour')
       start.focus()
@@ -214,7 +214,7 @@ describe('plugin-grid', () => {
       const cells = gridEl().querySelectorAll<HTMLButtonElement>('.gallerist-grid-cell')
       expect(cells.length).toBe(9)
       expect(gridEl().querySelector('.gallerist-grid-more')?.textContent).toBe('+21')
-      expect(cells[8]?.getAttribute('aria-label')).toContain('+21')
+      expect(cells[8]?.getAttribute('aria-label')).toContain('21 more')
       cells[3]?.click()
       expect(v.getState().cursor).toEqual({ g: 0, i: 3 })
       expect(gridEl().style.display).toBe('none')

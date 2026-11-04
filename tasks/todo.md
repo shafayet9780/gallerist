@@ -13,7 +13,7 @@
 - [x] **M18** Console: skin polish, `reviewer` preset upgrade (timeline rail, numbered items), zoom navigator, comment pins in the monitoring example. Review: 11 findings fixed (lint on the JSON files, React `navigator` prop, idle fade, CSS-sized minimap, video items, timeline in side rails and long labels, grid.css documented)
 - [x] **M19** Editorial: wall skin + Night scheme, framed media, placard caption with item controls, `editorial` preset. The renderer's scheme default moved to the skins (Editorial defaults to the light wall). Review: 7 findings fixed (editorial with side rails, fixed-height placard band, item stack column, tick targets, distinct item motion, framed error card, docs)
 - [x] **M20** Tour: thumbnails `groupDisplay: 'index'`, grid `layout: 'sections'` + `startOpen`, `arrowLabels`, `groupAxis`, `tour` preset, `examples/tour`. Review: 11 findings fixed (focus after cell click and on entering the overview, overview dropping sections, navigation behind the overview, reopen semantics, stale docs, late `use()`, one-group loop labels, items toggle on chips, Tab trap past hidden controls, `+N` name); chips start at 900px
-- [ ] **M21** Parity: `"use client"`, DOM-markup init, UMD build, strings audit
+- [x] **M21** Parity: `"use client"`, DOM-markup init (`bind`), UMD build (`@gallerist/cdn`), strings audit. Review: 9 findings fixed (repeated link ids, `pins()` across galleries documented, CDN versioned with its parts via a changesets `fixed` group, deep-link claim dropped, focus return, viewer-owned links, `open()` after destroy, skin docs, stricter audit)
 - [ ] Release 0.3: positioning, docs site with skin × preset playground, migration notes, publish
 
 ## Release 0.4

@@ -50,6 +50,41 @@ export interface ThumbnailsOptions {
   timeline?: boolean | ((group: Group, index: number) => string | undefined)
   /** Number the item thumbs (1, 2, 3…) in the item stack and peek, so items can be referred to. */
   numberItems?: boolean
+  /** UI text overrides, for translation; merged over English. */
+  strings?: Partial<ThumbnailsStrings>
+}
+
+export interface ThumbnailsStrings {
+  /** accessible name of the rail */
+  rail: string
+  /** an unnamed group's name, and a group card's accessible name */
+  group: (n: number) => string
+  /** a group card's accessible name with its timeline label */
+  groupAt: (n: number, time: string) => string
+  /** an index row's accessible name */
+  section: (name: string, subtitle: string | undefined, count: number) => string
+  /** an item thumb's accessible name */
+  item: (n: number) => string
+  /** accessible name of the peek flyout */
+  preview: (n: number) => string
+  /** the touch button that opens the peek */
+  previewButton: (n: number) => string
+  /** accessible name of the active group's item panel */
+  groupItems: string
+  /** the toolbar button that shows and hides that panel */
+  toggleItems: string
+}
+
+export const DEFAULT_THUMBNAILS_STRINGS: ThumbnailsStrings = {
+  rail: 'Thumbnails',
+  group: (n) => `Group ${n}`,
+  groupAt: (n, time) => `Group ${n}, ${time}`,
+  section: (name, subtitle, count) => `${name}${subtitle ? `, ${subtitle}` : ''} (${count})`,
+  item: (n) => `Item ${n}`,
+  preview: (n) => `Group ${n} preview`,
+  previewButton: (n) => `Preview group ${n}`,
+  groupItems: 'Group items',
+  toggleItems: 'Toggle group items',
 }
 
 const metaTime = (group: Group): string | undefined => {
@@ -153,6 +188,7 @@ interface FlatEntry {
 export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
   return (viewer: ViewerApi) => {
     const overscan = opts.overscan ?? 24
+    const t: ThumbnailsStrings = { ...DEFAULT_THUMBNAILS_STRINGS, ...opts.strings }
     const groupDisplay = opts.groupDisplay ?? 'stacked'
     const isIndex = groupDisplay === 'index'
     const itemAxis = isIndex ? 'horizontal' : (opts.itemAxis ?? 'vertical')
@@ -219,7 +255,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         : null
 
     const buildItemButton = (item: Item, gIndex: number, iIndex: number): HTMLButtonElement => {
-      const btn = thumbButton(`Item ${iIndex + 1}`, 'gallerist-thumb-item', () =>
+      const btn = thumbButton(t.item(iIndex + 1), 'gallerist-thumb-item', () =>
         viewer.goTo(gIndex, iIndex),
       )
       btn.dataset.item = item.id
@@ -282,7 +318,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // its own listbox (a sibling of the rail on the region host, not nested in it) → valid `option`
       // children. aria-label distinguishes it from the rail's "Thumbnails" listbox.
       col.setAttribute('role', 'listbox')
-      col.setAttribute('aria-label', `Group ${gIndex + 1} preview`)
+      col.setAttribute('aria-label', t.preview(gIndex + 1))
       col.dataset.axis = itemAxis
       fillColumn(col, group, gIndex, false)
       // Mount in `regionEl` (a sibling of the rail), not inside `.gallerist-thumbs`: the rail's overflow
@@ -302,10 +338,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // ── stacked mode ─────────────────────────────────────────────────────────
     // ── index mode ───────────────────────────────────────────────────────────
     const buildIndexRow = (group: Group, gIndex: number): HTMLButtonElement => {
-      const name = group.caption ?? `Group ${gIndex + 1}`
+      const name = group.caption ?? t.group(gIndex + 1)
       const subtitle = metaSubtitle(group)
       const count = group.items.length
-      const label = `${name}${subtitle ? `, ${subtitle}` : ''} (${count})`
+      const label = t.section(name, subtitle, count)
       const btn = thumbButton(label, 'gallerist-thumb-row', () => viewer.goTo(gIndex))
       btn.removeAttribute('role')
       btn.removeAttribute('aria-selected')
@@ -340,7 +376,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (isIndex) return buildIndexRow(group, gIndex)
       const multi = group.items.length > 1
       const btn = thumbButton(
-        `Group ${gIndex + 1}`,
+        t.group(gIndex + 1),
         `gallerist-thumb${multi ? ' gallerist-thumb-stacked' : ''}`,
         () => viewer.goTo(gIndex),
       )
@@ -380,7 +416,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         text.textContent = time ?? ''
         label.appendChild(text)
         wrap.prepend(label)
-        if (time) btn.setAttribute('aria-label', `Group ${gIndex + 1}, ${time}`)
+        if (time) btn.setAttribute('aria-label', t.groupAt(gIndex + 1, time))
       }
       if (multi) {
         btn.addEventListener('focusin', () => openPeek(group, gIndex, host))
@@ -393,7 +429,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           const caret = document.createElement('button')
           caret.type = 'button'
           caret.className = 'gallerist-thumb-expand'
-          caret.setAttribute('aria-label', `Preview group ${gIndex + 1}`)
+          caret.setAttribute('aria-label', t.previewButton(gIndex + 1))
           caret.addEventListener('click', (e) => {
             e.stopPropagation()
             openPeek(group, gIndex, wrap)
@@ -459,7 +495,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           itemRow.className = 'gallerist-thumb-items'
           // its own listbox (host-mounted sibling of the rail, not nested) → valid `option` children
           itemRow.setAttribute('role', 'listbox')
-          itemRow.setAttribute('aria-label', 'Group items')
+          itemRow.setAttribute('aria-label', t.groupItems)
           itemRow.setAttribute('aria-orientation', itemAxis)
           itemRow.dataset.axis = itemAxis
         }
@@ -549,7 +585,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       wrap.className = 'gallerist-thumb-group'
       wrap.dataset.group = group.id
       wrap.setAttribute('role', 'group')
-      wrap.setAttribute('aria-label', `Group ${gIndex + 1}`)
+      wrap.setAttribute('aria-label', t.group(gIndex + 1))
       const row = document.createElement('div')
       row.className = 'gallerist-thumb-group-row'
       wrap.appendChild(row)
@@ -744,7 +780,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         root = document.createElement('div')
         root.className = 'gallerist-thumbs'
         root.setAttribute('role', isIndex ? 'group' : 'listbox')
-        root.setAttribute('aria-label', 'Thumbnails')
+        root.setAttribute('aria-label', t.rail)
         if (timeLabel) root.setAttribute('data-timeline', '')
         regionEl.appendChild(root)
         if (groupDisplay === 'flat') {
@@ -758,7 +794,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           toolbarBtn = document.createElement('button')
           toolbarBtn.type = 'button'
           toolbarBtn.className = 'gallerist-items-toggle'
-          toolbarBtn.setAttribute('aria-label', 'Toggle group items')
+          toolbarBtn.setAttribute('aria-label', t.toggleItems)
           toolbarBtn.setAttribute('aria-pressed', String(panelOpen))
           toolbarBtn.innerHTML = ICONS.itemStack
           toolbarBtn.addEventListener('click', toggleActivePanel)
