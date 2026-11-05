@@ -25,7 +25,8 @@ import '@gallerist/theme-default/gallerist.css'
 Props that update live: `items` / `groups` / `collection` (changed content is applied in place and
 keeps the cursor on the same item; data rebuilt inline with the same content is ignored; an invalid
 update, such as a duplicate id, is logged and the current data kept), `on`, `open`, `onClose`, `skin`,
-`accent` and `scheme`. Everything else (`loop`, `startAt`, `plugins`, `overlays`, `preset`, `container`,
+`accent`, `scheme` and `groupDisplay`. `skin`, `accent` and `scheme` are each written to the viewer
+only when they change, so a value set another way (a View menu) stays while that prop doesn't. Everything else (`loop`, `startAt`, `plugins`, `overlays`, `preset`, `container`,
 `label`, `returnFocus`, `preload`, `adapters`, …) is read once; change the component's `key` to apply
 new values.
 
@@ -37,6 +38,11 @@ rail options for any option you don't pass (`preset="reviewer"` gives the timeli
 every item in order across groups (the counter reads `item N / total`); with another rail, or none,
 they move between groups. `linear={false}` keeps the group and item axes under a flat rail, and
 `linear` turns linear traversal on whatever the rail.
+
+`groupDisplay` (`'stacked'`, `'flat'` or `'index'`) is the thumbnails rail's display, and it is
+reactive: a new value switches the mounted rail in place (no remount), keeping the current item, and
+`linear` follows it as above. The first value is the display the rail mounts with. Leave it out and
+the rail keeps its own (`thumbnails({ groupDisplay })`, the preset's, a View menu's choice).
 
 `plugins`, `on` and render props are functions, so `<Gallerist>` is used from a client component. The
 build carries a `"use client"` banner, so a Next.js App Router page can import it from inside a client
@@ -123,6 +129,67 @@ Returning `null`, `undefined`, `true` or `false` shows the item's text `caption`
 accessible description (`aria-describedby`); the announcement on navigation stays the position plus
 the item's `alt`, so put what a screen reader user needs in `alt`. Without React, use
 [`@gallerist/plugin-captions`](../plugin-captions/README.md).
+
+### A View menu
+
+[`@gallerist/plugin-view`](../plugin-view/README.md) adds a View tool to the toolbar: people switch the
+rail between stacked and one row, and the scheme between dark and light, in the open viewer. Either
+the plugin applies a choice (uncontrolled) or your component does (controlled); neither remounts.
+
+Uncontrolled: the menu applies it, you remember it.
+
+```tsx
+import { thumbnails } from '@gallerist/plugin-thumbnails'
+import { type ViewState, view } from '@gallerist/plugin-view'
+
+const KEY = 'reviewer-view'
+const saved = (): Partial<ViewState> => JSON.parse(localStorage.getItem(KEY) ?? '{}')
+
+function Reviewer({ groups, onClose }: Props) {
+  const [plugins] = useState(() => [
+    thumbnails(),
+    view({ initial: saved(), onChange: (s) => localStorage.setItem(KEY, JSON.stringify(s)) }),
+  ])
+  return <Gallerist groups={groups} open onClose={onClose} preset="reviewer" skin="console" plugins={plugins} />
+}
+```
+
+Controlled: your state owns both, through the `scheme` and `groupDisplay` props, and the menu reports
+what was picked (`controlled: true`; or `['scheme']` to own only the scheme).
+
+```tsx
+type Prefs = { rail: 'stacked' | 'flat'; scheme: 'dark' | 'light' }
+
+function Reviewer({ groups, onClose }: Props) {
+  const [prefs, setPrefs] = useState<Prefs>(
+    () => JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? { rail: 'stacked', scheme: 'dark' },
+  )
+  useEffect(() => localStorage.setItem(KEY, JSON.stringify(prefs)), [prefs])
+  const [plugins] = useState(() => [
+    thumbnails(),
+    view({
+      controlled: true,
+      onChange: ({ rail, scheme }) =>
+        setPrefs({ rail: rail === 'flat' ? 'flat' : 'stacked', scheme: scheme === 'light' ? 'light' : 'dark' }),
+    }),
+  ])
+  return (
+    <Gallerist
+      groups={groups}
+      open
+      onClose={onClose}
+      preset="reviewer"
+      skin="console"
+      plugins={plugins}
+      scheme={prefs.scheme}
+      groupDisplay={prefs.rail}
+    />
+  )
+}
+```
+
+The menu reads the viewer each time it opens, so it shows what your props applied. Don't pass `scheme`
+(or `groupDisplay`) for a setting the menu owns: the prop would set it back the next time it changes.
 
 ### Hooks
 

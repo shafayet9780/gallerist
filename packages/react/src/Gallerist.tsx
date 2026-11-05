@@ -11,8 +11,10 @@ import {
   type ViewerOptions,
   createViewer,
 } from '@gallerist/core'
+import { getInternals } from '@gallerist/core/internal'
 import {
   type Accent,
+  type Appearance,
   type ArrowLayout,
   type ColorScheme,
   type ItemIndicator,
@@ -49,7 +51,8 @@ export interface GalleristOpenAt {
  * place (diffed by id, keeping the cursor); data rebuilt with the same content is ignored. Every other viewer option
  * (`loop`, `itemMemory`, `startAt`, `plugins`, `overlays`, …) and the layout props (`container`,
  * `preset`, `arrows`, `rail`, `label`, `preload`, `adapters`, …) are read once; change the
- * component's `key` to apply new ones. `skin`, `accent`, `scheme` and `open` are reactive.
+ * component's `key` to apply new ones. `skin`, `accent`, `scheme`, `groupDisplay` and `open` are
+ * reactive.
  */
 export interface GalleristProps extends ViewerOptions {
   /**
@@ -67,8 +70,15 @@ export interface GalleristProps extends ViewerOptions {
   skin?: Skin
   /** the skin's accent by name, e.g. `mint` (Gallery) or `cyan` (Console) (reactive). */
   accent?: Accent
-  /** colour scheme: `dark`, `light` or `auto`; unset, the skin's own default (reactive). */
+  /** colour scheme: `dark`, `light` or `auto`; unset, the skin's own default (reactive). Written
+   *  only when it changes, so a scheme set another way (a View menu) stays while it doesn't. */
   scheme?: ColorScheme
+  /**
+   * The thumbnails rail's display (`stacked`, `flat` or `index`), reactive: a new value switches the
+   * mounted rail in place, keeping the current item (no remount). Omitted, the rail keeps its own
+   * (`thumbnails({ groupDisplay })`, the preset's, a View menu's choice).
+   */
+  groupDisplay?: 'stacked' | 'flat' | 'index'
   /** within-group arrow placement (overrides the preset default) — UX-D. */
   arrows?: ArrowLayout
   /** thumbnail rail placement (overrides the preset default) — UX-E. */
@@ -171,6 +181,14 @@ const sameCollection = (a: Collection, b: Readonly<Collection>): boolean =>
     )
   })
 
+// Switch the viewer's thumbnails rail: plugin-thumbnails' instance carries `setDisplay` (so this
+// adapter doesn't depend on the plugin). Before the rail mounts, it's the display it mounts with.
+const showDisplay = (viewer: ViewerApi, display: GalleristProps['groupDisplay']) => {
+  if (!display) return
+  for (const p of getInternals(viewer).getPlugins())
+    if (p.name === 'thumbnails') (p as { setDisplay?: (d: string) => void }).setDisplay?.(display)
+}
+
 const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(props, ref) {
   const {
     open,
@@ -181,6 +199,7 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     skin,
     accent,
     scheme,
+    groupDisplay,
     arrows,
     rail,
     autoHide,
@@ -199,6 +218,7 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     ...options
   } = props
   const rootRef = useRef<HTMLElement | null>(null)
+  const appearance = useRef<Appearance>({}) // what the root was last given
   const { items, groups, collection, on } = options
 
   // The viewer outlives renders, so its handlers must not capture the first render's `on`: they
@@ -259,6 +279,8 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
   // component unmounts and the renderer/hook/overlay subscriptions have all cleaned themselves up.
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional mount-once (layout opts read once)
   useEffect(() => {
+    showDisplay(viewer, groupDisplay) // the rail builds with it
+    appearance.current = { skin, accent, scheme }
     const handle = mount(viewer, {
       container: container ?? null,
       controls,
@@ -289,11 +311,24 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
     }
   }, [viewer])
 
-  // The appearance is reactive: the skin files key off root attributes, so no remount is needed.
+  // The appearance is reactive: the skin files key off root attributes, so no remount is needed. Only
+  // the props that changed are written: a scheme the host doesn't pass (or doesn't change), set by
+  // a View menu, stays when the accent changes.
   useEffect(() => {
     const root = rootRef.current
-    if (root) applyAppearance(root, { skin, accent, scheme })
+    if (!root) return
+    const prev = appearance.current as Record<string, unknown>
+    const next = { skin, accent, scheme }
+    appearance.current = next
+    applyAppearance(
+      root,
+      Object.fromEntries(Object.entries(next).filter(([k, v]) => prev[k] !== v)) as Appearance,
+    )
   }, [skin, accent, scheme])
+
+  // The rail's display is reactive too: the rail switches in place (the mount effect gave it the
+  // first value, so this one changes nothing then)
+  useEffect(() => showDisplay(viewer, groupDisplay), [viewer, groupDisplay])
 
   // `open` is compared by value, so an inline `open={{ g: 2 }}` re-applies only when g or i change
   const openG = typeof open === 'object' && open ? open.g : undefined
