@@ -1025,6 +1025,22 @@ describe('mount — chrome structure (M15)', () => {
     expect(document.querySelector('.gallerist-bar .gallerist-region-toolbar')).not.toBeNull()
     expect(document.querySelector('.gallerist-close')).toBeNull()
   })
+
+  it('without built-in controls, a bar of hidden tools hides until one shows (refresh)', () => {
+    const tool = document.createElement('button')
+    tool.hidden = true
+    const v = createViewer({
+      collection: collection(),
+      plugins: [() => ({ name: 'tool', regions: { toolbar: () => tool } })],
+    })
+    mount(v, { controls: false })
+    v.open()
+    const bar = document.querySelector('.gallerist-bar') as HTMLElement
+    expect(bar.hidden).toBe(true)
+    tool.hidden = false
+    v.refresh()
+    expect(bar.hidden).toBe(false)
+  })
 })
 
 describe('mount — strings (translation)', () => {
@@ -1360,6 +1376,25 @@ describe('mount — linear follows the rail (a flat rail asks for it)', () => {
     w.goTo(1, 2)
     press('ArrowRight')
     expect(w.getState().cursor).toEqual({ g: 2, i: 0 })
+  })
+
+  it('reads the marker again on viewer.refresh(): a rail that switches its display', () => {
+    const node = document.createElement('div')
+    const v = openWith([() => ({ name: 'rail', regions: { thumbnails: () => node } })])
+    v.goTo(1, 1)
+    expect(counter()).toContain('2 / 3')
+    node.setAttribute('data-gallerist-linear', '') // the rail went flat; nothing re-mounted
+    expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+    v.refresh()
+    expect(root().getAttribute('data-gallerist-linear')).toBe('true')
+    expect(counter()).toContain('3 / 6')
+    expect((document.querySelector('.gallerist-itemnav') as HTMLElement).hidden).toBe(true)
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+    node.removeAttribute('data-gallerist-linear')
+    v.refresh()
+    expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+    expect(counter()).toContain('2 / 3')
   })
 
   it('follows a rail added and removed after mount, chrome included', () => {

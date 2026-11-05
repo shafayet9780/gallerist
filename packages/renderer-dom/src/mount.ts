@@ -1430,16 +1430,22 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   ]) {
     bandObserver?.observe(band)
   }
-  // viewer.refresh(): an explicit re-measure, for layout changes a ResizeObserver can't see
-  const offRefresh = internals.onRefresh(onStageResize)
+  // viewer.refresh(): an explicit re-measure, for layout changes a ResizeObserver can't see, and a
+  // re-read of what the regions ask for (readRegions, below)
+  const offRefresh = internals.onRefresh(() => {
+    readRegions()
+    if (attached) updateChrome()
+    onStageResize()
+  })
 
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
   const mountPluginRegions = createRegionMounter(regionHosts, { viewer, preset })
-  const mountRegions = () => {
-    pluginKeymap = aggregateKeymap(internals.getPlugins())
-    mountPluginRegions(internals.getPlugins())
-    // Linear traversal: the option, else on while the rail asks for it (a flat thumbnails rail marks
-    // its region), so it follows a rail added or removed after mount.
+  // What the mounted regions ask of the renderer, read when the plugin set changes and on
+  // viewer.refresh() (a rail that switches its display calls it). Linear traversal: the option, else
+  // on while the rail asks for it (a flat thumbnails rail marks its region), so it follows a rail
+  // added, removed or switched after mount. Without built-in controls the bar shows while it holds a
+  // tool that isn't hidden.
+  const readRegions = () => {
     const on = opts.linear ?? !!regionHosts.thumbnails.querySelector('[data-gallerist-linear]')
     root.toggleAttribute('data-gallerist-arrow-labels', !!arrowLabel && !on)
     if (on !== linear) {
@@ -1448,13 +1454,19 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       else root.removeAttribute('data-gallerist-linear')
       chromeCol = null // the counter, the item navigator and the arrows' names follow it
     }
+    if (!controls)
+      bar.hidden = ![...regionHosts.toolbar.children].some((n) => !(n as HTMLElement).hidden)
+  }
+  const mountRegions = () => {
+    pluginKeymap = aggregateKeymap(internals.getPlugins())
+    mountPluginRegions(internals.getPlugins())
+    readRegions()
     // The pull-handle leads the rail region while a rail plugin is mounted. The mounter leaves
     // nodes it didn't add alone, so place (or drop) the handle here.
     const thumbs = regionHosts.thumbnails
     const hasRail = [...thumbs.childNodes].some((n) => n !== railHandle)
     if (!hasRail) railHandle.remove()
     else if (thumbs.firstChild !== railHandle) thumbs.prepend(railHandle)
-    if (!controls) bar.hidden = regionHosts.toolbar.childElementCount === 0
     syncCaption()
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
