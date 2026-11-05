@@ -5,6 +5,7 @@ import { grid } from '@gallerist/plugin-grid'
 import { type Pin, pins } from '@gallerist/plugin-pins'
 import { download } from '@gallerist/plugin-save'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
+import { view } from '@gallerist/plugin-view'
 import {
   type ColorScheme,
   type PresetName,
@@ -169,6 +170,14 @@ function render() {
       pins({ presentation }),
       fullscreen(),
       download(),
+      // the View menu switches the rail and the scheme in the open viewer; the page's scheme follows
+      view({
+        onChange: ({ scheme }) => {
+          state.scheme = scheme
+          radios('scheme', SCHEMES)
+          $('snippet').textContent = snippet(state)
+        },
+      }),
     ],
   })
   viewer = current
