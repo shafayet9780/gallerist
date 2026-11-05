@@ -6,7 +6,7 @@ import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
 import { download } from '@gallerist/plugin-save'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
-import { type ViewState, view } from '@gallerist/plugin-view'
+import { type ViewChange, view } from '@gallerist/plugin-view'
 import {
   type ArrowLayout,
   type ColorScheme,
@@ -121,15 +121,15 @@ const viewer = createViewer({
           ...(p.get('view') === '1'
             ? [
                 view({
-                  onChange: (s) => {
-                    ;(window as unknown as { viewChanges: ViewState[] }).viewChanges.push(s)
+                  onChange: (change) => {
+                    ;(window as unknown as { viewChanges: ViewChange[] }).viewChanges.push(change)
                   },
                 }),
               ]
             : []),
         ],
 })
-;(window as unknown as { viewChanges: ViewState[] }).viewChanges = []
+;(window as unknown as { viewChanges: ViewChange[] }).viewChanges = []
 mount(viewer, {
   preset: (p.get('preset') ?? undefined) as PresetName | undefined,
   arrows: (p.get('arrows') ?? undefined) as ArrowLayout | undefined,

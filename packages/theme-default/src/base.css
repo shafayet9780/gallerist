@@ -922,10 +922,13 @@
   background: radial-gradient(circle, var(--gallerist-selection) 0 3px, transparent 3.5px);
   opacity: 1;
 }
-.gallerist-view-item:hover,
+/* the pointer's item takes the tool hover fill, the keyboard's the focus ring: the two never look
+   alike (nor like the checked mark) when they are different items */
+.gallerist-view-item:hover {
+  background: var(--gallerist-tool-hover-bg);
+}
 .gallerist-view-item:focus {
   outline: none;
-  background: var(--gallerist-tool-hover-bg);
 }
 .gallerist-view-item:focus-visible {
   outline: 2px solid var(--gallerist-focus);

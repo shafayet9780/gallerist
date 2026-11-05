@@ -99,10 +99,7 @@ test('clicks switch Stacked → Row → Stacked, and the cards navigate in each'
   const changes = await page.evaluate(
     () => (window as unknown as { viewChanges: unknown[] }).viewChanges,
   )
-  expect(changes).toEqual([
-    { rail: 'flat', scheme: 'dark' },
-    { rail: 'stacked', scheme: 'dark' },
-  ])
+  expect(changes).toEqual([{ rail: 'flat' }, { rail: 'stacked' }]) // the rail only: no scheme picked
 })
 
 test('Dark ↔ Light switches the scheme of the open viewer', async ({ page }) => {
@@ -123,6 +120,44 @@ test('Dark ↔ Light switches the scheme of the open viewer', async ({ page }) =
   await choice(page, 'Dark').click()
   await expect(root(page)).toHaveAttribute('data-gallerist-scheme', 'dark')
   expect(await bar()).toBe(darkBar)
+})
+
+test.describe('on a viewer following a dark system (auto)', () => {
+  test.use({ colorScheme: 'dark' })
+
+  test('a rail choice reports the rail only; Dark picked stores dark', async ({ page }) => {
+    await open(page, `${REVIEWER}&scheme=auto`)
+    const changes = () =>
+      page.evaluate(() => (window as unknown as { viewChanges: unknown[] }).viewChanges)
+    await tool(page).click()
+    await expect(choice(page, 'Dark')).toHaveAttribute('aria-checked', 'true') // the one in effect
+    await choice(page, 'Row').click()
+    await expect(rail(page)).toHaveAttribute('data-display', 'flat')
+    await expect(root(page)).toHaveAttribute('data-gallerist-scheme', 'auto') // still the system's
+    expect(await changes()).toEqual([{ rail: 'flat' }])
+    await tool(page).click()
+    await choice(page, 'Dark').click()
+    await expect(root(page)).toHaveAttribute('data-gallerist-scheme', 'dark')
+    expect(await changes()).toEqual([{ rail: 'flat' }, { scheme: 'dark' }])
+  })
+})
+
+test('the item under the pointer and the focused one look different', async ({ page }) => {
+  await open(page)
+  await tool(page).focus()
+  await page.keyboard.press('Enter') // opens on Stacked, focused from the keyboard
+  await expect(choice(page, 'Stacked')).toBeFocused()
+  await choice(page, 'Light').hover()
+  const look = (name: string) =>
+    choice(page, name).evaluate((el) => {
+      const s = getComputedStyle(el)
+      return { bg: s.backgroundColor, ring: s.outlineStyle }
+    })
+  const focused = await look('Stacked')
+  const hovered = await look('Light')
+  expect(focused.ring).toBe('solid')
+  expect(hovered.ring).toBe('none')
+  expect(focused.bg).not.toBe(hovered.bg)
 })
 
 test('Escape and a press outside close the menu, not the viewer', async ({ page }) => {

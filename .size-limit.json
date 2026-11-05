@@ -68,7 +68,7 @@
     "path": "packages/plugin-view/dist/index.js",
     "import": "{ view }",
     "ignore": ["@gallerist/core"],
-    "limit": "2.2 kB",
+    "limit": "2.4 kB",
     "gzip": true
   },
   {

@@ -173,6 +173,7 @@ function render() {
       // the View menu switches the rail and the scheme in the open viewer; the page's scheme follows
       view({
         onChange: ({ scheme }) => {
+          if (!scheme) return // a rail choice
           state.scheme = scheme
           radios('scheme', SCHEMES)
           $('snippet').textContent = snippet(state)

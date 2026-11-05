@@ -26,9 +26,11 @@ Props that update live: `items` / `groups` / `collection` (changed content is ap
 keeps the cursor on the same item; data rebuilt inline with the same content is ignored; an invalid
 update, such as a duplicate id, is logged and the current data kept), `on`, `open`, `onClose`, `skin`,
 `accent`, `scheme` and `groupDisplay`. `skin`, `accent` and `scheme` are each written to the viewer
-only when they change, so a value set another way (a View menu) stays while that prop doesn't. Everything else (`loop`, `startAt`, `plugins`, `overlays`, `preset`, `container`,
-`label`, `returnFocus`, `preload`, `adapters`, …) is read once; change the component's `key` to apply
-new values.
+only when they change, so a value set another way (a View menu) stays while that prop doesn't. While
+`scheme` or `groupDisplay` is passed, it owns that setting: a View menu only reports a choice for it
+([below](#a-view-menu)). Everything else (`loop`, `startAt`, `plugins`, `overlays`, `preset`,
+`container`, `label`, `returnFocus`, `preload`, `adapters`, …) is read once; change the component's
+`key` to apply new values.
 
 `preset` sets the layout, the thumbnails rail included: `thumbnails()` in `plugins` takes the preset's
 rail options for any option you don't pass (`preset="reviewer"` gives the timeline and numbered items;
@@ -42,7 +44,8 @@ they move between groups. `linear={false}` keeps the group and item axes under a
 `groupDisplay` (`'stacked'`, `'flat'` or `'index'`) is the thumbnails rail's display, and it is
 reactive: a new value switches the mounted rail in place (no remount), keeping the current item, and
 `linear` follows it as above. The first value is the display the rail mounts with. Leave it out and
-the rail keeps its own (`thumbnails({ groupDisplay })`, the preset's, a View menu's choice).
+the rail keeps its own (`thumbnails({ groupDisplay })`, the preset's, a View menu's choice). With
+several thumbnails plugins it switches the last one, whose rail shows.
 
 `plugins`, `on` and render props are functions, so `<Gallerist>` is used from a client component. The
 build carries a `"use client"` banner, so a Next.js App Router page can import it from inside a client
@@ -133,45 +136,31 @@ the item's `alt`, so put what a screen reader user needs in `alt`. Without React
 ### A View menu
 
 [`@gallerist/plugin-view`](../plugin-view/README.md) adds a View tool to the toolbar: people switch the
-rail between stacked and one row, and the scheme between dark and light, in the open viewer. Either
-the plugin applies a choice (uncontrolled) or your component does (controlled); neither remounts.
+rail between stacked and one row, and the scheme between dark and light, in the open viewer. Neither
+way remounts.
 
-Uncontrolled: the menu applies it, you remember it.
+Each setting has one owner. **A prop you pass owns its setting**: while `scheme` (or `groupDisplay`)
+is passed, the menu only reports a choice for it through `onChange`, and never applies its own value
+over it (its `initial`, a past choice), whatever order React runs the effects in (StrictMode, Fast
+Refresh, `<Activity>`). **A prop you leave out leaves the setting to the menu**, which applies a
+choice at once. The adapter tells the menu by marking the viewer
+(`Symbol.for('gallerist.controlled')`, see the plugin's README), on every commit.
+
+`onChange(change)` reports the one setting picked, `{ rail: 'flat' }` or `{ scheme: 'light' }`, so
+the remembered choice holds only what the user picked. A persisted choice:
 
 ```tsx
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import { type ViewState, view } from '@gallerist/plugin-view'
 
 const KEY = 'reviewer-view'
-const saved = (): Partial<ViewState> => JSON.parse(localStorage.getItem(KEY) ?? '{}')
 
 function Reviewer({ groups, onClose }: Props) {
-  const [plugins] = useState(() => [
-    thumbnails(),
-    view({ initial: saved(), onChange: (s) => localStorage.setItem(KEY, JSON.stringify(s)) }),
-  ])
-  return <Gallerist groups={groups} open onClose={onClose} preset="reviewer" skin="console" plugins={plugins} />
-}
-```
-
-Controlled: your state owns both, through the `scheme` and `groupDisplay` props, and the menu reports
-what was picked (`controlled: true`; or `['scheme']` to own only the scheme).
-
-```tsx
-type Prefs = { rail: 'stacked' | 'flat'; scheme: 'dark' | 'light' }
-
-function Reviewer({ groups, onClose }: Props) {
-  const [prefs, setPrefs] = useState<Prefs>(
-    () => JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? { rail: 'stacked', scheme: 'dark' },
-  )
+  const [prefs, setPrefs] = useState<ViewState>(() => JSON.parse(localStorage.getItem(KEY) ?? '{}'))
   useEffect(() => localStorage.setItem(KEY, JSON.stringify(prefs)), [prefs])
   const [plugins] = useState(() => [
     thumbnails(),
-    view({
-      controlled: true,
-      onChange: ({ rail, scheme }) =>
-        setPrefs({ rail: rail === 'flat' ? 'flat' : 'stacked', scheme: scheme === 'light' ? 'light' : 'dark' }),
-    }),
+    view({ onChange: (change) => setPrefs((p) => ({ ...p, ...change })) }),
   ])
   return (
     <Gallerist
@@ -188,8 +177,16 @@ function Reviewer({ groups, onClose }: Props) {
 }
 ```
 
-The menu reads the viewer each time it opens, so it shows what your props applied. Don't pass `scheme`
-(or `groupDisplay`) for a setting the menu owns: the prop would set it back the next time it changes.
+Until the user picks a setting its prop is `undefined`, so the menu owns it: the rail keeps its own
+display and the viewer the skin's scheme (or the system's). A pick is applied by the menu, lands in
+`prefs`, and from then on the prop owns it (it writes the same value, so nothing is drawn again).
+Next visit the props restore what was picked, and nothing else. The props are written as they are,
+so check what you read from storage if it can hold old values.
+
+Two other ways: `view({ controlled: true })` (or `['scheme']`) makes the menu only report even while
+a prop is left out, for a host that applies every choice itself; and leaving both props out with
+`view({ initial: saved, onChange })` lets the menu apply and restore everything, as in plain JS. The
+menu reads the viewer each time it opens, so it always shows what is applied.
 
 ### Hooks
 

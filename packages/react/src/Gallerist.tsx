@@ -70,13 +70,18 @@ export interface GalleristProps extends ViewerOptions {
   skin?: Skin
   /** the skin's accent by name, e.g. `mint` (Gallery) or `cyan` (Console) (reactive). */
   accent?: Accent
-  /** colour scheme: `dark`, `light` or `auto`; unset, the skin's own default (reactive). Written
-   *  only when it changes, so a scheme set another way (a View menu) stays while it doesn't. */
+  /**
+   * colour scheme: `dark`, `light` or `auto`; unset, the skin's own default (reactive). Written only
+   * when it changes, so a scheme set another way (a View menu) stays while it doesn't. While it's
+   * passed, the prop owns the scheme: a View menu (`@gallerist/plugin-view`) only reports a choice
+   * (`onChange`) and doesn't apply its own (`initial`, a past choice) over it.
+   */
   scheme?: ColorScheme
   /**
    * The thumbnails rail's display (`stacked`, `flat` or `index`), reactive: a new value switches the
    * mounted rail in place, keeping the current item (no remount). Omitted, the rail keeps its own
-   * (`thumbnails({ groupDisplay })`, the preset's, a View menu's choice).
+   * (`thumbnails({ groupDisplay })`, the preset's, a View menu's choice). While it's passed, the prop
+   * owns the display, as `scheme` does: a View menu only reports a choice.
    */
   groupDisplay?: 'stacked' | 'flat' | 'index'
   /** within-group arrow placement (overrides the preset default) — UX-D. */
@@ -181,13 +186,21 @@ const sameCollection = (a: Collection, b: Readonly<Collection>): boolean =>
     )
   })
 
-// Switch the viewer's thumbnails rail: plugin-thumbnails' instance carries `setDisplay` (so this
-// adapter doesn't depend on the plugin). Before the rail mounts, it's the display it mounts with.
+// Switch the viewer's thumbnails rail (the last one registered, whose rail shows): plugin-thumbnails'
+// instance carries `setDisplay` (so this adapter doesn't depend on the plugin). Before the rail
+// mounts, it's the display it mounts with.
 const showDisplay = (viewer: ViewerApi, display: GalleristProps['groupDisplay']) => {
-  if (!display) return
-  for (const p of getInternals(viewer).getPlugins())
-    if (p.name === 'thumbnails') (p as { setDisplay?: (d: string) => void }).setDisplay?.(display)
+  if (display)
+    (
+      getInternals(viewer)
+        .getPlugins()
+        .filter((p) => p.name === 'thumbnails')
+        .pop() as { setDisplay?: (d: string) => void } | undefined
+    )?.setDisplay?.(display)
 }
+
+// The settings a host applies itself, marked on the viewer (plugin-view reads it, as its `controlled`)
+const CONTROLLED = Symbol.for('gallerist.controlled')
 
 const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(props, ref) {
   const {
@@ -239,6 +252,15 @@ const GalleristBase = forwardRef<ViewerApi, GalleristProps>(function Gallerist(p
         (onRef.current?.[name] as ((p: unknown) => unknown) | undefined)?.(payload)
     }
     return createViewer({ ...rest, on: forward })
+  })
+  // While `scheme` / `groupDisplay` are passed they own those settings, so a View menu only reports a
+  // choice for them. Marked before the plugins register and the renderer mounts (insertion effects
+  // run first), and on every commit after.
+  useInsertionEffect(() => {
+    ;(viewer as { [CONTROLLED]?: unknown })[CONTROLLED] = [
+      scheme && 'scheme',
+      groupDisplay && 'rail',
+    ].filter(Boolean)
   })
 
   // Data props are reactive: new data swaps the collection via setCollection (diffed by id, so the
