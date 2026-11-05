@@ -1985,23 +1985,60 @@
 
 /* ── docked controls (`arrows: 'docked'`, the reviewer preset): nothing over the media ─────────
    Review needs every pixel, corners included. The group arrows sit in gutters the stage leaves at
-   its sides (none on touch, where swipes stand in for them). The item navigator is a grid item of
-   the root, the count over ↑ ↓: a header on the aside item column while that shows, else at the
-   end of the caption row, which makes room for it. While any group has several items it keeps its
-   room on a one-item group, so the stage and the item column hold still. Last in the file, so it
-   wins over the arrow layouts and the touch chip above. Where no row or column beside the stage is
-   free (immersive) it falls back to the stage's corner; the zoom minimap stays over the media (it
-   shows only while zoomed, and is the zoom tool itself). */
+   its sides (on touch, where swipes stand in for them, only while one has keyboard focus). The
+   item navigator is a grid item of the root, the count over ↑ ↓: a header on the aside item column
+   while that shows, else at the end of the caption row, which makes room for it. While any group
+   has several items it keeps its room on a one-item group, so the stage and the item column hold
+   still. Last in the file, so it wins over the arrow layouts and the touch chip above. Where no row
+   or column beside the stage is free (immersive) it falls back to the stage's corner; the zoom
+   minimap stays over the media (it shows only while zoomed, and is the zoom tool itself). */
 .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
   inset-inline: calc(var(--gallerist-arrow-size) + 24px);
 }
 .gallerist[data-gallerist-arrows="docked"][data-gallerist-axis="vertical"] .gallerist-stage {
   inset-inline-start: 0; /* both group arrows stack at the inline end */
 }
+/* touch: the stage takes the full width. A keyboard or switch user on touch still reaches the
+   arrows, which then come back beside the media, never over it: the stage makes room for them only
+   while one has focus, as much on each side, so letterboxed media holds still. Held sideways the
+   room is the gutters a mouse gets; upright, where most photos and screenshots leave their spare
+   room above and below, it is a band at the top and the bottom instead, and the arrows sit in the
+   bottom one (with ↑ ↓, ↑ in the top one); not in immersive, whose navigator has that corner. */
 @media (pointer: coarse) {
   .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
     inset-inline: 0;
   }
+  .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-controls > :focus-visible)
+    .gallerist-stage {
+    inset-inline: calc(var(--gallerist-arrow-size) + 24px);
+  }
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-preset="immersive"]):has(
+      .gallerist-controls > :focus-visible
+    )
+    .gallerist-stage {
+    inset: calc(var(--gallerist-arrow-size) + 16px) 0;
+  }
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-preset="immersive"])
+    .gallerist-controls
+    > :is(.gallerist-prev, .gallerist-next):focus-visible {
+    top: auto;
+    bottom: 8px;
+    transform: none;
+  }
+  .gallerist[data-gallerist-arrows="docked"][data-gallerist-axis="vertical"]:not(
+      [data-gallerist-preset="immersive"]
+    )
+    .gallerist-controls
+    > .gallerist-prev:focus-visible {
+    top: 8px;
+    bottom: auto;
+  }
+}
+/* and above the zoom minimap, which can reach a gutter on a short stage */
+.gallerist[data-gallerist-arrows="docked"] .gallerist-controls > :focus-visible {
+  z-index: 5;
 }
 /* one group (and no linear walk): the group arrows have nowhere to go, so they and their gutters go */
 .gallerist[data-gallerist-arrows="docked"][data-gallerist-one-group]:not([data-gallerist-linear])

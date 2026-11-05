@@ -118,11 +118,11 @@ The ←/→ group arrows stay on the side edges; the option places the **item na
 - `split` — ↑ at top-centre with the position under it, ↓ at bottom-centre.
 - `docked` (the `reviewer` preset) — nothing over the media, for review that needs every pixel,
   corners included. The group arrows sit in gutters the stage leaves at its sides (on touch, where
-  swipes stand in for them, the stage takes the full width). The navigator leaves the stage: the
-  `n / N` count over ↑ ↓, as a header on the `aside` item column while that shows (a `stacked`
-  rail's vertical item stack, over 600px wide, rail expanded), otherwise at the end of the caption
-  row, beside a text caption or a designed one (`plugin-captions`, `<Gallerist.Caption>`), which make
-  room for it. It shows the count rather than pills or dots. While any group has several items it
+  swipes stand in for them, the stage takes the full width until one has keyboard focus, below).
+  The navigator leaves the stage: the `n / N` count over ↑ ↓, as a header on the `aside` item
+  column while that shows (a `stacked` rail's vertical item stack, over 600px wide, rail expanded),
+  otherwise at the end of the caption row, beside a text caption or a designed one
+  (`plugin-captions`, `<Gallerist.Caption>`), which make room for it. It shows the count rather than pills or dots. While any group has several items it
   keeps its room on a one-item group, so neither the stage nor the item column moves (not in
   `linear` mode, which has no navigator). A one-group collection has no group arrows and no
   gutters (in `linear` mode the arrows walk the items, so they stay). Keyboard order follows the
@@ -141,7 +141,12 @@ count, up to 12 items), or `counter` (always `n / N`).
 On a touch screen the on-image arrows are visually hidden (swipes navigate; screen readers still
 reach them) and the navigator shows only the `n / N` position, at the bottom centre of the stage
 (`docked`: where it docks, with its ↑ ↓). A group arrow focused from a keyboard on a touch screen
-comes back over the stage edge while it has focus, `docked` included.
+(a tablet's keyboard, switch access) comes back while it has focus: over the stage edge in the other
+layouts, beside the media in `docked`. There the stage makes room for it only while it has focus,
+as much on each side, so letterboxed media holds still: on a landscape screen the gutters a mouse
+gets; on a portrait one a band above and below the stage, with the arrows in the bottom band (on a
+vertical group axis ↑ takes the top one; `immersive`, whose navigator holds that corner, keeps the
+gutters). A focused docked arrow also stays above the zoom minimap.
 
 ## Layout areas, rail collapse & idle auto-hide
 

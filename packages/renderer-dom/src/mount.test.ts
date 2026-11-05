@@ -235,6 +235,26 @@ describe('mount — chrome + keyboard', () => {
     expect(nav.hidden).toBe(true)
   })
 
+  // The theme gives a focused docked arrow room beside the media while it has focus (on touch,
+  // `.gallerist-controls > :focus-visible`), so the group arrows must be the controls box's only
+  // keyboard stops, as its own children: the item navigator is off it, the zoom minimap a pointer aid.
+  it('docked arrows: the group arrows are the stage controls’ only keyboard stops', () => {
+    for (const linear of [false, true]) {
+      document.body.innerHTML = ''
+      const v = createViewer({ collection: collection() })
+      mount(v, { arrows: 'docked', navigator: true, linear })
+      v.open({ g: 1 })
+      v.zoomTo(2) // the minimap shows
+      const controls = document.querySelector('.gallerist-controls') as HTMLElement
+      const stops = [
+        ...controls.querySelectorAll<HTMLElement>('button, a[href], input, [tabindex]'),
+      ].filter((el) => !el.matches('[tabindex="-1"], :disabled'))
+      expect(stops.map((el) => el.className)).toEqual(['gallerist-prev', 'gallerist-next'])
+      for (const el of stops) expect(el.parentElement).toBe(controls)
+      v.destroy()
+    }
+  })
+
   it('other arrow layouts keep the caption after the aside', () => {
     const v = createViewer({ collection: collection() })
     mount(v, { arrows: 'corner-br' })

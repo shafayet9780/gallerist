@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright'
 import { type Page, expect, test } from '@playwright/test'
 
 // Layout lint (plan P2-K): sweep chrome configurations × viewport × direction and assert that the
@@ -643,6 +644,226 @@ test.describe('reviewer: nothing over the media', () => {
     expect(nav.bottom).toBeLessThanOrEqual(band.top + 0.5)
     expect(nav.right).toBeLessThanOrEqual(main.right)
     expect(band.width).toBeCloseTo(main.width, 0)
+  })
+
+  // A group arrow focused from a keyboard (a tablet with a keyboard, switch access). On touch the
+  // arrows are visually hidden until then and the stage takes the full width, so a focused arrow
+  // has to find room beside the media rather than come back over it. Each arrow is reached from the
+  // keyboard and activated, on a stacked rail (it steps groups), a flat one (it steps screens) and a
+  // side rail (↑ ↓ at the end), and zoomed in (the minimap shares the stage's corner), in both
+  // directions, on a phone held either way, with touch and with a mouse, in every skin (each sizes
+  // its arrows).
+  test.describe('a docked arrow focused from a keyboard', () => {
+    const CONTEXTS = {
+      'touch portrait': VIEWPORTS.phone,
+      'touch landscape': VIEWPORTS.landscape,
+      'mouse portrait': { viewport: VIEWPORTS.phone.viewport },
+      'mouse landscape': { viewport: VIEWPORTS.landscape.viewport },
+    }
+    const LOOKS = {
+      stacked: 'preset=reviewer',
+      flat: 'preset=reviewer&display=flat',
+      side: 'preset=reviewer&rail=left',
+      zoomed: 'preset=reviewer&zoom=2',
+      // docked in immersive: its navigator holds the stage's bottom inline-end corner, so a focused
+      // arrow keeps the side gutters there, upright too, rather than the bottom band. Upright only:
+      // on a short landscape stage that corner box already reaches → at mid-height, with a mouse as
+      // on touch (outside the reviewer's contract; immersive puts chrome over its media by design).
+      immersive: 'preset=immersive&arrows=docked&railopen=1',
+    }
+    const current = (page: Page) =>
+      page
+        .locator('.gallerist-content[data-gallerist-current] .gallerist-media-image')
+        .getAttribute('alt')
+    // the image has loaded, the stage and rail hold still (a focused arrow may resize the stage),
+    // and the item's own entrance has ended
+    const settle = async (page: Page) => {
+      await expect(
+        page.locator('.gallerist-content[data-gallerist-current] .gallerist-media-image'),
+      ).toHaveAttribute('data-gallerist-loaded', '')
+      await railSettled(page)
+      await page.evaluate(() =>
+        Promise.all(
+          document
+            .getAnimations()
+            .filter((a) => a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY)
+            .map((a) => a.finished.catch(() => null)),
+        ),
+      )
+    }
+    // focus as a keyboard user does: Tab on from where focus is. Headless WebKit doesn't deliver
+    // Tab traversal (see a11y.spec), so there the arrow is focused after a key press, which
+    // :focus-visible treats as keyboard focus all the same.
+    const keyboardFocus = async (page: Page, sel: string, browserName: string) => {
+      if (browserName === 'webkit') {
+        await page.keyboard.press('Shift')
+        await page.locator(sel).focus()
+      } else {
+        for (let k = 0; k < 40; k++) {
+          if (await page.evaluate((s) => !!document.activeElement?.matches(s), sel)) break
+          await page.keyboard.press('Tab')
+        }
+      }
+      await expect(page.locator(sel)).toBeFocused()
+      expect(await page.locator(sel).evaluate((el) => el.matches(':focus-visible'))).toBe(true)
+    }
+    // the focused arrow: its box, how much of it its ancestors clip, and what is on top of it at its
+    // centre and at the middle of each edge (its own icon counts as itself)
+    const probe = (page: Page, sel: string) =>
+      page.evaluate((s) => {
+        const el = document.querySelector<HTMLElement>(s) as HTMLElement
+        const r = el.getBoundingClientRect()
+        const clip = (
+          window as unknown as { __galleristClip: (e: Element) => DOMRect | null }
+        ).__galleristClip(el)
+        const box = (q: string) =>
+          (document.querySelector(q) as HTMLElement).getBoundingClientRect()
+        const main = box('.gallerist-main')
+        const stage = box('.gallerist-stage')
+        const points = [
+          [r.x + r.width / 2, r.y + r.height / 2],
+          [r.x + r.width / 2, r.y + 4],
+          [r.x + r.width / 2, r.bottom - 4],
+          [r.x + 4, r.y + r.height / 2],
+          [r.right - 4, r.y + r.height / 2],
+        ] as const
+        const under = points.flatMap(([x, y]) => {
+          const top = document.elementFromPoint(x, y)
+          if (top && (top === el || el.contains(top))) return []
+          return [top ? top.getAttribute('class') || top.tagName : 'nothing']
+        })
+        return {
+          x: r.x,
+          y: r.y,
+          w: r.width,
+          h: r.height,
+          clipped:
+            !clip || Math.abs(clip.width - r.width) > 0.5 || Math.abs(clip.height - r.height) > 0.5,
+          shown: el.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
+          clipPath: getComputedStyle(el).clipPath,
+          under,
+          main: { x: main.x, y: main.y, r: main.right, b: main.bottom },
+          stage: { x: stage.x, y: stage.y, w: stage.width, h: stage.height },
+          vw: innerWidth,
+          vh: innerHeight,
+        }
+      }, sel)
+
+    for (const [ctxName, ctx] of Object.entries(CONTEXTS)) {
+      test.describe(ctxName, () => {
+        test.use(ctx)
+        const touch = 'hasTouch' in ctx
+        for (const [lookName, look] of Object.entries(LOOKS))
+          for (const dir of ['ltr', 'rtl'])
+            if (lookName !== 'immersive' || ctxName.endsWith('portrait'))
+              test(`${lookName}, ${dir}`, async ({ page, browserName }) => {
+                const problems: string[] = []
+                for (const skin of SKINS) {
+                  await page.goto(
+                    `/layout.html?${look}&skin=${skin}&g=1&captions=1${dir === 'rtl' ? '&dir=rtl' : ''}`,
+                  )
+                  const root = page.locator('.gallerist')
+                  await expect(root).toHaveAttribute('data-gallerist-phase', 'open')
+                  await expect(root).toHaveAttribute('data-gallerist-arrows', 'docked')
+                  if (lookName === 'flat')
+                    await expect(root).toHaveAttribute('data-gallerist-linear', 'true')
+                  expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(
+                    touch,
+                  )
+                  await installClip(page)
+                  await settle(page)
+                  // ← / ↑ goes back to the first group's (only) item; → / ↓ returns to the second's
+                  for (const [sel, to] of [
+                    ['.gallerist-prev', 'g0i0'],
+                    ['.gallerist-next', 'g1i0'],
+                  ] as const) {
+                    await keyboardFocus(page, sel, browserName)
+                    for (const step of ['focused', 'activated']) {
+                      if (step === 'activated') {
+                        await page.keyboard.press('Enter')
+                        await expect.poll(() => current(page)).toBe(to)
+                        await expect(page.locator(sel)).toBeFocused()
+                      }
+                      await settle(page)
+                      const at = `${skin} ${sel} ${step}`
+                      const a = await probe(page, sel)
+                      const painted = await paintedMedia(page)
+                      if (!painted) {
+                        problems.push(`${at}: no painted media`)
+                        continue
+                      }
+                      // what shows of it: a zoomed image runs past the stage, which clips it
+                      const x0 = Math.max(painted.x, a.stage.x)
+                      const y0 = Math.max(painted.y, a.stage.y)
+                      const media = {
+                        x: x0,
+                        y: y0,
+                        w: Math.min(painted.x + painted.w, a.stage.x + a.stage.w) - x0,
+                        h: Math.min(painted.y + painted.h, a.stage.y + a.stage.h) - y0,
+                      }
+                      if (!a.shown || a.clipPath !== 'none') problems.push(`${at}: not shown`)
+                      if (a.clipped) problems.push(`${at}: clipped`)
+                      // the focus ring (2px, 2px out) stays inside main, which no other chrome covers
+                      const ring = 4
+                      if (
+                        a.x - ring < a.main.x - 0.5 ||
+                        a.y - ring < a.main.y - 0.5 ||
+                        a.x + a.w + ring > a.main.r + 0.5 ||
+                        a.y + a.h + ring > a.main.b + 0.5
+                      )
+                        problems.push(`${at}: its focus ring leaves the stage area`)
+                      if (a.x < 0 || a.y < 0 || a.x + a.w > a.vw || a.y + a.h > a.vh)
+                        problems.push(`${at}: outside the viewport`)
+                      const min = touch ? 44 : 24
+                      if (a.w < min - 0.5 || a.h < min - 0.5)
+                        problems.push(
+                          `${at}: target ${Math.round(a.w)}×${Math.round(a.h)} < ${min}px`,
+                        )
+                      if (a.under.length) problems.push(`${at}: under ${a.under.join(', ')}`)
+                      const arrow = {
+                        sel,
+                        label: sel,
+                        ...a,
+                        fw: 0,
+                        fh: 0,
+                        button: true,
+                        inStage: false,
+                      }
+                      const m = { sel: 'media', label: 'media', ...media, fw: 0, fh: 0 }
+                      if (overlap(arrow, { ...m, button: false, inStage: true }))
+                        problems.push(
+                          `${at}: over the media (arrow ${[a.x, a.y, a.w, a.h].map(Math.round)}, media ${[media.x, media.y, media.w, media.h].map(Math.round)})`,
+                        )
+                      // docked, it sits beside the stage, whatever the media's shape (a letterbox
+                      // under it today could hold a wider image tomorrow)
+                      const s = { sel: 'stage', label: 'stage', ...a.stage, fw: 0, fh: 0 }
+                      if (overlap(arrow, { ...s, button: false, inStage: true }))
+                        problems.push(`${at}: on the stage`)
+                    }
+                  }
+                }
+                expect(problems, problems.join('\n')).toEqual([])
+              })
+      })
+    }
+
+    test.describe('touch portrait', () => {
+      test.use(VIEWPORTS.phone)
+      test('axe: no violations with an arrow focused', async ({ page, browserName }) => {
+        for (const look of Object.values(LOOKS)) {
+          await page.goto(`/layout.html?${look}&skin=console&g=1&captions=1`)
+          await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+          await settle(page)
+          await keyboardFocus(page, '.gallerist-next', browserName)
+          await settle(page)
+          const results = await new AxeBuilder({ page })
+            .include('.gallerist')
+            .withTags(['wcag2a', 'wcag2aa', 'wcag22aa', 'best-practice'])
+            .analyze()
+          expect(results.violations, look).toEqual([])
+        }
+      })
+    })
   })
 })
 
