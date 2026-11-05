@@ -551,8 +551,10 @@
   padding: 8px;
   padding-inline-start: 0;
 }
-/* collapsing the rail puts its item stack away too (fullscreen, `t`, rail: 'hidden') */
-.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside {
+/* collapsing the rail puts its item stack away too (fullscreen, `t`, rail: 'hidden'); a rail switched
+   to flat or index leaves the column hidden */
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside,
+.gallerist-thumbs-aside[hidden] {
   display: none;
 }
 .gallerist-thumb-item {
