@@ -1,3 +1,5 @@
 # @gallerist/plugin-video-youtube
 
+## 0.3.2
+
 ## 0.3.1
