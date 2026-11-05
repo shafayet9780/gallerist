@@ -76,8 +76,11 @@ without closing the viewer, wherever focus is; a field in a `renderCard` card ke
 by calling `event.preventDefault()` in its own `keydown` handler. A card opens beside its pin toward
 the side of the stage with more room and stays inside the stage on both axes: level with its pin when
 it fits, else slid along it (across too, over the pin, when the room beside it is narrow), never
-under a band floated over the stage (immersive) or the docked item navigator, and never wider or
-taller than the room. A taller card scrolls: it then joins the tab order, ↑ ↓ Home End Page Up/Down
+under a band floated over the stage (immersive), the docked item navigator or the zoom minimap
+(`navigator: true`, on in the `reviewer` preset), and never wider or taller than the room. When the
+navigator or the minimap is in the card's columns, the card's room ends at its edge, above or below
+it, whichever leaves more, and the card keeps its side of the pin. The minimap comes and goes with
+the zoom, and a card left open is placed again when it does. A taller card scrolls: it then joins the tab order, ↑ ↓ Home End Page Up/Down
 scroll it rather than navigate, a wheel over it scrolls it, and its close button stays in view. A
 wheel over something in a card that scrolls on the wheel's axis (the card, or a textarea or list of
 yours in it) scrolls that; over anything else, or a pinch (ctrl+wheel) anywhere on a card, it zooms

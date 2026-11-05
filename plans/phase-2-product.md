@@ -115,7 +115,7 @@ first publish from waiting on Atlas and the review plugins.
 - Raised 2026-11-03 (owner, P2-R): core + renderer ≤ **16.5 KB** gz, for the keyboard-scrollable
   caption band only (the a11y fix didn't fit at 15,952 B against 16,000 B). Not headroom for features.
 - Each skin CSS ≤ 6 KB gz; `base.css` ≤ 10 KB gz.
-- Each new plugin gets its own size-limit entry (pins ≤ 4 KB, atlas ≤ 5 KB).
+- Each new plugin gets its own size-limit entry (pins ≤ 4 KB, atlas ≤ 5 KB). (Pins: 4.03 KB since 0.3.2, for an open card keeping clear of the zoom minimap.)
 
 ## Risks
 
