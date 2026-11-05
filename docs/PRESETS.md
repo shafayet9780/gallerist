@@ -227,9 +227,10 @@ mount(viewer, { skin: 'console', accent: 'cyan', scheme: 'auto' })
 ```
 
 To let people switch the scheme (and the rail's layout) from inside the viewer, add the View menu,
-`@gallerist/plugin-view`. It sets `data-gallerist-scheme` itself, or, with `controlled`, reports the
-choice for the host to apply (React: the `scheme` prop). React writes each appearance prop only when
-it changes, so a scheme the menu set stays while the host's own props move.
+`@gallerist/plugin-view`. It sets `data-gallerist-scheme` itself, or, for a host that owns the scheme
+(`controlled`; in React, while the `scheme` prop is passed), reports the choice for the host to
+apply. React writes each appearance prop only when it changes, so a scheme the menu set stays while
+the host's other props move.
 
 Without its stylesheet a skin falls back to Gallery, and an accent the skin doesn't name falls back
 to the skin's default. Gallery uses Instrument Sans when the page has loaded it and the system sans

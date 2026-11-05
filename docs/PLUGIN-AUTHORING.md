@@ -39,9 +39,13 @@ got an explicit `linear`, ←/→ then walk every item in order across groups. T
 time the plugin set changes, so it follows the rail being added or removed; `plugin-thumbnails` marks
 its region this way in `flat` mode. A plugin that changes the marker on a region already mounted (the
 rail switching its display at run time) calls `viewer.refresh()` after, and the renderer reads it
-again, with the counter, the item navigator and the arrows' names. Without built-in controls
-(`controls: false`) the bar shows while the toolbar holds a tool that isn't `hidden`, read at the same
-times.
+again, with the counter, the item navigator and the arrows' names. The plugins' keymaps are read at
+the same times, so a `keymap` getter can drop a key a layout doesn't use and leave it to an earlier
+plugin (a flat rail leaves `e`). Without built-in controls (`controls: false`) the bar shows while the
+toolbar holds a tool, but for tools marked `data-gallerist-off`: a tool its plugin keeps hidden for a
+later layout (a flat rail's items toggle, a View menu with nothing to offer) carries that marker
+beside `hidden`, and the plugin calls `viewer.refresh()` when it changes. A tool that only toggles
+`hidden` itself still shows the bar, as before.
 
 A region renderer gets `ctx = { viewer, preset? }`. `preset` is the renderer's mounted layout preset as
 `PresetDefaults`, a map keyed by what each entry configures (the DOM renderer passes `resolvePreset()`'s
@@ -82,8 +86,15 @@ its UI from `ctx.preset` builds it again for that mount (see `plugin-thumbnails`
   `aria-expanded`) whose menu is appended to the viewer root (`button.closest('.gallerist')`, which is
   positioned), not to the toolbar region, which scrolls sideways on a narrow screen and would clip it.
   Stop the keys the menu handles (`stopPropagation`, `preventDefault`) so the viewer's keymap doesn't
-  navigate, zoom or close under it, close it on a press outside and when the viewer closes, and
-  return focus to the button.
+  navigate, zoom or close under it, close it on a press outside (check `event.composedPath()`, so a
+  viewer in a shadow root works) and when the viewer closes, and return focus to the button. The
+  renderer can be destroyed under an open menu without telling plugins: close it from the next
+  document or window event that finds the button disconnected (`!button.isConnected`).
+- **A setting the host may own** (`plugin-view`): read `viewer[Symbol.for('gallerist.controlled')]`
+  (`true` or a list of setting names) each time before applying a value of your own. A host or an
+  adapter sets it for the settings it applies itself; React's `<Gallerist>` lists `scheme` and
+  `rail` while its `scheme` and `groupDisplay` props are passed. Report a choice for such a setting,
+  don't apply it.
 
 ## Rules
 
