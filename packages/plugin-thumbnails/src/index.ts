@@ -15,7 +15,8 @@
 //    900px wide or less, the rows become a strip of chips.
 //
 // Reconcile-in-place (M14 UX-B): the rail is NOT torn down on cursor moves. Cursor moves flip
-// `data-active` on the previous and the new active thumb only, and scroll the active one into view.
+// `data-active` on the previous and the new active thumb only, and scroll the active one into view
+// with a card of context on each side (centred once a neighbour would be cut off, see reveal()).
 //
 // Windowing (U17): the rail draws a contiguous run of cards, what fits in its scroller plus a few each
 // side, and follows its own scroll: when the middle of the rail moves, cards that left the run are
@@ -207,29 +208,44 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
   return btn
 }
 
-// Scrolls only the viewer's own panels. scrollIntoView would also scroll the page, moving an inline
-// viewer's host page every time the cursor changes.
-function scrollActiveIntoView(btn: HTMLElement | undefined): void {
+// Brings the current card into view with context around it, scrolling only the viewer's own panels
+// (scrollIntoView would also scroll the page, moving an inline viewer's host page every time the
+// cursor changes). `around` are the cards next to it in its run (the rail's sequence, or the
+// group's items), where drawn. While the card and those neighbours all show whole, nothing moves,
+// so a click on a card in view doesn't shift the rail. Once one of them is cut by an edge or past
+// it, the panel centres the card, which leaves about half a panel of what comes next in view,
+// whichever way the cursor went. The browser clamps that at either end of the rail, so the first
+// and last cards stop at their edges. Instant, as every scroll of the rail is (there is no motion
+// to take out under prefers-reduced-motion).
+function reveal(btn: HTMLElement | undefined, ...around: Array<HTMLElement | undefined>): void {
   if (!btn) return
   const target = btn.getBoundingClientRect()
   if (!target.width && !target.height) return // hidden (an index chip's items): nothing to reveal
   for (let box = btn.parentElement; box; box = box.parentElement) {
     if (box.classList.contains('gallerist')) return
     const { overflowX, overflowY } = getComputedStyle(box)
-    const edge = box.getBoundingClientRect()
-    if (/auto|scroll/.test(overflowX)) {
-      box.scrollLeft += nearest(target.left, target.right, edge.left, edge.right)
-    }
-    if (/auto|scroll/.test(overflowY)) {
-      box.scrollTop += nearest(target.top, target.bottom, edge.top, edge.bottom)
-    }
+    if (/auto|scroll/.test(overflowX)) box.scrollLeft += centreBy(box, btn, around, 'left', 'right')
+    if (/auto|scroll/.test(overflowY)) box.scrollTop += centreBy(box, btn, around, 'top', 'bottom')
   }
 }
 
-/** How far to scroll so [start, end] shows inside [min, max], moving as little as possible. */
-function nearest(start: number, end: number, min: number, max: number): number {
-  if (start < min) return start - min
-  return end > max ? end - max : 0
+/** How far to scroll `box` along one axis: 0 while `btn` and its neighbours show whole, else what
+ *  centres `btn` in it. A neighbour with no box (not laid out, hidden) doesn't count. */
+function centreBy(
+  box: HTMLElement,
+  btn: HTMLElement,
+  around: Array<HTMLElement | undefined>,
+  lo: 'left' | 'top',
+  hi: 'right' | 'bottom',
+): number {
+  const edge = box.getBoundingClientRect()
+  const cut = (el: HTMLElement | undefined) => {
+    const r = el?.getBoundingClientRect()
+    return !!r && (!!r.width || !!r.height) && (r[lo] < edge[lo] - 1 || r[hi] > edge[hi] + 1)
+  }
+  if (!cut(btn) && !around.some(cut)) return 0
+  const r = btn.getBoundingClientRect()
+  return (r[lo] + r[hi] - edge[lo] - edge[hi]) / 2
 }
 
 /** Whether the primary pointer can hover (desktop). Defaults true when undetectable (SSR/test). */
@@ -681,12 +697,38 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
     }
 
+    // Reveal the current card with the ones beside it in the rail (a flat rail's items in rail
+    // order, across groups; else the group cards, or index rows), and the current item with its
+    // neighbours in the group's item panel (the item column, an index section's items)
+    const revealActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
+      const at = isFlat ? (flatPos.get(`${g}:${i}`) ?? 0) : g
+      const card = (k: number) =>
+        isFlat ? itemBtns.get(flat[k]?.itemId ?? '') : groupBtns.get(col.groups[k]?.id ?? '')
+      // Centring scrolls up to half the rail past what shows, and the drawn run reaches only a few
+      // cards past it: when the rail is about to centre, draw what the centred card's half-rails
+      // need first (keepPlace holds the screen still), or the scroll would stop at the run's end.
+      // The scroll that follows trims the run back (rewindow).
+      const btn = card(at)
+      if (root && btn && axis && perView) {
+        const [lo, hi] = axis === 'x' ? (['left', 'right'] as const) : (['top', 'bottom'] as const)
+        if (centreBy(root, btn, [card(at - 1), card(at + 1)], lo, hi)) {
+          const reach = Math.ceil(perView / 2) + 1
+          setWindow(
+            col,
+            Math.min(winStart, Math.max(0, at - reach)),
+            Math.max(winEnd, Math.min(seqLength(col) - 1, at + reach)),
+          )
+        }
+      }
+      reveal(btn, card(at - 1), card(at + 1))
+      const items = col.groups[g]?.items ?? []
+      const item = (k: number) => itemBtns.get(items[k]?.id ?? '')
+      if (!isFlat) reveal(item(i), item(i - 1), item(i + 1))
+    }
+
     const applyActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
       markActive(col, g, i)
-      const group = col.groups[g]
-      if (group) scrollActiveIntoView(groupBtns.get(group.id))
-      const item = group?.items[i]
-      if (item) scrollActiveIntoView(itemBtns.get(item.id))
+      revealActive(col, g, i)
     }
 
     // re-evaluate the active item panel for the current cursor (used when `panelOpen` toggles, since
@@ -931,11 +973,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         requestAnimationFrame(() => {
           if (!root) return
           const { g, i } = viewer.getState().cursor
-          const group = viewer.getCollection().groups[g]
-          if (!group) return
-          scrollActiveIntoView(groupBtns.get(group.id))
-          const item = group.items[i]
-          if (item) scrollActiveIntoView(itemBtns.get(item.id))
+          revealActive(viewer.getCollection(), g, i)
           rewindow() // the first layout: size the run to the rail
         })
       }

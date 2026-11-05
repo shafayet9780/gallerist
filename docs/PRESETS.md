@@ -128,7 +128,8 @@ The ←/→ group arrows stay on the side edges; the option places the **item na
   gutters (in `linear` mode the arrows walk the items, so they stay). Keyboard order follows the
   layout: the caption band, then the navigator, then the item column it heads. One exception, by
   design: the zoom minimap (the `reviewer`'s zoom navigator) still sits in the stage's corner over
-  the media; it shows only while zoomed in and is the zoom tool itself. With other presets:
+  the media; it shows only while zoomed in and is the zoom tool itself. An open pin card
+  (`plugin-pins`) keeps clear of it. With other presets:
   `editorial` without a placard ends its caption column with the navigator, under the caption;
   `immersive`, whose stage runs under every band, puts it in the stage's bottom inline-end corner
   above the caption band, as `corner-br` does, so there it sits over the media.
@@ -178,7 +179,8 @@ when they shrink). Keep them a steady height if the image shouldn't move between
   in the stage's bottom corner (top corner on narrow screens) with a box for the visible part;
   click or drag it to move around. It is a pointer aid, hidden from assistive tech; the keys zoom
   and pan as before. It belongs to the built-in controls (none with `controls: false`) and fades
-  with them on idle; it isn't shown for media that can't zoom (video).
+  with them on idle; it isn't shown for media that can't zoom (video). An open pin card
+  (`plugin-pins`) is placed clear of it, and placed again when it shows or hides.
 - **Phones:** under 600px wide the chrome compacts, the `aside` column and the items toggle are
   dropped and the bar's tools scroll sideways if they don't fit. On a touch screen every target is
   at least 44px, the ↑ · position · ↓ navigator stays visible (group arrows give way to swipes but

@@ -1224,6 +1224,88 @@ describe('plugin-pins', () => {
       expect(again.style.top).toBe(`${382 - 100 - 300}px`)
     })
 
+    // 0.3.2: the minimap (the reviewer's zoom navigator) sat over the start of an open card's note
+    const withMinimap = () => {
+      const plugin = pins()
+      const v = createViewer({ collection: collection(), plugins: [plugin] })
+      mount(v, { navigator: true })
+      v.open()
+      expect(document.querySelector('.gallerist-navigator')).not.toBeNull()
+      return v
+    }
+    it('never under the zoom minimap: in its columns, the room ends below it (a phone: top corner)', () => {
+      withMinimap()
+      // 390×520 portrait: a 217px stage under the bar; the minimap in its top-left corner, 96×60
+      const stage = rect(0, 57, 390, 217)
+      const minimap = rect(12, 69, 96, 60)
+      // the card goes left of a pin high on the right (242px of room against 88px): 46..246
+      layout({ 'gallerist-stage': stage, 'gallerist-navigator': minimap, ...pinAt(250, 70) }, 100)
+      const card = openCard()
+      expect(card.style.left).toBe(`${46 - 250}px`)
+      // 4px above the minimap, 137px below it: the room starts under it (129 + 8) and the card
+      // slides down to there, rather than level with its pin
+      expect(card.style.maxHeight).toBe(`${266 - 137}px`)
+      expect(card.style.top).toBe(`${137 - 70}px`)
+      markers()[0]?.click()
+      // clear of its columns (right of a pin on the left), the card stays level with its pin
+      layout({ 'gallerist-stage': stage, 'gallerist-navigator': minimap, ...pinAt(120, 70) }, 100)
+      const again = openCard()
+      expect(again.style.left).toBe('48px')
+      expect(again.style.top).toBe('0px')
+    })
+
+    it('never under the zoom minimap: the room ends above it (a desktop: bottom corner), either side', () => {
+      withMinimap()
+      const stage = rect(0, 50, 1000, 600)
+      // right of a pin near the bottom-left: 148..348, over the minimap's columns (12..172)
+      layout(
+        {
+          'gallerist-stage': stage,
+          'gallerist-navigator': rect(12, 538, 160, 100),
+          ...pinAt(100, 600),
+        },
+        100,
+      )
+      const card = openCard()
+      expect(card.style.left).toBe('48px')
+      expect(card.style.maxHeight).toBe(`${530 - 58}px`) // ends 8px above it (538)
+      expect(card.style.top).toBe(`${430 - 600}px`) // slid up: 430..530
+      markers()[0]?.click()
+      // right to left: the minimap in the bottom-right corner, the card left of a pin by it
+      layout(
+        {
+          'gallerist-stage': stage,
+          'gallerist-navigator': rect(828, 538, 160, 100),
+          ...pinAt(856, 600),
+        },
+        100,
+      )
+      const rtl = openCard()
+      expect(rtl.style.left).toBe(`${652 - 856}px`) // 652..852, over the minimap's 828..988
+      expect(rtl.style.top).toBe(`${430 - 600}px`)
+    })
+
+    it('placed again when the minimap shows or hides with the zoom (a card left open)', async () => {
+      const v = withMinimap()
+      const stage = rect(0, 50, 1000, 600)
+      const at = { 'gallerist-stage': stage, ...pinAt(100, 600) }
+      layout(at, 100)
+      const card = openCard()
+      expect(card.style.top).toBe(`${542 - 600}px`) // no minimap: as low as the stage allows
+      // zoomed in: the minimap shows in the corner the card reaches into
+      layout({ ...at, 'gallerist-navigator': rect(12, 538, 160, 100) }, 100)
+      v.zoomTo(2)
+      await new Promise((r) => requestAnimationFrame(r))
+      expect(card.style.top).toBe(`${430 - 600}px`)
+      expect(card.style.maxHeight).toBe(`${530 - 58}px`)
+      // zoomed out: hidden (no box), the card has the room back
+      layout(at, 100)
+      v.zoomTo(1)
+      await new Promise((r) => requestAnimationFrame(r))
+      expect(card.style.top).toBe(`${542 - 600}px`)
+      expect(card.style.maxHeight).toBe(`${642 - 58}px`)
+    })
+
     it('a wheel over a card that scrolls scrolls it; over a short card, or a pinch, it zooms', () => {
       open()
       const stage = document.querySelector('.gallerist-stage') as HTMLElement

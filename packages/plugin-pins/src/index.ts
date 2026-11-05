@@ -264,19 +264,22 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
   // which the controls box is inset, 8px in from its edges) on both axes: beside its pin toward the
   // side with more room, level with it, each slid along when it doesn't fit; at most as wide and as
   // tall as the room (it scrolls past that, and joins the tab order so the keys scroll it); never
-  // under the docked item navigator (a root grid item: immersive floats it over the stage's corner).
-  // Decided from where the pin is on screen (zoom and pan included) when the card opens, and again
-  // after a zoom or pan, and as its contents resize (a host renders late).
+  // under the docked item navigator (a root grid item: immersive floats it over the stage's corner)
+  // or the zoom minimap (in a stage corner while zoomed in: the zoom tool itself). When either is in
+  // the card's columns, the room ends at its edge, on whichever side of it has more room; the card
+  // keeps its side of the pin. A minimap faded on idle still counts, so the card doesn't jump when
+  // it comes back. Decided from where the pin is on screen (zoom and pan included) when the card
+  // opens, and again after a zoom or pan (the minimap shows and hides with the zoom), and as its
+  // contents resize (a host renders late).
   const placeCard = (r: Rendered) => {
     const box = (sel: string) => viewerRoot()?.querySelector(sel)?.getBoundingClientRect()
     const s = box('.gallerist-stage')
     if (!s?.width) return
     const c = box('.gallerist-controls')
     const k = c?.width ? c : s
-    const n = box('.gallerist > .gallerist-itemnav')
     const m = r.marker.getBoundingClientRect()
     const at = r.el.getBoundingClientRect()
-    const top = Math.max(s.top, k.top) + 8
+    let top = Math.max(s.top, k.top) + 8
     let bottom = Math.min(s.bottom, k.bottom) - 8
     const left = Math.max(s.left, k.left) + 8
     const right = Math.min(s.right, k.right) - 8
@@ -287,8 +290,10 @@ export function pins(opts: PinsOptions = {}): PinsPlugin {
     const w = card.offsetWidth
     const x = Math.max(left, Math.min(toLeft ? m.left - 4 - w : m.right + 4, right - w))
     st.left = `${x - at.left}px`
-    if (n?.width && n.top < bottom && n.bottom > top && x < n.right && x + w > n.left)
-      bottom = n.top - 8
+    for (const n of [box('.gallerist > .gallerist-itemnav'), box('.gallerist-navigator')])
+      if (n?.width && n.top < bottom && n.bottom > top && x < n.right && x + w > n.left)
+        if (n.top - top > bottom - n.bottom) bottom = n.top - 8
+        else top = n.bottom + 8
     st.maxHeight = `${Math.max(60, bottom - top)}px`
     st.top = `${Math.max(top, Math.min(m.top, bottom - card.offsetHeight)) - at.top}px`
     // it scrolls: in the tab order. While it does, the fade (pins.css) adds 12px below its contents,

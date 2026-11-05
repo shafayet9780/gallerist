@@ -44,7 +44,7 @@
     "path": "packages/plugin-pins/dist/index.js",
     "import": "{ pins }",
     "ignore": ["@gallerist/core"],
-    "limit": "4 kB",
+    "limit": "4.03 kB",
     "gzip": true
   },
   {

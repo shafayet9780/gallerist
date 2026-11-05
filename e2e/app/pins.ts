@@ -1,6 +1,7 @@
 // Pins fixture (e2e/tests/pins.spec.ts): one landscape item with three pins and one portrait item
 // (for the contained zoom bounds). Query: skin, scheme, preset, presentation, card (h: card=empty's
-// height), bg (the landscape image's colour), dir.
+// height), bg (the landscape image's colour), dir, wide=1 (the landscape image 3.2:1, so it fills a
+// desktop stage's width and its pins reach the stage's side corners).
 import { type Collection, createViewer } from '@gallerist/core'
 import { type Pin, type PinPresentation, pins } from '@gallerist/plugin-pins'
 import { type ColorScheme, type PresetName, mount } from '@gallerist/renderer-dom'
@@ -10,6 +11,7 @@ import '@gallerist/theme-default/editorial.css'
 
 const p = new URLSearchParams(location.search)
 if (p.get('dir') === 'rtl') document.documentElement.dir = 'rtl'
+const W = p.get('wide') === '1' ? 3200 : 1600
 const svg = (w: number, h: number, color: string) =>
   `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/><circle cx="${w / 4}" cy="${h / 4}" r="${w / 40}" fill="white"/></svg>`,
@@ -42,8 +44,8 @@ const collection: Collection = {
         {
           id: 'land',
           type: 'image',
-          source: svg(1600, 1000, p.get('bg') ?? '#2980b9'),
-          naturalSize: { w: 1600, h: 1000 },
+          source: svg(W, 1000, p.get('bg') ?? '#2980b9'),
+          naturalSize: { w: W, h: 1000 },
           alt: 'landscape',
           meta: { pins: landscapePins },
         },

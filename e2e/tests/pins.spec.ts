@@ -281,6 +281,125 @@ test('a tall host card on a landscape phone stays inside the stage; its last but
   }
 })
 
+// 0.3.2 (Apploye, a 390×520 phone): after a ctrl+wheel zoom, the zoom minimap (the reviewer's
+// navigator) sat over the start of an open draft card's note. An open card keeps clear of the minimap
+// wherever it is (a phone's top corner, a desktop's bottom one; the inline-start corner, so the right
+// one right to left), with the card on either side of its pin: when the minimap shows up while the
+// card is open (a pinch over its pin), and when the card opens while zoomed in.
+type Box = { x: number; y: number; width: number; height: number }
+const meets = (a: Box, b: Box) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+const boxOf = async (page: Page, sel: string) => {
+  const b = await page.locator(sel).boundingBox()
+  if (!b) throw new Error(`no box for ${sel}`)
+  return b
+}
+const pinch = async (page: Page, x: number, y: number, dy: number) => {
+  await page.mouse.move(x, y)
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, dy)
+  await page.keyboard.up('Control')
+}
+for (const { name, size, query, open, zoomed } of [
+  {
+    name: 'phone',
+    size: { width: 390, height: 520 },
+    query: '',
+    // image points (at 1x) whose card reaches into the minimap's corner, right and left of the pin
+    open: [
+      [0.08, 0.12],
+      [0.75, 0.12],
+    ],
+    zoomed: [0.75, 0.15], // a stage point, beside the minimap, once zoomed in
+  },
+  {
+    name: 'phone, right to left',
+    size: { width: 390, height: 520 },
+    query: '&dir=rtl',
+    open: [
+      [0.92, 0.12],
+      [0.25, 0.12],
+    ],
+    zoomed: [0.25, 0.15],
+  },
+  {
+    name: 'desktop',
+    size: { width: 1280, height: 720 },
+    query: '&wide=1',
+    open: [[0.03, 0.9]],
+    zoomed: [0.05, 0.55],
+  },
+  {
+    name: 'desktop, right to left',
+    size: { width: 1280, height: 720 },
+    query: '&wide=1&dir=rtl',
+    open: [[0.97, 0.9]],
+    zoomed: [0.95, 0.55],
+  },
+] as const) {
+  test(`an open card never sits under the zoom minimap (${name})`, async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'runs once (chromium)')
+    await page.setViewportSize(size)
+    const look = `preset=reviewer&skin=console&card=draft&presentation=comment${query}`
+    const card = page.locator('[data-pin="n1"] .gallerist-pin-card')
+    const minimap = page.locator('.gallerist-navigator')
+    const clear = async () => {
+      const c = await boxOf(page, '[data-pin="n1"] .gallerist-pin-card')
+      const s = await boxOf(page, '.gallerist-stage')
+      expect(c.y).toBeGreaterThanOrEqual(s.y - 1)
+      expect(c.y + c.height).toBeLessThanOrEqual(s.y + s.height + 1)
+      return !meets(c, await boxOf(page, '.gallerist-navigator'))
+    }
+    const sides = new Set<string>()
+    // a comment placed at 1x opens its draft card; a pinch over its pin zooms in with it open
+    for (const [fx, fy] of open) {
+      await ready(page, look)
+      await page.locator('.gallerist-pin-add').click()
+      const img = await imageBox(page)
+      await page.mouse.click(img.x + img.w * fx, img.y + img.h * fy)
+      await expect(card).toBeVisible()
+      await expect(minimap).toBeHidden()
+      const dot = await dotOf(page, 'n1')
+      const c = await boxOf(page, '[data-pin="n1"] .gallerist-pin-card')
+      sides.add(c.x + c.width / 2 < dot.cx ? 'left' : 'right')
+      await pinch(page, dot.cx, dot.cy, -240)
+      await expect(minimap).toBeVisible()
+      await expect.poll(clear, `${fx},${fy} zoomed in`).toBe(true)
+      // zoomed back out, the minimap goes and the card stays open
+      await pinch(page, dot.cx, dot.cy, 2000)
+      await expect(minimap).toBeHidden()
+      await expect(card).toBeVisible()
+    }
+    // both sides of a pin on a phone; on a desktop the card that reaches the minimap's corner is the
+    // one on its side, so left to right and right to left between them cover both
+    expect([...sides]).toEqual(
+      name === 'phone'
+        ? ['right', 'left']
+        : name === 'phone, right to left'
+          ? ['left', 'right']
+          : [name === 'desktop' ? 'right' : 'left'],
+    )
+    // zoomed in first: a comment placed beside the minimap opens clear of it
+    await ready(page, look)
+    const s = await boxOf(page, '.gallerist-stage')
+    await pinch(page, s.x + s.width / 2, s.y + s.height / 2, -360)
+    await expect(minimap).toBeVisible()
+    await page.locator('.gallerist-pin-add').click()
+    await page.mouse.click(s.x + s.width * zoomed[0], s.y + s.height * zoomed[1])
+    await expect(card).toBeVisible()
+    await expect.poll(clear, 'opened zoomed in').toBe(true)
+    // placed clear of the minimap, the card is as accessible as anywhere
+    const results = await new AxeBuilder({ page })
+      .include('.gallerist-pin')
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze()
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([])
+  })
+}
+
 // The host drops an empty draft when its card closes (onOpenChange + refresh()); the repaint takes
 // its pin a frame after the card's focus went there. Focus goes on to the add button, not <body>.
 test('an empty draft the host drops: focus on the add button; Escape keeps the viewer', async ({
