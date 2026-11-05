@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.3.2
+
+### Pin cards and the rail on phones (from the Apploye reviewer)
+- **plugin-pins (fixed)**: an open card no longer sits under the zoom minimap (`navigator: true`, on
+  in the `reviewer` preset). On a 390×520 phone, zooming in with a draft card open (ctrl+wheel) put
+  the minimap over the start of its note field. The card now keeps clear of the minimap as it already
+  did of the docked item navigator: when the minimap is in the card's columns, the card's room ends
+  above or below it, whichever leaves more, and the card stays on its side of the pin, scrolling if
+  it no longer fits. This holds in every corner the minimap uses (the top one on a phone, the bottom
+  one on wider screens, mirrored right to left), and the card is placed again when the minimap shows
+  or hides with the zoom. The card avoids the minimap rather than covering it, because the minimap is
+  the zoom tool and stays usable while the card is open. The plugin-pins size limit goes from 4 kB to
+  4.03 kB for this (the bundle grows from 3,996 B to 4,025 B gzipped).
+- **plugin-thumbnails (fixed)**: the rail keeps the next card in view. Stepping with → left the
+  current card flush against the rail's far edge, so the card that came next was out of view; on a
+  phone, at item 14 of 15 the 15th was off screen. Now, while the current card and the cards on
+  either side of it show whole, the rail stays put, so a click on a card in view doesn't move it. Once
+  one of them would be cut off, the rail centres the current card, so the next card shows along with
+  about half a rail of what follows. At either end the scroll stops at the first or last card. This
+  applies to every rail that scrolls (`flat`, `stacked`, `index` rows and chips, side rails, right to
+  left) and to the item column. The rail still scrolls instantly, with no animation, as before.
+
 ## v0.3.1
 
 ### The flat rail, completed
