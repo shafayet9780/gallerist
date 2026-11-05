@@ -126,12 +126,13 @@ export function getGroupDisplay(viewer: ViewerApi): GroupDisplay | undefined {
  * given `linear`). Applied like an explicit `groupDisplay`, so the preset rules hold: the preset's
  * `timeline` carries over, its `itemAxis` and `numberItems` apply only to its own display. Before the
  * rail mounts, it's the display the rail mounts with (and it stays for later mounts of the viewer).
- * An unknown display is ignored. Returns whether the viewer has a thumbnails rail.
+ * An unknown display is ignored. With several thumbnails plugins, it's the last registered one's,
+ * the rail that shows. Returns whether the viewer has a thumbnails rail.
  */
 export function setGroupDisplay(viewer: ViewerApi, display: GroupDisplay): boolean {
-  const rails = railsOf(viewer)
-  for (const rail of rails) rail.setDisplay(display)
-  return rails.length > 0
+  const rail = railsOf(viewer).pop() // the one whose rail shows
+  rail?.setDisplay(display)
+  return !!rail
 }
 
 export interface ThumbnailsStrings {
@@ -802,7 +803,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     const toggleActivePanel = () => {
-      if (isFlat) return // a flat rail has no item panel (the toggle is hidden; `e` does nothing)
+      if (isFlat) return // a flat rail has no item panel (the toggle is hidden; `e` isn't claimed)
       panelOpen = !panelOpen
       toolbarBtn?.setAttribute('aria-pressed', String(panelOpen))
       if (panelOpen) closePeek() // the persistent panel supersedes a transient peek
@@ -1105,7 +1106,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     // Apply the settled display to the built nodes: the rail's role and marks, the region's linear
     // marker (a flat rail runs item by item: the renderer walks it that way unless told otherwise), the
-    // aside column (a stacked rail's) and the items toggle (not on a flat rail, which has no panel).
+    // aside column (a stacked rail's) and the items toggle (not on a flat rail, which has no panel:
+    // hidden, and marked off so a bar without built-in controls doesn't show for it alone).
     const layout = () => {
       configure()
       if (!root || !regionEl) return
@@ -1120,6 +1122,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         if (isFlat && document.activeElement === toolbarBtn)
           regionEl.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
         toolbarBtn.hidden = isFlat
+        toggleAttr(toolbarBtn, 'data-gallerist-off', isFlat)
       }
     }
 
@@ -1223,6 +1226,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
     }
 
+    const keys = { e: () => toggleActivePanel(), E: () => toggleActivePanel() }
     const instance: ThumbnailsInstance = {
       name: 'thumbnails',
       get display() {
@@ -1237,7 +1241,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         builtFor = null
       },
       regions,
-      keymap: { e: () => toggleActivePanel(), E: () => toggleActivePanel() },
+      // A flat rail has no item panel, so `e` stays another plugin's (the renderer reads the keymaps
+      // again when the plugin set changes and on viewer.refresh(), which a switch calls).
+      get keymap() {
+        return isFlat ? undefined : keys
+      },
     }
     return instance
   }

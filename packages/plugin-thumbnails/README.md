@@ -87,13 +87,17 @@ counter, the item navigator and the arrows change with it. A zoomed image stays 
 counts as an explicit `groupDisplay`, so the preset rules below hold (`reviewer` → `flat` keeps the
 timeline, drops the numbering; back to `stacked` brings the numbering back), and an option you passed
 to `thumbnails()` still wins. Called before the rail mounts, it sets the display the rail mounts with;
-the display also stays for a later mount of the same viewer. It returns `false` when the viewer has no
+the display also stays for a later mount of the same viewer. With several thumbnails plugins it
+switches the last one registered, whose rail shows. It returns `false` when the viewer has no
 thumbnails rail, and ignores an unknown display. `getGroupDisplay(viewer)` returns the rail's display,
 `undefined` until it has mounted.
 
-The rail keeps the nodes it gave the renderer for every display it can switch to: a flat rail keeps
-its items toggle (hidden, and `e` does nothing) and, while a stacked rail would stack its items in the
-`aside` column, that column (hidden). React has a reactive `groupDisplay` prop that does the same, and
+The rail keeps the nodes it gave the renderer for every display it can switch to, since the renderer
+holds them for the mount: a flat rail keeps its items toggle in the toolbar (`hidden`, and marked
+`data-gallerist-off`, so a bar without built-in controls doesn't show for it alone) and, while a
+stacked rail would stack its items in the `aside` column, that column (`hidden`, taking no room). A
+flat rail doesn't claim `e`: another plugin's `e` works there, and the rail takes it back when it
+switches to stacked or index. React has a reactive `groupDisplay` prop that does the same, and
 [`@gallerist/plugin-view`](../plugin-view/README.md) puts the switch in a View menu.
 
 Without this package's import, the rail is found among the viewer's plugin instances: the instance

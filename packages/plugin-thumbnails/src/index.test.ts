@@ -2110,4 +2110,52 @@ describe('plugin-thumbnails — live display switch (setDisplay)', () => {
     expect(getGroupDisplay(v)).toBeUndefined()
     expect(q('.gallerist-thumbs')).toBeNull()
   })
+
+  it('setGroupDisplay switches only the rail that shows (the last registered)', () => {
+    const v = createViewer({ collection: timed(), plugins: [thumbnails(), thumbnails()] })
+    mount(v)
+    v.open()
+    const [hidden, shown] = getInternals(v)
+      .getPlugins()
+      .filter((p) => p.name === 'thumbnails') as ThumbnailsInstance[]
+    const switched = vi.spyOn(hidden as ThumbnailsInstance, 'setDisplay')
+    expect(setGroupDisplay(v, 'flat')).toBe(true)
+    expect(shown?.display).toBe('flat')
+    expect(switched).not.toHaveBeenCalled()
+    expect(hidden?.display).toBe('stacked')
+  })
+
+  it('a flat rail leaves `e` to another plugin; a switched-in stacked rail takes it back', () => {
+    const e = vi.fn()
+    // listed before the rail: on a key both map, the later plugin wins
+    const v = createViewer({
+      collection: timed(),
+      plugins: [() => ({ name: 'other', keymap: { e } }), thumbnails({ groupDisplay: 'flat' })],
+    })
+    mount(v)
+    v.open()
+    press('e')
+    expect(e).toHaveBeenCalledTimes(1)
+    setGroupDisplay(v, 'stacked')
+    const toggle = q('.gallerist-items-toggle') as HTMLElement
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    press('e') // the rail's again: its item panel
+    expect(e).toHaveBeenCalledTimes(1)
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    setGroupDisplay(v, 'flat')
+    press('e')
+    expect(e).toHaveBeenCalledTimes(2)
+  })
+
+  it('a flat rail’s kept toggle is marked off (the bar doesn’t show for it alone); stacked, it isn’t', () => {
+    const { rail } = setup({ groupDisplay: 'flat' }, { controls: false })
+    const toggle = q('.gallerist-items-toggle') as HTMLElement
+    const bar = q('.gallerist-bar') as HTMLElement
+    expect(toggle.hasAttribute('data-gallerist-off')).toBe(true)
+    expect(bar.hidden).toBe(true)
+    rail.setDisplay('stacked')
+    expect(toggle.hasAttribute('data-gallerist-off')).toBe(false)
+    expect(toggle.hidden).toBe(false)
+    expect(bar.hidden).toBe(false)
+  })
 })
