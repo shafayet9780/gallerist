@@ -1026,7 +1026,7 @@ describe('mount — chrome structure (M15)', () => {
     expect(document.querySelector('.gallerist-close')).toBeNull()
   })
 
-  it('without built-in controls, a bar of hidden tools hides until one shows (refresh)', () => {
+  it('without built-in controls, a tool that starts hidden still shows the bar (it may show itself)', () => {
     const tool = document.createElement('button')
     tool.hidden = true
     const v = createViewer({
@@ -1036,10 +1036,59 @@ describe('mount — chrome structure (M15)', () => {
     mount(v, { controls: false })
     v.open()
     const bar = document.querySelector('.gallerist-bar') as HTMLElement
+    expect(bar.hidden).toBe(false)
+    tool.hidden = false // no refresh
+    expect(bar.hidden).toBe(false)
+  })
+
+  it('without built-in controls, a bar of tools marked off hides until one is not (refresh)', () => {
+    const tool = document.createElement('button')
+    tool.hidden = true
+    tool.setAttribute('data-gallerist-off', '')
+    const v = createViewer({
+      collection: collection(),
+      plugins: [() => ({ name: 'tool', regions: { toolbar: () => tool } })],
+    })
+    mount(v, { controls: false })
+    v.open()
+    const bar = document.querySelector('.gallerist-bar') as HTMLElement
     expect(bar.hidden).toBe(true)
     tool.hidden = false
+    tool.removeAttribute('data-gallerist-off')
     v.refresh()
     expect(bar.hidden).toBe(false)
+  })
+
+  it('reads the plugins’ keymaps again on viewer.refresh()', () => {
+    const a = vi.fn()
+    const b = vi.fn()
+    let keymap: Record<string, () => void> | undefined = { q: a }
+    const v = createViewer({
+      collection: collection(),
+      plugins: [
+        () => ({ name: 'other', keymap: { q: b } }),
+        () => ({
+          name: 'switching',
+          get keymap() {
+            return keymap
+          },
+        }),
+      ],
+    })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const press = () =>
+      root.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', bubbles: true }))
+    press()
+    expect(a).toHaveBeenCalledTimes(1)
+    keymap = undefined
+    press() // not read yet
+    expect(a).toHaveBeenCalledTimes(2)
+    v.refresh()
+    press()
+    expect(b).toHaveBeenCalledTimes(1)
+    expect(a).toHaveBeenCalledTimes(2)
   })
 })
 
