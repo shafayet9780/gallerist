@@ -1064,7 +1064,7 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
     const rect = (top: number, bottom: number) =>
       ({ top, bottom, left: 0, right: 100, width: 100, height: bottom - top }) as DOMRect
 
-    it('brings the active item into view inside its panel', () => {
+    it('brings the active item into view inside its panel, centred', () => {
       const v = open()
       v.next()
       const panel = document.querySelector('.gallerist-thumb-items') as HTMLElement
@@ -1073,7 +1073,28 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       const second = panel.querySelector('[data-item="b1"]') as HTMLElement
       second.getBoundingClientRect = () => rect(150, 200)
       v.nextItem()
-      expect(panel.scrollTop).toBe(100)
+      expect(panel.scrollTop).toBe(125) // its middle (175) on the panel's (50)
+    })
+
+    it('centres the active item once the item after it would be cut off', () => {
+      const v = open()
+      v.next()
+      const panel = document.querySelector('.gallerist-thumb-items') as HTMLElement
+      panel.style.overflowY = 'auto'
+      panel.getBoundingClientRect = () => rect(0, 300)
+      const at = (id: string, top: number) => {
+        const el = panel.querySelector(`[data-item="${id}"]`) as HTMLElement
+        el.getBoundingClientRect = () => rect(top, top + 90)
+      }
+      at('b0', 0)
+      at('b1', 100)
+      at('b2', 200) // 200..290: shows whole
+      v.nextItem()
+      expect(panel.scrollTop).toBe(0) // b1 and both its neighbours show: nothing moves
+      at('b2', 250) // 250..340: cut by the panel's bottom
+      v.prevItem()
+      v.nextItem()
+      expect(panel.scrollTop).toBe(145 - 150) // b1's middle (145) on the panel's (150)
     })
 
     it('leaves a panel alone when the active item already shows', () => {
@@ -1600,6 +1621,173 @@ describe('plugin-thumbnails — windowing in every direction (U17 review)', () =
     // the active section is still drawn, with its items
     const g12 = document.querySelector('.gallerist-thumb-section[data-group="g12"]')
     expect(g12?.querySelector('.gallerist-thumb-items')).not.toBeNull()
+  })
+})
+
+// Context around the current card (0.3.2): a step, a click or a jump leaves the rail alone while the
+// current card and the cards either side of it show whole; once one of them would be cut, the rail
+// centres the current card, which the browser clamps at either end of the rail. Cards are 90px
+// every 100px in a 1000px rail, as above; scrolling clamps as a browser's does.
+describe('plugin-thumbnails — context around the current card', () => {
+  const EXTENT = 1000
+  let rail: HTMLElement
+  let scroll = 0
+  const box = (start: number, axis: 'x' | 'y') =>
+    (axis === 'x'
+      ? { left: start, right: start + 90, top: 0, bottom: 80, width: 90, height: 80 }
+      : { top: start, bottom: start + 90, left: 0, right: 80, width: 80, height: 90 }) as DOMRect
+  // `at(k)`: where the k-th card starts at scroll 0; cards are `sel` in rail order
+  const layOut = (
+    axis: 'x' | 'y',
+    sel: string,
+    at: (k: number) => number,
+    { rtl = false } = {},
+  ) => {
+    rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+    scroll = 0
+    if (axis === 'x') rail.style.overflowX = 'auto'
+    else rail.style.overflowY = 'auto'
+    const prop = axis === 'x' ? 'scrollLeft' : 'scrollTop'
+    const cards = () => [...rail.querySelectorAll<HTMLElement>(sel)]
+    // as far as the drawn cards reach (toward negative scrollLeft in a right-to-left rail)
+    const max = () => {
+      const n = cards().length
+      return n ? Math.max(0, (n - 1) * 100 + 90 - EXTENT) : 0
+    }
+    Object.defineProperty(rail, prop, {
+      configurable: true,
+      get: () => scroll,
+      set: (v: number) => {
+        scroll = rtl ? Math.min(0, Math.max(-max(), v)) : Math.max(0, Math.min(max(), v))
+      },
+    })
+    const real = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this === rail)
+        return (
+          axis === 'x'
+            ? { left: 0, right: EXTENT, top: 0, bottom: 100, width: EXTENT, height: 100 }
+            : { top: 0, bottom: EXTENT, left: 0, right: 100, width: 100, height: EXTENT }
+        ) as DOMRect
+      const k = cards().indexOf(this)
+      return k < 0 ? real.call(this) : box(at(k) - scroll, axis)
+    })
+  }
+  const many = (n: number, per = 1): Collection => ({
+    groups: Array.from({ length: n }, (_, g) => ({
+      id: `g${g}`,
+      items: Array.from({ length: per }, (_, i) => item(`g${g}i${i}`)),
+    })),
+  })
+  // the card's extent along the rail
+  const span = (el: Element | null, axis: 'x' | 'y' = 'x') => {
+    const r = el?.getBoundingClientRect()
+    if (!r) return null
+    return axis === 'x' ? [r.left, r.right] : [r.top, r.bottom]
+  }
+  const whole = (el: Element | null, axis: 'x' | 'y' = 'x') => {
+    const s = span(el, axis)
+    return !!s && (s[0] as number) >= 0 && (s[1] as number) <= EXTENT
+  }
+  const group = (g: number) => document.querySelector(`.gallerist-thumb[data-group="g${g}"]`)
+  afterEach(() => {
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+    document.documentElement.removeAttribute('dir')
+  })
+
+  it('a step keeps the next card in view: the rail centres the current one before it is cut', () => {
+    // every card drawn: the walk below measures against fixed positions
+    const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 50 })] })
+    mount(v)
+    v.open()
+    layOut('x', '.gallerist-thumb', (k) => k * 100)
+    v.goTo(8) // 800..890; g9 900..990 shows whole
+    expect(scroll).toBe(0)
+    v.next() // g9: g10 (1000..1090) would be cut
+    expect(scroll).toBe(445) // g9's middle (945) on the rail's (500)
+    expect(whole(group(10))).toBe(true)
+    v.next() // g10 at 555..645, its neighbours show: nothing moves
+    expect(scroll).toBe(445)
+    for (let g = 11; g < 30; g++) {
+      v.next()
+      expect(whole(group(g)), `g${g}`).toBe(true)
+      if (g < 29) expect(whole(group(g + 1)), `after g${g}`).toBe(true)
+      expect(whole(group(g - 1)), `before g${g}`).toBe(true)
+    }
+    // the end: the browser clamps the centring, the last card sits at the rail's end
+    expect(scroll).toBe(29 * 100 + 90 - EXTENT)
+    expect(span(group(29))?.[1]).toBe(EXTENT)
+    // and back to the start: the card before it stays in view, clamped at the first card
+    for (let g = 28; g >= 0; g--) {
+      v.prev()
+      if (g > 0) expect(whole(group(g - 1)), `before g${g}`).toBe(true)
+    }
+    expect(scroll).toBe(0)
+  })
+
+  it('a click on a card whose neighbours show moves nothing; one at the edge centres it', () => {
+    open(many(30))
+    layOut('x', '.gallerist-thumb', (k) => k * 100)
+    ;(group(5) as HTMLElement).click()
+    expect(document.querySelector('.gallerist-thumb[data-active]')).toBe(group(5))
+    expect(scroll).toBe(0)
+    ;(group(8) as HTMLElement).click()
+    expect(scroll).toBe(0)
+    ;(group(9) as HTMLElement).click() // the last card that shows whole: g10 is cut
+    expect(scroll).toBe(445)
+  })
+
+  it('right to left: the same, toward negative scrollLeft', () => {
+    document.documentElement.setAttribute('dir', 'rtl')
+    const v = open(many(30))
+    // card k runs from the right edge leftwards
+    layOut('x', '.gallerist-thumb', (k) => EXTENT - (k + 1) * 100 + 10, { rtl: true })
+    v.goTo(8) // 110..200; g9 at 10..100 shows whole
+    expect(scroll).toBe(0)
+    v.next()
+    expect(scroll).toBe(-445) // g9's middle (55) on the rail's (500)
+    expect(whole(group(10))).toBe(true)
+  })
+
+  it('a side rail: down the column, by scrollTop', () => {
+    const v = createViewer({ collection: many(30), plugins: [thumbnails()] })
+    mount(v, { rail: 'left' })
+    v.open()
+    layOut('y', '.gallerist-thumb', (k) => k * 100)
+    v.goTo(8)
+    expect(scroll).toBe(0)
+    v.next()
+    expect(scroll).toBe(445)
+    expect(whole(group(10), 'y')).toBe(true)
+  })
+
+  it('flat: the cards beside the current one are its neighbours in rail order, across groups', () => {
+    const v = openFlat(many(10, 3))
+    layOut('x', '.gallerist-thumb-item', (k) => k * 100)
+    const card = (id: string) => document.querySelector(`.gallerist-thumb-item[data-item="${id}"]`)
+    v.goTo(2, 2) // the 9th card (800..890): g3i0 after it shows whole
+    expect(scroll).toBe(0)
+    v.goTo(3, 0) // the 10th (900..990): g3i1 after it would be cut
+    expect(scroll).toBe(445)
+    expect(whole(card('g3i1'))).toBe(true)
+    expect(whole(card('g2i2'))).toBe(true) // the card before it, in the group before
+  })
+
+  it('index chips: the same along the strip', () => {
+    const v = createViewer({
+      collection: many(30, 3),
+      plugins: [thumbnails({ groupDisplay: 'index' })],
+    })
+    mount(v)
+    v.open()
+    layOut('x', '.gallerist-thumb-row', (k) => k * 100)
+    v.goTo(8)
+    expect(scroll).toBe(0)
+    v.goTo(9)
+    expect(scroll).toBe(445)
   })
 })
 

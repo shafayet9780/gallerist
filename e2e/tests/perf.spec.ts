@@ -148,8 +148,9 @@ const install = (page: Page) =>
         if (!btn) return false
         btn.click()
       } else if (action === 'toRailEnd') {
-        // the last card wholly inside the rail: a group step from there scrolls the rail, and the
-        // run follows (cards enter at one end and leave at the other)
+        // the card before the last one wholly inside the rail: both its neighbours show, so the rail
+        // stays put; a group step from there lands where the next card is cut, the rail centres it,
+        // and the run follows (cards enter at one end and leave at the other)
         const rail = root.querySelector<HTMLElement>('.gallerist-thumbs')
         if (!rail) return false
         const box = rail.getBoundingClientRect()
@@ -162,7 +163,7 @@ const install = (page: Page) =>
           const r = c.getBoundingClientRect()
           return r.width > 0 && (down ? r.bottom <= box.bottom : r.right <= box.right)
         })
-        const last = cards.at(-1)
+        const last = cards.at(-2) ?? cards.at(-1)
         const id = last?.dataset.group ?? last?.dataset.item?.split('i')[0]
         if (!id) return false
         v.goTo(Number(id.slice(1)), 0)
@@ -476,9 +477,10 @@ for (const config of CONFIGS) {
         await run('next') // across a group boundary
         await run('prev')
         await run('clickGroupThumb')
-        // two group steps from the end of what the rail shows: each scrolls the rail by about a
-        // card, so between them the run must shift (one alone may stop short of the next card).
-        // Far enough in that the run isn't held at the start of the collection.
+        // two group steps from the end of what the rail shows: the first (or, on a flat rail, where
+        // a group step is several cards, either) lands near the edge and centres the current card,
+        // so between them the run must shift. Far enough in that the run isn't held at the start of
+        // the collection.
         await call(page, 'probe', `goTo:${Math.min(60, groupCount - 3)},0`)
         await call(page, 'probe', 'toRailEnd')
         await run('nextPastEdge')

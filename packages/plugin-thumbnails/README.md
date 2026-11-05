@@ -25,6 +25,13 @@ mount(viewer)
 - **Reconciles in place.** Cursor moves flip `data-active` and scroll the active node into view (inside the viewer's panels only, never the page) —
   the rail is never torn down on navigation (rebuilt only when the collection or visible window
   changes). This keeps node identity stable and the scroll position steady.
+- **Context around the current card.** While the current card and the cards on either side of it
+  show whole, the rail doesn't move, so clicking a card in view doesn't shift it. Once one of them
+  would be cut off by an edge, the rail scrolls to centre the current card, so a step always shows
+  what comes next. At either end of the rail the scroll stops at the first or last card. This applies
+  to every rail that scrolls (`flat`, `stacked`, `index` rows and chips, side rails, right to left) and
+  to the item column. The rail scrolls instantly, with no animation, so there is nothing to turn off
+  for `prefers-reduced-motion`.
 - **Live-preview card.** The active multi-item group's card mirrors the currently-viewed item's
   image; it reverts to the group cover once the group is no longer active.
 - **Vertical item column (default).** The active group's items stack in a column floating above the
