@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-hash",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Gallerist plugin — deep-link the cursor to the URL hash (#g=&i=), with back/forward.",
   "license": "MIT",
   "type": "module",
