@@ -141,6 +141,9 @@ for (const [size, ctx] of Object.entries(VIEWPORTS)) {
 // start) then the title, the tools right after them when they overflow, else ending one bar gap
 // before Close (or at the bar's end); every tool hit where it is; the bar's free space the bar's
 // own, and under an immersive bar the stage's (a swipe or wheel there reaches the image).
+// A phone leaves fullscreen out of the bar; the runs keep it (--gallerist-phone-fullscreen) for the
+// most tools, but this variant, the phone's own bar, doesn't.
+const PHONE_BAR = "the phone's own bar"
 const GEOMETRY: Record<string, [string, string?][]> = {
   desktop: [
     ['view=1'],
@@ -151,9 +154,14 @@ const GEOMETRY: Record<string, [string, string?][]> = {
     ['preset=immersive&view=1&controls=0&dir=rtl'],
     ['preset=immersive&view=1&captions=1'],
   ],
-  phone: [['preset=immersive&view=1&captions=1&dir=rtl'], ['view=1&controls=0']],
+  phone: [
+    ['preset=immersive&view=1&captions=1&dir=rtl'],
+    ['view=1&controls=0'],
+    ['preset=reviewer&view=1&captions=1', PHONE_BAR],
+  ],
   narrow: [
     ['preset=reviewer&view=1&captions=1'],
+    ['preset=reviewer&view=1&captions=1&dir=rtl', PHONE_BAR],
     ['preset=reviewer&view=1&captions=1&skin=console&dir=rtl'],
     ['preset=immersive&view=1&controls=0'],
   ],
@@ -244,10 +252,17 @@ for (const [size, configs] of Object.entries(GEOMETRY)) {
         }
         if (variant === 'title hidden by the host')
           await page.addStyleTag({ content: '.gallerist-title { display: none }' })
+        if (size !== 'desktop' && variant !== PHONE_BAR)
+          await page.addStyleTag({ content: '.gallerist { --gallerist-phone-fullscreen: grid }' })
         const g = await barGeometry(page)
         const immersive = query.includes('immersive')
         const tools = g.tools
-        expect(tools.length, `${at}: tools`).toBeGreaterThanOrEqual(4)
+        expect(tools.length, `${at}: tools`).toBeGreaterThanOrEqual(variant === PHONE_BAR ? 3 : 4)
+        if (variant === PHONE_BAR)
+          expect(
+            await page.locator('.gallerist-fullscreen-btn').isVisible(),
+            `${at}: fullscreen`,
+          ).toBe(false)
         // the chrome before the strip, from the bar's start
         if (g.counter) near(g.counter[0], g.bar[0], 'the counter starts at')
         if (g.title && g.counter) near(g.title[0], g.counter[1] + g.gap, 'the title starts at')
@@ -265,7 +280,12 @@ for (const [size, configs] of Object.entries(GEOMETRY)) {
           near(last, g.after ? g.after[0] - g.gap : g.bar[1], 'the last tool ends at')
         }
         // a host hiding the title leaves the tools at the end, far from the counter
-        if (variant && g.counter && !g.overflows && first - g.counter[1] < 100)
+        if (
+          variant === 'title hidden by the host' &&
+          g.counter &&
+          !g.overflows &&
+          first - g.counter[1] < 100
+        )
           problems.push(`${at}: the tools moved next to the counter`)
         g.toolHits.forEach((h, k) => {
           if (h !== `tool ${k}`) problems.push(`${at}: a pointer on tool ${k} lands on ${h}`)
