@@ -123,6 +123,8 @@ describe('the duration token', () => {
     expect(toMs(' 0.3s')).toBe(300)
     expect(toMs('1s ')).toBe(1000)
     expect(toMs('0ms')).toBe(0)
+    expect(toMs('0.3S')).toBe(300) // CSS units are case-insensitive
+    expect(toMs('220MS')).toBe(220)
     expect(toMs('0')).toBe(0)
     expect(toMs('')).toBe(220)
     expect(toMs('fast')).toBe(220)
@@ -219,6 +221,29 @@ describe('plugin-thumbnails — the rail glides as it collapses', () => {
     ;(document.querySelector('.gallerist-rail-toggle') as HTMLElement).click()
     await settle()
     expect(animations[0]?.keyframes.width).toEqual(['130px', '0px'])
+  })
+
+  it('a collapse hands focus in the rail to the viewer, in a shadow root too', async () => {
+    reduceMotion(true)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const shadow = host.attachShadow({ mode: 'open' })
+    const container = shadow.appendChild(document.createElement('div'))
+    const v = createViewer({
+      collection: { groups: [{ id: 'g0', items: [{ id: 'a', type: 'image', source: 'a.jpg' }] }] },
+      plugins: [thumbnails({ groupDisplay: 'flat' })],
+    })
+    mount(v, { container })
+    v.open()
+    await settle()
+    const root = container.querySelector('.gallerist') as HTMLElement
+    const thumb = container.querySelector('.gallerist-thumb-item') as HTMLElement
+    thumb.focus()
+    expect(shadow.activeElement).toBe(thumb)
+    root.setAttribute('data-gallerist-rail', 'collapsed')
+    await settle()
+    expect(shadow.activeElement).toBe(root)
+    v.destroy()
   })
 
   it('no glide after the viewer is destroyed', async () => {

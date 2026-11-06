@@ -32,7 +32,7 @@ export const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion:
 /** A CSS time (`220ms`, `0.3s`, `0`) in ms; 220 when it isn't one (the token unset). */
 export const toMs = (v: string): number => {
   const n = Number.parseFloat(v)
-  return Number.isNaN(n) ? 220 : /\ds$/.test(v.trim()) ? n * 1000 : n
+  return Number.isNaN(n) ? 220 : /\ds$/i.test(v.trim()) ? n * 1000 : n
 }
 
 export function createGlides(duration: () => number) {

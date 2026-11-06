@@ -138,6 +138,34 @@ describe('rail strip — drag', () => {
     expect(onCard).toHaveBeenCalledTimes(1)
   })
 
+  it('a press that leaves the strip before it was a drag is over: a later press from outside, dragged over the strip, does not drag it', () => {
+    const { scroller, card, onCard } = make({ at: 200 })
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointermove', 102) // short of a drag, then off the strip across it
+    scroller.dispatchEvent(new PointerEvent('pointerleave', { pointerId: 1 }))
+    pointer(document.body, 'pointerup', 102) // released on the stage: no capture brought it here
+    // a press on the stage (not on the strip), dragged onto it and along it
+    pointer(card, 'pointermove', 102)
+    pointer(card, 'pointermove', 160)
+    pointer(card, 'pointermove', 220)
+    expect(scroller.scrollLeft).toBe(200)
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(false)
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointerup', 100)
+    card.click()
+    expect(onCard).toHaveBeenCalledTimes(1)
+  })
+
+  it('a drag goes on past the strip', () => {
+    const { scroller, card } = make({ at: 200 })
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointermove', 140)
+    scroller.dispatchEvent(new PointerEvent('pointerleave', { pointerId: 1 }))
+    pointer(card, 'pointermove', 120)
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(true)
+    expect(scroller.scrollLeft).toBe(180)
+  })
+
   it('a drag whose release never came is over at the next press: its clicks are clicks again', async () => {
     const { scroller, card, onCard } = make({ at: 200 })
     pointer(card, 'pointerdown', 100)
@@ -162,6 +190,17 @@ describe('rail strip — drag', () => {
     await new Promise((r) => setTimeout(r))
     card.click()
     expect(onCard).toHaveBeenCalledTimes(1)
+  })
+
+  it("a card's own capture lost, or another pointer's, does not end the drag", () => {
+    const { scroller, card } = make({ at: 200 })
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointermove', 140)
+    card.dispatchEvent(new PointerEvent('lostpointercapture', { pointerId: 1, bubbles: true }))
+    scroller.dispatchEvent(new PointerEvent('lostpointercapture', { pointerId: 2 }))
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(true)
+    pointer(card, 'pointermove', 120)
+    expect(scroller.scrollLeft).toBe(180)
   })
 
   it(`a wobble across the strip is still a click; a pen goes ${DRAG_SLOP * 2}px before it drags`, () => {

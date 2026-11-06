@@ -64,8 +64,9 @@ export function attachStrip(
     e.preventDefault()
     e.stopPropagation()
   }
-  // The press is over: its pointerup, a cancel, the capture lost, or (released off the strip before
-  // it was a drag, so no capture brought the pointerup here) the next move with no button held.
+  // The press is over: its pointerup, a cancel, the strip's capture lost, the pointer leaving the
+  // strip before it was a drag (no capture yet: its pointerup may land elsewhere, and a later press
+  // from outside, dragged over the strip, must not take it up), or the next move with no button.
   const endDrag = () => {
     press = null
     if (!dragging) return
@@ -102,6 +103,11 @@ export function attachStrip(
   }
   const onUp = (e: PointerEvent) => {
     if (press && e.pointerId === press.id) endDrag()
+  }
+  // the strip's own capture lost (not a card's, bubbling up)
+  const onLost = (e: PointerEvent) => e.target === scroller && onUp(e)
+  const onLeave = () => {
+    if (!dragging) press = null
   }
   // no native drag of a thumbnail image (it would take the pointer away mid-drag); the page buttons
   // use it too, to keep focus where it is
@@ -202,7 +208,8 @@ export function attachStrip(
     ['pointermove', onMove],
     ['pointerup', onUp],
     ['pointercancel', onUp],
-    ['lostpointercapture', endDrag],
+    ['lostpointercapture', onLost],
+    ['pointerleave', onLeave],
     ['dragstart', onDragStart],
     ['wheel', onWheel],
   ]

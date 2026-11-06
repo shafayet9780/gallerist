@@ -258,15 +258,11 @@ export const DEFAULT_THUMBNAILS_STRINGS: ThumbnailsStrings = {
   toggleItems: 'Toggle group items',
 }
 
-const metaTime = (group: Group): string | undefined => {
-  const time = (group.meta as { time?: unknown } | undefined)?.time
-  return typeof time === 'string' ? time : undefined
-}
-
-const metaSubtitle = (group: Group): string | undefined => {
-  const subtitle = (group.meta as { subtitle?: unknown } | undefined)?.subtitle
-  return typeof subtitle === 'string' ? subtitle : undefined
-}
+/** `v` if it is a string (an untyped caption or meta field). */
+const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
+const metaOf = (group: Group, key: 'time' | 'subtitle') =>
+  str((group.meta as Record<string, unknown> | undefined)?.[key])
+const metaTime = (group: Group) => metaOf(group, 'time')
 
 function thumbUrl(source: MediaSource | undefined): string | null {
   if (!source) return null
@@ -297,9 +293,7 @@ function lazyImg(src: string | null, observer: IntersectionObserver | null): HTM
 }
 
 /** Display caption string, if one was explicitly provided (no `alt` fallback — UX-G). */
-function captionOf(x: { caption?: unknown }): string | undefined {
-  return typeof x.caption === 'string' ? x.caption : undefined
-}
+const captionOf = (x: { caption?: unknown }) => str(x.caption)
 
 /** A new `tag` element of class `cls` (with `text`). */
 const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string) => {
@@ -337,11 +331,6 @@ const titleWhenCut = (on: HTMLElement, text: HTMLElement, whole: string) =>
     else on.removeAttribute('title')
   })
 
-function toggleAriaCurrent(btn: HTMLElement, on: boolean): void {
-  if (on) btn.setAttribute('aria-current', 'true')
-  else btn.removeAttribute('aria-current')
-}
-
 /** Mark a thumb (or a card's wrapper, which only takes `data-active`) active or not; a no-op when it
  *  already is, so a step writes to the two thumbs that changed and nothing else. */
 function setActiveAttr(el: HTMLElement, active: boolean): void {
@@ -350,7 +339,7 @@ function setActiveAttr(el: HTMLElement, active: boolean): void {
   if (el.tagName !== 'BUTTON') return
   // index rows are plain buttons (their list holds a listbox of items, which can't nest in another)
   if (el.getAttribute('role') === 'option') el.setAttribute('aria-selected', String(active))
-  else toggleAriaCurrent(el, active)
+  else toggleAttr(el, 'aria-current', active, 'true')
 }
 
 /** Place a listbox option in its whole list: the rail draws only a run of it. */
@@ -359,15 +348,14 @@ function setPos(el: HTMLElement, pos: number, size: number): void {
   el.setAttribute('aria-setsize', String(size))
 }
 
-function toggleAttr(el: HTMLElement, name: string, on: boolean): void {
-  if (on) el.setAttribute(name, '')
+function toggleAttr(el: HTMLElement, name: string, on: boolean, value = ''): void {
+  if (on) el.setAttribute(name, value)
   else el.removeAttribute(name)
 }
 
 function thumbButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
-  const btn = document.createElement('button')
+  const btn = make('button', className)
   btn.type = 'button'
-  btn.className = className
   btn.setAttribute('role', 'option')
   btn.setAttribute('aria-selected', 'false')
   btn.setAttribute('aria-label', label)
@@ -424,8 +412,7 @@ function centreBy(
 
 /** Whether the primary pointer can hover (desktop). Defaults true when undetectable (SSR/test). */
 function canHover(): boolean {
-  if (typeof window === 'undefined') return true
-  return window.matchMedia?.('(hover: hover)').matches ?? true
+  return globalThis.matchMedia?.('(hover: hover)').matches ?? true
 }
 
 const DISPLAYS = ['stacked', 'flat', 'index'] as const
@@ -538,7 +525,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // peek (stacked mode): a transient flyout previewing a non-active group's items.
     let peekRow: HTMLElement | null = null
     let peekGroupId: string | null = null
-    let peekTimer: ReturnType<typeof setTimeout> | null = null
+    let peekTimer: ReturnType<typeof setTimeout> | undefined
 
     // flat mode: a flattened (g,i) sequence + the group wrappers that bracket runs of items.
     let flat: FlatEntry[] = []
@@ -607,18 +594,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     // ── peek flyout ──────────────────────────────────────────────────────────
     const removePeek = () => {
-      if (peekRow) {
-        peekRow.remove()
-        peekRow = null
-      }
-      peekGroupId = null
+      peekRow?.remove()
+      peekRow = peekGroupId = null
     }
-    const cancelPeekClose = () => {
-      if (peekTimer != null) {
-        clearTimeout(peekTimer)
-        peekTimer = null
-      }
-    }
+    const cancelPeekClose = () => clearTimeout(peekTimer)
     const closePeek = () => {
       cancelPeekClose()
       removePeek()
@@ -661,7 +640,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // ── index mode ───────────────────────────────────────────────────────────
     const buildIndexRow = (group: Group, gIndex: number): HTMLButtonElement => {
       const name = captionOf(group) ?? t.group(gIndex + 1)
-      const subtitle = metaSubtitle(group)
+      const subtitle = metaOf(group, 'subtitle')
       const count = group.items.length
       const label = t.section(name, subtitle, count)
       const btn = thumbButton(label, 'gallerist-thumb-row', () => viewer.goTo(gIndex))
@@ -670,17 +649,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       btn.dataset.group = group.id
       btn.appendChild(lazyImg(groupThumb(group), observer))
       const text = make('span', 'gallerist-thumb-row-text')
-      const nameEl = document.createElement('span')
-      nameEl.className = 'gallerist-thumb-row-name'
-      nameEl.textContent = name
-      text.appendChild(nameEl)
-      if (subtitle) {
-        const sub = make('span', 'gallerist-thumb-row-sub', subtitle)
-        text.appendChild(sub)
-      }
-      btn.appendChild(text)
-      const badge = make('span', 'gallerist-thumb-row-count', String(count))
-      btn.appendChild(badge)
+      text.appendChild(make('span', 'gallerist-thumb-row-name', name))
+      if (subtitle) text.appendChild(make('span', 'gallerist-thumb-row-sub', subtitle))
+      btn.append(text, make('span', 'gallerist-thumb-row-count', String(count)))
       const wrap = make('div', 'gallerist-thumb-section')
       wrap.dataset.group = group.id
       wrap.appendChild(btn)
@@ -739,9 +710,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           btn.addEventListener('mouseleave', schedulePeekClose)
         } else {
           const wrap = wrapCard()
-          const caret = document.createElement('button')
+          const caret = make('button', 'gallerist-thumb-expand')
           caret.type = 'button'
-          caret.className = 'gallerist-thumb-expand'
           caret.setAttribute('aria-label', t.previewButton(gIndex + 1))
           caret.addEventListener('click', (e) => {
             e.stopPropagation()
@@ -777,16 +747,22 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       )
     }
 
-    // a removed card's lazy image stops being watched (it would otherwise stay observed, detached)
+    // a removed card (or marker) stops being watched, its lazy image too (either would otherwise
+    // keep it alive, detached)
     const drop = (el: Element) => {
       el.remove()
+      resizeObs?.unobserve(el)
       for (const img of el.querySelectorAll('img')) observer?.unobserve(img)
     }
+
+    // what has focus in the viewer's document or shadow root
+    const active = () =>
+      ((regionEl ?? document).getRootNode() as Document | ShadowRoot).activeElement
 
     // Run `redraw`; a focused thumb it took out of the document hands focus to the viewer, so the
     // keys keep working (focus would fall to <body>).
     const keepFocus = (redraw: () => void) => {
-      const focused = document.activeElement
+      const focused = active()
       const viewerEl = regionEl?.closest<HTMLElement>('.gallerist')
       redraw()
       if (focused instanceof HTMLElement && !focused.isConnected) {
@@ -910,7 +886,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const dropMarks = (drawn: Set<string>) => {
       for (const [id, el] of markerEls)
         if (!drawn.has(id)) {
-          el.remove()
+          drop(el)
           markerEls.delete(id)
         }
     }
@@ -1110,7 +1086,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (!viewerRoot || !regionEl || collapsed === railCollapsed) return
       railCollapsed = collapsed
       // focus in the rail or the item column (not on the handle, which stays) goes to the viewer
-      if (collapsed && [regionEl, asideEl].some((n) => n?.contains(document.activeElement)))
+      if (collapsed && [regionEl, asideEl].some((n) => n?.contains(active())))
         viewerRoot.focus({ preventScroll: true })
       const side = viewerRoot.getAttribute('data-gallerist-orientation') === 'vertical'
       for (const [el, dim] of [
@@ -1286,8 +1262,12 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     // wipe everything (collection identity changed — ids may be entirely different)
     const resetAll = () => {
-      if (root) root.replaceChildren()
-      observer?.disconnect() // every lazy image went with it
+      observer?.disconnect() // every lazy image went with it, and every card watched for its size
+      resizeObs?.disconnect()
+      if (root) {
+        root.replaceChildren()
+        resizeObs?.observe(root)
+      }
       groupBtns.clear()
       itemBtns.clear()
       coverUrls.clear()
@@ -1497,7 +1477,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (asideEl) asideEl.hidden = groupDisplay !== 'stacked'
       if (toolbarBtn) {
         // a focused toggle that hides hands focus to the viewer (else it falls to <body>)
-        if (isFlat && document.activeElement === toolbarBtn)
+        if (isFlat && active() === toolbarBtn)
           regionEl.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
         toolbarBtn.hidden = isFlat
         toggleAttr(toolbarBtn, 'data-gallerist-off', isFlat)
@@ -1551,7 +1531,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
             const item = col.groups[g]?.items[i]
             if (item) decorateItem(btn, item, g, i)
           }
-          for (const el of markerEls.values()) el.remove()
+          for (const el of markerEls.values()) drop(el)
           markerEls.clear()
           readMarkers(col)
           if (isFlat) rebuildRailFlat(col, winStart, winEnd)

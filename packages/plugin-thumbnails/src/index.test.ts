@@ -1285,6 +1285,57 @@ describe('plugin-thumbnails — windowing (U17)', () => {
     expect(drawn()).toEqual(range(0, 18))
   })
 
+  it('a card or marker drawn out is no longer watched for its size; nor is any after a display switch', async () => {
+    const watched = new Set<Element>()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(el: Element) {
+          watched.add(el)
+        }
+        unobserve(el: Element) {
+          watched.delete(el)
+        }
+        disconnect() {
+          watched.clear()
+        }
+      },
+    )
+    try {
+      const markers = (col: Collection) =>
+        col.groups
+          .filter((_, g) => g % 20 === 0)
+          .map((g) => ({ id: `m-${g.id}`, label: g.id, after: g.id }))
+      const v = createViewer({ collection: many(2000), plugins: [thumbnails({ markers })] })
+      mount(v)
+      v.open()
+      layOut()
+      await scrollTo(0)
+      expect(document.querySelector('[data-marker="m-g0"]')).not.toBeNull()
+      // the rail's own (the renderer watches its caption band with the same mock)
+      const cards = () => [...watched].filter((el) => el !== rail && rail.contains(el))
+      const first = cards()
+      expect(first.length).toBeGreaterThan(10)
+      for (const x of [1000, 2000, 3000, 4000]) await scrollTo(x)
+      expect(document.querySelector('[data-marker="m-g0"]')).toBeNull() // drawn out
+      const stale = () => [...watched].filter((el) => !el.isConnected)
+      expect(stale()).toEqual([])
+      expect(first.filter((el) => !el.isConnected).length).toBeGreaterThan(5) // drawn out, let go
+      expect(watched.has(rail)).toBe(true)
+      const inst = getInternals(v)
+        .getPlugins()
+        .find((p) => p.name === 'thumbnails') as ThumbnailsInstance
+      const before = cards()
+      inst.setDisplay('flat') // everything drawn afresh
+      expect(stale()).toEqual([])
+      expect(before.some((el) => watched.has(el))).toBe(false)
+      expect(watched.has(rail)).toBe(true)
+      expect(cards().length).toBeGreaterThan(10) // the flat rail's cards are watched
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('follows the rail scroll, inserting and removing only the cards that cross the edges', async () => {
     open(many(2000))
     layOut()

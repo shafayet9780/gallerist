@@ -378,6 +378,27 @@ test.describe('a press released off the row rail', () => {
     await hoverAndClick(page)
   })
 
+  test('above the rail, then a press on the stage dragged along it: no drag', async ({ page }) => {
+    await open(page, REVIEWER)
+    const box = await page.locator('.gallerist-thumb-item:not([data-active])').nth(3).boundingBox()
+    if (!box) throw new Error('no card')
+    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + 2, y - 2) // short of a drag
+    await page.mouse.move(x + 2, box.y - 200) // straight up off the rail (across it), onto the stage
+    await page.mouse.up()
+    await page.mouse.down() // a new press, on the stage
+    const before = await scrolled(page)
+    await page.mouse.move(x + 2, y) // down onto the rail, then along it
+    for (let k = 1; k <= 6; k++) await page.mouse.move(x + 2 - k * 30, y)
+    await frames(page)
+    expect(await scrolled(page)).toBe(before)
+    await expect(rail(page)).not.toHaveAttribute('data-gallerist-dragging', '')
+    await page.mouse.up()
+    await hoverAndClick(page)
+  })
+
   test('on a page button beside the card it started on: the same', async ({ page }) => {
     await open(page, `${REVIEWER}&g=0`)
     const box = await rail(page).boundingBox()
