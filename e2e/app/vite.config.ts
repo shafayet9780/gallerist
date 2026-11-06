@@ -20,6 +20,7 @@ export default defineConfig({
       '@gallerist/plugin-save': r('../../packages/plugin-save/src/index.ts'),
       '@gallerist/plugin-pins': r('../../packages/plugin-pins/src/index.ts'),
       '@gallerist/plugin-captions': r('../../packages/plugin-captions/src/index.ts'),
+      '@gallerist/plugin-view': r('../../packages/plugin-view/src/index.ts'),
     },
   },
 })

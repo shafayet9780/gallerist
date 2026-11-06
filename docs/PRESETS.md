@@ -92,6 +92,13 @@ carries over unless you pass `timeline: false`.
   and item count; the active group's items expand under its row. At 900px wide or less, or on a
   bottom rail, it's a strip of chips instead, which don't expand.
 
+**Switching at run time.** The display of a mounted rail can change without a remount:
+`setGroupDisplay(viewer, 'flat')` (from `@gallerist/plugin-thumbnails`), React's reactive
+`groupDisplay` prop, or the View menu (`@gallerist/plugin-view`). The current item stays, the rail is
+drawn again around it, and the switch counts as an explicit `groupDisplay`, so the rules above hold:
+under `reviewer`, a switch to `flat` keeps the timeline and drops the numbering, and a switch back to
+`stacked` (the preset's own display) brings the numbering back. Linear traversal follows (below).
+
 ## Linear traversal (`mount({ linear })`, `<Gallerist linear>`)
 
 In linear traversal ←/→ (↑/↓ beside a side rail) walk the flattened item sequence across groups
@@ -103,9 +110,11 @@ It follows the rail by default: a flat thumbnails rail (`thumbnails({ groupDispl
 it on, since that rail shows every item in one run; a stacked or index rail, or no rail, leaves it
 off. The thumbnails plugin marks its region with `data-gallerist-linear` in flat mode and the renderer
 reads that whenever the plugin set changes, so a rail added or removed after mount (or a new mount
-with another preset) updates it. An explicit option wins either way: `linear: false` (React:
-`linear={false}`) keeps the group and item axes under a flat rail, and `linear: true` makes any rail
-linear. React passes nothing when the prop is omitted, so the rail decides there too.
+with another preset) updates it, and again on `viewer.refresh()`, which a rail switched at run time
+calls: the counter, the item navigator and the arrows follow at once. An explicit option wins either
+way: `linear: false` (React: `linear={false}`) keeps the group and item axes under a flat rail, and
+`linear: true` makes any rail linear. React passes nothing when the prop is omitted, so the rail
+decides there too.
 
 ## Arrow placement (`data-gallerist-arrows`)
 
@@ -233,6 +242,12 @@ mount(viewer, { skin: 'console', accent: 'cyan', scheme: 'auto' })
 ```tsx
 <Gallerist skin="console" accent="cyan" scheme="auto" … /> // React: all three are reactive
 ```
+
+To let people switch the scheme (and the rail's layout) from inside the viewer, add the View menu,
+`@gallerist/plugin-view`. It sets `data-gallerist-scheme` itself, or, for a host that owns the scheme
+(`controlled`; in React, while the `scheme` prop is passed), reports the choice for the host to
+apply. React writes each appearance prop only when it changes, so a scheme the menu set stays while
+the host's other props move.
 
 Without its stylesheet a skin falls back to Gallery, and an accent the skin doesn't name falls back
 to the skin's default. Gallery uses Instrument Sans when the page has loaded it and the system sans

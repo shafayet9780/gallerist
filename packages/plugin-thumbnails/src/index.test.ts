@@ -4,7 +4,7 @@ import { type Collection, type Item, createViewer } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { type PresetName, mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { thumbnails } from './index'
+import { type ThumbnailsInstance, getGroupDisplay, setGroupDisplay, thumbnails } from './index'
 import { axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
@@ -692,9 +692,9 @@ describe('plugin-thumbnails — active item panel (expandActive)', () => {
     expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
   })
 
-  it('flat mode contributes no items-toggle button', () => {
+  it('flat mode shows no items-toggle button (it is kept, hidden, for a switch back)', () => {
     openFlat()
-    expect(document.querySelector('.gallerist-items-toggle')).toBeNull()
+    expect(document.querySelector<HTMLElement>('.gallerist-items-toggle')?.hidden).toBe(true)
   })
 })
 
@@ -851,6 +851,11 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       [...document.querySelectorAll('.gallerist-thumb-items .gallerist-thumb-num')].map(
         (n) => n.textContent,
       )
+    // what the aside column shows: a rail that isn't stacked keeps its column there, hidden
+    const asideShown = () =>
+      [...(document.querySelector('.gallerist-region-aside')?.children ?? [])].filter(
+        (n) => !(n as HTMLElement).hidden,
+      ).length
 
     it('thumbnails() takes the mounted preset’s rail: reviewer → timeline + numbered items', () => {
       const v = openPreset('reviewer')
@@ -889,7 +894,7 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
         'index',
       )
       expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(3)
-      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+      expect(asideShown()).toBe(0)
     })
 
     it('explicit options can undo the preset’s layout (tour as a stacked vertical rail)', () => {
@@ -957,7 +962,7 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
         'index',
       )
       expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(3)
-      expect(document.querySelector('.gallerist-region-aside')?.childElementCount).toBe(0)
+      expect(asideShown()).toBe(0)
     })
 
     it('an explicit groupDisplay other than the preset’s drops its layout keys (tour, stacked)', () => {
@@ -1050,8 +1055,8 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       const { v, inst, ctx, rail, regions } = regionsWith({ groupDisplay: 'flat' })
       v.open()
       expect(rail.querySelector('.gallerist-thumbs')?.getAttribute('data-display')).toBe('flat')
-      // the toolbar region was claimed (the explicit options allowed it) but gets no button
-      expect(regions.toolbar?.(ctx).nodeType).toBe(Node.COMMENT_NODE)
+      // the toolbar region was claimed (the explicit options allowed it): its button stays hidden
+      expect((regions.toolbar?.(ctx) as HTMLElement).hidden).toBe(true)
       const before = rail.innerHTML
       inst.keymap?.e?.(new KeyboardEvent('keydown', { key: 'e' }))
       inst.keymap?.E?.(new KeyboardEvent('keydown', { key: 'E' }))
@@ -1214,7 +1219,9 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
         .querySelector('.gallerist')
         ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', bubbles: true }))
       expect(document.querySelector('.gallerist-thumb-items')).toBeNull()
-      expect(document.querySelector('.gallerist-thumbs-aside')).toBeNull()
+      // the column a stacked rail would use stays hidden and empty
+      expect(document.querySelector<HTMLElement>('.gallerist-thumbs-aside')?.hidden).toBe(true)
+      expect(document.querySelector('.gallerist-thumbs-aside')?.childElementCount).toBe(0)
     })
   })
 })
@@ -1875,5 +1882,280 @@ describe('strip helpers', () => {
     expect(scroller.scrollLeft).toBe(240)
     keepPlace(scroller, ref, null, () => {}) // no axis measured yet: nothing to correct
     expect(scroller.scrollLeft).toBe(240)
+  })
+})
+
+describe('plugin-thumbnails — live display switch (setDisplay)', () => {
+  const timed = (): Collection => ({
+    groups: [
+      { id: 'g0', meta: { time: '09:00' }, items: [item('a0')] },
+      { id: 'g1', meta: { time: '09:10' }, items: [item('b0'), item('b1'), item('b2')] },
+      { id: 'g2', meta: { time: '09:20' }, items: [item('c0'), item('c1')] },
+    ],
+  })
+  const railOf = (v: ReturnType<typeof createViewer>) =>
+    getInternals(v)
+      .getPlugins()
+      .find((p) => p.name === 'thumbnails') as ThumbnailsInstance
+  const setup = (
+    opts?: Parameters<typeof thumbnails>[0],
+    mountOpts: Parameters<typeof mount>[1] = {},
+  ) => {
+    const v = createViewer({ collection: timed(), plugins: [thumbnails(opts)] })
+    mount(v, mountOpts)
+    v.open()
+    return { v, rail: railOf(v) }
+  }
+  const q = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel)
+  const root = () => q('.gallerist') as HTMLElement
+  const counter = () => q('.gallerist-counter')?.textContent
+  const itemNavHidden = () => (q('.gallerist-itemnav') as HTMLElement).hidden
+  const nums = () =>
+    [...document.querySelectorAll('.gallerist-thumb-num')].map((n) => n.textContent)
+  const press = (key: string) =>
+    root().dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+
+  it('stacked → flat: the current item stays, the rail lays every item out, traversal turns linear', () => {
+    const { v, rail } = setup()
+    v.goTo(1, 1)
+    expect(rail.display).toBe('stacked')
+    expect(counter()).toBe('2 / 3')
+    rail.setDisplay('flat')
+    expect(rail.display).toBe('flat')
+    expect(v.getState().cursor).toMatchObject({ g: 1, i: 1 })
+    expect(q('.gallerist-thumbs')?.getAttribute('data-display')).toBe('flat')
+    expect(document.querySelectorAll('.gallerist-thumb').length).toBe(0) // no group cards left
+    expect(document.querySelectorAll('.gallerist-thumbs .gallerist-thumb-item').length).toBe(6)
+    expect(q('.gallerist-thumb-item[data-active]')?.getAttribute('data-item')).toBe('b1')
+    expect(q('.gallerist-thumb-group[data-active]')?.getAttribute('data-group')).toBe('g1')
+    // the renderer read the marker again: linear, the counter counts items, no item navigator
+    expect(q('.gallerist-thumbs-region')?.hasAttribute('data-gallerist-linear')).toBe(true)
+    expect(root().getAttribute('data-gallerist-linear')).toBe('true')
+    expect(counter()).toBe('3 / 6')
+    expect(itemNavHidden()).toBe(true)
+    // no item panel or toggle on a flat rail; the aside column is put away
+    expect(q('.gallerist-thumb-items')).toBeNull()
+    expect(q('.gallerist-items-toggle')?.hidden).toBe(true)
+    expect(q('.gallerist-thumbs-aside')?.hidden).toBe(true)
+    // ←/→ walk the items across the group boundary
+    press('ArrowRight')
+    press('ArrowRight')
+    expect(v.getState().cursor).toMatchObject({ g: 2, i: 0 })
+    expect(q('.gallerist-thumb-item[data-active]')?.getAttribute('data-item')).toBe('c0')
+  })
+
+  it('flat → stacked: group cards, the item stack in the aside column, the two axes back', () => {
+    const { v, rail } = setup()
+    rail.setDisplay('flat')
+    v.goTo(2, 1)
+    rail.setDisplay('stacked')
+    expect(v.getState().cursor).toMatchObject({ g: 2, i: 1 })
+    expect(q('.gallerist-thumbs')?.hasAttribute('data-display')).toBe(false)
+    expect(document.querySelectorAll('.gallerist-thumb').length).toBe(3)
+    expect(q('.gallerist-thumb[data-active]')?.getAttribute('data-group')).toBe('g2')
+    expect(q('.gallerist-region-aside .gallerist-thumb-items')).not.toBeNull()
+    expect(q('.gallerist-thumb-item[data-active]')?.getAttribute('data-item')).toBe('c1')
+    expect(q('.gallerist-thumbs-aside')?.hidden).toBe(false)
+    expect(q('.gallerist-items-toggle')?.hidden).toBe(false)
+    expect(q('.gallerist-thumbs-region')?.hasAttribute('data-gallerist-linear')).toBe(false)
+    expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+    expect(counter()).toBe('3 / 3')
+    expect(itemNavHidden()).toBe(false)
+    press('ArrowUp') // the item axis is back
+    expect(v.getState().cursor).toMatchObject({ g: 2, i: 0 })
+  })
+
+  it('back and forth many times leaves one rail and no stray nodes', () => {
+    const { v, rail } = setup()
+    v.goTo(1, 2)
+    for (let k = 0; k < 5; k++) {
+      rail.setDisplay('flat')
+      rail.setDisplay('stacked')
+    }
+    expect(document.querySelectorAll('.gallerist-thumbs').length).toBe(1)
+    expect(document.querySelectorAll('.gallerist-thumbs-region').length).toBe(1)
+    expect(document.querySelectorAll('.gallerist-thumb-items').length).toBe(1)
+    expect(document.querySelectorAll('.gallerist-thumb-group').length).toBe(0)
+    expect(document.querySelectorAll('.gallerist-items-toggle').length).toBe(1)
+    expect(document.querySelectorAll('.gallerist-thumb[data-active]').length).toBe(1)
+    expect(q('.gallerist-thumb-item[data-active]')?.getAttribute('data-item')).toBe('b2')
+  })
+
+  it('keeps the preset rules: the reviewer’s timeline carries into flat, its numbering does not', () => {
+    const { v, rail } = setup(undefined, { preset: 'reviewer' })
+    v.goTo(1, 0)
+    expect(nums()).toEqual(['1', '2', '3'])
+    rail.setDisplay('flat')
+    expect(q('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+    expect(
+      [...document.querySelectorAll('.gallerist-thumb-group-cap')].map((c) => c.textContent),
+    ).toEqual(['09:00', '09:10', '09:20'])
+    expect(nums()).toEqual([]) // numberItems belongs to the reviewer's stacked rail
+    rail.setDisplay('stacked')
+    expect(q('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(true)
+    expect(nums()).toEqual(['1', '2', '3']) // its own display again: the numbers come back
+  })
+
+  it('an option the host passed still wins after a switch', () => {
+    const { rail } = setup({ numberItems: true, timeline: false }, { preset: 'reviewer' })
+    rail.setDisplay('flat')
+    expect(q('.gallerist-thumbs')?.hasAttribute('data-timeline')).toBe(false)
+    expect(nums().length).toBe(6) // explicit numbering stays on the flat rail
+  })
+
+  it('an explicit mount({ linear: false }) keeps the two axes under a switched-in flat rail', () => {
+    const { v, rail } = setup(undefined, { linear: false })
+    v.goTo(1, 0)
+    rail.setDisplay('flat')
+    expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+    expect(counter()).toBe('2 / 3')
+    expect(itemNavHidden()).toBe(false)
+  })
+
+  it('while zoomed: the zoom and the item stay', () => {
+    const { v, rail } = setup()
+    v.goTo(1, 1)
+    v.zoomTo(2)
+    const zoom = { ...v.getState().zoom }
+    rail.setDisplay('flat')
+    expect(v.getState().zoom).toEqual(zoom)
+    expect(v.getState().cursor).toMatchObject({ g: 1, i: 1 })
+    rail.setDisplay('stacked')
+    expect(v.getState().zoom).toEqual(zoom)
+  })
+
+  it('a rail that starts flat can switch to stacked, with the aside column and the toggle', () => {
+    const { v, rail } = setup({ groupDisplay: 'flat' })
+    expect(rail.display).toBe('flat')
+    v.goTo(1, 0)
+    rail.setDisplay('stacked')
+    expect(q('.gallerist-region-aside .gallerist-thumb-items')?.getAttribute('data-axis')).toBe(
+      'vertical',
+    )
+    expect(q('.gallerist-items-toggle')?.hidden).toBe(false)
+    press('e') // the toggle's key works on the switched-in panel
+    expect(q('.gallerist-thumb-items')).toBeNull()
+  })
+
+  it('switches to and from a section index', () => {
+    const { v, rail } = setup()
+    v.goTo(2, 0)
+    rail.setDisplay('index')
+    expect(q('.gallerist-thumbs')?.getAttribute('data-display')).toBe('index')
+    expect(q('.gallerist-thumbs')?.getAttribute('role')).toBe('group')
+    expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(3)
+    expect(q('.gallerist-thumb-section[data-group="g2"] .gallerist-thumb-items')).not.toBeNull()
+    expect(q('.gallerist-thumbs-aside')?.hidden).toBe(true)
+    rail.setDisplay('stacked')
+    expect(q('.gallerist-thumbs')?.getAttribute('role')).toBe('listbox')
+    expect(document.querySelectorAll('.gallerist-thumb-row').length).toBe(0)
+    expect(q('.gallerist-region-aside .gallerist-thumb-items')).not.toBeNull()
+  })
+
+  it('a focused thumb the switch takes out hands focus to the viewer; so does the hidden toggle', () => {
+    const { rail } = setup()
+    ;(q('.gallerist-thumb[data-group="g1"]') as HTMLElement).focus()
+    rail.setDisplay('flat')
+    expect(document.activeElement).toBe(root())
+    rail.setDisplay('stacked')
+    ;(q('.gallerist-items-toggle') as HTMLElement).focus()
+    rail.setDisplay('flat')
+    expect(document.activeElement).toBe(root())
+  })
+
+  it('the same display, or an unknown one, changes nothing', () => {
+    const { rail } = setup()
+    const before = q('.gallerist-thumb[data-group="g0"]')
+    rail.setDisplay('stacked')
+    rail.setDisplay('grid' as never)
+    expect(rail.display).toBe('stacked')
+    expect(q('.gallerist-thumb[data-group="g0"]')).toBe(before) // not drawn again
+  })
+
+  it('before the rail mounts, setDisplay sets the display it mounts with', () => {
+    const v = createViewer({ collection: timed(), plugins: [thumbnails()] })
+    const rail = railOf(v)
+    expect(rail.display).toBeUndefined()
+    rail.setDisplay('flat')
+    expect(rail.display).toBeUndefined()
+    mount(v)
+    v.open()
+    expect(rail.display).toBe('flat')
+    expect(q('.gallerist-thumbs')?.getAttribute('data-display')).toBe('flat')
+    expect(root().getAttribute('data-gallerist-linear')).toBe('true')
+  })
+
+  it('setGroupDisplay / getGroupDisplay: the viewer’s rail, kept for a later mount', () => {
+    const v = createViewer({ collection: timed(), plugins: [thumbnails()] })
+    expect(getGroupDisplay(v)).toBeUndefined() // not mounted
+    const first = mount(v)
+    v.open()
+    expect(getGroupDisplay(v)).toBe('stacked')
+    expect(setGroupDisplay(v, 'flat')).toBe(true)
+    expect(getGroupDisplay(v)).toBe('flat')
+    expect(root().getAttribute('data-gallerist-linear')).toBe('true')
+    first.destroy()
+    mount(v)
+    expect(getGroupDisplay(v)).toBe('flat')
+    expect(q('.gallerist-thumbs')?.getAttribute('data-display')).toBe('flat')
+  })
+
+  it('setGroupDisplay on a viewer without a rail does nothing and says so', () => {
+    const v = createViewer({ collection: timed() })
+    mount(v)
+    const dispose = v.use(thumbnails())
+    v.open()
+    dispose()
+    expect(setGroupDisplay(v, 'flat')).toBe(false)
+    expect(getGroupDisplay(v)).toBeUndefined()
+    expect(q('.gallerist-thumbs')).toBeNull()
+  })
+
+  it('setGroupDisplay switches only the rail that shows (the last registered)', () => {
+    const v = createViewer({ collection: timed(), plugins: [thumbnails(), thumbnails()] })
+    mount(v)
+    v.open()
+    const [hidden, shown] = getInternals(v)
+      .getPlugins()
+      .filter((p) => p.name === 'thumbnails') as ThumbnailsInstance[]
+    const switched = vi.spyOn(hidden as ThumbnailsInstance, 'setDisplay')
+    expect(setGroupDisplay(v, 'flat')).toBe(true)
+    expect(shown?.display).toBe('flat')
+    expect(switched).not.toHaveBeenCalled()
+    expect(hidden?.display).toBe('stacked')
+  })
+
+  it('a flat rail leaves `e` to another plugin; a switched-in stacked rail takes it back', () => {
+    const e = vi.fn()
+    // listed before the rail: on a key both map, the later plugin wins
+    const v = createViewer({
+      collection: timed(),
+      plugins: [() => ({ name: 'other', keymap: { e } }), thumbnails({ groupDisplay: 'flat' })],
+    })
+    mount(v)
+    v.open()
+    press('e')
+    expect(e).toHaveBeenCalledTimes(1)
+    setGroupDisplay(v, 'stacked')
+    const toggle = q('.gallerist-items-toggle') as HTMLElement
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    press('e') // the rail's again: its item panel
+    expect(e).toHaveBeenCalledTimes(1)
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    setGroupDisplay(v, 'flat')
+    press('e')
+    expect(e).toHaveBeenCalledTimes(2)
+  })
+
+  it('a flat rail’s kept toggle is marked off (the bar doesn’t show for it alone); stacked, it isn’t', () => {
+    const { rail } = setup({ groupDisplay: 'flat' }, { controls: false })
+    const toggle = q('.gallerist-items-toggle') as HTMLElement
+    const bar = q('.gallerist-bar') as HTMLElement
+    expect(toggle.hasAttribute('data-gallerist-off')).toBe(true)
+    expect(bar.hidden).toBe(true)
+    rail.setDisplay('stacked')
+    expect(toggle.hasAttribute('data-gallerist-off')).toBe(false)
+    expect(toggle.hidden).toBe(false)
+    expect(bar.hidden).toBe(false)
   })
 })

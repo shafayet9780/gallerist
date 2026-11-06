@@ -17,7 +17,8 @@
       "@gallerist/plugin-save",
       "@gallerist/plugin-thumbnails",
       "@gallerist/plugin-video",
-      "@gallerist/plugin-video-youtube"
+      "@gallerist/plugin-video-youtube",
+      "@gallerist/plugin-view"
     ]
   ],
   "linked": [],

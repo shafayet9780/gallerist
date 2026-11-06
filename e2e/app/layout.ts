@@ -6,6 +6,7 @@ import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
 import { download } from '@gallerist/plugin-save'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
+import { type ViewChange, view } from '@gallerist/plugin-view'
 import {
   type ArrowLayout,
   type ColorScheme,
@@ -117,8 +118,19 @@ const viewer = createViewer({
           fullscreen(),
           download(),
           ...customCaption,
+          // view=1: the View menu (rail layout + scheme); its choices are recorded for the spec
+          ...(p.get('view') === '1'
+            ? [
+                view({
+                  onChange: (change) => {
+                    ;(window as unknown as { viewChanges: ViewChange[] }).viewChanges.push(change)
+                  },
+                }),
+              ]
+            : []),
         ],
 })
+;(window as unknown as { viewChanges: ViewChange[] }).viewChanges = []
 mount(viewer, {
   preset: (p.get('preset') ?? undefined) as PresetName | undefined,
   arrows: (p.get('arrows') ?? undefined) as ArrowLayout | undefined,

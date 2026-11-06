@@ -65,6 +65,44 @@ mount(viewer)
   the counter reads `item N / total` and the ↑/↓ item navigator hides. Pass `linear: false` to
   `mount()` (`linear={false}` in React) to keep the group/item axes.
 
+## Switching the display at run time
+
+```ts
+import { getGroupDisplay, setGroupDisplay, thumbnails } from '@gallerist/plugin-thumbnails'
+
+const viewer = createViewer({ collection, plugins: [thumbnails()] })
+mount(viewer, { preset: 'reviewer' })
+viewer.open()
+
+setGroupDisplay(viewer, 'flat') // → true; every item in one row, ←/→ walk them in order
+getGroupDisplay(viewer)         // 'flat'
+setGroupDisplay(viewer, 'stacked')
+```
+
+`setGroupDisplay(viewer, display)` switches the viewer's mounted rail (`stacked`, `flat` or `index`)
+in place. The current item stays current; the rail is drawn again around it (its run, its marks, the
+scroll that shows it with its neighbours, the item panel of a stacked or index rail); and the renderer
+follows at once: a flat rail turns linear traversal on (unless `mount()` was given `linear`), so the
+counter, the item navigator and the arrows change with it. A zoomed image stays zoomed. The switch
+counts as an explicit `groupDisplay`, so the preset rules below hold (`reviewer` → `flat` keeps the
+timeline, drops the numbering; back to `stacked` brings the numbering back), and an option you passed
+to `thumbnails()` still wins. Called before the rail mounts, it sets the display the rail mounts with;
+the display also stays for a later mount of the same viewer. With several thumbnails plugins it
+switches the last one registered, whose rail shows. It returns `false` when the viewer has no
+thumbnails rail, and ignores an unknown display. `getGroupDisplay(viewer)` returns the rail's display,
+`undefined` until it has mounted.
+
+The rail keeps the nodes it gave the renderer for every display it can switch to, since the renderer
+holds them for the mount: a flat rail keeps its items toggle in the toolbar (`hidden`, and marked
+`data-gallerist-off`, so a bar without built-in controls doesn't show for it alone) and, while a
+stacked rail would stack its items in the `aside` column, that column (`hidden`, taking no room). A
+flat rail doesn't claim `e`: another plugin's `e` works there, and the rail takes it back when it
+switches to stacked or index. React has a reactive `groupDisplay` prop that does the same, and
+[`@gallerist/plugin-view`](../plugin-view/README.md) puts the switch in a View menu.
+
+Without this package's import, the rail is found among the viewer's plugin instances: the instance
+named `thumbnails` has `display` and `setDisplay(display)` (`ThumbnailsInstance`).
+
 ## Options
 
 ```ts
@@ -80,7 +118,7 @@ thumbnails({
 |----------------|------------------------------|-------------|-------|
 | `overscan`     | `number`                     | measured    | Cards drawn each side of the card in the middle of the rail; scrolling draws the ones it reaches. A jump past the drawn run first draws around the new current card, then the scroll that reveals it trims the run back to the middle. By default what fits plus 3 each side (8 each side before the rail has a layout); a number below half of what fits is raised to it. Group cards in `stacked`/`index`, item cards in `flat`. |
 | `itemAxis`     | `'vertical' \| 'horizontal'` | `'vertical'`| `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. Ignored in `flat`. |
-| `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, grouped under each group's label with a hairline between groups, and makes the renderer's traversal linear by default. |
+| `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, grouped under each group's label with a hairline between groups, and makes the renderer's traversal linear by default. The display it starts with; `setGroupDisplay()` changes it later. |
 | `expandActive` | `boolean`                    | `true`      | `stacked` and `index`. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |
 | `timeline`     | `boolean \| (group, index) => string` | off | `stacked` and `flat`, the current group's label in the accent. Stacked: a label with a tick above each card, joined into a track. Flat: the label heads each group in place of its caption (a group whose label is `undefined` shows its caption). `true` reads `group.meta.time`. The label joins the card's (flat: the group's) accessible name. |
 | `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |

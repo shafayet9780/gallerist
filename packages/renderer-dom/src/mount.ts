@@ -289,7 +289,6 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // Aggregate plugin extensions (adapters/overlays captured at mount; regions + keymap re-applied
   // live on plugin changes, see below). Plugins register on the viewer (decision P1-C).
   const internals = getInternals(viewer)
-  const plugins = internals.getPlugins()
   const baseAdapters = opts.adapters ?? [imageAdapter()]
   // Adapters, overlays, and keymap are recomputed live so a plugin added via use() after mount
   // contributes all of its extensions, not just regions (review T4 / Important #5).
@@ -306,7 +305,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         typeof p.overlays === 'function' ? p.overlays({ group, item }) : (p.overlays ?? []),
       ),
   ]
-  let pluginKeymap = aggregateKeymap(plugins)
+  let pluginKeymap: ReturnType<typeof aggregateKeymap> = {} // read with the regions (readRegions)
 
   const pickAdapter = (type: string, item: Parameters<MediaAdapter['mount']>[0]) =>
     currentAdapters().find((a) => (a.match ? a.match(item) : a.type === type))
@@ -1454,16 +1453,16 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   ]) {
     bandObserver?.observe(band)
   }
-  // viewer.refresh(): an explicit re-measure, for layout changes a ResizeObserver can't see
-  const offRefresh = internals.onRefresh(onStageResize)
-
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
   const mountPluginRegions = createRegionMounter(regionHosts, { viewer, preset })
-  const mountRegions = () => {
+  // What the mounted plugins ask of the renderer, read when the plugin set changes and on
+  // viewer.refresh() (a rail that switches its display calls it): their keymaps (a flat rail leaves
+  // `e` to another plugin), and linear traversal: the option, else on while the rail asks for it (a
+  // flat thumbnails rail marks its region), so it follows a rail added, removed or switched after
+  // mount. Without built-in controls the bar shows while it holds a tool, but for one its plugin
+  // marks `data-gallerist-off` (kept for a later layout: a flat rail's items toggle).
+  const readRegions = () => {
     pluginKeymap = aggregateKeymap(internals.getPlugins())
-    mountPluginRegions(internals.getPlugins())
-    // Linear traversal: the option, else on while the rail asks for it (a flat thumbnails rail marks
-    // its region), so it follows a rail added or removed after mount.
     const on = opts.linear ?? !!regionHosts.thumbnails.querySelector('[data-gallerist-linear]')
     root.toggleAttribute('data-gallerist-arrow-labels', !!arrowLabel && !on)
     if (on !== linear) {
@@ -1472,13 +1471,27 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       else root.removeAttribute('data-gallerist-linear')
       chromeCol = null // the counter, the item navigator and the arrows' names follow it
     }
+    if (!controls)
+      bar.hidden = ![...regionHosts.toolbar.children].some(
+        (n) => !n.hasAttribute('data-gallerist-off'),
+      )
+  }
+  // viewer.refresh(): an explicit re-measure, for layout changes a ResizeObserver can't see, and a
+  // re-read of what the plugins ask for (readRegions)
+  const offRefresh = internals.onRefresh(() => {
+    readRegions()
+    if (attached) updateChrome()
+    onStageResize()
+  })
+  const mountRegions = () => {
+    mountPluginRegions(internals.getPlugins())
+    readRegions()
     // The pull-handle leads the rail region while a rail plugin is mounted. The mounter leaves
     // nodes it didn't add alone, so place (or drop) the handle here.
     const thumbs = regionHosts.thumbnails
     const hasRail = [...thumbs.childNodes].some((n) => n !== railHandle)
     if (!hasRail) railHandle.remove()
     else if (thumbs.firstChild !== railHandle) thumbs.prepend(railHandle)
-    if (!controls) bar.hidden = regionHosts.toolbar.childElementCount === 0
     syncCaption()
     // plugin overlays may have changed (e.g. React <Gallerist.Overlay> mount/unmount) → force repaint
     const cur = currentRec()
