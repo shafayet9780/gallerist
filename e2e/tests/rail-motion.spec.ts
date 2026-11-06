@@ -60,7 +60,14 @@ type Glide = {
   before: Frame
   after: Frame
   // the panel's animations of its size: their timing and their first and last keyframe, in px
-  anims: Array<{ duration: number; easing: string; from: number; to: number }>
+  anims: Array<{
+    duration: number
+    delay: number
+    rate: number
+    easing: string
+    from: number
+    to: number
+  }>
   // the page held at points along the glide (a fraction of its duration)
   samples: Array<Frame & { at: number }>
 }
@@ -97,6 +104,8 @@ const glide = (page: Page, act: Act, panel: string, dim: 'width' | 'height') =>
         const timing = effect.getTiming()
         return {
           duration: Number(timing.duration),
+          delay: Number(timing.delay),
+          rate: a.playbackRate,
           easing: String(timing.easing),
           from: Number.parseFloat(String(kf[0]?.[dim])),
           to: Number.parseFloat(String(kf[kf.length - 1]?.[dim])),
@@ -130,6 +139,8 @@ const glided = (g: Glide) => {
   expect(g.anims, 'one animation on the panel size').toHaveLength(1)
   const [a] = g.anims
   expect(a?.duration).toBe(1000)
+  expect(a?.delay, 'starts at once').toBe(0)
+  expect(a?.rate, 'at its own pace').toBe(1)
   expect(a?.easing).toBe('cubic-bezier(0.4, 0, 0.2, 1)')
   expect(Math.abs((a?.from ?? -9) - g.before.panel), 'starts at its size').toBeLessThan(1)
   expect(Math.abs((a?.to ?? -9) - g.after.panel), 'ends at its new size').toBeLessThan(1)

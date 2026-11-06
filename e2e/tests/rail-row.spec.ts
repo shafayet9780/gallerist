@@ -237,6 +237,32 @@ test.describe('pulling the row rail', () => {
     await expect(toStart).toBeHidden()
   })
 
+  test('› and ‹ go the whole page and no further when the page’s CSS scrolls the rail smoothly', async ({
+    page,
+  }) => {
+    await open(page, `${REVIEWER}&g=0`)
+    // a host's stylesheet (a smooth scroll would still read its old offset right after each step)
+    await page.addStyleTag({ content: '.gallerist .gallerist-thumbs { scroll-behavior: smooth }' })
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    await page.mouse.move(box.x + box.width / 2, box.y + 4)
+    const toEnd = page.locator('.gallerist-rail-page[data-dir="end"]')
+    const toStart = page.locator('.gallerist-rail-page[data-dir="start"]')
+    await expect(toEnd).toHaveCSS('opacity', '1')
+    const width = await rail(page).evaluate((el) => el.clientWidth)
+    const card = page.locator('.gallerist-thumb-item[data-item="g5i0"]')
+    const x0 = (await card.boundingBox())?.x ?? 0
+    const moved = async () => x0 - ((await card.boundingBox())?.x ?? 0)
+    await toEnd.click()
+    await expect.poll(moved).toBeGreaterThan(width * 0.8 - 6)
+    // past the glide and any frames it could carry on for: still where the page took it
+    await page.waitForTimeout(1000)
+    expect(await moved()).toBeLessThan(width * 0.8 + 6)
+    await toStart.click()
+    await expect.poll(async () => Math.abs(await moved())).toBeLessThanOrEqual(1)
+    await expect(toStart).toBeHidden()
+  })
+
   test('right to left: the drag, the wheel and the buttons run the other way', async ({ page }) => {
     await open(page, `${REVIEWER}&g=0&dir=rtl`)
     const box = await rail(page).boundingBox()
