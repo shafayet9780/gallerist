@@ -2,6 +2,47 @@
 
 ## v0.3.4
 
+### Host hooks: the rail and the keys (owner-approved, for the Apploye reviewer)
+- **plugin-thumbnails (new)**: `renderGroupMeta(group, index, { display, place })` draws a host's
+  decoration per group: on a flat rail at the end of the group's label line (`place: 'label'`; the
+  group widens to fit the label and the meta, the label still ending in an ellipsis past three card
+  heights), on a stacked rail under the card at its width (`'below'`; every card is then wrapped) and,
+  with a `timeline`, at the end of its time label (`'label'`). Not on an index rail.
+- **plugin-thumbnails (new)**: `renderItemBadge(item, g, i)` puts a host's badge in each item thumb's
+  top end corner (a flat rail, the item column, the peek, an index section), clear of the
+  `numberItems` number at the top start and of the focus ring.
+- **plugin-thumbnails (new)**: `cluster(item, g, i)`: consecutive items with the same key sit 2px
+  apart and 8px between clusters, in rows and columns, right to left too (`data-cluster="in"` /
+  `"start"`; theme tokens `--gallerist-cluster-inner`, `--gallerist-cluster-gap`). Visual only.
+- **plugin-thumbnails (new)**: `markers(collection)` returns `RailMarker`s (`id`, `after` or `before`
+  a group id, `label`, `caption`, `render`, `tip`), drawn in order between groups on flat and stacked
+  rails as a dashed box the height of the cards under a label line. They are not in the collection:
+  never a stop for the arrows, Home/End or a click, not counted, not in the hash, and windowed with
+  their group. Not focusable (information, not an action); a named `role="group"`, its label shown in
+  the box. `tip` shows a host tooltip while a mouse or pen is over it and after a 500ms long press on
+  touch (until the next press), in the rail's region, so the rail doesn't clip it; without one, the
+  label is the `title`.
+- **plugin-thumbnails (new)**: what a decoration or badge says joins the card's, group's or thumb's
+  accessible name (a node's `aria-label`, else its text); the drawn node is hidden from assistive
+  tech. `refreshRail(viewer)` (and the instance's `refresh()`) draws decorations and markers again in
+  place after the host's data changed: the cards, the thumbs, the scroll and focus stay.
+- **renderer-dom (changed)**: the viewer leaves any key a handler before it already took
+  (`preventDefault()`), not only Escape, so a host popover in the caption can walk its own list with
+  the arrows and close itself on Escape before the viewer. Keys typed in an `input`, `textarea`,
+  `select` or contenteditable inside the viewer stay there (unchanged; Escape still closes from a
+  field nobody handled it in).
+- **plugin-captions (docs)**: a popover from the caption goes in the viewer root, not the caption:
+  the caption band scrolls when tall, and a scroller clips it (checked: a popover kept in the band is
+  cut off where it rises over the stage). In the root at `z-index` 10 it shows over the stage and the
+  rail; Escape, typing and a key that opens it are covered in the README.
+- **theme-default (changed)**: on a phone (600px wide or less) the bar leaves out the zoom tool and
+  fullscreen: a pinch or a double tap zooms, and the viewer fills the screen. `--gallerist-phone-zoom:
+  flex` and `--gallerist-phone-fullscreen: grid` keep them. The reviewer preset with View, save and
+  Close then fits a 390px bar without scrolling.
+- **size**: core + renderer-dom 16,615 → 16,616 B (limit 16,650); core + renderer-dom + thumbnails
+  23,794 → 25,302 B, so its budget goes from 24 to 25.5 kB (owner's call); base.css 8,124 → 8,556 B;
+  the `@gallerist/cdn` bundle 36,501 → 38,031 B, its budget raised from 37 to 40 kB (owner-approved).
+
 ### The toolbar's focus ring
 - **theme-default (fixed)**: a toolbar tool with keyboard focus (fullscreen, save, View, the rail's
   items toggle, the grid, any plugin tool in the strip) shows its whole focus ring. The strip the

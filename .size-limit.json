@@ -28,7 +28,7 @@
       "packages/renderer-dom/dist/index.js": "{ mount }",
       "packages/plugin-thumbnails/dist/index.js": "{ thumbnails }"
     },
-    "limit": "24 kB",
+    "limit": "25.5 kB",
     "gzip": true
   },
   {
@@ -114,7 +114,7 @@
   {
     "name": "@gallerist/cdn global build (gz)",
     "path": "packages/cdn/dist/gallerist.umd.js",
-    "limit": "37 kB",
+    "limit": "40 kB",
     "gzip": true
   }
 ]

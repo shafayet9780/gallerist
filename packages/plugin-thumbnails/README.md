@@ -144,6 +144,10 @@ thumbnails({
 | `timeline`     | `boolean \| (group, index) => string` | off | `stacked` and `flat`, the current group's label in the accent. Stacked: a label with a tick above each card, joined into a track. Flat: the label heads each group in place of its caption (a group whose label is `undefined` shows its caption). `true` reads `group.meta.time`. The label joins the card's (flat: the group's) accessible name. |
 | `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
+| `renderGroupMeta` | `(group, index, { display, place }) => Node \| string \| null` | none | A host's decoration per group: flat, at the end of its label line; stacked, under the card (and with a `timeline`, at the end of its time label). See [Host decorations](#host-decorations-and-markers). |
+| `renderItemBadge` | `(item, g, i) => Node \| string \| null` | none | A host's badge in each item thumb's top end corner. |
+| `cluster`      | `(item, g, i) => string \| number \| null` | none | Consecutive items with the same key sit 2px apart, 8px between clusters. Visual only. |
+| `markers`      | `(collection) => RailMarker[]` | none | Entries between groups that are not items (time without screenshots): drawn, never a stop. |
 
 Presets configure these for you: with `mount(viewer, { preset })` (or React's `preset` prop) every
 option you leave unset takes the preset's value, so `thumbnails()` under `preset: 'reviewer'` gets the
@@ -154,6 +158,80 @@ carries over (`groupDisplay: 'flat'` under `reviewer` heads each group with its 
 options settle when the rail mounts (and again for each new mount, with its preset). See [layout presets](https://github.com/shafayet9780/gallerist/blob/main/docs/PRESETS.md)
 for each preset's values. The rail's **position** (bottom/top/hidden) is a renderer option (`rail`),
 not a thumbnails option.
+
+## Host decorations and markers
+
+The rail draws what the host renders for its groups and items, so data the viewer doesn't know about
+(activity, notes, a monitor) shows where it belongs. Each function returns a `Node`, a string (shown
+as text, never parsed) or `null`/`undefined` (nothing). What it returns is presentational: it sits
+inside a card (a button) or a label, hidden from assistive tech, and its text joins the accessible
+name instead, a node's `aria-label` if it has one, else its text content. Give a meter or an icon an
+`aria-label` ("Activity 64%", "Monitor 2"). Return a fresh node each call.
+
+```ts
+import { refreshRail, thumbnails } from '@gallerist/plugin-thumbnails'
+
+thumbnails({
+  // flat: the end of the label line · stacked: under the card ('below') and, with a timeline,
+  // the end of its time label ('label')
+  renderGroupMeta: (group, index, { display, place }) =>
+    display === 'stacked' && place === 'label' ? noteCount(group) : activityMeter(group),
+  // a thumb's top end corner (numberItems keeps the start)
+  renderItemBadge: (item) => monitorBadge(item.meta.screen),
+  // the screens of one capture sit together
+  cluster: (item) => item.meta.capturedAt,
+  // manual time: not a screenshot, so not an item
+  markers: (collection) => [
+    {
+      id: 'manual-42',
+      after: 'timeframe-1110', // a group id (or `before: id`)
+      caption: 'Manual', // the label line over it
+      label: 'Manual time, 11:20 – 11:45, 25 minutes', // its accessible name
+      render: () => '✎ 25m', // the box (default: the label)
+      tip: () => entryDetails(), // hover, or a long press on touch
+    },
+  ],
+})
+
+// after the host's data changed in place (a note saved):
+refreshRail(viewer)
+```
+
+- **`renderGroupMeta(group, index, { display, place })`**: `display` is `'flat'` or `'stacked'`
+  (an index rail draws none). Flat: `place: 'label'`, at the end of the group's label line; the group
+  widens to fit the label and the meta, the label still ending in an ellipsis past three card heights
+  (its whole text in its `title`). Stacked: `'below'`, under the card at its width (every card is
+  wrapped, so the rail's height grows by that line), and with a `timeline` also `'label'`, at the end
+  of the card's time label (which the card's width cuts first). Called for each group as it is drawn
+  (the rail draws only a run of them) and on `refreshRail()`.
+- **`renderItemBadge(item, g, i)`**: in each item thumb's top end corner, wherever item thumbs show
+  (a flat rail, the item column, the peek, an index section). The `numberItems` number takes the top
+  start; the focus ring is outside the thumb.
+- **`cluster(item, g, i)`**: consecutive items with the same key (not `null`/`undefined`) sit
+  `--gallerist-cluster-inner` apart (2px), with `--gallerist-cluster-gap` (8px) where the key
+  changes, in a row and in a column alike. Items without a key keep the plain gap. Traversal, counts
+  and names don't change: ↑/↓ (or ←/→ on a flat rail) still step one item at a time, so the other
+  monitor of the same capture is the next item. Thumbs carry `data-cluster="in"` (continues the one
+  before) or `"start"` (a new one after another).
+- **`markers(collection)`** returns `RailMarker`s: `{ id, after?, before?, label, caption?, render?,
+  tip? }`. A marker is drawn after the group `after` names (else before `before`'s), in the order
+  given, on flat and stacked rails; one whose group isn't in the collection is not drawn. It is not
+  part of the collection: never a stop for the arrows, Home/End or a click, not counted, not in the
+  hash, and windowed with its group (drawn when its group's end, or start for `before`, is drawn). It
+  is a dashed box the height of the rail's cards under a label line (`.gallerist-rail-marker`, `-cap`,
+  `-body`). Read for each new collection and on `refreshRail()`.
+- **Markers and assistive tech**: a marker is not focusable. It is information, not an action, and a
+  stop that does nothing would cost every keyboard user a key press each time they pass it (the
+  reason it isn't an item in the first place). It is a named `role="group"` (the one role a listbox
+  holds besides its options) with no option in it, so a screen reader's reading of the rail meets
+  its `label`; its text shows in the box. Its `tip` shows while a mouse or pen is over it, and after
+  a long press on touch (500ms, until the next press anywhere), in the rail's region (unclipped,
+  above or beside the marker, kept inside the viewer) as `role="tooltip"`. Without a `tip` the
+  marker's `title` is its `label`. Put what matters in `label`: the tip can't be reached from the
+  keyboard.
+- **`refreshRail(viewer)`**: draws the decorations and the markers again in place (the cards, the
+  thumbs, the scroll and focus stay). A new collection (`setCollection`) needs no call. The
+  instance's `refresh()` does the same.
 
 ## Data
 

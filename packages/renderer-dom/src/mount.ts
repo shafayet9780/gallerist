@@ -1136,10 +1136,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const setDir = () => root.setAttribute('data-gallerist-dir', isRtl() ? 'rtl' : 'ltr')
 
   const onKey = (e: KeyboardEvent) => {
-    // Don't hijack typing inside an embedded control (overlay input/textarea/etc); Escape still
-    // closes from anywhere (I-UX2), unless a handler before ours called preventDefault() on it
-    // (a host form keeping Escape for itself).
-    if (isEditableTarget(e.target) && e.key !== 'Escape') return
+    // A key a handler before ours took (preventDefault: a host popover closing on Escape, a host
+    // list walking its own ↑/↓) is not ours. Don't hijack typing inside an embedded control (overlay
+    // input/textarea/select/contenteditable); Escape still closes from anywhere (I-UX2).
+    if (e.defaultPrevented || (isEditableTarget(e.target) && e.key !== 'Escape')) return
     // A focused caption band scrolls with ↑/↓/Home/End rather than navigating. Scrolled here, not
     // left to the browser: WebKit on Linux (GTK/WPE) leaves the placard's band unscrolled.
     const by =
@@ -1183,7 +1183,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         break
       }
       case 'Escape':
-        if (!e.defaultPrevented) viewer.close()
+        viewer.close()
         break
       case '+':
       case '=':

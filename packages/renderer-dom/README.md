@@ -24,6 +24,16 @@ viewer.open()
 
 Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 
+## Keys and host UI inside the viewer
+
+The viewer's keys (arrows, Home/End, digits, `+`/`-`/`0`, `t`, plugin keys) do nothing in a text
+field inside the viewer (`input`, `textarea`, `select`, contenteditable), and nothing with a key a
+handler before the viewer's already took with `preventDefault()`. So a host popover closes on Escape
+before the viewer does: handle Escape on the popover (or its field) and call `preventDefault()`; an
+Escape nobody took still closes the viewer, from a field too. A plugin key that moves focus into a
+field (a "notes" key opening a note box) should `preventDefault()` too, or the field gets the
+character.
+
 ## Markup init
 
 `bind()` opens a viewer from `<a href="big.jpg" data-gallerist="trip">` links, with no collection to
