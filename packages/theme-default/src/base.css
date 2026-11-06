@@ -83,6 +83,7 @@
     /* the line between a flat rail's groups: the hairline, unless a skin's dark scheme lifts it (a
        hairline that reads on a light band all but disappears on a dark one) */
     --gallerist-divider: var(--gallerist-hairline);
+    --gallerist-rail-fade: 40px; /* how far a rail's end fades where it has more beyond it */
 
     /* hover: unchanged unless a skin sets one */
     --gallerist-arrow-hover-bg: var(--gallerist-arrow-bg);
@@ -450,26 +451,120 @@
 
 /* ── thumbnails rail (plugin-thumbnails) ───────────────────────────────────── */
 /* the region wrapper: holds the scrollable rail plus the floating item/peek panels as siblings, so
-   the panels escape the rail's overflow-clip yet still ride along when the region is re-mounted. */
+   the panels escape the rail's overflow-clip yet still ride along when the region is re-mounted. It
+   paints the rail's band, so the strip inside can fade its ends without fading the band. */
 .gallerist-thumbs-region {
   position: relative;
   display: flex;
   align-items: center;
   min-width: 0;
+  background: var(--gallerist-rail-bg);
+  border-block-start: var(--gallerist-rail-border);
+  backdrop-filter: var(--gallerist-blur);
 }
 .gallerist-thumbs-region > .gallerist-thumbs {
   flex: 1 1 auto;
   min-width: 0;
 }
+/* the strip: no scrollbar (a mouse drags it, a wheel scrolls it, ‹ › page it; plugin-thumbnails),
+   no text or image selection while it's pulled; an end with more beyond it fades */
 .gallerist-thumbs {
+  --_fade-to: to right;
+  --_fade-start: 0px;
+  --_fade-end: 0px;
   display: flex;
   gap: 8px;
   align-items: center;
   padding: 8px 12px;
   overflow-x: auto;
-  background: var(--gallerist-rail-bg);
-  border-block-start: var(--gallerist-rail-border);
+  scrollbar-width: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.gallerist-thumbs::-webkit-scrollbar {
+  display: none;
+}
+.gallerist-thumbs img {
+  -webkit-user-drag: none;
+}
+.gallerist-thumbs[data-gallerist-scroll="y"] {
+  --_fade-to: to bottom;
+}
+.gallerist[data-gallerist-dir="rtl"] .gallerist-thumbs[data-gallerist-scroll="x"] {
+  --_fade-to: to left;
+}
+.gallerist-thumbs[data-gallerist-more-start] {
+  --_fade-start: var(--gallerist-rail-fade);
+}
+.gallerist-thumbs[data-gallerist-more-end] {
+  --_fade-end: var(--gallerist-rail-fade);
+}
+.gallerist-thumbs:is([data-gallerist-more-start], [data-gallerist-more-end]) {
+  -webkit-mask-image: linear-gradient(
+    var(--_fade-to),
+    transparent,
+    #000 var(--_fade-start),
+    #000 calc(100% - var(--_fade-end)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    var(--_fade-to),
+    transparent,
+    #000 var(--_fade-start),
+    #000 calc(100% - var(--_fade-end)),
+    transparent
+  );
+}
+@media (pointer: fine) {
+  .gallerist-thumbs:is([data-gallerist-more-start], [data-gallerist-more-end]) {
+    cursor: grab;
+  }
+}
+.gallerist-thumbs[data-gallerist-dragging],
+.gallerist-thumbs[data-gallerist-dragging] * {
+  cursor: grabbing;
+}
+/* ‹ › at a sideways strip's ends, while there's more that way: for a mouse, on hover (the keys
+   already walk the rail, so they're out of the tab order and hidden from assistive tech) */
+.gallerist-rail-page {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-inline: 6px;
+  padding: 0;
+  translate: 0 -50%;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: 50%;
+  background: var(--gallerist-chrome-bg);
+  color: var(--gallerist-fg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
   backdrop-filter: var(--gallerist-blur);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--gallerist-dur-exit) var(--gallerist-ease-out);
+}
+.gallerist-rail-page[hidden] {
+  display: none;
+}
+.gallerist-rail-page .gallerist-icon {
+  width: 16px;
+  height: 16px;
+}
+.gallerist[data-gallerist-dir="rtl"] .gallerist-rail-page .gallerist-icon {
+  transform: scaleX(-1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .gallerist-thumbs-region:hover > .gallerist-rail-page {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .gallerist-rail-page:hover {
+    background: var(--gallerist-tool-hover-bg, var(--gallerist-chrome-bg));
+  }
 }
 /* cards stack image + (optional) caption band; height grows for the caption */
 .gallerist-thumb {
@@ -656,13 +751,13 @@
   top: calc(14px + 6px + 4px);
 }
 /* a side rail's band edge faces the stage, not the bar */
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs-region {
   border-block-start: 0 none;
 }
-.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumbs {
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumbs-region {
   border-right: var(--gallerist-rail-border);
 }
-.gallerist[data-gallerist-rail-pos="right"] .gallerist-thumbs {
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-thumbs-region {
   border-left: var(--gallerist-rail-border);
 }
 .gallerist-thumb-time::before {
@@ -2116,6 +2211,7 @@
     .gallerist-region-thumbnails:has(.gallerist-thumbs[data-display="index"])
     .gallerist-thumbs-region {
     align-items: stretch;
+    border-inline: 0 none;
   }
   .gallerist[data-gallerist-orientation="vertical"]
     .gallerist-region-thumbnails:has(.gallerist-thumbs[data-display="index"])
@@ -2129,7 +2225,6 @@
     padding: 8px 12px;
     overflow-x: auto;
     overflow-y: hidden;
-    border-inline: 0 none;
   }
   .gallerist[data-gallerist-orientation="vertical"]
     .gallerist-thumbs[data-display="index"]

@@ -31,6 +31,9 @@
 // Motion (motion.ts): the rail collapsing to its handle (the renderer's `data-gallerist-rail`, from
 // the handle, `t` or fullscreen) and a stacked rail's item column opening and closing glide to their
 // new size instead of jumping, unless the user prefers reduced motion.
+//
+// Pull, don't scroll (scroll.ts): the rail shows no scrollbar. A mouse or pen drags it, a vertical
+// wheel scrolls a sideways rail, its ends fade where there's more, and ‹ › buttons there page it.
 
 import type {
   Group,
@@ -43,6 +46,7 @@ import type {
 } from '@gallerist/core'
 import { ICONS, getInternals } from '@gallerist/core/internal'
 import { GLIDE, createGlides, sizeOf } from './motion'
+import { type Strip, attachStrip } from './scroll'
 import { type Axis, axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
 
 /** Cards drawn beyond the visible ones on each side, so a step or a short scroll lands on drawn cards. */
@@ -394,6 +398,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let hoverCapable = true
     // the viewer's root, once the rail is in it, and what it last said about the rail's collapse
     let viewerRoot: HTMLElement | null = null
+    let strip: Strip | null = null // the rail's drag, wheel, end fades and page buttons
     let railObs: MutationObserver | null = null
     let railCollapsed = false
     const glides = createGlides(
@@ -726,6 +731,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           itemRow.setAttribute('aria-label', t.groupItems)
           itemRow.setAttribute('aria-orientation', itemAxis)
           itemRow.dataset.axis = itemAxis
+          // a mouse drags the stack too (it keeps its scrollbar: it sits on a panel)
+          if (itemAxis === 'vertical') attachStrip(itemRow, null, () => 'y')
         }
         fillColumn(itemRow, activeGroup, gIndex, true)
         mountEl.appendChild(itemRow)
@@ -1093,6 +1100,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       frame = requestAnimationFrame(() => {
         frame = 0
         rewindow()
+        strip?.update()
       })
     }
 
@@ -1107,6 +1115,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           const { g, i } = viewer.getState().cursor
           revealActive(viewer.getCollection(), g, i)
           rewindow() // the first layout: size the run to the rail
+          strip?.update()
         })
       }
       wasClosed = closed
@@ -1146,6 +1155,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         if (peekGroupId && peekGroupId === activeGroupId) closePeek() // navigated into the peeked group
       }
       applyActive(col, cur.g, cur.i)
+      strip?.update()
 
       lastCol = col
       lastG = cur.g
@@ -1160,6 +1170,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       railObs = null
       viewerRoot = null
       glides.stopAll()
+      strip?.destroy()
+      strip = null
       resizeObs?.disconnect()
       resizeObs = null
       root?.removeEventListener('scroll', scheduleRewindow)
@@ -1227,6 +1239,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           const { g, i } = viewer.getState().cursor
           revealActive(viewer.getCollection(), g, i)
           rewindow()
+          strip?.update()
         })
       viewer.refresh()
     }
@@ -1254,6 +1267,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       regionEl.appendChild(root)
       root.style.overflowAnchor = 'none' // keepPlace corrects the offset itself
       root.addEventListener('scroll', scheduleRewindow, { passive: true })
+      const rail = root
+      strip = attachStrip(rail, regionEl, () => axis ?? axisOf(rail))
       if (typeof ResizeObserver !== 'undefined') {
         resizeObs = new ResizeObserver(scheduleRewindow)
         resizeObs.observe(root)

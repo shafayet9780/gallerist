@@ -77,3 +77,180 @@ for (const skin of ['gallery', 'console', 'editorial']) {
     expect(light.same).toBe(true) // the light scheme keeps its hairline
   })
 }
+
+// ── pulling the rail: no scrollbar; drag, wheel, end fades and page buttons ─────────────────────
+const rail = (page: Page) => page.locator('.gallerist-thumbs')
+const counter = (page: Page) => page.locator('.gallerist-counter')
+// how far the rail has scrolled from its start (right to left: scrollLeft runs negative)
+const scrolled = (page: Page) => rail(page).evaluate((el) => Math.abs(Math.round(el.scrollLeft)))
+const frames = (page: Page, n = 3) =>
+  page.evaluate(async (n) => {
+    for (let k = 0; k < n; k++) await new Promise((r) => requestAnimationFrame(r))
+  }, n)
+
+test.describe('pulling the row rail', () => {
+  test.use({ viewport: { width: 1280, height: 720 } })
+  const REVIEWER = 'skin=console&custom=short'
+
+  test('no scrollbar; the band is still painted behind the strip', async ({ page }) => {
+    await open(page, REVIEWER)
+    const style = await rail(page).evaluate((el) => {
+      const s = getComputedStyle(el)
+      const region = getComputedStyle(el.parentElement as HTMLElement)
+      return {
+        scrollbar: 'scrollbarWidth' in s ? s.scrollbarWidth : 'none',
+        gutter: el.offsetHeight - el.clientHeight,
+        bg: s.backgroundColor,
+        band: region.backgroundColor,
+        rule: region.borderTopWidth,
+      }
+    })
+    expect(style.scrollbar).toBe('none')
+    expect(style.gutter).toBe(0)
+    expect(style.bg).toBe('rgba(0, 0, 0, 0)')
+    expect(style.band).not.toBe('rgba(0, 0, 0, 0)')
+    expect(style.rule).toBe('1px')
+  })
+
+  test('a mouse drag scrolls it and never clicks; a click still selects', async ({ page }) => {
+    await open(page, REVIEWER)
+    await expect(counter(page)).toHaveText('2 / 37')
+    const card = page.locator('.gallerist-thumb-item[data-item="g4i2"]')
+    const box = await card.boundingBox()
+    if (!box) throw new Error('no card')
+    const before = await scrolled(page)
+    await page.mouse.move(box.x + 20, box.y + 20)
+    await page.mouse.down()
+    for (let k = 1; k <= 10; k++) await page.mouse.move(box.x + 20 - k * 25, box.y + 20)
+    await expect(rail(page)).toHaveAttribute('data-gallerist-dragging', '')
+    await page.mouse.up()
+    await frames(page)
+    expect((await scrolled(page)) - before).toBeGreaterThan(200)
+    await expect(counter(page)).toHaveText('2 / 37') // the press on g4i2 didn't select it
+    await expect(rail(page)).not.toHaveAttribute('data-gallerist-dragging', '')
+
+    // a press that wobbles a pixel or two is still a click
+    const other = page.locator('.gallerist-thumb-item[data-item="g5i1"]')
+    const at = await other.boundingBox()
+    if (!at) throw new Error('no card')
+    await page.mouse.move(at.x + 20, at.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(at.x + 22, at.y + 21)
+    await page.mouse.up()
+    await expect(page.locator('.gallerist-thumb-item[data-active]')).toHaveAttribute(
+      'data-item',
+      'g5i1',
+    )
+    await page.locator('.gallerist-thumb-item[data-item="g5i2"]').click()
+    await expect(page.locator('.gallerist-thumb-item[data-active]')).toHaveAttribute(
+      'data-item',
+      'g5i2',
+    )
+  })
+
+  test('a vertical wheel scrolls it sideways, and leaves the page alone at its start', async ({
+    page,
+  }) => {
+    await open(page, `${REVIEWER}&g=0`)
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    expect(await scrolled(page)).toBe(0)
+    await page.mouse.wheel(0, 300)
+    await expect.poll(() => scrolled(page)).toBeGreaterThan(250)
+    await page.mouse.wheel(0, -1000)
+    await expect.poll(() => scrolled(page)).toBe(0)
+    await expect(counter(page)).toHaveText('1 / 37') // the wheel didn't navigate
+  })
+
+  test('its ends fade where there is more, and ‹ › page it on hover', async ({ page }) => {
+    await open(page, `${REVIEWER}&g=0`)
+    await expect(rail(page)).toHaveAttribute('data-gallerist-more-end', '')
+    await expect(rail(page)).not.toHaveAttribute('data-gallerist-more-start', '')
+    expect(await rail(page).evaluate((el) => getComputedStyle(el).maskImage)).toContain('gradient')
+    const toEnd = page.locator('.gallerist-rail-page[data-dir="end"]')
+    const toStart = page.locator('.gallerist-rail-page[data-dir="start"]')
+    await expect(toStart).toBeHidden()
+    await expect(toEnd).toHaveAttribute('aria-hidden', 'true')
+    await expect(toEnd).toHaveAttribute('tabindex', '-1')
+    await expect(toEnd).toHaveCSS('opacity', '0') // until the pointer is over the rail
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    await page.mouse.move(box.x + box.width / 2, box.y + 4)
+    await expect(toEnd).toHaveCSS('opacity', '1')
+    // at the rail's end (the right in this direction), level with it
+    const b = await toEnd.boundingBox()
+    expect((b?.x ?? 0) + (b?.width ?? 0)).toBeGreaterThan(box.x + box.width - 50)
+    // a card near the end moves most of the rail's width towards the start (the rail re-windows as
+    // it goes, so its scroll offset alone doesn't tell how far it moved)
+    const width = await rail(page).evaluate((el) => el.clientWidth)
+    const card = page.locator('.gallerist-thumb-item[data-item="g5i0"]')
+    const x0 = (await card.boundingBox())?.x ?? 0
+    await toEnd.click()
+    await expect
+      .poll(async () => Math.round(x0 - ((await card.boundingBox())?.x ?? 0)))
+      .toBeGreaterThan(width * 0.8 - 6)
+    expect(x0 - ((await card.boundingBox())?.x ?? 0)).toBeLessThan(width * 0.8 + 6)
+    await expect(rail(page)).toHaveAttribute('data-gallerist-more-start', '')
+    await expect(toStart).toBeVisible()
+    await expect(page.locator('.gallerist')).toBeFocused() // the click took no focus
+    await expect(page.locator('.gallerist-rail-page:focus')).toHaveCount(0)
+    await toStart.click()
+    await expect
+      .poll(async () => Math.round((await card.boundingBox())?.x ?? 0))
+      .toBe(Math.round(x0))
+    await expect(toStart).toBeHidden()
+  })
+
+  test('right to left: the drag, the wheel and the buttons run the other way', async ({ page }) => {
+    await open(page, `${REVIEWER}&g=0&dir=rtl`)
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    const toEnd = page.locator('.gallerist-rail-page[data-dir="end"]')
+    await page.mouse.move(box.x + box.width / 2, box.y + 4)
+    const b = await toEnd.boundingBox()
+    expect(b?.x ?? 999).toBeLessThan(box.x + 50) // the end is on the left
+    const card = page.locator('.gallerist-thumb-item[data-item="g5i0"]')
+    const x0 = (await card.boundingBox())?.x ?? 0
+    await toEnd.click()
+    await expect
+      .poll(async () => Math.round(((await card.boundingBox())?.x ?? 0) - x0))
+      .toBeGreaterThan(box.width * 0.8 - 30)
+    // the wheel back up to the start (over a page button, the wheel is the rail's too)
+    for (let k = 0; k < 4; k++) await page.mouse.wheel(0, -1000)
+    await expect.poll(() => scrolled(page)).toBe(0)
+    // dragging right pulls in what's to the left: towards the end
+    await page.mouse.move(box.x + 300, box.y + box.height - 20)
+    await page.mouse.down()
+    for (let k = 1; k <= 8; k++)
+      await page.mouse.move(box.x + 300 + k * 25, box.y + box.height - 20)
+    await page.mouse.up()
+    await frames(page)
+    expect(await rail(page).evaluate((el) => el.scrollLeft)).toBeLessThan(-150)
+    await expect(counter(page)).toHaveText('1 / 37')
+  })
+
+  test('the keys still bring the current card into view', async ({ page }) => {
+    await open(page, `${REVIEWER}&g=0`)
+    await page.locator('.gallerist').focus()
+    for (let k = 0; k < 20; k++) await page.keyboard.press('ArrowRight')
+    await expect(counter(page)).toHaveText('21 / 37')
+    await expect(page.locator('.gallerist-thumb-item[data-active]')).toBeInViewport({ ratio: 1 })
+    await expect(rail(page)).toHaveAttribute('data-gallerist-more-start', '')
+  })
+
+  test('a stacked rail pulls the same way', async ({ page }) => {
+    await page.goto('/layout.html?skin=console&g=0')
+    await viewerSettled(page)
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    await page.setViewportSize({ width: 600, height: 720 })
+    await frames(page, 4)
+    await expect(rail(page)).toHaveAttribute('data-gallerist-more-end', '')
+    const again = await rail(page).boundingBox()
+    if (!again) throw new Error('no rail')
+    await page.mouse.move(again.x + again.width / 2, again.y + again.height / 2)
+    await page.mouse.wheel(0, 200)
+    await expect.poll(() => scrolled(page)).toBeGreaterThan(150)
+  })
+})

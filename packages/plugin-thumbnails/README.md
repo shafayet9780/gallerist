@@ -30,8 +30,29 @@ mount(viewer)
   would be cut off by an edge, the rail scrolls to centre the current card, so a step always shows
   what comes next. At either end of the rail the scroll stops at the first or last card. This applies
   to every rail that scrolls (`flat`, `stacked`, `index` rows and chips, side rails, right to left) and
-  to the item column. The rail scrolls instantly, with no animation, so there is nothing to turn off
+  to the item column. These scrolls are instant, with no animation, so there is nothing to turn off
   for `prefers-reduced-motion`.
+- **Pull, don't scroll.** The rail shows no scrollbar (in every engine). A mouse or pen **drags** it:
+  past 5px a press is a drag, which scrolls the rail and never clicks the card it started on; short of
+  that it's a click, which selects. While a rail can scroll it shows a grab cursor between its cards,
+  and nothing in it is selected or dragged out as an image. Touch keeps the browser's own scrolling.
+  A **vertical wheel** scrolls a sideways rail (towards its end, whatever the reading direction) while
+  it can go that way; at that end, or when it doesn't scroll, the page gets the wheel. A sideways wheel
+  or trackpad swipe, and a pinch, are left to the browser. Each end with more beyond it **fades**
+  (`data-gallerist-more-start` / `data-gallerist-more-end` on the rail, the theme's mask, 40px by
+  `--gallerist-rail-fade`), on a side rail too. On a sideways rail, **‹ ›** buttons at those ends
+  (`.gallerist-rail-page`, in the rail region) show while a mouse is over the rail and page it by 80%
+  of its width, gliding unless the user prefers reduced motion; they are out of the tab order and
+  hidden from assistive tech, as the keys already walk the rail and bring the current card into view.
+  The item column beside the stage drags too, and keeps its scrollbar (it sits on a panel). The
+  theme paints the rail's band on the region (`.gallerist-thumbs-region`), so the rail itself can fade
+  its ends.
+- **Glides open and shut.** Collapsing the rail (its handle, **`t`**, fullscreen) and bringing it back
+  animates its height (a side rail's width) over `--gallerist-dur-panel` (220ms), so the stage refits
+  smoothly and a zoomed image keeps its view; the item column beside the stage does the same as it
+  opens and closes (the items toggle, **`e`**). On its way out a panel is `inert`, then
+  `display: none` as before; a collapse that would take the focus with it hands it to the viewer. No
+  motion under `prefers-reduced-motion`, or where the browser has no Web Animations.
 - **Live-preview card.** The active multi-item group's card mirrors the currently-viewed item's
   image; it reverts to the group cover once the group is no longer active.
 - **Vertical item column (default).** The active group's items stack in a column floating above the
@@ -53,7 +74,7 @@ mount(viewer)
   hidden, in which case hovering the active card peeks too.
 - **Flat mode** (`groupDisplay: 'flat'`). Every item of every group renders side-by-side as its own
   card, each group's run wrapped in a `role="group"` element with its label above the items (the
-  `timeline` label, else `group.caption`) and a hairline between neighbouring groups; on a side rail
+  `timeline` label, else `group.caption`) and a divider between neighbouring groups; on a side rail
   the groups run down the rail, the items in a column. The group holding the current item is marked
   `data-active`, and only its label takes the accent. The label is part of the group's accessible
   name (`strings.groupAt`), and the visible text is `aria-hidden` so it isn't read twice.
