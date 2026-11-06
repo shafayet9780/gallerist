@@ -71,6 +71,7 @@ afterEach(() => {
   window.matchMedia = realMatchMedia
   document.body.innerHTML = ''
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('rail strip — drag', () => {
@@ -361,6 +362,38 @@ describe('rail strip — the ends', () => {
     scroller.scrollLeft += 50 // the rail corrects its offset under it (cards drawn before)
     await new Promise((r) => setTimeout(r, 400))
     expect(scroller.scrollLeft).toBe(800 + 400 * PAGE + 50)
+  })
+
+  it('a late frame that runs into the edge of the drawn cards goes on once the rail draws more', async () => {
+    window.matchMedia = ((q: string) =>
+      ({
+        matches: q.includes('reduced-motion') && false,
+      }) as MediaQueryList) as typeof window.matchMedia
+    // the next frame comes late: the whole page in one step
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) =>
+      Number(setTimeout(() => cb(performance.now() + 1000), 0)),
+    )
+    let drawn = false
+    const { scroller, host, strip } = make({ at: 100, more: () => [!drawn, false] })
+    // a browser's scroll offset stops at 0; at it, the rail draws 300px of cards before and keeps
+    // what shows in place
+    let at = 100
+    Object.defineProperty(scroller, 'scrollLeft', {
+      configurable: true,
+      get: () => at,
+      set: (v: number) => {
+        at = Math.max(0, Math.min(1600, v))
+        if (at === 0 && !drawn)
+          setTimeout(() => {
+            drawn = true
+            at += 300
+          }, 0)
+      },
+    })
+    strip.update()
+    host.querySelector<HTMLButtonElement>('[data-dir="start"]')?.click()
+    await new Promise((r) => setTimeout(r, 100))
+    expect(at).toBe(100 + 300 - 400 * PAGE) // the whole page, the cards drawn before counted
   })
 
   it('a wheel over a page button scrolls the strip', () => {

@@ -21,6 +21,7 @@ export const DRAG_SLOP = 5
 /** A page button scrolls by this share of what shows. */
 export const PAGE = 0.8
 const PAGE_MS = 260
+const MAX_EXTRA = 30 // frames a page may run past PAGE_MS while the rail draws what lies beyond
 
 export interface Strip {
   /** Read the scroll position again: the ends' fades and the page buttons. */
@@ -136,15 +137,23 @@ export function attachStrip(
     glide = 0
     if (reduced() || typeof requestAnimationFrame === 'undefined') return along('x', total)
     // a step at a time, by what's left to go, so the rail's own offset corrections in between
-    // (cards drawn and dropped as it moves) don't stop it short or carry it past
+    // (cards drawn and dropped as it moves) don't stop it short or carry it past. A step can run
+    // into the edge of the drawn cards (a late frame makes one big step) before the rail draws the
+    // ones beyond: what it didn't move is carried to the next frames, once they're drawn, until it
+    // has gone the whole way or the strip's true end stops it.
     const t0 = performance.now()
     let done = 0
+    let extra = 0 // frames past the glide's end, carrying what's left
     const step = (now: number) => {
       const t = Math.min(1, (now - t0) / PAGE_MS)
-      const to = Math.round(total * ease(t))
-      along('x', to - done)
-      done = to
-      glide = t < 1 ? requestAnimationFrame(step) : 0
+      const was = scroller.scrollLeft
+      along('x', Math.round(total * ease(t)) - done)
+      const moved = (scroller.scrollLeft - was) * (rtl() ? -1 : 1)
+      done += moved
+      const left = Math.abs(total - done) >= 1
+      const beyond = more?.()[dir > 0 ? 1 : 0] ?? false
+      const going = t < 1 || (left && (moved !== 0 || beyond) && ++extra <= MAX_EXTRA)
+      glide = going ? requestAnimationFrame(step) : 0
     }
     glide = requestAnimationFrame(step)
   }

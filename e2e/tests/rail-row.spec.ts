@@ -204,6 +204,39 @@ test.describe('pulling the row rail', () => {
     expect(await rail(page).evaluate((el) => Math.abs(el.scrollLeft))).toBeLessThanOrEqual(1)
   })
 
+  test('‹ goes the whole page back to the start even when the next frame comes late', async ({
+    page,
+  }) => {
+    await open(page, `${REVIEWER}&g=0`)
+    // each click holds the page up 400ms, so the glide's first frame lands past its end: one step
+    // the whole page, into the edge of the cards drawn so far
+    await rail(page).evaluate(() => {
+      for (const b of document.querySelectorAll('.gallerist-rail-page'))
+        b.addEventListener('click', () => {
+          const t = performance.now()
+          while (performance.now() - t < 400) {}
+        })
+    })
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    await page.mouse.move(box.x + box.width / 2, box.y + 4)
+    const toEnd = page.locator('.gallerist-rail-page[data-dir="end"]')
+    const toStart = page.locator('.gallerist-rail-page[data-dir="start"]')
+    await expect(toEnd).toHaveCSS('opacity', '1')
+    const width = await rail(page).evaluate((el) => el.clientWidth)
+    const card = page.locator('.gallerist-thumb-item[data-item="g5i0"]')
+    const x0 = (await card.boundingBox())?.x ?? 0
+    await toEnd.click()
+    await expect
+      .poll(async () => Math.round(x0 - ((await card.boundingBox())?.x ?? 0)))
+      .toBeGreaterThan(width * 0.8 - 6)
+    await toStart.click()
+    await expect
+      .poll(async () => Math.abs(((await card.boundingBox())?.x ?? 0) - x0))
+      .toBeLessThanOrEqual(1)
+    await expect(toStart).toBeHidden()
+  })
+
   test('right to left: the drag, the wheel and the buttons run the other way', async ({ page }) => {
     await open(page, `${REVIEWER}&g=0&dir=rtl`)
     const box = await rail(page).boundingBox()
