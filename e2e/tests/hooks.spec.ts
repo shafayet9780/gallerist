@@ -168,10 +168,21 @@ for (const [name, query, width] of [
       if (next)
         expect(next.label[0] - h.label[1], `${h.id}: clear of the next`).toBeGreaterThan(gap - 0.5)
     })
-    // the label with the note count is the one longer than its card
+    // the label with the note count is the one longer than its card: it runs past the card by
+    // all it needs, at its own (max-content) width, not squeezed to the card's
     const notes = hosts.find((h) => h.id === 'tf60')
-    expect((notes?.label[1] ?? 0) - (notes?.card[1] ?? 0)).toBeGreaterThan(8)
     const label = page.locator('[data-group="tf60"] .gallerist-thumb-time')
+    const natural = await label.evaluate((el) => {
+      const s = (el as HTMLElement).style
+      const was = s.width
+      s.width = 'max-content'
+      const w = el.getBoundingClientRect().width
+      s.width = was
+      return w
+    })
+    const card = (notes?.card[1] ?? 0) - (notes?.card[0] ?? 0)
+    expect(natural - card, 'tf60: longer than its card').toBeGreaterThan(4)
+    expect(Math.abs((notes?.label[1] ?? 0) - (notes?.label[0] ?? 0) - natural)).toBeLessThan(0.5)
     await label.hover()
     await expect(label).not.toHaveAttribute('title')
   })
