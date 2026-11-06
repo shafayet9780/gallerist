@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/cdn",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Gallerist as one <script>: the core, DOM renderer and plugins on a global `Gallerist`, for pages with no build step.",
   "license": "MIT",
   "sideEffects": false,
