@@ -51,11 +51,29 @@ const palette = ['#c0392b', '#2980b9', '#27ae60', '#f39c12', '#8e44ad', '#16a085
 const sizes = [1, 3, 2, 1, 5, 12, 1, 4, 2, 1, 3, 2]
   .slice(0, Number(p.get('groups')) || undefined)
   .map((n) => (p.get('one') === '1' ? 1 : n))
+// labels=uneven: short and longer group names (an index chip's width follows its name), so the
+// chips differ in width whatever the fonts: on a phone a longer chip is too wide for centring a
+// short one beside it to show it whole, though the two with another short one fit the strip.
+// labels=uneven-wide: the same at a 900px window, with much longer names.
+const LONGER = ['Laundry room', 'Drawing room', 'Morning room', 'Library wing']
+const WIDE = [
+  'The long gallery upstairs, with the portraits along its north wall',
+  'The garden room and terrace that look out over the orchard below',
+]
+const label = (g: number) => {
+  const mode = p.get('labels')
+  if (mode !== 'uneven' && mode !== 'uneven-wide') return undefined
+  const names = mode === 'uneven' ? LONGER : WIDE
+  // short, longer, short, short, longer, … (a longer one every third group, one between two shorts)
+  return g % 3 === 1
+    ? names[Math.floor(g / 3) % names.length]
+    : ['Hall', 'WC', 'Den', 'Loft'][g % 4]
+}
 const collection: Collection = {
   meta: { title: 'Fixture house' },
   groups: sizes.map((n, g) => ({
     id: `g${g}`,
-    caption: captionMode === '1' ? `Group ${g + 1} title` : undefined,
+    caption: captionMode === '1' ? `Group ${g + 1} title` : label(g),
     // the reviewer timeline's labels: 09:12, 09:19, … every 7 minutes
     meta: {
       subtitle: captionMode === '1' ? `Floor ${(g % 3) + 1}` : undefined,

@@ -264,8 +264,10 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
 // group's items), where drawn. While the card and those neighbours all show whole, nothing moves,
 // so a click on a card in view doesn't shift the rail. Once one of them is cut by an edge or past
 // it, the panel centres the card, which leaves about half a panel of what comes next in view,
-// whichever way the cursor went. The browser clamps that at either end of the rail, so the first
-// and last cards stop at their edges. Instant, as every scroll of the rail is (there is no motion
+// whichever way the cursor went. Cards of different widths (index chips) can leave a wider
+// neighbour cut once centred: where the three fit, the scroll goes on from the centre just as far
+// as shows them all. The browser clamps that at either end of the rail, so the first and last
+// cards stop at their edges. Instant, as every scroll of the rail is (there is no motion
 // to take out under prefers-reduced-motion).
 function reveal(btn: HTMLElement | undefined, ...around: Array<HTMLElement | undefined>): void {
   if (!btn) return
@@ -280,7 +282,8 @@ function reveal(btn: HTMLElement | undefined, ...around: Array<HTMLElement | und
 }
 
 /** How far to scroll `box` along one axis: 0 while `btn` and its neighbours show whole, else what
- *  centres `btn` in it. A neighbour with no box (not laid out, hidden) doesn't count. */
+ *  centres `btn` in it, moved on as little as shows them all where they fit. A neighbour with no
+ *  box (not laid out, hidden) doesn't count. */
 function centreBy(
   box: HTMLElement,
   btn: HTMLElement,
@@ -289,13 +292,17 @@ function centreBy(
   hi: 'right' | 'bottom',
 ): number {
   const edge = box.getBoundingClientRect()
-  const cut = (el: HTMLElement | undefined) => {
+  const rs = [btn, ...around].flatMap((el) => {
     const r = el?.getBoundingClientRect()
-    return !!r && (!!r.width || !!r.height) && (r[lo] < edge[lo] - 1 || r[hi] > edge[hi] + 1)
-  }
-  if (!cut(btn) && !around.some(cut)) return 0
+    return r && (r.width || r.height) ? [r] : []
+  })
+  if (rs.every((r) => r[lo] >= edge[lo] - 1 && r[hi] <= edge[hi] + 1)) return 0
   const r = btn.getBoundingClientRect()
-  return (r[lo] + r[hi] - edge[lo] - edge[hi]) / 2
+  const by = (r[lo] + r[hi] - edge[lo] - edge[hi]) / 2
+  // the scrolls that show every card whole run from `from` to `to` (none: they don't fit)
+  const from = Math.max(...rs.map((q) => q[hi])) - edge[hi]
+  const to = Math.min(...rs.map((q) => q[lo])) - edge[lo]
+  return from > to + 1 ? by : Math.min(Math.max(by, from), to)
 }
 
 /** Whether the primary pointer can hover (desktop). Defaults true when undetectable (SSR/test). */

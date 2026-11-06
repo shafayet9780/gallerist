@@ -92,6 +92,12 @@
   on the stage moves focus to the viewer, so the chrome fades again after keyboard use; a swipe or
   pinch moves no focus, as a page scroll doesn't.
 
+### Index chips of different widths
+- **plugin-thumbnails (fixed)**: with index chips of different widths (a chip is as wide as its
+  group's name), the rail now shows the current chip's neighbours whenever the three fit. Before,
+  centring the current chip could leave a wider neighbour cut off (from 0.3.2). Now the rail goes on
+  from the centre only as far as shows all three, and still centres the chip where they don't fit.
+
 ## v0.3.2
 
 ### Pin cards and the rail on phones (from the Apploye reviewer)

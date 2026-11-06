@@ -48,3 +48,8 @@ Switch the rail's layout and the colour scheme in an open viewer, from a new Vie
   focus colours, in both schemes, and fits a 390px phone. The item under the pointer takes the tool
   hover fill and the keyboard's item the focus ring, so they never look alike. A rail's hidden
   `aside` column takes no room.
+- **Index chips of different widths keep their neighbours in view (plugin-thumbnails).** A chip is
+  as wide as its group's name, and centring the current chip could leave a wider chip beside it cut
+  off though the three fit in the rail (from 0.3.2). Where they fit, the rail now goes on from the
+  centre only as far as shows all three; where they don't, it centres the current chip, as before.
+  While the three show whole the rail still doesn't move.

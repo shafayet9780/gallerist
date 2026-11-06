@@ -1806,6 +1806,178 @@ describe('plugin-thumbnails — context around the current card', () => {
   })
 })
 
+// Cards of different widths (0.3.3): index chips follow their labels, so centring the current card
+// can leave a wider neighbour cut off though the three fit in the rail. Where they fit, the rail goes
+// on from the centre just as far as shows them all; where they don't, it centres the current card.
+describe('plugin-thumbnails — context around the current card, cards of different widths', () => {
+  const EXTENT = 1000
+  let rail: HTMLElement
+  let scroll = 0
+  // card k: 90 long, but card 10 is `wide`; 10 between cards. Where it starts at scroll 0 along the
+  // rail's reading direction (`start`), and its box at a scroll (mirrored in a right-to-left rail)
+  const len = (wide: number) => (k: number) => (k === 10 ? wide : 90)
+  const start = (wide: number) => (k: number) => k * 100 + (k > 10 ? wide - 90 : 0)
+  const layOut = (axis: 'x' | 'y', sel: string, wide: number, { rtl = false } = {}) => {
+    rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+    scroll = 0
+    if (axis === 'x') rail.style.overflowX = 'auto'
+    else rail.style.overflowY = 'auto'
+    const prop = axis === 'x' ? 'scrollLeft' : 'scrollTop'
+    const cards = () => [...rail.querySelectorAll<HTMLElement>(sel)]
+    const groupOf = (el: HTMLElement) =>
+      el.matches(sel) && el.dataset.group ? Number(el.dataset.group.slice(1)) : -1
+    const at = (k: number) => {
+      const a = start(wide)(k)
+      return rtl ? EXTENT - a - len(wide)(k) : a
+    }
+    const max = () => {
+      const n = cards().length
+      return n ? Math.max(0, start(wide)(n - 1) + len(wide)(n - 1) - EXTENT) : 0
+    }
+    Object.defineProperty(rail, prop, {
+      configurable: true,
+      get: () => scroll,
+      set: (v: number) => {
+        scroll = rtl ? Math.min(0, Math.max(-max(), v)) : Math.max(0, Math.min(max(), v))
+      },
+    })
+    const real = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this === rail)
+        return (
+          axis === 'x'
+            ? { left: 0, right: EXTENT, top: 0, bottom: 100, width: EXTENT, height: 100 }
+            : { top: 0, bottom: EXTENT, left: 0, right: 100, width: 100, height: EXTENT }
+        ) as DOMRect
+      const k = groupOf(this)
+      if (k < 0) return real.call(this)
+      const a = at(k) - scroll
+      const l = len(wide)(k)
+      return (
+        axis === 'x'
+          ? { left: a, right: a + l, top: 0, bottom: 80, width: l, height: 80 }
+          : { top: a, bottom: a + l, left: 0, right: 80, width: 80, height: l }
+      ) as DOMRect
+    })
+  }
+  const many = (n: number, per = 1): Collection => ({
+    groups: Array.from({ length: n }, (_, g) => ({
+      id: `g${g}`,
+      items: Array.from({ length: per }, (_, i) => item(`g${g}i${i}`)),
+    })),
+  })
+  const card = (sel: string, g: number) => document.querySelector(`${sel}[data-group="g${g}"]`)
+  const whole = (el: Element | null, axis: 'x' | 'y' = 'x') => {
+    const r = el?.getBoundingClientRect()
+    if (!r) return false
+    return axis === 'x' ? r.left >= 0 && r.right <= EXTENT : r.top >= 0 && r.bottom <= EXTENT
+  }
+  const middle = (el: Element | null, axis: 'x' | 'y' = 'x') => {
+    const r = el?.getBoundingClientRect() as DOMRect
+    return axis === 'x' ? (r.left + r.right) / 2 : (r.top + r.bottom) / 2
+  }
+  // step through the whole rail and back: the current card and both neighbours show whole
+  // after every step (they always fit here)
+  const walk = (v: ReturnType<typeof createViewer>, sel: string, n: number, axis: 'x' | 'y') => {
+    v.goTo(0)
+    for (let g = 1; g < n; g++) {
+      v.next()
+      for (const k of [g - 1, g, g + 1])
+        if (k < n) expect(whole(card(sel, k), axis), `at g${g}: g${k}`).toBe(true)
+    }
+    for (let g = n - 2; g >= 0; g--) {
+      v.prev()
+      for (const k of [g - 1, g, g + 1])
+        if (k >= 0) expect(whole(card(sel, k), axis), `back at g${g}: g${k}`).toBe(true)
+    }
+  }
+  afterEach(() => {
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+    document.documentElement.removeAttribute('dir')
+  })
+  const chips = (n: number) => {
+    const v = createViewer({
+      collection: many(n, 3),
+      plugins: [thumbnails({ groupDisplay: 'index', overscan: 50 })], // every chip drawn
+    })
+    mount(v)
+    v.open()
+    return v
+  }
+  const ROW = '.gallerist-thumb-row'
+
+  it('index chips: a wider neighbour that centring would cut comes in whole, no further', () => {
+    const v = chips(30)
+    layOut('x', ROW, 500) // g10 runs 1000..1500
+    v.goTo(8)
+    expect(scroll).toBe(0)
+    v.next() // g9 (900..990): centred (445) g10 would end at 1055; 500 brings it to the edge
+    expect(scroll).toBe(500)
+    expect(card(ROW, 10)?.getBoundingClientRect().right).toBe(EXTENT)
+    for (const k of [8, 9, 10]) expect(whole(card(ROW, k)), `g${k}`).toBe(true)
+    v.next() // g10 (500..1000): g11 is cut; centring g10 shows g9 and g11
+    expect(scroll).toBe(750)
+    v.goTo(12) // g12 (860..950), g13 cut: centred, g11 (760..850) and g13 show
+    v.goTo(11) // g10 cut behind: centring g11 would cut it, so the rail stops where it shows whole
+    expect(card(ROW, 10)?.getBoundingClientRect().left).toBe(0)
+    for (const k of [10, 11, 12]) expect(whole(card(ROW, k)), `g${k}`).toBe(true)
+  })
+
+  it('index chips: the whole strip and back keeps both neighbours in view', () => {
+    const v = chips(30)
+    layOut('x', ROW, 500)
+    walk(v, ROW, 30, 'x')
+    expect(scroll).toBe(0)
+  })
+
+  it('a click on a chip whose neighbours show still moves nothing', () => {
+    const v = chips(30)
+    layOut('x', ROW, 500)
+    v.goTo(9)
+    expect(scroll).toBe(500)
+    ;(card(ROW, 8) as HTMLElement).click() // g7 (200..290), g8 and g9 show
+    expect(document.querySelector(`${ROW}[data-active]`)).toBe(card(ROW, 8))
+    expect(scroll).toBe(500)
+  })
+
+  it('where the three cannot fit, the current card is centred', () => {
+    const v = chips(30)
+    layOut('x', ROW, 950) // g9..g11 span 1150
+    v.goTo(8)
+    v.next()
+    expect(scroll).toBe(445) // g9 centred, as before
+    expect(middle(card(ROW, 9))).toBe(EXTENT / 2)
+  })
+
+  it('right to left: the same, toward negative scrollLeft', () => {
+    document.documentElement.setAttribute('dir', 'rtl')
+    const v = chips(30)
+    layOut('x', ROW, 500, { rtl: true }) // g10 runs -500..0
+    v.goTo(8)
+    expect(scroll).toBe(0)
+    v.next()
+    expect(scroll).toBe(-500)
+    expect(card(ROW, 10)?.getBoundingClientRect().left).toBe(0)
+    for (const k of [8, 9, 10]) expect(whole(card(ROW, k)), `g${k}`).toBe(true)
+    walk(v, ROW, 30, 'x')
+  })
+
+  it('a side rail: down the column, by scrollTop', () => {
+    const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 50 })] })
+    mount(v, { rail: 'left' })
+    v.open()
+    layOut('y', '.gallerist-thumb', 500)
+    v.goTo(8)
+    v.next()
+    expect(scroll).toBe(500)
+    expect(card('.gallerist-thumb', 10)?.getBoundingClientRect().bottom).toBe(EXTENT)
+    walk(v, '.gallerist-thumb', 30, 'y')
+  })
+})
+
 describe('strip helpers', () => {
   const at = (left: number, top = 0) =>
     ({

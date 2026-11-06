@@ -136,7 +136,8 @@ const spanOf = (n: RailNow, id: string) => n.cards.find((c) => c.id === id)
 // Step `steps` times with `key`. After each step the current card and its neighbours show whole (or,
 // where the rail is too short for three cards, the current one shows whole, centred); the rail moved
 // only if one of them didn't show whole before the step; and a move centres the current card unless
-// the rail stopped at an end.
+// the rail stopped at an end, or, where the three fit but centring would cut a wider neighbour (index
+// chips follow their labels), goes on from the centre only as far as shows them all.
 const walk = async (page: Page, flat: boolean, key: string, steps: number) => {
   let before = await railNow(page, flat)
   for (let s = 0; s < steps; s++) {
@@ -149,7 +150,13 @@ const walk = async (page: Page, flat: boolean, key: string, steps: number) => {
     const room = (ends[1] ?? cur).z - (ends[0] ?? cur).a <= now.hi - now.lo + 0.5
     for (const c of room ? [prev, cur, next] : [cur])
       expect(whole(now, c), `${now.id}: ${c?.id} shows`).toBe(true)
-    const centred = Math.abs((cur.a + cur.z) / 2 - (now.lo + now.hi) / 2) < 2
+    // how far the current card's middle is from the rail's, less what showing the three whole
+    // takes back (scrolling by d moves every card by -d; the three show for d in [from, to])
+    const off = (cur.a + cur.z) / 2 - (now.lo + now.hi) / 2
+    const three = [prev, cur, next].filter((c): c is Span => !!c)
+    const from = Math.max(...three.map((c) => c.z)) - now.hi
+    const to = Math.min(...three.map((c) => c.a)) - now.lo
+    const centred = Math.abs(room ? Math.min(Math.max(off, from), to) : off) < 2
     const atEnd = now.at <= 1 || now.at >= now.max - 1
     // did the rail move? (the cards that stay keep their place through a re-window otherwise)
     const ref = spanOf(before, before.id) as Span
@@ -157,7 +164,8 @@ const walk = async (page: Page, flat: boolean, key: string, steps: number) => {
     const needed = around(before, now.id).some((c) => !whole(before, c))
     if (!needed) expect(moved, `${now.id}: the rail stayed put`).toBe(false)
     else if (!moved) expect(centred || atEnd, `${now.id}: already in place`).toBe(true)
-    if (moved && !atEnd) expect(centred, `${now.id} centred`).toBe(true)
+    if (moved && !atEnd)
+      expect(centred, `${now.id} centred (or as near as shows all three)`).toBe(true)
     before = now
   }
   return before
@@ -236,8 +244,39 @@ for (const { name, size, query, flat, fwd, back, total } of [
     back: 'ArrowLeft',
     total: 12,
   },
+  // labels=uneven(-wide): short and long group names, so the chips differ in width whatever the
+  // fonts (0.3.3: centring a chip could leave a wider neighbour cut off though the three fit)
+  {
+    name: 'index chips of different widths, phone',
+    size: { width: 390, height: 520 },
+    query: 'display=index&labels=uneven',
+    flat: false,
+    fwd: 'ArrowRight',
+    back: 'ArrowLeft',
+    total: 12,
+  },
+  {
+    name: 'index chips of different widths, phone, right to left',
+    size: { width: 390, height: 520 },
+    query: 'display=index&labels=uneven&dir=rtl',
+    flat: false,
+    fwd: 'ArrowLeft',
+    back: 'ArrowRight',
+    total: 12,
+  },
+  {
+    name: 'index chips of different widths, desktop',
+    size: { width: 900, height: 720 },
+    query: 'display=index&labels=uneven-wide',
+    flat: false,
+    fwd: 'ArrowRight',
+    back: 'ArrowLeft',
+    total: 12,
+  },
 ] as const) {
   test(`the rail keeps the cards beside the current one in view (${name})`, async ({ page }) => {
+    // two walks of a step and a re-window each: slow on Linux WebKit (CI), so a second a step
+    test.setTimeout(30_000 + 2 * total * 1_000)
     await page.setViewportSize(size)
     await page.goto(`/layout.html?g=0&${query}`)
     await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
@@ -258,6 +297,7 @@ for (const { name, size, query, flat, fwd, back, total } of [
 test('a click on a card in view moves the rail only to keep its neighbours in view', async ({
   page,
 }) => {
+  test.setTimeout(30_000 + 12 * 1_000) // a walk of 12 steps first (see above)
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.goto('/layout.html?g=0&preset=reviewer&skin=console&display=flat')
   await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
