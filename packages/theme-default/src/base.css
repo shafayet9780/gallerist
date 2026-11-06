@@ -85,7 +85,7 @@
     --gallerist-divider: var(--gallerist-hairline);
     --gallerist-rail-fade: 40px; /* how far a rail's end fades where it has more beyond it */
 
-    /* popovers (the View menu) sit a step above the bands; a segmented control
+    /* popovers (the View menu, the shortcut list) sit a step above the bands; a segmented control
        is a recessed track with its checked segment raised */
     --gallerist-popover-bg: var(--gallerist-panel);
     --gallerist-popover-shadow: var(--gallerist-shadow);
@@ -1148,8 +1148,9 @@
 .gallerist-view-foot:hover {
   color: var(--gallerist-fg);
 }
-/* the shortcut list's key, as a key cap */
-.gallerist-view-foot kbd {
+/* a key, as the shortcut list draws them */
+.gallerist-view-foot kbd,
+.gallerist-shortcuts kbd {
   display: inline-grid;
   place-items: center;
   box-sizing: border-box;
@@ -1174,6 +1175,168 @@
   }
   .gallerist-view-foot kbd {
     display: none;
+  }
+}
+
+/* ── the shortcut list (plugin-shortcuts): a modal dialog over the viewer ────────── */
+/* The plugin puts a scrim over the whole viewer (the rest of it inert) and the dialog in its middle:
+   a header (the title, Esc to close), then a column per section, the moves widest. On a narrow
+   screen it is a sheet from the bottom edge, one column. */
+.gallerist-shortcuts-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--gallerist-scrim);
+  animation: gallerist-fade var(--gallerist-dur-exit) var(--gallerist-ease-out);
+}
+.gallerist-shortcuts {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  max-height: 100%;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: calc(var(--gallerist-radius) + 5px);
+  background: var(--gallerist-popover-bg);
+  backdrop-filter: var(--gallerist-blur);
+  box-shadow: var(--gallerist-popover-shadow);
+  color: var(--gallerist-fg);
+  font: 400 13px / 1.35 var(--gallerist-font);
+}
+.gallerist-shortcuts:focus {
+  outline: none; /* focus starts on the dialog, so a screen reader reads it whole; the ring is the close button's */
+}
+.gallerist-shortcuts-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 12px 20px;
+  border-block-end: 1px solid var(--gallerist-hairline);
+}
+.gallerist-shortcuts-head .gallerist-icon {
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+.gallerist-shortcuts-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.gallerist-shortcuts-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin-inline-start: auto;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--gallerist-control-radius, 6px);
+  background: transparent;
+  color: var(--gallerist-fg-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.gallerist-shortcuts-close:hover {
+  background: var(--gallerist-tool-hover-bg);
+  color: var(--gallerist-fg);
+}
+.gallerist-shortcuts-close:focus {
+  outline: none;
+}
+.gallerist-shortcuts-close:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: 1px;
+}
+.gallerist-shortcuts-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  overflow-y: auto;
+  padding: 16px 20px 18px;
+}
+.gallerist-shortcuts-body section {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.gallerist-shortcuts-body section:first-child {
+  flex: 1.7 1 250px;
+}
+.gallerist-shortcuts h3 {
+  margin: 0 0 6px;
+  color: var(--gallerist-fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.gallerist-shortcuts dl {
+  margin: 0;
+}
+.gallerist-shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+}
+.gallerist-shortcuts dd {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  margin: 0;
+  color: var(--gallerist-fg-muted);
+}
+.gallerist-shortcuts-note {
+  margin: 0;
+  padding: 11px 20px;
+  border-block-start: 1px solid var(--gallerist-hairline);
+  color: var(--gallerist-fg-muted);
+  font-size: 12.5px;
+}
+/* the gestures: one list, a hairline between rows */
+.gallerist-shortcuts[data-gallerist-list="gestures"] .gallerist-shortcuts-body {
+  padding-block: 4px;
+}
+.gallerist-shortcuts[data-gallerist-list="gestures"] .gallerist-shortcuts-row {
+  min-height: 42px;
+}
+.gallerist-shortcuts[data-gallerist-list="gestures"]
+  .gallerist-shortcuts-row
+  + .gallerist-shortcuts-row {
+  border-block-start: 1px solid var(--gallerist-hairline);
+}
+@media (max-width: 600px) {
+  .gallerist-shortcuts-scrim {
+    place-items: end stretch;
+    padding: 16px 0 0;
+  }
+  .gallerist-shortcuts {
+    width: 100%;
+    border-width: 1px 0 0;
+    border-radius: 14px 14px 0 0;
+  }
+  .gallerist-shortcuts-body {
+    flex-direction: column;
+    gap: 14px;
+    padding-inline: 16px;
+  }
+  .gallerist-shortcuts-body section,
+  .gallerist-shortcuts-body section:first-child {
+    flex: none;
+  }
+  .gallerist-shortcuts-head {
+    padding-inline-start: 16px;
+  }
+  .gallerist-shortcuts-note {
+    padding: 12px 16px 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gallerist-shortcuts-scrim {
+    animation: none;
   }
 }
 

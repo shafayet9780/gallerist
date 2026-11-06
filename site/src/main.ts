@@ -4,6 +4,7 @@ import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
 import { type Pin, pins } from '@gallerist/plugin-pins'
 import { download } from '@gallerist/plugin-save'
+import { shortcuts } from '@gallerist/plugin-shortcuts'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import { view } from '@gallerist/plugin-view'
 import { zoom } from '@gallerist/plugin-zoom'
@@ -181,6 +182,8 @@ function render() {
           $('snippet').textContent = snippet(state)
         },
       }),
+      // ? lists the keys (the View menu's last row opens it too)
+      shortcuts(),
     ],
   })
   viewer = current

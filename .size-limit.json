@@ -80,6 +80,14 @@
     "gzip": true
   },
   {
+    "name": "@gallerist/plugin-shortcuts (gz)",
+    "path": "packages/plugin-shortcuts/dist/index.js",
+    "import": "{ shortcuts }",
+    "ignore": ["@gallerist/core"],
+    "limit": "2.85 kB",
+    "gzip": true
+  },
+  {
     "name": "theme base.css (gz)",
     "path": "packages/theme-default/src/base.css",
     "limit": "10 kB",

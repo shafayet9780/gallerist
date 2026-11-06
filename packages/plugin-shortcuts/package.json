@@ -1,0 +1,65 @@
+{
+  "name": "@gallerist/plugin-shortcuts",
+  "version": "0.3.3",
+  "description": "Gallerist plugin — a keyboard shortcut list on ?: the keys that work in the viewer as it is laid out (and the gestures on a touch screen), with the host's own, in a modal dialog.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist", "LICENSE", "README.md"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../../scripts/copy-license.mjs"
+  },
+  "peerDependencies": {
+    "@gallerist/core": "workspace:>=0.3.0 <1"
+  },
+  "devDependencies": {
+    "@gallerist/core": "workspace:*",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shafayet9780/gallerist.git",
+    "directory": "packages/plugin-shortcuts"
+  },
+  "homepage": "https://github.com/shafayet9780/gallerist#readme",
+  "bugs": {
+    "url": "https://github.com/shafayet9780/gallerist/issues"
+  },
+  "author": "Shafayet Ahmmed",
+  "keywords": [
+    "lightbox",
+    "gallery",
+    "image-viewer",
+    "media-viewer",
+    "photo-gallery",
+    "carousel",
+    "keyboard-shortcuts",
+    "accessibility",
+    "overlays",
+    "headless",
+    "framework-agnostic",
+    "virtualized",
+    "nested-gallery"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

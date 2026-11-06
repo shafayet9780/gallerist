@@ -15,6 +15,7 @@
       "@gallerist/plugin-hash",
       "@gallerist/plugin-pins",
       "@gallerist/plugin-save",
+      "@gallerist/plugin-shortcuts",
       "@gallerist/plugin-thumbnails",
       "@gallerist/plugin-video",
       "@gallerist/plugin-video-youtube",

@@ -5,6 +5,7 @@ import { captions } from '@gallerist/plugin-captions'
 import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
 import { download } from '@gallerist/plugin-save'
+import { shortcuts } from '@gallerist/plugin-shortcuts'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import { type ViewChange, view } from '@gallerist/plugin-view'
 import { zoom } from '@gallerist/plugin-zoom'
@@ -156,6 +157,14 @@ const viewer = createViewer({
                   onChange: (change) => {
                     ;(window as unknown as { viewChanges: ViewChange[] }).viewChanges.push(change)
                   },
+                }),
+              ]
+            : []),
+          // shortcuts=1: the shortcut list on ?, with one host entry (and its gesture)
+          ...(p.get('shortcuts') === '1'
+            ? [
+                shortcuts({
+                  shortcuts: [{ keys: ['N'], label: 'Add a note', gesture: 'Long press' }],
                 }),
               ]
             : []),
