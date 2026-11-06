@@ -33,6 +33,63 @@
   width); the renderer's zoom-reset button stays out of a bar that has the tool (unchanged without it);
   at 600px wide or less only − and + show.
 
+### The View menu: a popover with segmented controls (owner-approved 1A, for the Apploye reviewer)
+- **plugin-view (changed)**: the menu's radio list becomes a compact popover (about 280px wide, inside
+  a 390px phone): two labelled segmented controls with icons, Layout [Stacked | Row] and Theme
+  [Dark | Light] (Index and Auto when offered). The current value is raised on a recessed track, its
+  text at full strength and its glyph in the skin's selection colour; the segment focused from the
+  keyboard takes the neutral focus ring, so focus never reads as the selection. A choice applies at
+  once and the popover stays open, so both settings change in one visit; it repaints when a host
+  applies a controlled choice while it is open (the rail's `data-display` and the root's scheme are
+  watched), so host-owned settings (`controlled`, `Symbol.for('gallerist.controlled')`, React's props)
+  still show what the host applied, and `onChange` still reports only the setting changed. The API is
+  unchanged; the default `rail` / `scheme` strings now read "Layout" / "Theme", as in the mockup.
+- **plugin-view (changed, a11y)**: the tool is `aria-haspopup="dialog"`; the popover a non-modal
+  `role="dialog"` named "View"; each setting a `radiogroup` named by its visible label, its segments
+  `button`s with `role="radio"` and roving `tabindex` (APG radio group). Enter, Space or ↓ on the tool
+  open it on the first group's checked segment, ↑ on the last stop; ←/→ (↑/↓) move and choose, wrapping,
+  mirrored right to left; Space or a click chooses; Enter chooses and closes; Tab moves between the
+  groups and the shortcut row, and past either end closes (forward on from the tool, back onto it);
+  Escape closes with focus on the tool; `?` opens the shortcut list. Every key but Tab stays in the
+  popover. The menu's letter keys and Home/End are gone (two choices a group).
+- **plugin-view (new)**: with `@gallerist/plugin-shortcuts` registered, a last row, "Keyboard
+  shortcuts ?" ("Gestures", without the key cap, on a coarse pointer), opens the list; focus comes
+  back to the View tool when it closes.
+- **theme-default (new)**: tokens `--gallerist-popover-bg`, `--gallerist-popover-shadow`,
+  `--gallerist-seg-track`, `--gallerist-seg-on`, `--gallerist-seg-on-shadow`. Every skin derives them
+  (panel, shadow, ground, surface and a hairline ring); Console sets the mockup's (dark #1b1d21 /
+  #111215 / #2b2f35, light #fff / #eceef1 / #fff). Segments are 36px tall on a coarse pointer.
+- **size**: plugin-view 2.39 → 2.93 kB, its budget 2.4 → 3 kB (the six segment glyphs about 0.27 kB;
+  the radio-group keys, the live repaint and the shortcut row the rest); base.css 8.12 → 8.33 kB;
+  console.css 1.21 → 1.33 kB.
+
+### A keyboard shortcut list on ? (owner-approved 3c, for the Apploye reviewer)
+- **plugin-shortcuts (new)**: `shortcuts()` shows the viewer's keyboard shortcuts in a modal dialog:
+  on `?` while the viewer has focus (not in a text field, not with Ctrl, ⌘ or Alt), from the View
+  menu's last row, or from the host (`open(keys?)` / `close()` on the plugin; the instance, named
+  `shortcuts`, has them too, with `isOpen` and `label`). No toolbar tool. The list is built each time
+  it opens from what the viewer does then: Move (groups on ←/→ and items on ↑/↓, Home/End, 1–9 while
+  items are grouped; a row rail or one item a group: ←/→ and Home/End through every item; a side rail
+  turns the axes; right to left shows → ← for previous / next), Zoom (`+` `−` `0`, the renderer's or
+  plugin-zoom's), Viewer (F with plugin-fullscreen where the browser can fullscreen an element, T with
+  a rail, E with a stacked rail, G, P, C with `onPlace`, D or plugin-save's `key`, each only while its
+  plugin holds the key; `?`; Esc on an overlay viewer), then the host's entries
+  (`shortcuts: [{ keys, label, gesture?, section? }]`, into Viewer, a named built-in section or a new
+  one). Opened by a touch (a coarse pointer, without `?`) it lists the gestures instead: swipe left or
+  right, swipe up within a group, pinch or double-tap, drag while zoomed, swipe down to close (an
+  overlay viewer), the host's, and a note that `?` lists the keys with a keyboard.
+- **plugin-shortcuts (a11y)**: `role="dialog"`, `aria-modal="true"`, named by its title; it sits in
+  the viewer's root over a scrim, the rest of the viewer `inert` while it shows; focus moves to it and
+  Tab stays inside; Escape (or `?`, the close button, a click on the scrim) closes it, and only it,
+  with focus back where it was. A `window` capture-phase listener takes every key pressed in the viewer
+  while it shows, so nothing moves, zooms or closes under it. Translated text in `strings` (key names
+  included).
+- **theme-default (new)**: the dialog in every skin and scheme: centred, up to 720px, the sections side
+  by side (Move widest); key caps in the surface colour and monospace face; a sheet from the bottom
+  edge, one column, at 600px wide or less; a fade in, none under reduced motion; right to left.
+- **size**: plugin-shortcuts 2.74 kB (its budget 2.85 kB; not in the `@gallerist/cdn` bundle);
+  base.css 8.33 → 8.76 kB (limit 10 kB). Core, the renderer and the cdn bundle are unchanged.
+
 ### The rail (from the Apploye reviewer)
 - **plugin-thumbnails (changed)**: collapsing the rail (the handle, `t`, fullscreen) and bringing it
   back glides its height (a side rail's width) between its size and none over `--gallerist-dur-panel`
