@@ -196,10 +196,12 @@ test.describe('pulling the row rail', () => {
     await expect(page.locator('.gallerist')).toBeFocused() // the click took no focus
     await expect(page.locator('.gallerist-rail-page:focus')).toHaveCount(0)
     await toStart.click()
+    // back where it started, give or take the subpixel the scroll lands on
     await expect
-      .poll(async () => Math.round((await card.boundingBox())?.x ?? 0))
-      .toBe(Math.round(x0))
+      .poll(async () => Math.abs(((await card.boundingBox())?.x ?? 0) - x0))
+      .toBeLessThanOrEqual(1)
     await expect(toStart).toBeHidden()
+    expect(await rail(page).evaluate((el) => Math.abs(el.scrollLeft))).toBeLessThanOrEqual(1)
   })
 
   test('right to left: the drag, the wheel and the buttons run the other way', async ({ page }) => {
