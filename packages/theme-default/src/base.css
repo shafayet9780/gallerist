@@ -79,6 +79,9 @@
     --gallerist-enter-group: gallerist-enter-group;
     --gallerist-enter-item: gallerist-enter-item;
     --gallerist-rail-track-gap: var(--gallerist-rail-bg); /* the ring that cuts the track at a tick */
+    /* the line between a flat rail's groups: the hairline, unless a skin's dark scheme lifts it (a
+       hairline that reads on a light band all but disappears on a dark one) */
+    --gallerist-divider: var(--gallerist-hairline);
 
     /* hover: unchanged unless a skin sets one */
     --gallerist-arrow-hover-bg: var(--gallerist-arrow-bg);
@@ -782,7 +785,7 @@
 /* the divider: the same room on both sides of it (the rail's gap, then this padding) */
 .gallerist-thumb-group + .gallerist-thumb-group {
   padding-inline-start: 12px;
-  border-inline-start: 1px solid var(--gallerist-hairline);
+  border-inline-start: 1px solid var(--gallerist-divider);
 }
 .gallerist-thumb-group-cap {
   contain: inline-size; /* a long label ends in an ellipsis instead of widening its group */
@@ -818,7 +821,7 @@
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group + .gallerist-thumb-group {
   padding: 12px 0 0;
   border-inline-start: 0;
-  border-block-start: 1px solid var(--gallerist-hairline);
+  border-block-start: 1px solid var(--gallerist-divider);
 }
 
 /* ── chrome buttons (one look for bar tools, arrows, item navigator, plugin buttons) ───────── */

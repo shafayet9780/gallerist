@@ -23,6 +23,7 @@
     --gallerist-fg-muted: #58544b;
     --gallerist-chrome-bg: #f3f0e9;
     --gallerist-hairline: #dad4c7;
+    --gallerist-divider: var(--gallerist-hairline); /* not Gallery's dark one */
     --gallerist-surface: #fbfaf6;
     --gallerist-cell-bg: #fbfaf6;
     --gallerist-panel: rgb(243 240 233 / 0.98);
@@ -139,6 +140,7 @@
     --gallerist-fg-muted: #aba597;
     --gallerist-chrome-bg: #191816;
     --gallerist-hairline: #36332e;
+    --gallerist-divider: #4d4840; /* 1.96:1 on the wall (the hairline is 1.41:1) */
     --gallerist-surface: #262421;
     --gallerist-cell-bg: #262421;
     --gallerist-panel: rgb(25 24 22 / 0.98);
@@ -168,6 +170,7 @@
       --gallerist-fg-muted: #aba597;
       --gallerist-chrome-bg: #191816;
       --gallerist-hairline: #36332e;
+      --gallerist-divider: #4d4840;
       --gallerist-surface: #262421;
       --gallerist-cell-bg: #262421;
       --gallerist-panel: rgb(25 24 22 / 0.98);

@@ -84,7 +84,8 @@ carries over unless you pass `timeline: false`.
   as a row inline in the rail (`itemAxis: 'horizontal'`). The stack takes space rather than covering
   the stage, and stays up for one-item groups so the stage doesn't change width as you navigate.
 - `flat` — every item renders side-by-side, each group under its label (the `timeline` label, else
-  `group.caption`) with a hairline between groups; only the current group's label takes the accent.
+  `group.caption`) with a divider between groups (`--gallerist-divider`: the hairline, lifted in the
+  dark schemes); only the current group's label takes the accent.
   On a side rail the groups run down the rail, each one's items in a column. Item-windowed, so it
   stays bounded for large galleries and for a single giant group. A flat rail makes the renderer's
   traversal linear by default (below).
