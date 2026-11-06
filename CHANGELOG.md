@@ -2,12 +2,45 @@
 
 ## v0.3.4
 
+Two new packages join the fixed version group at 0.3.4: `@gallerist/plugin-zoom` (a "− 100% +"
+toolbar tool) and `@gallerist/plugin-shortcuts` (the keyboard shortcut list on `?`). The rail gains
+host hooks (group meta, item badges, clusters, markers), the View menu becomes a segmented popover,
+toolbar tools show their whole focus ring, and the rail glides, drags and fades. Four size budgets
+go up (see the end).
+
+### Upgrading: what behaves differently
+- **theme-default**: the rail's band (background, rule, blur) is painted on `.gallerist-thumbs-region`,
+  not `.gallerist-thumbs`; a page that styled the strip's background or border should move that to the
+  region.
+- **theme-default**: the toolbar's strip takes the bar's free space and lets pointers through except on
+  its tools, the 6px between two tools included: a drag or wheel that starts there is the bar's (under
+  the `immersive` bar, the image's), and no longer scrolls the strip. A page that styled the strip's
+  `margin`, `padding`, `flex`, `::before` or `::after` should check it.
+- **theme-default**: on a phone (600px wide or less) the bar leaves out the zoom tool and fullscreen;
+  `--gallerist-phone-zoom: flex` and `--gallerist-phone-fullscreen: grid` keep them.
+- **renderer-dom**: the viewer ignores any key a handler before it already took with
+  `preventDefault()` (until now only Escape), so a host handler that calls it on a key the viewer also
+  uses (an arrow, Home, a digit, a plugin's letter) now keeps that key to itself.
+- **plugin-zoom** (new): with it registered, `+` / `=`, `-` and `0` pressed in the viewer stop at the
+  viewer's root (`keys: false` leaves them to the renderer, which lets them bubble).
+- **plugin-view**: the menu is a popover that stays open on a choice (Enter chooses and closes); its
+  letter keys and Home/End are gone; the default `rail` / `scheme` strings read "Layout" / "Theme".
+- **plugin-thumbnails**: a stacked timeline label longer than its card widens its card's column instead
+  of being cut, and has a `title` only while cut.
+
 ### Host hooks: the rail and the keys (owner-approved, for the Apploye reviewer)
 - **plugin-thumbnails (new)**: `renderGroupMeta(group, index, { display, place })` draws a host's
   decoration per group: on a flat rail at the end of the group's label line (`place: 'label'`; the
   group widens to fit the label and the meta, the label still ending in an ellipsis past three card
   heights), on a stacked rail under the card at its width (`'below'`; every card is then wrapped) and,
   with a `timeline`, at the end of its time label (`'label'`). Not on an index rail.
+- **plugin-thumbnails, theme-default (changed)**: a stacked timeline label longer than its card (a
+  range, with a note count from `renderGroupMeta` at its end) was cut to the card's width
+  ("11:00 – 1…"). The card's column now widens to fit it, so the label shows whole and ends a rail gap
+  before the next card's (or marker's) label; past three card heights (the flat rail's cap) it ends in
+  an ellipsis, with the whole label in its `title` while it is cut. Right to left mirrors it (a touch
+  caret keeps to its card's corner), a phone's bottom rail does the same, and down a side rail the
+  label keeps to the rail's width.
 - **plugin-thumbnails (new)**: `renderItemBadge(item, g, i)` puts a host's badge in each item thumb's
   top end corner (a flat rail, the item column, the peek, an index section), clear of the
   `numberItems` number at the top start and of the focus ring.
@@ -39,9 +72,6 @@
   fullscreen: a pinch or a double tap zooms, and the viewer fills the screen. `--gallerist-phone-zoom:
   flex` and `--gallerist-phone-fullscreen: grid` keep them. The reviewer preset with View, save and
   Close then fits a 390px bar without scrolling.
-- **size**: core + renderer-dom 16,615 → 16,616 B (limit 16,650); core + renderer-dom + thumbnails
-  23,794 → 25,302 B, so its budget goes from 24 to 25.5 kB (owner's call); base.css 8,124 → 8,556 B;
-  the `@gallerist/cdn` bundle 36,501 → 38,031 B, its budget raised from 37 to 40 kB (owner-approved).
 
 ### The toolbar's focus ring
 - **theme-default (fixed)**: a toolbar tool with keyboard focus (fullscreen, save, View, the rail's
@@ -75,10 +105,12 @@
   the viewer has focus, `+` / `=`, `-` and `0` take the same stops in place of the renderer's own ×1.25
   steps, except in a text field and with Ctrl, ⌘ or Alt; a key it takes stops at the viewer's root
   (`keys: false` leaves them to the renderer). Translated labels in `strings`. Not in the
-  `@gallerist/cdn` bundle (1.53 kB gzipped; its own budget is 1.65 kB). No core or renderer change.
+  `@gallerist/cdn` bundle. No core or renderer change.
 - **theme-default (new)**: the tool's look in every skin and scheme (a tabular percentage of one
-  width); the renderer's zoom-reset button stays out of a bar that has the tool (unchanged without it);
-  at 600px wide or less only − and + show.
+  width); the renderer's zoom-reset button stays out of a bar that has the tool (unchanged without it).
+  A phone (600px wide or less) leaves the tool out of the bar (see the phone bar under Host hooks);
+  where a page keeps it (`--gallerist-phone-zoom: flex`) only − and + show. A tool given `hidden`
+  stays hidden (its `display: flex` no longer beats the attribute).
 
 ### The View menu: a popover with segmented controls (owner-approved 1A, for the Apploye reviewer)
 - **plugin-view (changed)**: the menu's radio list becomes a compact popover (about 280px wide, inside
@@ -106,9 +138,6 @@
   `--gallerist-seg-track`, `--gallerist-seg-on`, `--gallerist-seg-on-shadow`. Every skin derives them
   (panel, shadow, ground, surface and a hairline ring); Console sets the mockup's (dark #1b1d21 /
   #111215 / #2b2f35, light #fff / #eceef1 / #fff). Segments are 36px tall on a coarse pointer.
-- **size**: plugin-view 2.39 → 2.93 kB, its budget 2.4 → 3 kB (the six segment glyphs about 0.27 kB;
-  the radio-group keys, the live repaint and the shortcut row the rest); base.css 8.12 → 8.33 kB;
-  console.css 1.21 → 1.33 kB.
 
 ### A keyboard shortcut list on ? (owner-approved 3c, for the Apploye reviewer)
 - **plugin-shortcuts (new)**: `shortcuts()` shows the viewer's keyboard shortcuts in a modal dialog:
@@ -134,8 +163,6 @@
 - **theme-default (new)**: the dialog in every skin and scheme: centred, up to 720px, the sections side
   by side (Move widest); key caps in the surface colour and monospace face; a sheet from the bottom
   edge, one column, at 600px wide or less; a fade in, none under reduced motion; right to left.
-- **size**: plugin-shortcuts 2.74 kB (its budget 2.85 kB; not in the `@gallerist/cdn` bundle);
-  base.css 8.33 → 8.76 kB (limit 10 kB). Core, the renderer and the cdn bundle are unchanged.
 
 ### The rail (from the Apploye reviewer)
 - **plugin-thumbnails (changed)**: collapsing the rail (the handle, `t`, fullscreen) and bringing it
@@ -159,8 +186,8 @@
   the tab order and hidden from assistive tech, as the keys already walk the rail and bring the current
   card into view. Right to left throughout. The item column beside the stage drags too and keeps its
   scrollbar.
-- **plugin-thumbnails (changed)**: a flat rail's group labels and a stacked timeline's labels carry
-  their whole text in a `title`.
+- **plugin-thumbnails (changed)**: a flat rail's group label carries its whole text in a `title`; a
+  stacked timeline label has one while it is cut (see Host hooks).
 - **theme-default (changed)**: the rail's band (background, rule, blur) is painted by
   `.gallerist-thumbs-region` rather than `.gallerist-thumbs`, so the strip can fade its ends without
   fading the band. A page that styled the strip's background or border should move that to the region.
@@ -172,9 +199,19 @@
   "10:49 – 10:50 am" over a one-item group) was cut with an ellipsis. It now widens its group, so it
   shows whole and clear of the next group's divider, up to three card heights; past that it ends in an
   ellipsis. Down a side rail a group stays the rail's width.
-- **size**: core + renderer-dom unchanged (16.61 kB); core + renderer-dom + thumbnails 21.99 → 23.79 kB
-  (limit 24 kB); base.css 7.60 → 8.12 kB; the `@gallerist/cdn` bundle 34.62 → 36.5 kB, so its budget
-  goes from 35 to 37 kB (owner's call).
+
+### Sizes and budgets (gzipped; 0.3.3 → 0.3.4)
+- core + renderer-dom 16,497 → 16,616 B; its budget goes from 16.5 to 16.65 kB (owner-approved, for the
+  toolbar focus ring; the key a host took is 1 B more).
+- core + renderer-dom + thumbnails 21.99 → 25.33 kB (25,325 B); its budget goes from 24 to 25.5 kB
+  (owner-approved, for the rail's motion, drag and the host hooks).
+- plugin-view 2,392 → 2,959 B; its budget goes from 2.4 to 3 kB (owner-approved: the segment glyphs,
+  the radio-group keys, the live repaint and the shortcut row).
+- `@gallerist/cdn` 34.62 → 38.05 kB (38,054 B); its budget goes from 35 to 40 kB (owner-approved). It
+  bundles neither plugin-zoom nor plugin-shortcuts.
+- New: plugin-zoom 1,526 B (budget 1.65 kB); plugin-shortcuts 2,726 B (budget 2.85 kB).
+- theme-default base.css 7.60 → 9.24 kB (limit 10 kB); console.css 1.21 → 1.30 kB. Core unchanged
+  (3.10 kB).
 
 ## v0.3.3
 

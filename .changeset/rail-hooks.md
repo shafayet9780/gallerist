@@ -12,6 +12,9 @@ between clusters (`--gallerist-cluster-inner`, `--gallerist-cluster-gap`); `mark
 `RailMarker`s between groups (time logged without screenshots), which are never a stop for the keys,
 not counted, not focusable, named for assistive tech, with a host tooltip on hover or a long press.
 What a decoration says joins the card's or thumb's accessible name. `refreshRail(viewer)` draws them
-again in place after the host's data changed. On a phone (600px or less) the bar leaves out the zoom
+again in place after the host's data changed. A stacked timeline label longer than its card (a range
+with a note count) now widens its card's column to show whole, clear of the next card's label, up to
+three card heights, then ends in an ellipsis with the whole label in its `title` (down a side rail it
+keeps the rail's width). On a phone (600px or less) the bar leaves out the zoom
 tool and fullscreen (a pinch zooms; the viewer fills the screen); `--gallerist-phone-zoom` and
 `--gallerist-phone-fullscreen` keep them.

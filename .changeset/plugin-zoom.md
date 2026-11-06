@@ -9,4 +9,6 @@ current zoom (press it to fit the image again), zoom in, through stops of the zo
 click as it moves. − and + are unavailable at the ends of the range and while the item can't zoom (a
 video, loading, an error). While the viewer has focus, `+` / `=`, `-` and `0` take the same steps
 (not in text fields, not with a modifier). The renderer's own zoom-reset button stays out of a bar
-that has the tool; on a phone only − and + show. Not in the `@gallerist/cdn` bundle.
+that has the tool. A phone (600px or less) leaves the tool out of the bar (a pinch zooms);
+`--gallerist-phone-zoom: flex` keeps it, with − and + only. A `hidden` tool stays hidden. Not in the
+`@gallerist/cdn` bundle.

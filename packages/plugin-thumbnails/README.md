@@ -141,7 +141,7 @@ thumbnails({
 | `itemAxis`     | `'vertical' \| 'horizontal'` | `'vertical'`| `vertical` matches the ↑/↓ input direction; `horizontal` is the legacy inline row. Ignored in `flat`. |
 | `groupDisplay` | `'stacked' \| 'flat' \| 'index'` | `'stacked'` | `stacked` collapses each group to one card (peek to preview); `flat` lays every item out side-by-side, grouped under each group's label with a hairline between groups, and makes the renderer's traversal linear by default. The display it starts with; `setGroupDisplay()` changes it later. |
 | `expandActive` | `boolean`                    | `true`      | `stacked` and `index`. Auto-show the active multi-item group's item panel; hide/show via the toolbar items-toggle or `e`. Ignored in `flat`. |
-| `timeline`     | `boolean \| (group, index) => string` | off | `stacked` and `flat`, the current group's label in the accent. Stacked: a label with a tick above each card, joined into a track. Flat: the label heads each group in place of its caption (a group whose label is `undefined` shows its caption). `true` reads `group.meta.time`. The label joins the card's (flat: the group's) accessible name. |
+| `timeline`     | `boolean \| (group, index) => string` | off | `stacked` and `flat`, the current group's label in the accent. Stacked: a label with a tick above each card, joined into a track; a long one widens its card's column (up to three card heights). Flat: the label heads each group in place of its caption (a group whose label is `undefined` shows its caption). `true` reads `group.meta.time`. The label joins the card's (flat: the group's) accessible name. |
 | `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 | `renderGroupMeta` | `(group, index, { display, place }) => Node \| string \| null` | none | A host's decoration per group: flat, at the end of its label line; stacked, under the card (and with a `timeline`, at the end of its time label). See [Host decorations](#host-decorations-and-markers). |
@@ -202,7 +202,9 @@ refreshRail(viewer)
   widens to fit the label and the meta, the label still ending in an ellipsis past three card heights
   (its whole text in its `title`). Stacked: `'below'`, under the card at its width (every card is
   wrapped, so the rail's height grows by that line), and with a `timeline` also `'label'`, at the end
-  of the card's time label (which the card's width cuts first). Called for each group as it is drawn
+  of the card's time label: a label longer than its card widens the card's column so it shows whole,
+  clear of the next card's label, up to three card heights, then ends in an ellipsis (its whole text
+  in its `title` while cut); down a side rail it keeps to the rail's width. Called for each group as it is drawn
   (the rail draws only a run of them) and on `refreshRail()`.
 - **`renderItemBadge(item, g, i)`**: in each item thumb's top end corner, wherever item thumbs show
   (a flat rail, the item column, the peek, an index section). The `numberItems` number takes the top

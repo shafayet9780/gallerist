@@ -62,9 +62,10 @@ this tool is in the bar: the percentage does the same. Without the plugin it wor
 
 The buttons are bar tools like the others, so they take each skin's tool style, in both schemes.
 Right to left the group mirrors with the bar (− stays at the inline start, now on the right). The
-percentage uses tabular figures and keeps one width, so the bar doesn't shift as it changes. On a narrow screen (600px wide or less) the percentage
-is left out and only − and + show (a pinch zooms there, and a double tap fits); the toolbar's strip
-scrolls if the tools still don't fit. The styles ship in `@gallerist/theme-default` (`base.css`).
+percentage uses tabular figures and keeps one width, so the bar doesn't shift as it changes. On a phone (600px wide or less) the bar
+leaves the tool out (a pinch zooms there, and a double tap fits); a page that keeps it
+(`.gallerist { --gallerist-phone-zoom: flex }`) gets − and + without the percentage, and the
+toolbar's strip scrolls if the tools still don't fit. A tool given `hidden` stays hidden. The styles ship in `@gallerist/theme-default` (`base.css`).
 
 ## How it reads the zoom
 
