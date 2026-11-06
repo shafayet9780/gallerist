@@ -9,7 +9,9 @@
 //    updated as it scrolls or resizes.
 //  • on a sideways strip, ‹ › buttons at those ends (shown on hover, with a fine pointer) page it by
 //    most of its width. They're out of the tab order and hidden from assistive tech: the keys already
-//    move through the rail, which scrolls the current card into view.
+//    move through the rail, which scrolls the current card into view. A press or the wheel on the
+//    strip stops a page mid-glide.
+//  • every scroll of the strip lands at once, even where the page's CSS has it scroll smoothly.
 // Reading direction is the strip's own: in a right-to-left rail the start is on the right.
 
 import { ICONS } from '@gallerist/core/internal'
@@ -43,11 +45,14 @@ export function attachStrip(
   more?: () => readonly [boolean, boolean],
 ): Strip {
   const rtl = () => getComputedStyle(scroller).direction === 'rtl'
-  // scroll by `by` px along the axis, towards the end when positive (whatever the direction)
-  const along = (axis: Axis, by: number) => {
-    if (axis === 'y') scroller.scrollTop += by
-    else scroller.scrollLeft += rtl() ? -by : by
+  // scroll a sideways strip by `by` px, towards its end when positive (whatever the direction)
+  const along = (by: number) => {
+    scroller.scrollLeft += rtl() ? -by : by
   }
+  // every scroll of the strip lands at once, whatever the page's CSS says: a smooth one would still
+  // be at its old offset when read back, so a page's next step (or the rail's own correction of its
+  // offset as it draws cards) would start from there
+  scroller.style.scrollBehavior = 'auto'
   // how far it has scrolled from its start, and how far it can
   const reach = (axis: Axis) => {
     const x = axis === 'x'
@@ -55,11 +60,19 @@ export function attachStrip(
     const max = x
       ? scroller.scrollWidth - scroller.clientWidth
       : scroller.scrollHeight - scroller.clientHeight
-    return { pos, max }
+    return [pos, max] as const
+  }
+
+  // a page button's glide, stopped by a press, the wheel, another page or the strip going away
+  let glide = 0
+  const stop = () => {
+    if (glide) cancelAnimationFrame(glide)
+    glide = 0
   }
 
   // ── drag (mouse, pen) ─────────────────────────────────────────────────────
-  let press: { id: number; x: number; y: number; lastX: number; lastY: number } | null = null
+  // the pointer pressed on the strip, and where it went down (once it's a drag: where it last was)
+  let press: { id: number; x: number; y: number } | null = null
   let dragging = false
   const swallowClick = (e: Event) => {
     e.preventDefault()
@@ -78,16 +91,17 @@ export function attachStrip(
   }
   const onDown = (e: PointerEvent) => {
     endDrag() // anything left of an earlier press
+    stop()
     if (e.pointerType === 'touch' || e.button !== 0 || !axisOf()) return
-    press = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY }
+    press = { id: e.pointerId, x: e.clientX, y: e.clientY }
   }
   const onMove = (e: PointerEvent) => {
     const axis = axisOf()
     if (!press || e.pointerId !== press.id || !axis) return
     if (!(e.buttons & 1)) return endDrag()
+    // along the strip: a wobble across it is still a click
+    const by = axis === 'y' ? e.clientY - press.y : e.clientX - press.x
     if (!dragging) {
-      // along the strip: a wobble across it is still a click
-      const by = axis === 'y' ? e.clientY - press.y : e.clientX - press.x
       if (Math.abs(by) < DRAG_SLOP * (e.pointerType === 'pen' ? 2 : 1)) return
       dragging = true
       scroller.setAttribute('data-gallerist-dragging', '')
@@ -96,10 +110,10 @@ export function attachStrip(
       scroller.addEventListener('click', swallowClick, true)
     }
     // incremental: the rail re-windows as it scrolls and corrects its own offset meanwhile
-    if (axis === 'y') scroller.scrollTop -= e.clientY - press.lastY
-    else scroller.scrollLeft -= e.clientX - press.lastX
-    press.lastX = e.clientX
-    press.lastY = e.clientY
+    if (axis === 'y') scroller.scrollTop -= by
+    else scroller.scrollLeft -= by
+    press.x = e.clientX
+    press.y = e.clientY
     e.preventDefault()
   }
   const onUp = (e: PointerEvent) => {
@@ -119,43 +133,50 @@ export function attachStrip(
     if (axisOf() !== 'x' || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? scroller.clientWidth : 1
     const by = e.deltaY * unit
-    const { pos, max } = reach('x')
+    const [pos, max] = reach('x')
     const [before, after] = more?.() ?? []
     // the page's at the end it is going to, unless cards not drawn yet lie beyond it
     if (by > 0 ? pos >= max - 1 && !after : pos <= 1 && !before) return
-    along('x', by)
+    stop()
+    along(by)
     e.preventDefault()
   }
 
   // ── page buttons ──────────────────────────────────────────────────────────
-  let glide = 0
   const page = (dir: 1 | -1) => {
-    const axis = axisOf()
-    if (axis !== 'x') return
-    const total = dir * scroller.clientWidth * PAGE
-    if (glide) cancelAnimationFrame(glide)
-    glide = 0
-    if (reduced() || typeof requestAnimationFrame === 'undefined') return along('x', total)
-    // a step at a time, by what's left to go, so the rail's own offset corrections in between
-    // (cards drawn and dropped as it moves) don't stop it short or carry it past. A step can run
-    // into the edge of the drawn cards (a late frame makes one big step) before the rail draws the
-    // ones beyond: what it didn't move is carried to the next frames, once they're drawn, until it
-    // has gone the whole way or the strip's true end stops it.
-    const t0 = performance.now()
+    if (axisOf() !== 'x') return
+    stop()
+    const total = scroller.clientWidth * PAGE
+    if (typeof requestAnimationFrame === 'undefined') return along(dir * total)
+    // a step a frame, by what's left to go, so the rail's own offset corrections in between (cards
+    // drawn and dropped as it moves) don't stop it short or carry it past. A step can run into the
+    // edge of the drawn cards (a late frame makes one big step) before the rail draws the ones
+    // beyond: what it didn't move is carried to the next frames, until it has gone the whole way
+    // or the strip's true end stops it. Under reduced motion it starts past the glide's end: the
+    // first step, at once, is the whole way.
+    const start = performance.now()
+    const t0 = reduced() ? start - PAGE_MS : start
     let done = 0
     let extra = 0 // frames past the glide's end, carrying what's left
+    let idle = 0 // frames in a row it didn't move
     const step = (now: number) => {
-      const t = Math.min(1, (now - t0) / PAGE_MS)
+      // (a frame can be timed a little before the click)
+      const t = Math.min(1, Math.max(0, (now - t0) / PAGE_MS))
       const was = scroller.scrollLeft
-      along('x', Math.round(total * ease(t)) - done)
-      const moved = (scroller.scrollLeft - was) * (rtl() ? -1 : 1)
+      along(dir * (Math.round(total * ease(t)) - done))
+      const moved = Math.abs(scroller.scrollLeft - was) // every step goes the page's way
       done += moved
-      const left = Math.abs(total - done) >= 1
-      const beyond = more?.()[dir > 0 ? 1 : 0] ?? false
-      const going = t < 1 || (left && (moved !== 0 || beyond) && ++extra <= MAX_EXTRA)
-      glide = going ? requestAnimationFrame(step) : 0
+      idle = moved ? 0 : idle + 1
+      // past its end: on while some is left and it moves, or a frame more while the rail draws the
+      // cards beyond
+      glide =
+        t < 1 ||
+        (total - done >= 1 && idle < (more?.()[dir > 0 ? 1 : 0] ? 2 : 1) && ++extra <= MAX_EXTRA)
+          ? requestAnimationFrame(step)
+          : 0
     }
-    glide = requestAnimationFrame(step)
+    if (t0 < start) step(start)
+    else glide = requestAnimationFrame(step)
   }
   const button = (dir: 1 | -1) => {
     const btn = document.createElement('button')
@@ -184,7 +205,7 @@ export function attachStrip(
   }
   const update = () => {
     const axis = axisOf()
-    const { pos, max } = axis ? reach(axis) : { pos: 0, max: 0 }
+    const [pos, max] = axis ? reach(axis) : [0, 0]
     const [undrawnBefore, undrawnAfter] = more?.() ?? []
     const before = !!axis && (pos > 1 || !!undrawnBefore)
     const after = !!axis && (pos < max - 1 || !!undrawnAfter)
@@ -228,8 +249,7 @@ export function attachStrip(
   return {
     update,
     destroy() {
-      if (glide) cancelAnimationFrame(glide)
-      glide = 0
+      stop()
       for (const [type, fn] of listeners) scroller.removeEventListener(type, fn as EventListener)
       scroller.removeEventListener('click', swallowClick, true)
       toStart?.remove()

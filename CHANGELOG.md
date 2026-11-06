@@ -226,7 +226,10 @@ version.
   decorations arrive. On a sideways rail, ‹ › buttons at those ends (`.gallerist-rail-page`) show on hover
   with a fine pointer and page it by 80% of its width, gliding unless reduced motion; they are out of
   the tab order and hidden from assistive tech, as the keys already walk the rail and bring the current
-  card into view. Right to left throughout. The item column beside the stage drags too and keeps its
+  card into view. A page goes the whole way even when a frame comes late or runs into cards not drawn
+  yet (it carries on once they are, at most 30 frames, and stops at the rail's true end), under reduced
+  motion too; a press or the wheel on the rail stops it. The rail's scrolls land at once whatever the
+  page's CSS says (`.gallerist-thumbs` gets an inline `scroll-behavior: auto`). Right to left throughout. The item column beside the stage drags too and keeps its
   scrollbar.
 - **plugin-thumbnails (changed)**: a flat rail's group label, and a stacked timeline label, carry
   their whole text in a `title` while cut (see Host hooks).
@@ -246,12 +249,12 @@ version.
 - core + renderer-dom 16,497 → 16,650 B; its budget goes from 16.5 to 16.65 kB (owner-approved, for the
   toolbar focus ring; the key a host took is 1 B more, a field in a shadow root and AltGr 34 B), and
   it is now at the limit.
-- core + renderer-dom + thumbnails 21.99 → 25.49 kB (25,493 B); its budget goes from 24 to 25.5 kB
+- core + renderer-dom + thumbnails 21.99 → 25.48 kB (25,484 B); its budget goes from 24 to 25.5 kB
   (owner-approved, for the rail's motion, drag and the host hooks; the pre-release review's fixes fit
   in it after a trim).
 - plugin-view 2,392 → 2,959 B; its budget goes from 2.4 to 3 kB (owner-approved: the segment glyphs,
   the radio-group keys, the live repaint and the shortcut row).
-- `@gallerist/cdn` 34.62 → 38.30 kB (38,295 B); its budget goes from 35 to 40 kB (owner-approved). It
+- `@gallerist/cdn` 34.62 → 38.24 kB (38,244 B); its budget goes from 35 to 40 kB (owner-approved). It
   bundles neither plugin-zoom nor plugin-shortcuts.
 - New: plugin-zoom 1,645 B (budget 1.65 kB); plugin-shortcuts 2,834 B (budget 2.85 kB).
 - theme-default base.css 7.60 → 9.39 kB (limit 10 kB); console.css 1.21 → 1.30 kB. Core unchanged

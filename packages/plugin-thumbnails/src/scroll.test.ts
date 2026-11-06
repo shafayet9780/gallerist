@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DRAG_SLOP, PAGE, attachStrip } from './scroll'
+import { DRAG_SLOP, PAGE, type Strip, attachStrip } from './scroll'
 import type { Axis } from './strip'
+
+const strips: Strip[] = [] // destroyed after each test, so no glide runs on into the next
 
 // A strip 400px wide holding 2000px of cards, scrolled `at` px from its start.
 const make = (
@@ -41,6 +43,7 @@ const make = (
     () => (opts.axis === undefined ? 'x' : opts.axis),
     opts.more,
   )
+  strips.push(strip)
   return { host, scroller, card, onCard, strip }
 }
 
@@ -66,8 +69,36 @@ const wheel = (el: Element, init: WheelEventInit) => {
   return e.defaultPrevented
 }
 
+const motion = (reduce: boolean) => {
+  window.matchMedia = ((q: string) =>
+    ({
+      matches: reduce && q.includes('reduced-motion'),
+    }) as MediaQueryList) as typeof window.matchMedia
+}
+// Every frame comes late: a glide's first step is the whole page. Returns the frames asked for.
+const lateFrames = () => {
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => clearTimeout(id))
+  return vi
+    .spyOn(window, 'requestAnimationFrame')
+    .mockImplementation((cb) => Number(setTimeout(() => cb(performance.now() + 1000), 0)))
+}
+// The strip's scroll offset as a browser keeps it: `set` turns what is written into where it lands.
+const offset = (scroller: HTMLElement, set: (to: number, from: number) => number) => {
+  let at = scroller.scrollLeft
+  Object.defineProperty(scroller, 'scrollLeft', {
+    configurable: true,
+    get: () => at,
+    set: (v: number) => {
+      at = set(v, at)
+    },
+  })
+}
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+const settle = (ms = 100) => new Promise((r) => setTimeout(r, ms))
+
 const realMatchMedia = window.matchMedia
 afterEach(() => {
+  for (const s of strips.splice(0)) s.destroy()
   window.matchMedia = realMatchMedia
   document.body.innerHTML = ''
   vi.useRealTimers()
@@ -335,8 +366,7 @@ describe('rail strip — the ends', () => {
   })
 
   it(`a page button scrolls ${PAGE * 100}% of what shows; at once under reduced motion`, () => {
-    window.matchMedia = ((q: string) =>
-      ({ matches: q.includes('reduced-motion') }) as MediaQueryList) as typeof window.matchMedia
+    motion(true)
     const { scroller, host, strip } = make({ at: 800 })
     strip.update()
     const [toStart, toEnd] = host.querySelectorAll<HTMLButtonElement>('.gallerist-rail-page')
@@ -348,10 +378,7 @@ describe('rail strip — the ends', () => {
   })
 
   it('glides otherwise, by what is left to go each frame', async () => {
-    window.matchMedia = ((q: string) =>
-      ({
-        matches: q.includes('reduced-motion') && false,
-      }) as MediaQueryList) as typeof window.matchMedia
+    motion(false)
     const { scroller, host, strip } = make({ at: 800 })
     strip.update()
     host.querySelector<HTMLButtonElement>('[data-dir="end"]')?.click()
@@ -364,36 +391,115 @@ describe('rail strip — the ends', () => {
     expect(scroller.scrollLeft).toBe(800 + 400 * PAGE + 50)
   })
 
-  it('a late frame that runs into the edge of the drawn cards goes on once the rail draws more', async () => {
-    window.matchMedia = ((q: string) =>
-      ({
-        matches: q.includes('reduced-motion') && false,
-      }) as MediaQueryList) as typeof window.matchMedia
-    // the next frame comes late: the whole page in one step
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) =>
-      Number(setTimeout(() => cb(performance.now() + 1000), 0)),
-    )
+  // At its start a browser's offset stops at 0; there, the rail draws 300px of cards before (in its
+  // own frame) and keeps what shows in place. `rtl`: the offset runs from 0 down.
+  const drawsBefore = (rtl = false) => {
     let drawn = false
-    const { scroller, host, strip } = make({ at: 100, more: () => [!drawn, false] })
-    // a browser's scroll offset stops at 0; at it, the rail draws 300px of cards before and keeps
-    // what shows in place
-    let at = 100
-    Object.defineProperty(scroller, 'scrollLeft', {
-      configurable: true,
-      get: () => at,
-      set: (v: number) => {
-        at = Math.max(0, Math.min(1600, v))
-        if (at === 0 && !drawn)
-          setTimeout(() => {
-            drawn = true
-            at += 300
-          }, 0)
-      },
+    const made = make({ at: 100, rtl, more: () => [!drawn, false] })
+    const sign = rtl ? -1 : 1
+    offset(made.scroller, (v) => {
+      const to = sign * clamp(sign * v, 0, 1600)
+      if (to === 0 && !drawn)
+        requestAnimationFrame(() => {
+          drawn = true
+          made.scroller.scrollLeft = sign * 300
+        })
+      return to
     })
-    strip.update()
+    made.strip.update()
+    return made
+  }
+
+  it('a late frame that runs into the edge of the drawn cards goes on once the rail draws more', async () => {
+    motion(false)
+    lateFrames()
+    const { scroller, host } = drawsBefore()
     host.querySelector<HTMLButtonElement>('[data-dir="start"]')?.click()
-    await new Promise((r) => setTimeout(r, 100))
-    expect(at).toBe(100 + 300 - 400 * PAGE) // the whole page, the cards drawn before counted
+    await settle()
+    expect(scroller.scrollLeft).toBe(100 + 300 - 400 * PAGE) // the whole page, the cards drawn before counted
+  })
+
+  it('right to left too, where the offset runs negative', async () => {
+    motion(false)
+    lateFrames()
+    const { scroller, host } = drawsBefore(true)
+    host.querySelector<HTMLButtonElement>('[data-dir="start"]')?.click()
+    await settle()
+    expect(scroller.scrollLeft).toBe(-(100 + 300 - 400 * PAGE))
+  })
+
+  it('under reduced motion: the whole page at once, carried on once the rail draws more', async () => {
+    motion(true)
+    const { scroller, host } = drawsBefore()
+    host.querySelector<HTMLButtonElement>('[data-dir="start"]')?.click()
+    expect(scroller.scrollLeft).toBe(0) // at once, into the edge of the cards drawn
+    await settle()
+    expect(scroller.scrollLeft).toBe(100 + 300 - 400 * PAGE)
+  })
+
+  it('stops at the strip’s true end, with nothing beyond it', async () => {
+    motion(false)
+    const frames = lateFrames()
+    const { scroller, host, strip } = make({ at: 1500, more: () => [false, false] })
+    offset(scroller, (v) => clamp(v, 0, 1600))
+    strip.update()
+    host.querySelector<HTMLButtonElement>('[data-dir="end"]')?.click()
+    await settle()
+    expect(scroller.scrollLeft).toBe(1600)
+    expect(frames).toHaveBeenCalledTimes(2) // the step to the end, and one that didn't move
+  })
+
+  it('waits a frame, not more, for cards beyond that the rail doesn’t draw', async () => {
+    motion(false)
+    const frames = lateFrames()
+    const { scroller, host, strip } = make({ at: 1500, more: () => [false, true] })
+    offset(scroller, (v) => clamp(v, 0, 1600))
+    strip.update()
+    host.querySelector<HTMLButtonElement>('[data-dir="end"]')?.click()
+    await settle()
+    expect(scroller.scrollLeft).toBe(1600)
+    expect(frames).toHaveBeenCalledTimes(3) // the step to the edge, then two that didn't move
+  })
+
+  it('carries what is left for 30 frames past the glide at most', async () => {
+    motion(false)
+    const frames = lateFrames()
+    const { scroller, host, strip } = make({ at: 800, more: () => [false, true] })
+    // a rail that only ever lets it move a pixel a frame
+    offset(scroller, (v, from) => from + clamp(v - from, -1, 1))
+    strip.update()
+    host.querySelector<HTMLButtonElement>('[data-dir="end"]')?.click()
+    await settle(300)
+    expect(frames).toHaveBeenCalledTimes(31) // the glide's one (late) frame, then 30 more
+    expect(scroller.scrollLeft).toBe(800 + 31)
+  })
+
+  it('a press or the wheel on the strip stops a glide', async () => {
+    motion(false)
+    const { scroller, host, strip } = make({ at: 800 })
+    strip.update()
+    const toEnd = host.querySelector<HTMLButtonElement>('[data-dir="end"]')
+    toEnd?.click()
+    await settle(60)
+    pointer(scroller, 'pointerdown', 100)
+    pointer(scroller, 'pointerup', 100)
+    const held = scroller.scrollLeft
+    expect(held).toBeGreaterThan(800)
+    expect(held).toBeLessThan(800 + 400 * PAGE)
+    await settle(400)
+    expect(scroller.scrollLeft).toBe(held)
+    toEnd?.click()
+    await settle(60)
+    wheel(scroller, { deltaY: 10 })
+    const wheeled = scroller.scrollLeft
+    await settle(400)
+    expect(scroller.scrollLeft).toBe(wheeled)
+    expect(wheeled).toBeLessThan(held + 400 * PAGE)
+  })
+
+  it('scrolls at once, whatever the page’s CSS says (no smooth scroll-behavior)', () => {
+    const { scroller } = make()
+    expect(scroller.style.scrollBehavior).toBe('auto')
   })
 
   it('a wheel over a page button scrolls the strip', () => {

@@ -1179,15 +1179,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (!root) return
       const desiredItemIds = new Set<string>()
       const desiredGroupIds = new Set<string>()
-      const minI = new Map<string, number>()
-      const maxI = new Map<string, number>()
       for (let fi = start; fi <= end; fi++) {
         const e = flat[fi]
         if (!e) continue
         desiredItemIds.add(e.itemId)
         desiredGroupIds.add(e.groupId)
-        minI.set(e.groupId, Math.min(minI.get(e.groupId) ?? e.i, e.i))
-        maxI.set(e.groupId, Math.max(maxI.get(e.groupId) ?? e.i, e.i))
       }
       // evict nodes that left the window
       for (const [id, btn] of itemBtns) {
@@ -1203,17 +1199,22 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
       }
       // place in window order, inserting only what entered (the rest is already in order)
-      let curGroupId: string | null = null
+      // the group being placed, its wrapper, and the last of its items placed (the flat list runs
+      // in order: a group's first item placed is its first drawn)
+      let curGrp: Group | undefined
+      let curWrap: HTMLElement | undefined
+      let lastI = 0
       let prevWrap: Element | null = null
       let row: Element = root
       let prevBtn: Element | null = null
       // a group's markers show where its start (before) or its end (after) is drawn
       const marks = new Set<string>()
+      // past a group's last item drawn: it's cut there unless that's its last
       const after = () => {
-        const g = groupIndexById.get(curGroupId ?? '')
-        const n = g == null ? 0 : (col.groups[g]?.items.length ?? 0)
-        if (curGroupId && maxI.get(curGroupId) === n - 1)
-          prevWrap = placeMarks(curGroupId, true, prevWrap, marks)
+        if (!curGrp || !curWrap) return
+        const whole = lastI === curGrp.items.length - 1
+        toggleAttr(curWrap, 'data-partial-end', !whole)
+        if (whole) prevWrap = placeMarks(curGrp.id, true, prevWrap, marks)
       }
       for (let fi = start; fi <= end; fi++) {
         const e = flat[fi]
@@ -1226,12 +1227,16 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           wrap = buildGroupWrapper(grp, e.g)
           groupWraps.set(e.groupId, wrap)
         }
-        if (e.groupId !== curGroupId) {
+        if (grp !== curGrp) {
           after()
           if (e.i === 0) prevWrap = placeMarks(e.groupId, false, prevWrap, marks)
           place(root, wrap, prevWrap)
-          prevWrap = wrap
-          curGroupId = e.groupId
+          prevWrap = curWrap = wrap
+          curGrp = grp
+          // cut at its start: the label shows only over a group's start
+          toggleAttr(wrap, 'data-partial-start', e.i > 0)
+          const line = wrap.firstElementChild as HTMLElement | null // the label line, if any
+          if (line && !line.classList.contains('gallerist-thumb-group-row')) line.hidden = e.i > 0
           row = wrap.querySelector('.gallerist-thumb-group-row') ?? wrap
           prevBtn = null
         }
@@ -1242,22 +1247,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
         place(row, ib, prevBtn)
         prevBtn = ib
+        lastI = e.i
       }
       after()
       dropMarks(marks)
-      // partial-edge flags (a group the drawn run cuts); the label shows only over a group's start
-      for (const [id, wrap] of groupWraps) {
-        const gi = groupIndexById.get(id)
-        if (gi == null) continue
-        const grp = col.groups[gi]
-        if (!grp) continue
-        const mn = minI.get(id) ?? 0
-        const mx = maxI.get(id) ?? 0
-        toggleAttr(wrap, 'data-partial-start', mn > 0)
-        toggleAttr(wrap, 'data-partial-end', mx < grp.items.length - 1)
-        const line = wrap.firstElementChild as HTMLElement | null // the label line, if any
-        if (line && !line.classList.contains('gallerist-thumb-group-row')) line.hidden = mn > 0
-      }
     }
 
     // wipe everything (collection identity changed — ids may be entirely different)
@@ -1560,8 +1553,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       configure()
       panelOpen = o.expandActive ?? true
       regionEl = make('div', 'gallerist-thumbs-region')
-      root = document.createElement('div')
-      root.className = 'gallerist-thumbs'
+      root = make('div', 'gallerist-thumbs')
       root.setAttribute('aria-label', t.rail)
       regionEl.appendChild(root)
       root.style.overflowAnchor = 'none' // keepPlace corrects the offset itself
@@ -1580,9 +1572,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (oneOf(AXES, settle(opts, preset, 'stacked').itemAxis) === 'vertical') {
         asideEl = make('div', 'gallerist-thumbs-aside')
       }
-      toolbarBtn = document.createElement('button')
+      toolbarBtn = make('button', 'gallerist-items-toggle')
       toolbarBtn.type = 'button'
-      toolbarBtn.className = 'gallerist-items-toggle'
       toolbarBtn.setAttribute('aria-label', t.toggleItems)
       toolbarBtn.setAttribute('aria-pressed', String(panelOpen))
       toolbarBtn.innerHTML = ICONS.itemStack
