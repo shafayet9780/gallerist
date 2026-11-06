@@ -32,6 +32,7 @@
     --gallerist-dur-snappy: 340ms;
     --gallerist-dur-gentle: 280ms;
     --gallerist-dur-exit: 180ms; /* exits run shorter than entrances */
+    --gallerist-dur-panel: 220ms; /* the rail collapsing, the item column opening (plugin-thumbnails) */
 
     /* the accent: each skin names its accents as a dark/light pair, the scheme picks one */
     --gallerist-accent: var(--gallerist-accent-dark);
@@ -587,7 +588,7 @@
 }
 /* collapsing the rail puts its item stack away too (fullscreen, `t`, rail: 'hidden'); a rail switched
    to flat or index leaves the column hidden */
-.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside,
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside:not([data-gallerist-glide]),
 .gallerist-thumbs-aside[hidden] {
   display: none;
 }
@@ -1452,8 +1453,16 @@
   display: flex;
   flex-direction: column;
 }
-.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-region {
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-region:not([data-gallerist-glide]) {
   display: none;
+}
+/* gliding open or shut (plugin-thumbnails animates its size, clipped): the strip keeps to the edge
+   by its handle, so it slides out past the viewer's edge rather than squeezing */
+.gallerist-thumbs-region[data-gallerist-glide] {
+  align-items: flex-start;
+}
+.gallerist-thumbs-aside[data-gallerist-glide] {
+  justify-content: flex-start;
 }
 /* the pull-handle: a grip tab on the rail's edge — clearly part of the gallery */
 .gallerist-rail-handle {
@@ -1496,7 +1505,7 @@
 .gallerist-rail-toggle .gallerist-icon {
   width: 16px;
   height: 16px;
-  transition: transform var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
+  transition: transform var(--gallerist-dur-panel, 220ms) var(--gallerist-ease-out, ease);
 }
 /* expanded = chevron points down (pull down to hide); collapsed = points up (pull up to show) */
 .gallerist-rail-toggle[aria-pressed="true"] .gallerist-icon {
@@ -1687,8 +1696,18 @@
   min-height: 0;
 }
 .gallerist[data-gallerist-orientation="vertical"][data-gallerist-rail="collapsed"]
-  .gallerist-thumbs-region {
+  .gallerist-thumbs-region:not([data-gallerist-glide]) {
   display: none;
+}
+/* a side rail slides out sideways: its strip keeps to the handle's side (the stage's) */
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumbs-region[data-gallerist-glide],
+.gallerist[data-gallerist-dir="rtl"][data-gallerist-rail-pos="right"]
+  .gallerist-thumbs-region[data-gallerist-glide] {
+  align-items: flex-end;
+}
+.gallerist[data-gallerist-dir="rtl"][data-gallerist-rail-pos="left"]
+  .gallerist-thumbs-region[data-gallerist-glide] {
+  align-items: flex-start;
 }
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs {
   flex: 1 1 auto;

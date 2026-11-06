@@ -27,6 +27,10 @@
 // display of a mounted rail. The nodes the renderer holds (the rail region, the aside column, the
 // toolbar toggle) stay; what's in them is drawn again for the new display around the current item,
 // and `viewer.refresh()` tells the renderer to read the region's linear marker again.
+//
+// Motion (motion.ts): the rail collapsing to its handle (the renderer's `data-gallerist-rail`, from
+// the handle, `t` or fullscreen) and a stacked rail's item column opening and closing glide to their
+// new size instead of jumping, unless the user prefers reduced motion.
 
 import type {
   Group,
@@ -38,6 +42,7 @@ import type {
   ViewerApi,
 } from '@gallerist/core'
 import { ICONS, getInternals } from '@gallerist/core/internal'
+import { GLIDE, createGlides, sizeOf } from './motion'
 import { type Axis, axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
 
 /** Cards drawn beyond the visible ones on each side, so a step or a short scroll lands on drawn cards. */
@@ -387,6 +392,16 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let toolbarBtn: HTMLButtonElement | null = null
     let unsub: (() => void) | null = null
     let hoverCapable = true
+    // the viewer's root, once the rail is in it, and what it last said about the rail's collapse
+    let viewerRoot: HTMLElement | null = null
+    let railObs: MutationObserver | null = null
+    let railCollapsed = false
+    const glides = createGlides(
+      () =>
+        Number.parseFloat(
+          viewerRoot ? getComputedStyle(viewerRoot).getPropertyValue('--gallerist-dur-panel') : '',
+        ) || 220,
+    )
 
     // Reconcile state. Group cards + item buttons are keyed by id so we can flip active state and
     // reorder without destroying nodes.
@@ -809,12 +824,60 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       applyActive(col, cur.g, cur.i)
     }
 
+    // The item column beside the stage glides to its new width: open, it grows to the stack; closed,
+    // the stack stays (inert) while the column narrows, then goes.
     const toggleActivePanel = () => {
       if (isFlat) return // a flat rail has no item panel (the toggle is hidden; `e` isn't claimed)
       panelOpen = !panelOpen
       toolbarBtn?.setAttribute('aria-pressed', String(panelOpen))
       if (panelOpen) closePeek() // the persistent panel supersedes a transient peek
+      const column = !isIndex && itemAxis === 'vertical' && asideEl?.isConnected ? asideEl : null
+      if (!column) return syncPanel()
+      const from = sizeOf(column, 'width') // mid-glide: as far as it got
+      glides.stop(column)
+      const leaving = itemRow
       syncPanel()
+      const to = sizeOf(column, 'width')
+      if (leaving && !leaving.isConnected) {
+        column.append(leaving)
+        glides.glide(column, 'width', from, to, () => leaving.remove())
+      } else glides.glide(column, 'width', from, to)
+    }
+
+    // The rail collapsing or coming back (the renderer flips `data-gallerist-rail` on its root): the
+    // rail glides between its height (its width on a side rail) and none, and a stacked rail's item
+    // column beside the stage between its width and none. A collapse that takes focus with it hands
+    // focus to the viewer first.
+    const onRailChange = () => {
+      const collapsed = viewerRoot?.getAttribute('data-gallerist-rail') === 'collapsed'
+      if (!viewerRoot || !regionEl || collapsed === railCollapsed) return
+      railCollapsed = collapsed
+      if (collapsed && regionEl.parentElement?.contains(document.activeElement))
+        viewerRoot.focus({ preventScroll: true })
+      const side = viewerRoot.getAttribute('data-gallerist-orientation') === 'vertical'
+      for (const [el, dim] of [
+        [regionEl, side ? 'width' : 'height'],
+        [asideEl, 'width'],
+      ] as const) {
+        if (!el?.isConnected || el.hidden) continue
+        const mid = glides.moving(el)
+        el.setAttribute(GLIDE, '') // displayed (and so measured) while it moves
+        const now = sizeOf(el, dim)
+        glides.stop(el)
+        el.setAttribute(GLIDE, '')
+        const full = sizeOf(el, dim)
+        if (collapsed) glides.glide(el, dim, now, 0)
+        else glides.glide(el, dim, mid ? now : 0, full)
+      }
+    }
+    const watchRail = () => {
+      const root = regionEl?.closest<HTMLElement>('.gallerist') ?? null
+      if (!root || root === viewerRoot || typeof MutationObserver === 'undefined') return
+      railObs?.disconnect()
+      viewerRoot = root
+      railCollapsed = root.getAttribute('data-gallerist-rail') === 'collapsed'
+      railObs = new MutationObserver(onRailChange)
+      railObs.observe(root, { attributeFilter: ['data-gallerist-rail'] })
     }
 
     // ── flat mode ────────────────────────────────────────────────────────────
@@ -1051,6 +1114,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     const render = () => {
       if (!root) return
+      if (!railObs) watchRail()
       revealOnOpen()
       const col = viewer.getCollection()
       const cur = viewer.getState().cursor
@@ -1092,6 +1156,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     const teardown = () => {
       unsub?.()
       unsub = null
+      railObs?.disconnect()
+      railObs = null
+      viewerRoot = null
+      glides.stopAll()
       resizeObs?.disconnect()
       resizeObs = null
       root?.removeEventListener('scroll', scheduleRewindow)
@@ -1204,6 +1272,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       layout()
       render()
       unsub = viewer.subscribe(render)
+      queueMicrotask(watchRail) // once the renderer has put the rail in the viewer
     }
 
     // Which regions to claim is decided now, before the preset is known (and the display can change
