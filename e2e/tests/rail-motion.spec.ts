@@ -7,7 +7,8 @@ import { viewerSettled } from './settled'
 
 const REVIEWER = '/layout.html?preset=reviewer&skin=console&display=flat&custom=short'
 
-// The glides run over 1s here, so even a slow, loaded frame rate shows several steps of them.
+// The glides run over 1s here (the token the panels read), so a slow, loaded frame rate still shows
+// steps of the ones `frames` records.
 const open = async (page: Page, query: string, duration = '1000ms') => {
   await page.goto(query)
   await viewerSettled(page)
@@ -22,11 +23,17 @@ const open = async (page: Page, query: string, duration = '1000ms') => {
 
 type Frame = { stage: number; panel: number; display: string; inert: boolean }
 
+const ACTS = {
+  toggle: '.gallerist-rail-toggle',
+  items: '.gallerist-items-toggle',
+} as const
+type Act = keyof typeof ACTS
+
 // Run `act` in the page, then record the stage's size along `dim` and the panel's, frame by frame,
 // for `ms`.
-const frames = (page: Page, act: string, panel: string, dim: 'width' | 'height', ms = 1200) =>
+const frames = (page: Page, act: Act, panel: string, dim: 'width' | 'height', ms = 1200) =>
   page.evaluate(
-    async ({ act, panel, dim, ms }) => {
+    async ({ toggle, panel, dim, ms }) => {
       const stage = document.querySelector('.gallerist-main') as HTMLElement
       const el = document.querySelector(panel) as HTMLElement
       const out: Frame[] = []
@@ -38,10 +45,7 @@ const frames = (page: Page, act: string, panel: string, dim: 'width' | 'height',
           inert: el.inert,
         })
       read()
-      if (act === 'toggle')
-        (document.querySelector('.gallerist-rail-toggle') as HTMLElement).click()
-      if (act === 'items')
-        (document.querySelector('.gallerist-items-toggle') as HTMLElement).click()
+      ;(document.querySelector(toggle) as HTMLElement).click()
       const t0 = performance.now()
       while (performance.now() - t0 < ms) {
         await new Promise((r) => requestAnimationFrame(r))
@@ -49,23 +53,98 @@ const frames = (page: Page, act: string, panel: string, dim: 'width' | 'height',
       }
       return out
     },
-    { act, panel, dim, ms },
+    { toggle: ACTS[act], panel, dim, ms },
   )
 
-// The stage moved through several sizes between its first and last, one way only, no step more
-// than half the way.
-const glided = (seen: Frame[]) => {
-  const sizes = seen.map((f) => Math.round(f.stage))
-  const first = sizes[0] ?? 0
-  const last = sizes[sizes.length - 1] ?? 0
-  const between = new Set(sizes.filter((s) => (s - first) * (s - last) < 0))
+type Glide = {
+  before: Frame
+  after: Frame
+  // the panel's animations of its size: their timing and their first and last keyframe, in px
+  anims: Array<{ duration: number; easing: string; from: number; to: number }>
+  // the page held at points along the glide (a fraction of its duration)
+  samples: Array<Frame & { at: number }>
+}
+
+// Run `act` in the page and catch the panel's glide: the Web Animation on its size, then the stage
+// and the panel held at points along it (the animation paused and scrubbed, so what is seen doesn't
+// depend on how many frames a loaded browser draws), then finished and settled.
+const glide = (page: Page, act: Act, panel: string, dim: 'width' | 'height') =>
+  page.evaluate(
+    async ({ toggle, panel, dim }): Promise<Glide> => {
+      const stage = document.querySelector('.gallerist-main') as HTMLElement
+      const el = document.querySelector(panel) as HTMLElement
+      const read = (): Frame => ({
+        stage: stage.getBoundingClientRect()[dim],
+        panel: el.getBoundingClientRect()[dim],
+        display: getComputedStyle(el).display,
+        inert: el.inert,
+      })
+      const before = read()
+      ;(document.querySelector(toggle) as HTMLElement).click()
+      // the rail's glide starts once the viewer marks it collapsed (an observer, so a microtask on)
+      const sized = () =>
+        el
+          .getAnimations()
+          .filter((a) => (a.effect as KeyframeEffect).getKeyframes().some((k) => dim in k))
+      let anims = sized()
+      for (let k = 0; !anims.length && k < 10; k++) {
+        await (k < 5 ? Promise.resolve() : new Promise((r) => requestAnimationFrame(r)))
+        anims = sized()
+      }
+      const info = anims.map((a) => {
+        const effect = a.effect as KeyframeEffect
+        const kf = effect.getKeyframes()
+        const timing = effect.getTiming()
+        return {
+          duration: Number(timing.duration),
+          easing: String(timing.easing),
+          from: Number.parseFloat(String(kf[0]?.[dim])),
+          to: Number.parseFloat(String(kf[kf.length - 1]?.[dim])),
+        }
+      })
+      const samples: Glide['samples'] = []
+      const anim = anims[0]
+      if (anim) {
+        anim.pause()
+        const d = Number(anim.effect?.getTiming().duration)
+        for (const at of [0, 0.25, 0.5, 0.75]) {
+          anim.currentTime = at * d
+          samples.push({ at, ...read() })
+        }
+        anim.finish()
+      }
+      // settled: the glide's end has run (the panel drops its mark), and a frame drawn after it
+      const t0 = performance.now()
+      while (el.hasAttribute('data-gallerist-glide') && performance.now() - t0 < 5000)
+        await new Promise((r) => requestAnimationFrame(r))
+      await new Promise((r) => requestAnimationFrame(r))
+      return { before, after: read(), anims: info, samples }
+    },
+    { toggle: ACTS[act], panel, dim },
+  )
+
+// The panel's size glided from where it was to where it ends, over the token's duration with the
+// designed easing, and the stage beside it followed: at each point along the way it sits strictly
+// between its first and last sizes, one way only, so nothing jumped.
+const glided = (g: Glide) => {
+  expect(g.anims, 'one animation on the panel size').toHaveLength(1)
+  const [a] = g.anims
+  expect(a?.duration).toBe(1000)
+  expect(a?.easing).toBe('cubic-bezier(0.4, 0, 0.2, 1)')
+  expect(Math.abs((a?.from ?? -9) - g.before.panel), 'starts at its size').toBeLessThan(1)
+  expect(Math.abs((a?.to ?? -9) - g.after.panel), 'ends at its new size').toBeLessThan(1)
+  const first = g.before.stage
+  const last = g.after.stage
   expect(Math.abs(last - first)).toBeGreaterThan(30)
-  expect(between.size).toBeGreaterThanOrEqual(3)
   const dir = Math.sign(last - first)
-  for (let k = 1; k < sizes.length; k++) {
-    const step = ((sizes[k] ?? 0) - (sizes[k - 1] ?? 0)) * dir
-    expect(step).toBeGreaterThanOrEqual(-1) // never back
-    expect(step).toBeLessThan(Math.abs(last - first) / 2)
+  expect(g.samples.map((s) => s.at)).toEqual([0, 0.25, 0.5, 0.75])
+  // held at 0: as it was, but for the 1px border a skin's rail keeps even at no size as it opens
+  expect(Math.abs((g.samples[0]?.stage ?? -9) - first), 'held at 0: as it was').toBeLessThan(1.5)
+  let prev = first
+  for (const s of g.samples.slice(1)) {
+    expect((s.stage - prev) * dir, `at ${s.at}: further on`).toBeGreaterThan(1)
+    expect((last - s.stage) * dir, `at ${s.at}: not there yet`).toBeGreaterThan(1)
+    prev = s.stage
   }
 }
 
@@ -74,22 +153,23 @@ test('the handle collapses the row rail with a glide, and brings it back the sam
 }) => {
   await open(page, REVIEWER)
   const region = page.locator('.gallerist-thumbs-region')
-  const shut = await frames(page, 'toggle', '.gallerist-thumbs-region', 'height')
+  const shut = await glide(page, 'toggle', '.gallerist-thumbs-region', 'height')
   glided(shut)
-  // on its way out the rail takes no focus; then it is gone (display: none)
-  expect(shut.some((f) => f.display !== 'none' && f.inert)).toBe(true)
+  // on its way out the rail is displayed but takes no focus; then it is gone (display: none)
+  expect(shut.samples.every((f) => f.display !== 'none' && f.inert)).toBe(true)
+  expect(shut.after.display).toBe('none')
   await expect(region).toBeHidden()
   await expect(region).not.toHaveAttribute('data-gallerist-glide')
   expect(await region.evaluate((el) => (el as HTMLElement).inert)).toBe(false)
   await expect(page.locator('.gallerist-rail-toggle')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.gallerist-thumb-item').first()).not.toBeInViewport()
 
-  const back = await frames(page, 'toggle', '.gallerist-thumbs-region', 'height')
+  const back = await glide(page, 'toggle', '.gallerist-thumbs-region', 'height')
   glided(back)
-  expect(back.every((f) => !f.inert)).toBe(true)
+  expect([...back.samples, back.after].every((f) => !f.inert)).toBe(true)
   await expect(region).toBeVisible()
   // back where it started
-  expect(Math.round(back[back.length - 1]?.stage ?? 0)).toBe(Math.round(shut[0]?.stage ?? 0))
+  expect(Math.abs(back.after.stage - shut.before.stage)).toBeLessThan(1)
 })
 
 test('reduced motion: the rail collapses and comes back at once', async ({ page }) => {
@@ -131,7 +211,7 @@ test('`t` with focus on a thumbnail: focus goes to the viewer, not the page', as
 
 test('a side rail glides sideways', async ({ page }) => {
   await open(page, '/layout.html?rail=left&skin=console')
-  const shut = await frames(page, 'toggle', '.gallerist-thumbs-region', 'width')
+  const shut = await glide(page, 'toggle', '.gallerist-thumbs-region', 'width')
   glided(shut)
   await expect(page.locator('.gallerist-thumbs-region')).toBeHidden()
 })
@@ -140,13 +220,15 @@ test("a stacked rail's item column glides shut and open beside the stage", async
   await open(page, '/layout.html?g=1')
   const column = page.locator('.gallerist-thumbs-aside .gallerist-thumb-items')
   await expect(column).toBeVisible()
-  const shut = await frames(page, 'items', '.gallerist-thumbs-aside', 'width')
+  const shut = await glide(page, 'items', '.gallerist-thumbs-aside', 'width')
   glided(shut)
+  // the stack stays (inert) while the column narrows, then goes
+  expect(shut.samples.every((f) => f.inert)).toBe(true)
   await expect(column).toHaveCount(0)
-  const back = await frames(page, 'items', '.gallerist-thumbs-aside', 'width')
+  const back = await glide(page, 'items', '.gallerist-thumbs-aside', 'width')
   glided(back)
   await expect(column).toBeVisible()
-  expect(Math.round(back[back.length - 1]?.stage ?? 0)).toBe(Math.round(shut[0]?.stage ?? 0))
+  expect(Math.abs(back.after.stage - shut.before.stage)).toBeLessThan(1)
 })
 
 test('Enter on the focused handle collapses the rail and Enter again brings it back', async ({
