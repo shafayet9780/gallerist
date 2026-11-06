@@ -18,6 +18,11 @@ jobs:
   e2e:
     name: e2e (${{ matrix.browser }} ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    # Microsoft's Playwright image has the browsers and their system libraries installed, so a shard
+    # doesn't spend its time on apt (a slow mirror once ate a 30-minute shard). Its tag must match the
+    # Playwright version in pnpm-lock.yaml; a step below checks that.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.0-noble
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -33,22 +38,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: Playwright version
-        id: pw
-        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-${{ matrix.browser }}
-      - name: Install the browser
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - name: Install the browser's system libraries
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps ${{ matrix.browser }}
+      - name: The image matches the locked Playwright
+        run: |
+          locked=$(pnpm exec playwright --version | awk '{print $2}')
+          test "$locked" = "1.61.0" || { echo "::error::pnpm-lock.yaml has Playwright $locked; update the container image tag in e2e.yml"; exit 1; }
       - name: Run shard ${{ matrix.shard }}/3
+        env:
+          HOME: /root # the image runs as root; the browsers expect its home
         run: pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/3
       - name: Keep traces of failed tests
         if: failure()
