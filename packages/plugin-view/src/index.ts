@@ -186,16 +186,20 @@ export function view(opts: ViewOptions = {}): Plugin {
       opts.onChange?.({ [s]: value } as unknown as ViewChange)
     }
 
-    // The button shows while the menu has a section: the schemes, or a rail while one is registered.
-    // Hidden, it's marked off too, so a bar without built-in controls doesn't show for it alone.
+    // The button shows while the menu has a section: the schemes, or a rail while one shows (one
+    // registered but never built, as under another renderer, has none). Hidden, it's marked off too,
+    // so a bar without built-in controls doesn't show for it alone. Read again once the renderer has
+    // mounted the regions (a rail builds in the same pass, maybe after this button), and then the
+    // renderer reads the bar again if it changed.
     const sync = () => {
-      const off = !(choices.scheme.length || (choices.rail.length && rail()))
+      const off = !(choices.scheme.length || (choices.rail.length && rail()?.display))
       if (!btn || btn.hidden === off) return false
       btn.hidden = off
       btn.toggleAttribute(OFF, off)
       close()
       return true
     }
+    const resync = () => sync() && viewer.refresh()
 
     const items = () => [...(menu?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])]
 
@@ -356,7 +360,11 @@ export function view(opts: ViewOptions = {}): Plugin {
       btn = b
       sync()
       applyRail()
-      queueMicrotask(applyScheme) // the renderer puts the button in the viewer once this returns
+      // the renderer puts the button in the viewer once this returns
+      queueMicrotask(() => {
+        applyScheme()
+        resync()
+      })
       return b
     }
 
@@ -367,10 +375,8 @@ export function view(opts: ViewOptions = {}): Plugin {
         unsub = viewer.subscribe((s) => {
           if (s.phase === 'closing' || s.phase === 'closed') close()
         })
-        // a rail added or removed: show or hide the button, and let the renderer read the bar again
-        offPlugins = getInternals(viewer).onPluginsChanged(() => {
-          if (sync()) viewer.refresh()
-        })
+        // a rail added or removed: show or hide the button once the renderer has mounted it
+        offPlugins = getInternals(viewer).onPluginsChanged(() => queueMicrotask(resync))
       },
       destroy() {
         close()

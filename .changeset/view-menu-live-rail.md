@@ -18,7 +18,7 @@ Switch the rail's layout and the colour scheme in an open viewer, from a new Vie
   true`, `['scheme']`, `['rail']`, or the viewer marked with `Symbol.for('gallerist.controlled')`)
   gets only the report, and the plugin never writes that setting. Unknown `initial` values (old
   storage) are ignored, and the user's choices are kept per viewer. With nothing to offer
-  (`scheme: false` and no rail) the tool is hidden. It follows the ARIA menu button pattern
+  (`scheme: false` and no rail mounted) the tool is hidden. It follows the ARIA menu button pattern
   (`aria-haspopup`, `aria-expanded`, `role="menu"` with a `menuitemradio` group per section; ↑/↓,
   Home/End, a letter, Enter/Space, Escape and Tab; focus back on the tool; a press outside closes
   it, inside a shadow root too) and keeps the keys it handles from the viewer. It is not in the
@@ -31,7 +31,8 @@ Switch the rail's layout and the colour scheme in an open viewer, from a new Vie
   display). Before the rail mounts it sets the display the rail mounts with. A rail now keeps its
   items toggle and its `aside` column for every display it can switch to, instead of leaving them
   out: on a flat rail the toolbar holds the toggle `hidden` and marked `data-gallerist-off`, and the
-  aside region holds the column `hidden`. A flat rail still leaves `e` to other plugins.
+  aside region holds the column `hidden`. A flat rail still leaves `e` to other plugins, and so
+  does a rail not built yet.
 - **The renderer follows a switched rail (renderer-dom).** `viewer.refresh()` now also reads the
   rail's `data-gallerist-linear` and the plugins' keymaps again, so a rail switched to or from `flat`
   turns linear traversal on or off at once, with the counter, the item navigator and the arrows'

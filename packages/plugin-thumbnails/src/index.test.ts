@@ -1051,6 +1051,14 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       expect((aside as HTMLElement).className).toBe('gallerist-thumbs-aside')
     })
 
+    it('claims `e` once built: before (or never, under another renderer) it is another plugin’s', () => {
+      const v = createViewer({ collection: timed() })
+      const inst = thumbnails()(v)
+      expect(inst.keymap).toBeUndefined()
+      inst.regions?.thumbnails?.({ viewer: v })
+      expect(Object.keys(inst.keymap ?? {})).toEqual(['e', 'E'])
+    })
+
     it('a preset that makes the rail flat leaves the claimed toggle and `e` key inert', () => {
       const { v, inst, ctx, rail, regions } = regionsWith({ groupDisplay: 'flat' })
       v.open()

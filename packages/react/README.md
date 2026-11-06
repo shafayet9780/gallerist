@@ -144,7 +144,9 @@ is passed, the menu only reports a choice for it through `onChange`, and never a
 over it (its `initial`, a past choice), whatever order React runs the effects in (StrictMode, Fast
 Refresh, `<Activity>`). **A prop you leave out leaves the setting to the menu**, which applies a
 choice at once. The adapter tells the menu by marking the viewer
-(`Symbol.for('gallerist.controlled')`, see the plugin's README), on every commit.
+(`Symbol.for('gallerist.controlled')`, see the plugin's README), on every commit. `<Gallerist>` owns
+that mark: each commit writes it from the props, over a mark set on the viewer by hand. To have the
+menu only report a setting you leave without a prop, use `view({ controlled })` (below).
 
 `onChange(change)` reports the one setting picked, `{ rail: 'flat' }` or `{ scheme: 'light' }`, so
 the remembered choice holds only what the user picked. A persisted choice:

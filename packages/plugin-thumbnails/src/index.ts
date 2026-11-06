@@ -1241,10 +1241,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         builtFor = null
       },
       regions,
-      // A flat rail has no item panel, so `e` stays another plugin's (the renderer reads the keymaps
-      // again when the plugin set changes and on viewer.refresh(), which a switch calls).
+      // A flat rail has no item panel, nor has a rail not built yet (or never: another renderer), so
+      // `e` stays another plugin's (the renderer reads the keymaps after mounting the regions, again
+      // when the plugin set changes and on viewer.refresh(), which a switch calls).
       get keymap() {
-        return isFlat ? undefined : keys
+        return isFlat || !root ? undefined : keys
       },
     }
     return instance

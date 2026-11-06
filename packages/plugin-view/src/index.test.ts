@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 
-import { type Collection, type Item, type Plugin, createViewer } from '@gallerist/core'
+import {
+  type Collection,
+  type Item,
+  type Plugin,
+  type PluginInstance,
+  createViewer,
+} from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { type MountOptions, applyAppearance, mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -364,22 +370,47 @@ describe('plugin-view — sections and choices', () => {
     expect(labels()).toEqual(['Stacked', 'Row'])
   })
 
-  it('with no section to show the button is hidden (marked off), and shows when a rail comes', () => {
+  it('with no section to show the button is hidden (marked off), and shows when a rail comes', async () => {
     const { v } = setup({ scheme: false }, { rail: false, mountOpts: { controls: false } })
     const bar = q('.gallerist-bar') as HTMLElement
     expect(btn().hidden).toBe(true)
     expect(btn().hasAttribute('data-gallerist-off')).toBe(true)
     expect(bar.hidden).toBe(true) // a bar without built-in controls doesn't show for it alone
     const dispose = v.use(thumbnails({ groupDisplay: 'flat' })) // its own toggle is off too
+    await Promise.resolve() // once the renderer has built the rail
     expect(btn().hidden).toBe(false)
     expect(btn().hasAttribute('data-gallerist-off')).toBe(false)
     expect(bar.hidden).toBe(false)
     btn().click()
     expect(labels()).toEqual(['Stacked', 'Row'])
     dispose()
+    await Promise.resolve()
     expect(menu()).toBeNull()
     expect(btn().hidden).toBe(true)
     expect(bar.hidden).toBe(true)
+  })
+
+  it('a rail registered after it shows the button once built, whatever the plugin order', async () => {
+    setup({ scheme: false }, { before: true, mountOpts: { controls: false } })
+    await Promise.resolve()
+    expect(btn().hidden).toBe(false)
+    expect((q('.gallerist-bar') as HTMLElement).hidden).toBe(false)
+    btn().click()
+    expect(labels()).toEqual(['Stacked', 'Row'])
+  })
+
+  it('a rail that never builds (another renderer’s) has no section: the button stays hidden', async () => {
+    // registered, but nothing mounts it: no display to show, nothing to switch
+    const unbuilt: Plugin = () => ({ name: 'thumbnails', setDisplay() {} }) as PluginInstance
+    const v = createViewer({
+      collection: collection(),
+      plugins: [unbuilt, view({ scheme: false })],
+    })
+    mount(v)
+    v.open()
+    await Promise.resolve()
+    expect(btn().hidden).toBe(true)
+    expect(btn().hasAttribute('data-gallerist-off')).toBe(true)
   })
 
   it('checks the scheme in effect: the skin’s default, the one set, or auto when offered', () => {

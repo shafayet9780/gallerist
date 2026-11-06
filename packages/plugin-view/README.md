@@ -35,7 +35,8 @@ two groups of choices:
 
 The menu shows what the viewer shows each time it opens (the rail's display, the scheme in effect),
 so it always agrees with the viewer, however the setting was last changed. With nothing to offer
-(`scheme: false` and no thumbnails rail) the tool is hidden; it shows when a rail is added.
+(`scheme: false` and no thumbnails rail mounted; one registered on a viewer no renderer has built
+counts as none) the tool is hidden; it shows when a rail is added.
 
 ## Options
 
@@ -84,7 +85,8 @@ Each setting has one owner:
   ```
 
   The React adapter sets this mark while its `scheme` or `groupDisplay` prop is passed (and clears
-  it when the prop is left out), so a prop and the menu never pull opposite ways.
+  it when the prop is left out), so a prop and the menu never pull opposite ways. It owns the mark:
+  under `<Gallerist>` one set by hand is written over on the next commit; use `controlled` there.
 
 Mixing is fine: `controlled: ['scheme']` lets the plugin switch the rail while the host owns the
 scheme.
@@ -109,7 +111,10 @@ mount(viewer, { preset: 'reviewer', skin: 'console', scheme: 'auto' })
 ```
 
 In React, see [the React adapter](../react/README.md#a-view-menu): the props restore the saved
-choices, and neither way remounts.
+choices, and neither way remounts. `view({ initial })` is read once per viewer, like every plugin
+option (`<Gallerist>` registers its `plugins` once): build the plugins once, e.g.
+`useState(() => [thumbnails(), view({ initial: saved, onChange })])`; an `initial` passed on a later
+render is ignored.
 
 ## Keyboard, pointer and screen readers
 
