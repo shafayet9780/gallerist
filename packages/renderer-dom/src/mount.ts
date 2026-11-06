@@ -1324,12 +1324,18 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     s.setProperty('--gallerist-box-w', `${box.w}px`)
     s.setProperty('--gallerist-box-h', `${box.h}px`)
   }
+  // The stage size the committed zoom was last clamped at, and what the last re-clamp kept: the
+  // view it aimed for (before the clamp), the size it aimed at, and the zoom it left.
+  type Size = { w: number; h: number }
+  let zoomSize: Size | undefined
+  let kept: [ZoomState, Size | undefined, ZoomState] | undefined
   const constrainZoom = (z: ZoomState): ZoomState => {
     const scaled = { scale: clampScale(z.scale, 1, MAX_ZOOM), x: z.x, y: z.y }
     const size = stageSize()
     // Not laid out (closed overlay, hidden container): the scale range needs no geometry, the pan
     // bounds do; the ResizeObserver re-clamps the pan once the stage has a size.
     if (!(size.w > 0 && size.h > 0)) return scaled
+    zoomSize = size
     return clampPanToBox(scaled, size, mediaBox(size))
   }
   const offZoomBounds = internals.setZoomBounds({
@@ -1340,16 +1346,34 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     constrain: constrainZoom,
   })
 
-  // Re-check the committed zoom against the current geometry; repaints either way.
+  // Re-check the committed zoom against the current geometry; repaints either way. The pan is in
+  // stage pixels, so when the stage has resized since, the media point under the stage centre is
+  // first put back under it (as a share of the media box), then the pan is clamped. While the zoom
+  // is still the one the last re-clamp left, that starts from the view it aimed for rather than the
+  // clamped one: a stage that shrinks and grows back (room for a focused docked arrow on touch, a
+  // rotation there and back) returns to the same view instead of staying clamped to the smaller one.
   const reclampZoom = () => {
-    const z = viewer.getState().zoom
-    const clamped = constrainZoom(z)
-    if (clamped.scale !== z.scale || clamped.x !== z.x || clamped.y !== z.y) {
-      internals.setZoom(clamped) // commit → sync → repaint
-    } else {
+    const cur = viewer.getState().zoom
+    const size = stageSize()
+    let [z, was] = kept?.[2] === cur ? kept : [cur, zoomSize]
+    if (was && size.w > 0 && size.h > 0 && (was.w !== size.w || was.h !== size.h)) {
+      // the media box's edge keeps its offset from the stage centre, scaled with the box
+      const a = mediaBox(was)
+      const b = mediaBox(size)
+      const s = z.scale
+      z = {
+        scale: s,
+        x: ((z.x + s * a.x - was.w / 2) * b.w) / a.w + size.w / 2 - s * b.x,
+        y: ((z.y + s * a.y - was.h / 2) * b.h) / a.h + size.h / 2 - s * b.y,
+      }
+    }
+    internals.setZoom(z) // clamped on commit → sync → repaint; no commit if it lands where it was
+    const out = viewer.getState().zoom
+    if (out === cur) {
       renderWindow() // repaint overlays at the new rect
       updateNavigator()
     }
+    kept = [z, zoomSize, out]
   }
 
   // ── re-measure on resize (spec §10.5) ──────────────────────────────────────────

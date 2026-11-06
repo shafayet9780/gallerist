@@ -385,7 +385,7 @@ Default transition = transform-based slide (`translate3d`) on a track, or per-sl
 
 ### 10.5 Resize
 
-A single `ResizeObserver` on the stage re-measures and re-picks `srcset` candidates and re-clamps zoom bounds. Debounced to a frame.
+A single `ResizeObserver` on the stage re-measures and re-picks `srcset` candidates and re-clamps zoom bounds. Debounced to a frame. Zoomed in, the media point under the stage centre is put back under it (as a share of the painted media box) before the clamp, and while the zoom is the one the last re-clamp left, that starts from the view it aimed for: a stage that shrinks and grows back (a rotation and back, room for a focused docked arrow on touch) returns to the same view rather than the one the smaller stage clamped it to.
 
 ---
 

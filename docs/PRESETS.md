@@ -122,14 +122,14 @@ The ←/→ group arrows stay on the side edges; the option places the **item na
   The navigator leaves the stage: the `n / N` count over ↑ ↓, as a header on the `aside` item
   column while that shows (a `stacked` rail's vertical item stack, over 600px wide, rail expanded),
   otherwise at the end of the caption row, beside a text caption or a designed one
-  (`plugin-captions`, `<Gallerist.Caption>`), which make room for it. It shows the count rather than pills or dots. While any group has several items it
-  keeps its room on a one-item group, so neither the stage nor the item column moves (not in
-  `linear` mode, which has no navigator). A one-group collection has no group arrows and no
-  gutters (in `linear` mode the arrows walk the items, so they stay). Keyboard order follows the
-  layout: the caption band, then the navigator, then the item column it heads. One exception, by
-  design: the zoom minimap (the `reviewer`'s zoom navigator) still sits in the stage's corner over
-  the media; it shows only while zoomed in and is the zoom tool itself. An open pin card
-  (`plugin-pins`) keeps clear of it. With other presets:
+  (`plugin-captions`, `<Gallerist.Caption>`), which make room for it. It shows the count rather
+  than pills or dots. While any group has several items it keeps its room on a one-item group, so
+  neither the stage nor the item column moves (not in `linear` mode, which has no navigator). A
+  one-group collection has no group arrows and no gutters (in `linear` mode the arrows walk the
+  items, so they stay). Keyboard order follows the layout: the caption band, then the navigator,
+  then the item column it heads. One exception, by design: the zoom minimap (the `reviewer`'s zoom
+  navigator) still sits in the stage's corner over the media; it shows only while zoomed in and is
+  the zoom tool itself. An open pin card (`plugin-pins`) keeps clear of it. With other presets:
   `editorial` without a placard ends its caption column with the navigator, under the caption;
   `immersive`, whose stage runs under every band, puts it in the stage's bottom inline-end corner
   above the caption band, as `corner-br` does, so there it sits over the media.
@@ -142,11 +142,21 @@ On a touch screen the on-image arrows are visually hidden (swipes navigate; scre
 reach them) and the navigator shows only the `n / N` position, at the bottom centre of the stage
 (`docked`: where it docks, with its ↑ ↓). A group arrow focused from a keyboard on a touch screen
 (a tablet's keyboard, switch access) comes back while it has focus: over the stage edge in the other
-layouts, beside the media in `docked`. There the stage makes room for it only while it has focus,
-as much on each side, so letterboxed media holds still: on a landscape screen the gutters a mouse
-gets; on a portrait one a band above and below the stage, with the arrows in the bottom band (on a
-vertical group axis ↑ takes the top one; `immersive`, whose navigator holds that corner, keeps the
-gutters). A focused docked arrow also stays above the zoom minimap.
+layouts, beside the media in `docked`. There the stage makes room for it only while a group arrow
+has keyboard focus (`:focus-visible`; an arrow a script focuses after a tap stays hidden and takes
+no room), as much on each side, so letterboxed media holds still: on a landscape screen a gutter at
+each side (on a vertical group axis too, where a mouse gets only the inline-end one); on a portrait
+one a band above and below the stage, with the arrows in the bottom band (on a vertical group axis
+↑ takes the top one). `immersive`, whose navigator holds that corner, keeps the gutters upright
+too; there, held sideways on a short stage, its navigator can cover a focused → (as it can with a
+mouse). Zoomed in, the part of the image at the stage's centre stays there while the stage makes
+room, and the view comes back as it was when focus moves on (as after a rotation there and back).
+A focused docked arrow also stays above the zoom minimap.
+
+Landscape or portrait here is the screen's (a media query), not the viewer's: an inline viewer that
+is wide but short on a portrait screen still gets the bands, which take from its height. Following
+the viewer's own shape needs container queries, which iOS Safari has only from 16, above the
+library's iOS 15 floor.
 
 ## Layout areas, rail collapse & idle auto-hide
 
@@ -167,9 +177,11 @@ when they shrink). Keep them a steady height if the image shouldn't move between
   item stack. Entering fullscreen collapses it by default and exit restores the prior state.
 - **Auto-hide chrome on idle** (`autoHide`, default `true`) flags `data-gallerist-idle` after
   inactivity; the chrome fades but keeps its place, so nothing jumps. Plugin tools in the bar fade
-  with it on purpose; they come back on the next pointer move or key press. It is **inert under
-  `prefers-reduced-motion`**. The `immersive` preset additionally fades the rail + toolbar, and
-  there the floating bar and caption let clicks through to the image except on their buttons.
+  with it on purpose; they come back on the next pointer move or key press. A control with keyboard
+  focus doesn't fade, nor the band or rail it is in, so a keyboard user who pauses still sees where
+  focus is. It is **inert under `prefers-reduced-motion`**. The `immersive` preset additionally
+  fades the rail + toolbar, and there the floating bar and caption let clicks through to the image
+  except on their buttons.
 - **Zoom reset** appears only while zoomed in.
 - **Framed media** (`frame: true`, on in `editorial`): the work hangs inside the stage with room
   around it (the skin's `--gallerist-frame-inset`), and the media element is sized to the image so

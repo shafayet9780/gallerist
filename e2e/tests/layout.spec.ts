@@ -648,11 +648,11 @@ test.describe('reviewer: nothing over the media', () => {
 
   // A group arrow focused from a keyboard (a tablet with a keyboard, switch access). On touch the
   // arrows are visually hidden until then and the stage takes the full width, so a focused arrow
-  // has to find room beside the media rather than come back over it. Each arrow is reached from the
-  // keyboard and activated, on a stacked rail (it steps groups), a flat one (it steps screens) and a
-  // side rail (↑ ↓ at the end), and zoomed in (the minimap shares the stage's corner), in both
-  // directions, on a phone held either way, with touch and with a mouse, in every skin (each sizes
-  // its arrows).
+  // has to find room beside the media rather than come back over it, and only while it has
+  // keyboard focus. Each arrow is reached from the keyboard and activated, on a stacked rail (it
+  // steps groups), a flat one (it steps screens) and a side rail (↑ ↓ at the end), and zoomed in
+  // (the minimap shares the stage's corner), in both directions, on a phone held either way, with
+  // touch and with a mouse, in every skin (each sizes its arrows).
   test.describe('a docked arrow focused from a keyboard', () => {
     const CONTEXTS = {
       'touch portrait': VIEWPORTS.phone,
@@ -671,6 +671,10 @@ test.describe('reviewer: nothing over the media', () => {
       // on touch (outside the reviewer's contract; immersive puts chrome over its media by design).
       immersive: 'preset=immersive&arrows=docked&railopen=1',
     }
+    type Rect = { x: number; y: number; w: number; h: number }
+    const fmt = (r: Rect | null) => (r ? [r.x, r.y, r.w, r.h].map(Math.round).join(',') : 'none')
+    const same = (a: Rect | null, b: Rect | null) =>
+      !!a && !!b && (['x', 'y', 'w', 'h'] as const).every((k) => Math.abs(a[k] - b[k]) <= 0.5)
     const current = (page: Page) =>
       page
         .locator('.gallerist-content[data-gallerist-current] .gallerist-media-image')
@@ -691,6 +695,16 @@ test.describe('reviewer: nothing over the media', () => {
         ),
       )
     }
+    // main, the stage and the painted media
+    const boxes = async (page: Page) => {
+      const [main, stage] = await page.evaluate(() =>
+        ['.gallerist-main', '.gallerist-stage'].map((q) => {
+          const r = (document.querySelector(q) as HTMLElement).getBoundingClientRect()
+          return { x: r.x, y: r.y, w: r.width, h: r.height }
+        }),
+      )
+      return { main: main as Rect, stage: stage as Rect, media: await paintedMedia(page) }
+    }
     // focus as a keyboard user does: Tab on from where focus is. Headless WebKit doesn't deliver
     // Tab traversal (see a11y.spec), so there the arrow is focused after a key press, which
     // :focus-visible treats as keyboard focus all the same.
@@ -707,12 +721,28 @@ test.describe('reviewer: nothing over the media', () => {
       await expect(page.locator(sel)).toBeFocused()
       expect(await page.locator(sel).evaluate((el) => el.matches(':focus-visible'))).toBe(true)
     }
-    // the focused arrow: its box, how much of it its ancestors clip, and what is on top of it at its
-    // centre and at the middle of each edge (its own icon counts as itself)
+    // and off the group arrows: Shift+Tab back to the bar (WebKit: to the viewer itself). Back,
+    // not on: on is the rail, whose item stack (a stacked rail's) still lingers over main a moment
+    // after focus leaves it, and a flat rail's long run of cards.
+    const keyboardLeave = async (page: Page, browserName: string) => {
+      const onArrow = () =>
+        page.evaluate(() => !!document.activeElement?.matches('.gallerist-prev, .gallerist-next'))
+      if (browserName === 'webkit') await page.locator('.gallerist').focus()
+      else for (let k = 0; k < 3 && (await onArrow()); k++) await page.keyboard.press('Shift+Tab')
+      expect(await onArrow()).toBe(false)
+    }
+    // the focused arrow: its box and its focus ring's (the outline, from the computed style), how
+    // much of it its ancestors clip, and what is on top of it at its centre and at the middle of
+    // each edge (its own icon counts as itself)
     const probe = (page: Page, sel: string) =>
       page.evaluate((s) => {
         const el = document.querySelector<HTMLElement>(s) as HTMLElement
         const r = el.getBoundingClientRect()
+        const cs = getComputedStyle(el)
+        const out =
+          cs.outlineStyle === 'none'
+            ? 0
+            : Number.parseFloat(cs.outlineWidth) + Number.parseFloat(cs.outlineOffset)
         const clip = (
           window as unknown as { __galleristClip: (e: Element) => DOMRect | null }
         ).__galleristClip(el)
@@ -730,13 +760,15 @@ test.describe('reviewer: nothing over the media', () => {
         const under = points.flatMap(([x, y]) => {
           const top = document.elementFromPoint(x, y)
           if (top && (top === el || el.contains(top))) return []
-          return [top ? top.getAttribute('class') || top.tagName : 'nothing']
+          const what = top ? top.getAttribute('class') || top.tagName : 'nothing'
+          return [`${what} at ${Math.round(x)},${Math.round(y)}`]
         })
         return {
           x: r.x,
           y: r.y,
           w: r.width,
           h: r.height,
+          ring: { x: r.x - out, y: r.y - out, w: r.width + 2 * out, h: r.height + 2 * out },
           clipped:
             !clip || Math.abs(clip.width - r.width) > 0.5 || Math.abs(clip.height - r.height) > 0.5,
           shown: el.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
@@ -748,6 +780,15 @@ test.describe('reviewer: nothing over the media', () => {
           vh: innerHeight,
         }
       }, sel)
+    const asBox = (label: string, r: Rect, inStage: boolean, button = false): Box => ({
+      sel: label,
+      label,
+      ...r,
+      fw: 0,
+      fh: 0,
+      button,
+      inStage,
+    })
 
     for (const [ctxName, ctx] of Object.entries(CONTEXTS)) {
       test.describe(ctxName, () => {
@@ -755,10 +796,10 @@ test.describe('reviewer: nothing over the media', () => {
         const touch = 'hasTouch' in ctx
         for (const [lookName, look] of Object.entries(LOOKS))
           for (const dir of ['ltr', 'rtl'])
-            if (lookName !== 'immersive' || ctxName.endsWith('portrait'))
-              test(`${lookName}, ${dir}`, async ({ page, browserName }) => {
-                const problems: string[] = []
-                for (const skin of SKINS) {
+            for (const skin of SKINS)
+              if (lookName !== 'immersive' || ctxName.endsWith('portrait'))
+                test(`${lookName}, ${dir}, ${skin}`, async ({ page, browserName }) => {
+                  const problems: string[] = []
                   await page.goto(
                     `/layout.html?${look}&skin=${skin}&g=1&captions=1${dir === 'rtl' ? '&dir=rtl' : ''}`,
                   )
@@ -767,6 +808,8 @@ test.describe('reviewer: nothing over the media', () => {
                   await expect(root).toHaveAttribute('data-gallerist-arrows', 'docked')
                   if (lookName === 'flat')
                     await expect(root).toHaveAttribute('data-gallerist-linear', 'true')
+                  if (lookName === 'side')
+                    await expect(root).toHaveAttribute('data-gallerist-axis', 'vertical')
                   expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(
                     touch,
                   )
@@ -777,7 +820,24 @@ test.describe('reviewer: nothing over the media', () => {
                     ['.gallerist-prev', 'g0i0'],
                     ['.gallerist-next', 'g1i0'],
                   ] as const) {
+                    // zoomed: in again before each arrow (a group step resets the zoom)
+                    if (lookName === 'zoomed') {
+                      await page.evaluate(() =>
+                        (
+                          window as unknown as { viewer: { zoomTo(s: number): void } }
+                        ).viewer.zoomTo(2),
+                      )
+                      await expect(page.locator('.gallerist-navigator')).toBeVisible()
+                      await settle(page)
+                    }
+                    // before focus: on touch the stage is all of main (no gutters, no bands)
+                    const before = await boxes(page)
+                    if (touch && !same(before.stage, before.main))
+                      problems.push(
+                        `${sel} before focus: the stage is ${fmt(before.stage)}, not main ${fmt(before.main)}`,
+                      )
                     await keyboardFocus(page, sel, browserName)
+                    let held: Rect | null = null
                     for (const step of ['focused', 'activated']) {
                       if (step === 'activated') {
                         await page.keyboard.press('Enter')
@@ -785,13 +845,14 @@ test.describe('reviewer: nothing over the media', () => {
                         await expect(page.locator(sel)).toBeFocused()
                       }
                       await settle(page)
-                      const at = `${skin} ${sel} ${step}`
+                      const at = `${sel} ${step}`
                       const a = await probe(page, sel)
                       const painted = await paintedMedia(page)
                       if (!painted) {
                         problems.push(`${at}: no painted media`)
                         continue
                       }
+                      held = painted
                       // what shows of it: a zoomed image runs past the stage, which clips it
                       const x0 = Math.max(painted.x, a.stage.x)
                       const y0 = Math.max(painted.y, a.stage.y)
@@ -803,13 +864,13 @@ test.describe('reviewer: nothing over the media', () => {
                       }
                       if (!a.shown || a.clipPath !== 'none') problems.push(`${at}: not shown`)
                       if (a.clipped) problems.push(`${at}: clipped`)
-                      // the focus ring (2px, 2px out) stays inside main, which no other chrome covers
-                      const ring = 4
+                      // its focus ring stays inside main, which no other chrome covers, and off the
+                      // stage and the media
                       if (
-                        a.x - ring < a.main.x - 0.5 ||
-                        a.y - ring < a.main.y - 0.5 ||
-                        a.x + a.w + ring > a.main.r + 0.5 ||
-                        a.y + a.h + ring > a.main.b + 0.5
+                        a.ring.x < a.main.x - 0.5 ||
+                        a.ring.y < a.main.y - 0.5 ||
+                        a.ring.x + a.ring.w > a.main.r + 0.5 ||
+                        a.ring.y + a.ring.h > a.main.b + 0.5
                       )
                         problems.push(`${at}: its focus ring leaves the stage area`)
                       if (a.x < 0 || a.y < 0 || a.x + a.w > a.vw || a.y + a.h > a.vh)
@@ -820,30 +881,140 @@ test.describe('reviewer: nothing over the media', () => {
                           `${at}: target ${Math.round(a.w)}×${Math.round(a.h)} < ${min}px`,
                         )
                       if (a.under.length) problems.push(`${at}: under ${a.under.join(', ')}`)
-                      const arrow = {
-                        sel,
-                        label: sel,
-                        ...a,
-                        fw: 0,
-                        fh: 0,
-                        button: true,
-                        inStage: false,
-                      }
-                      const m = { sel: 'media', label: 'media', ...media, fw: 0, fh: 0 }
-                      if (overlap(arrow, { ...m, button: false, inStage: true }))
+                      const arrow = asBox(sel, a, false, true)
+                      const ring = asBox(`${sel} ring`, a.ring, false, true)
+                      const m = asBox('media', media, true)
+                      if (overlap(arrow, m))
                         problems.push(
-                          `${at}: over the media (arrow ${[a.x, a.y, a.w, a.h].map(Math.round)}, media ${[media.x, media.y, media.w, media.h].map(Math.round)})`,
+                          `${at}: over the media (arrow ${fmt(a)}, media ${fmt(media)})`,
+                        )
+                      if (overlap(ring, m))
+                        problems.push(
+                          `${at}: its focus ring is over the media (${fmt(a.ring)}, media ${fmt(media)})`,
                         )
                       // docked, it sits beside the stage, whatever the media's shape (a letterbox
-                      // under it today could hold a wider image tomorrow)
-                      const s = { sel: 'stage', label: 'stage', ...a.stage, fw: 0, fh: 0 }
-                      if (overlap(arrow, { ...s, button: false, inStage: true }))
-                        problems.push(`${at}: on the stage`)
+                      // under it today could hold a wider image tomorrow), ring and all
+                      const s = asBox('stage', a.stage, true)
+                      if (overlap(arrow, s)) problems.push(`${at}: on the stage`)
+                      else if (overlap(ring, s))
+                        problems.push(
+                          `${at}: its focus ring is on the stage (${fmt(a.ring)}, stage ${fmt(a.stage)})`,
+                        )
+                      // the room it took was letterbox: the media holds still (immersive keeps
+                      // gutters upright, so there a full-width image narrows)
+                      if (
+                        step === 'focused' &&
+                        !(touch && lookName === 'immersive') &&
+                        !same(painted, before.media)
+                      )
+                        problems.push(
+                          `${at}: the media moved, ${fmt(before.media)} -> ${fmt(painted)}`,
+                        )
                     }
+                    // focus moves on: the room goes with it, and the media still holds still
+                    await keyboardLeave(page, browserName)
+                    await settle(page)
+                    const after = await boxes(page)
+                    const at = `${sel} after focus moved on`
+                    if (touch && !same(after.stage, after.main))
+                      problems.push(
+                        `${at}: the stage is ${fmt(after.stage)}, not main ${fmt(after.main)}`,
+                      )
+                    if (!same(after.stage, before.stage))
+                      problems.push(`${at}: the stage ${fmt(before.stage)} -> ${fmt(after.stage)}`)
+                    if (!(touch && lookName === 'immersive') && !same(after.media, held))
+                      problems.push(`${at}: the media moved, ${fmt(held)} -> ${fmt(after.media)}`)
                   }
-                }
-                expect(problems, problems.join('\n')).toEqual([])
-              })
+                  // on touch an arrow focused by a script after a tap has no keyboard focus: it stays
+                  // hidden, and the stage keeps all of main
+                  if (touch) {
+                    await page.evaluate(() =>
+                      (document.activeElement as HTMLElement | null)?.blur(),
+                    )
+                    await page.locator('.gallerist-counter').tap()
+                    const next = page.locator('.gallerist-next')
+                    await next.evaluate((el) => (el as HTMLElement).focus())
+                    await expect(next).toBeFocused()
+                    expect(await next.evaluate((el) => el.matches(':focus-visible'))).toBe(false)
+                    await settle(page)
+                    const b = await boxes(page)
+                    if (!same(b.stage, b.main))
+                      problems.push(
+                        `script focus after a tap: the stage is ${fmt(b.stage)}, not main ${fmt(b.main)}`,
+                      )
+                  }
+                  expect(problems, problems.join('\n')).toEqual([])
+                })
+      })
+    }
+
+    // Zoomed in and panned to an edge, the room a focused arrow takes, and gives back when focus
+    // moves on, must leave the view as it was: the zoom's pan is in stage pixels, and the stage
+    // shrinks while the arrow has focus. A panorama on a tablet held sideways (the gutters take
+    // from its width, so it shrinks with the stage) and a phone screenshot on a phone held upright
+    // (the bands take from its height), each at the edge the stage shrinks toward.
+    const EDGES = {
+      'touch tablet landscape': {
+        ctx: { viewport: { width: 1024, height: 768 }, isMobile: true, hasTouch: true },
+        look: 'preset=reviewer&wide=1',
+        edge: { x: 1, y: 0.5 },
+      },
+      'touch portrait': {
+        ctx: VIEWPORTS.phone,
+        look: 'preset=reviewer&tall=1',
+        edge: { x: 0.5, y: 1 },
+      },
+    }
+    for (const [ctxName, { ctx, look, edge }] of Object.entries(EDGES)) {
+      test.describe(ctxName, () => {
+        test.use(ctx)
+        for (const skin of SKINS)
+          test(`zoomed to an edge, focus in and out leaves the view as it was, ${skin}`, async ({
+            page,
+            browserName,
+          }) => {
+            await page.goto(`/layout.html?${look}&skin=${skin}&g=1&captions=1`)
+            await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
+            await settle(page)
+            await page.evaluate((f) => {
+              const r = (
+                document.querySelector('.gallerist-stage') as HTMLElement
+              ).getBoundingClientRect()
+              ;(
+                window as unknown as { viewer: { zoomTo(s: number, p: object): void } }
+              ).viewer.zoomTo(2, { x: r.width * f.x, y: r.height * f.y })
+            }, edge)
+            await expect(page.locator('.gallerist-navigator')).toBeVisible()
+            await settle(page)
+            const view = async () => ({
+              zoom: await page.evaluate(
+                () =>
+                  (
+                    window as unknown as {
+                      viewer: { getState(): { zoom: { scale: number; x: number; y: number } } }
+                    }
+                  ).viewer.getState().zoom,
+              ),
+              ...(await boxes(page)),
+            })
+            const v0 = await view()
+            const media = v0.media as Rect
+            // at that edge: the media's edge on the stage's
+            if (edge.x === 1) expect(media.x + media.w).toBeCloseTo(v0.stage.x + v0.stage.w, 0)
+            if (edge.y === 1) expect(media.y + media.h).toBeCloseTo(v0.stage.y + v0.stage.h, 0)
+            await keyboardFocus(page, '.gallerist-next', browserName)
+            await settle(page)
+            const v1 = await view()
+            expect(same(v1.stage, v0.stage), 'the focused arrow took room').toBe(false)
+            await keyboardLeave(page, browserName)
+            await settle(page)
+            const v2 = await view()
+            expect(v2.zoom.scale).toBe(v0.zoom.scale)
+            expect(v2.zoom.x).toBeCloseTo(v0.zoom.x, 1)
+            expect(v2.zoom.y).toBeCloseTo(v0.zoom.y, 1)
+            expect(fmt(v2.stage)).toBe(fmt(v0.stage))
+            expect(same(v2.media, v0.media), `${fmt(v0.media)} -> ${fmt(v2.media)}`).toBe(true)
+          })
       })
     }
 
@@ -864,6 +1035,48 @@ test.describe('reviewer: nothing over the media', () => {
         }
       })
     })
+
+    // Idle auto-hide fades the chrome, but not a control with keyboard focus, nor the band holding
+    // it (WCAG 2.4.7). The fixture mounts with it off, for steady measurements; on here.
+    for (const [ctxName, ctx] of Object.entries({
+      desktop: VIEWPORTS.desktop,
+      'touch portrait': VIEWPORTS.phone,
+    })) {
+      test.describe(ctxName, () => {
+        test.use(ctx)
+        test('idle: a control with keyboard focus does not fade', async ({ page, browserName }) => {
+          await page.goto('/layout.html?preset=reviewer&autohide=1&g=1&captions=1')
+          const root = page.locator('.gallerist')
+          await expect(root).toHaveAttribute('data-gallerist-phase', 'open')
+          await settle(page)
+          const opacity = (sel: string) =>
+            page.locator(sel).evaluate((el) => getComputedStyle(el).opacity)
+          // a tool in the bar (the bar stays), then a docked group arrow
+          for (const [sel, band] of [
+            ['.gallerist-close', '.gallerist-bar'],
+            ['.gallerist-next', '.gallerist-next'],
+          ] as const) {
+            await keyboardFocus(page, sel, browserName)
+            await expect(root).not.toHaveAttribute('data-gallerist-idle')
+            await expect(root).toHaveAttribute('data-gallerist-idle', '', { timeout: 10_000 })
+            await settle(page)
+            expect(await opacity(band), `${band} with ${sel} focused`).toBe('1')
+            expect(
+              await page
+                .locator(sel)
+                .evaluate((el) => el.checkVisibility({ opacityProperty: true })),
+              `${sel} shown`,
+            ).toBe(true)
+            await expect(page.locator(sel)).toBeFocused()
+            // the rest of the chrome has faded
+            expect(await opacity('.gallerist-caption'), 'the caption').toBe('0')
+            expect(await opacity('.gallerist-prev'), 'the other arrow').toBe('0')
+            if (band !== '.gallerist-bar')
+              expect(await opacity('.gallerist-bar'), 'the bar').toBe('0')
+          }
+        })
+      })
+    }
   })
 })
 
