@@ -622,7 +622,7 @@ gallerist/
 └─ .changeset/
 ```
 
-- **CI:** typecheck → unit (vitest) → size-limit → docs build. e2e (Playwright, including axe and the perf gate) runs locally before merging, or on demand through the manual E2E workflow. Release via Changesets, run by hand.
+- **CI:** typecheck → unit (vitest) → size-limit → docs build. e2e (Playwright, including axe and the perf gate) runs on every pull request in its own workflow, split into six parallel jobs (Chromium and WebKit, three shards each). Release via Changesets, run by hand.
 
 ---
 
