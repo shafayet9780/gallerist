@@ -332,7 +332,63 @@ describe('markers', () => {
   })
 })
 
+describe('what a decoration says', () => {
+  it('a fragment, or a number, joins the name with its text (read from what is drawn)', () => {
+    open({
+      groupDisplay: 'flat',
+      renderGroupMeta: (g) => {
+        if (g.id === 'g1') return 7 as unknown as string // a host's plain JS number
+        const frag = document.createDocumentFragment()
+        const b = document.createElement('b')
+        b.textContent = '3'
+        frag.append('✉ ', b)
+        return frag
+      },
+    })
+    expect($('.gallerist-thumb-group[data-group="g0"]').getAttribute('aria-label')).toBe(
+      'Group 1, ✉ 3',
+    )
+    expect($('.gallerist-thumb-group[data-group="g1"]').getAttribute('aria-label')).toBe(
+      'Group 2, 7',
+    )
+  })
+
+  it('a marker id used twice is drawn once', () => {
+    open({
+      groupDisplay: 'flat',
+      markers: () => [
+        { id: 'm', after: 'g0', label: 'One' },
+        { id: 'm', after: 'g1', label: 'Two' },
+      ],
+    })
+    expect($$('.gallerist-rail-marker').map((m) => m.getAttribute('aria-label'))).toEqual(['One'])
+  })
+})
+
 describe('refreshRail', () => {
+  it('a tip that is open shows again on its marker, drawn anew with the new data', () => {
+    let by = 'Sam'
+    const tip = (m: RailMarker) => {
+      const el = document.createElement('div')
+      el.textContent = `${m.label}. Added by ${by}.`
+      return el
+    }
+    const v = open({
+      groupDisplay: 'flat',
+      markers: () => [{ id: 'm1', after: 'g0', label: 'Manual time', tip }],
+    })
+    $('[data-marker="m1"]').dispatchEvent(
+      new window.PointerEvent('pointerenter', { pointerType: 'mouse', bubbles: true }),
+    )
+    expect($('.gallerist-rail-tip')?.textContent).toContain('Sam')
+    by = 'Ana'
+    refreshRail(v)
+    expect($$('.gallerist-rail-tip')).toHaveLength(1)
+    expect($('.gallerist-rail-tip')?.textContent).toContain('Ana')
+    document.body.dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true }))
+    expect($('.gallerist-rail-tip')).toBeNull()
+  })
+
   it('draws the decorations and markers again in place; the thumbs stay', () => {
     const notes: Record<string, number> = {}
     const marks: RailMarker[] = []

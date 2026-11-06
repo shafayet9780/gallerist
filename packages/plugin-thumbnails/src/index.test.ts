@@ -2341,7 +2341,7 @@ describe('plugin-thumbnails — live display switch (setDisplay)', () => {
 })
 
 describe('plugin-thumbnails — long labels', () => {
-  it('a flat group label carries its whole text in a title, a stacked one while it is cut', () => {
+  it('a flat or stacked group label carries its whole text in a title while it is cut', () => {
     const label = '10:49 – 10:50 am'
     const flat = createViewer({
       collection: collection(),
@@ -2351,6 +2351,11 @@ describe('plugin-thumbnails — long labels', () => {
     flat.open()
     const cap = document.querySelector('.gallerist-thumb-group-cap') as HTMLElement
     expect(cap.textContent).toBe(label)
+    cap.dispatchEvent(new Event('pointerenter'))
+    expect(cap.hasAttribute('title')).toBe(false) // shown whole
+    Object.defineProperty(cap, 'scrollWidth', { value: 120, configurable: true })
+    Object.defineProperty(cap, 'clientWidth', { value: 80, configurable: true })
+    cap.dispatchEvent(new Event('pointerenter'))
     expect(cap.title).toBe(label)
     flat.destroy()
     document.body.innerHTML = ''

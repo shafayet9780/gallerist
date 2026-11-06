@@ -294,7 +294,7 @@ for (const [name, viewport] of [
     for (const l of seen) {
       expect(l.text).toMatch(/^\d\d:\d\d – \d\d:\d\d am$/)
       expect(l, l.text).toMatchObject({ cut: false, inGroup: true, clear: true })
-      expect(l.title).toBe(l.text)
+      expect(l.title).toBe('') // whole: no title to repeat it
     }
   })
 }
@@ -322,10 +322,11 @@ test('a label longer than the cap ends in an ellipsis, whole in its title', asyn
   await open(page, 'skin=console&time=long&g=0')
   const seen = await labels(page)
   expect(seen.length).toBeGreaterThan(1)
-  for (const l of seen) {
-    expect(l, l.text).toMatchObject({ cut: true, inGroup: true, clear: true })
-    expect(l.title).toContain('Weekly review of the dashboard')
-  }
+  for (const l of seen) expect(l, l.text).toMatchObject({ cut: true, inGroup: true, clear: true })
+  // its title is set as the pointer comes over it, while it is cut
+  const cap = page.locator('.gallerist-thumb-group-cap:visible').first()
+  await cap.hover()
+  await expect(cap).toHaveAttribute('title', /Weekly review of the dashboard/)
 })
 
 test('down a side rail, a long label stays within the rail', async ({ page }) => {
@@ -336,4 +337,71 @@ test('down a side rail, a long label stays within the rail', async ({ page }) =>
   })
   expect(fits).toBe(true)
   for (const l of await labels(page)) expect(l.inGroup).toBe(true)
+})
+
+// A press that ends off the strip before it was a drag (no pointer capture yet, so its pointerup
+// lands elsewhere): the next hover must not drag the rail, and a click must still select.
+test.describe('a press released off the row rail', () => {
+  test.use({ viewport: { width: 1280, height: 720 } })
+  const REVIEWER = 'skin=console&custom=short'
+  const active = (page: Page) =>
+    page.locator('.gallerist-thumb-item[data-active]').getAttribute('data-item')
+
+  const hoverAndClick = async (page: Page) => {
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    const before = await scrolled(page)
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 })
+    await page.mouse.move(box.x + box.width / 2 - 250, box.y + box.height / 2, { steps: 10 })
+    await frames(page)
+    expect(await scrolled(page)).toBe(before) // a hover doesn't drag
+    await expect(rail(page)).not.toHaveAttribute('data-gallerist-dragging', '')
+    for (const n of [2, 1]) {
+      const card = page.locator('.gallerist-thumb-item:not([data-active])').nth(n)
+      const id = await card.getAttribute('data-item')
+      await card.click()
+      await expect.poll(() => active(page)).toBe(id)
+    }
+  }
+
+  test('above the rail: the hover after it does not drag, and clicks still select', async ({
+    page,
+  }) => {
+    await open(page, REVIEWER)
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    const x = box.x + box.width / 2
+    await page.mouse.move(x, box.y + 2)
+    await page.mouse.down()
+    await page.mouse.move(x, box.y - 60) // one step out, past the slop but across the rail
+    await page.mouse.up()
+    await hoverAndClick(page)
+  })
+
+  test('on a page button beside the card it started on: the same', async ({ page }) => {
+    await open(page, `${REVIEWER}&g=0`)
+    const box = await rail(page).boundingBox()
+    if (!box) throw new Error('no rail')
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    const btn = page.locator('.gallerist-rail-page[data-dir="end"]')
+    await expect(btn).toHaveCSS('opacity', '1')
+    const b = await btn.boundingBox()
+    if (!b) throw new Error('no button')
+    const y = b.y + b.height / 2
+    await page.mouse.move(b.x - 2, y) // on a card, just beside the button
+    await page.mouse.down()
+    await page.mouse.move(b.x + 2, y) // 4px: onto the button
+    await page.mouse.up()
+    await hoverAndClick(page)
+  })
+})
+
+test('a focused thumb in a cluster shows its whole ring over its neighbours', async ({ page }) => {
+  await page.goto('/hooks.html')
+  await expect(page.locator('.gallerist[data-gallerist-phase="open"]')).toBeVisible()
+  const thumb = page.locator('.gallerist-thumb-item[data-cluster="in"]').first()
+  await thumb.focus()
+  await page.keyboard.press('Shift') // keyboard modality: :focus-visible
+  await thumb.focus()
+  expect(await thumb.evaluate((el) => getComputedStyle(el).zIndex)).toBe('1')
 })

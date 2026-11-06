@@ -5,7 +5,14 @@ import { DRAG_SLOP, PAGE, attachStrip } from './scroll'
 import type { Axis } from './strip'
 
 // A strip 400px wide holding 2000px of cards, scrolled `at` px from its start.
-const make = (opts: { at?: number; axis?: Axis | null; rtl?: boolean } = {}) => {
+const make = (
+  opts: {
+    at?: number
+    axis?: Axis | null
+    rtl?: boolean
+    more?: () => readonly [boolean, boolean]
+  } = {},
+) => {
   const host = document.createElement('div')
   const scroller = document.createElement('div')
   if (opts.rtl) scroller.style.direction = 'rtl'
@@ -28,7 +35,12 @@ const make = (opts: { at?: number; axis?: Axis | null; rtl?: boolean } = {}) => 
     Object.defineProperty(scroller, k, { configurable: true, value: v })
   Object.defineProperty(host, 'clientWidth', { configurable: true, value: 500 })
   scroller.scrollLeft = (opts.rtl ? -1 : 1) * (opts.at ?? 0)
-  const strip = attachStrip(scroller, host, () => (opts.axis === undefined ? 'x' : opts.axis))
+  const strip = attachStrip(
+    scroller,
+    host,
+    () => (opts.axis === undefined ? 'x' : opts.axis),
+    opts.more,
+  )
   return { host, scroller, card, onCard, strip }
 }
 
@@ -40,6 +52,7 @@ const pointer = (el: Element, type: string, x: number, init: PointerEventInit = 
       pointerId: 1,
       pointerType: 'mouse',
       button: 0,
+      buttons: 1, // held (a move with none is a hover)
       clientX: x,
       clientY: 50,
       ...init,
@@ -111,6 +124,61 @@ describe('rail strip — drag', () => {
     expect(side.scroller.scrollTop).toBe(140)
   })
 
+  it('a press released off the strip before it was a drag ends at the next move without a button', async () => {
+    const { scroller, card, onCard } = make({ at: 200 })
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointermove', 103) // short of a drag; the release lands outside the strip
+    pointer(card, 'pointermove', 160, { buttons: 0 }) // a hover back over it
+    pointer(card, 'pointermove', 260, { buttons: 0 })
+    expect(scroller.scrollLeft).toBe(200)
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(false)
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointerup', 100)
+    card.click()
+    expect(onCard).toHaveBeenCalledTimes(1)
+  })
+
+  it('a drag whose release never came is over at the next press: its clicks are clicks again', async () => {
+    const { scroller, card, onCard } = make({ at: 200 })
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointermove', 140)
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(true)
+    pointer(card, 'pointerdown', 100) // no pointerup reached the strip
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(false)
+    pointer(card, 'pointerup', 100)
+    await new Promise((r) => setTimeout(r))
+    card.click()
+    expect(onCard).toHaveBeenCalledTimes(1)
+  })
+
+  it('losing the pointer capture ends a drag', async () => {
+    const { scroller, card, onCard } = make({ at: 200 })
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointermove', 140)
+    scroller.dispatchEvent(new PointerEvent('lostpointercapture', { pointerId: 1 }))
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(false)
+    pointer(card, 'pointermove', 200)
+    expect(scroller.scrollLeft).toBe(160) // no longer follows
+    await new Promise((r) => setTimeout(r))
+    card.click()
+    expect(onCard).toHaveBeenCalledTimes(1)
+  })
+
+  it(`a wobble across the strip is still a click; a pen goes ${DRAG_SLOP * 2}px before it drags`, () => {
+    const { scroller, card, onCard } = make({ at: 200 })
+    pointer(card, 'pointerdown', 100)
+    pointer(card, 'pointermove', 102, { clientY: 50 + DRAG_SLOP + 3 }) // across: 8px
+    pointer(card, 'pointerup', 102)
+    card.click()
+    expect(onCard).toHaveBeenCalledTimes(1)
+    expect(scroller.scrollLeft).toBe(200)
+    pointer(card, 'pointerdown', 100, { pointerType: 'pen' })
+    pointer(card, 'pointermove', 100 + DRAG_SLOP + 2, { pointerType: 'pen' })
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(false)
+    pointer(card, 'pointermove', 100 + DRAG_SLOP * 2, { pointerType: 'pen' })
+    expect(scroller.hasAttribute('data-gallerist-dragging')).toBe(true)
+  })
+
   it('blocks the native image drag', () => {
     const { scroller } = make()
     const e = new Event('dragstart', { bubbles: true, cancelable: true })
@@ -173,6 +241,36 @@ describe('rail strip — the ends', () => {
     strip.update()
     expect(scroller.hasAttribute('data-gallerist-more-end')).toBe(false)
     expect(toEnd?.hidden).toBe(true)
+  })
+
+  it('cards not drawn yet beyond an end count as more: it fades, its button shows, the wheel stays', () => {
+    let more: [boolean, boolean] = [false, true]
+    const { scroller, host, strip } = make({ at: 1600, more: () => more }) // at the drawn end
+    const [toStart, toEnd] = host.querySelectorAll<HTMLButtonElement>('.gallerist-rail-page')
+    strip.update()
+    expect(scroller.hasAttribute('data-gallerist-more-end')).toBe(true)
+    expect(toEnd?.hidden).toBe(false)
+    expect(wheel(scroller, { deltaY: 100 })).toBe(true) // the rail draws more as it goes
+    scroller.scrollLeft = 0
+    more = [true, false]
+    strip.update()
+    expect(scroller.hasAttribute('data-gallerist-more-start')).toBe(true)
+    expect(toStart?.hidden).toBe(false)
+    expect(wheel(scroller, { deltaY: -100 })).toBe(true)
+    more = [false, false]
+    scroller.scrollLeft = 0
+    strip.update()
+    expect(scroller.hasAttribute('data-gallerist-more-start')).toBe(false)
+    expect(wheel(scroller, { deltaY: -100 })).toBe(false) // the page's
+  })
+
+  it('writes its axis once, not on every update', () => {
+    const { scroller, strip } = make({ at: 200 })
+    strip.update()
+    const set = vi.spyOn(scroller, 'setAttribute')
+    strip.update()
+    strip.update()
+    expect(set).not.toHaveBeenCalledWith('data-gallerist-scroll', 'x')
   })
 
   it('page buttons: out of the tab order, hidden from assistive tech, at the strip’s ends', () => {

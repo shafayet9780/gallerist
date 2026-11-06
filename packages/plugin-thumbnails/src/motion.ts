@@ -23,8 +23,16 @@ export const sizeOf = (el: Element, dim: Dim): number => el.getBoundingClientRec
 /** Whether panels should move: not under prefers-reduced-motion, and only where the browser
  *  animates elements (Web Animations). */
 export function canGlide(el: Element): boolean {
-  if (typeof (el as HTMLElement).animate !== 'function') return false
-  return !globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  return typeof (el as HTMLElement).animate === 'function' && !reduced()
+}
+
+/** Whether the page asks for reduced motion. */
+export const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/** A CSS time (`220ms`, `0.3s`, `0`) in ms; 220 when it isn't one (the token unset). */
+export const toMs = (v: string): number => {
+  const n = Number.parseFloat(v)
+  return Number.isNaN(n) ? 220 : /\ds$/.test(v.trim()) ? n * 1000 : n
 }
 
 export function createGlides(duration: () => number) {
@@ -35,8 +43,8 @@ export function createGlides(duration: () => number) {
 
   /**
    * Resize `el` along `dim` from `from` px to `to` px, clipped, displayed throughout and, while it
-   * closes, inert (it can't take focus or clicks on its way out); then `end`. Without motion, or
-   * with nothing to move, `end` runs at once.
+   * closes, inert (it can't take focus or clicks on its way out); then `end`. Without motion, with a
+   * duration of 0, or with nothing to move, `end` runs at once.
    */
   const glide = (el: HTMLElement, dim: Dim, from: number, to: number, end?: () => void): void => {
     stop(el)
@@ -45,7 +53,8 @@ export function createGlides(duration: () => number) {
       el.inert = false
       end?.()
     }
-    if (Math.abs(from - to) < 1 || !canGlide(el)) {
+    const ms = duration()
+    if (Math.abs(from - to) < 1 || !(ms > 0) || !canGlide(el)) {
       settle()
       return
     }
@@ -58,7 +67,7 @@ export function createGlides(duration: () => number) {
         boxSizing: ['border-box', 'border-box'],
         overflow: ['hidden', 'hidden'],
       },
-      { duration: duration(), easing: EASE },
+      { duration: ms, easing: EASE },
     )
     const done = () => {
       running.delete(el)

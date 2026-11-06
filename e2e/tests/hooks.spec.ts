@@ -505,10 +505,10 @@ test.describe('on a phone', () => {
     const marker = page.locator('.gallerist-rail-marker')
     await marker.scrollIntoViewIfNeeded()
     await marker.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true })
-    await page.waitForTimeout(650)
-    await marker.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true })
     const tip = page.locator('.gallerist-rail-tip')
-    await expect(tip).toBeVisible()
+    await expect(tip).toBeVisible() // after the long press, still pressed
+    await marker.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true })
+    await expect(tip).toBeVisible() // and kept after the finger lifts
     await expect(tip).toBeInViewport({ ratio: 1 })
     await page.locator('.gallerist-main').dispatchEvent('pointerdown', { pointerType: 'touch' })
     await expect(tip).toHaveCount(0)

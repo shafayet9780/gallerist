@@ -33,12 +33,16 @@ mount(viewer)
   to the item column. These scrolls are instant, with no animation, so there is nothing to turn off
   for `prefers-reduced-motion`.
 - **Pull, don't scroll.** The rail shows no scrollbar (in every engine). A mouse or pen **drags** it:
-  past 5px a press is a drag, which scrolls the rail and never clicks the card it started on; short of
-  that it's a click, which selects. While a rail can scroll it shows a grab cursor between its cards,
-  and nothing in it is selected or dragged out as an image. Touch keeps the browser's own scrolling.
+  past 5px along the rail (10px with a pen) a press is a drag, which scrolls the rail and never clicks
+  the card it started on; short of that, or across the rail, it's a click, which selects. A press
+  that ends off the rail before it was a drag is over at the next move without a button, so hovering
+  back never drags. While a rail can scroll it shows a grab cursor between its cards, and nothing in
+  it is selected or dragged out as an image: the rail cancels `dragstart` (a host that wants a card
+  to be draggable can't use the native drag there). Touch keeps the browser's own scrolling.
   A **vertical wheel** scrolls a sideways rail (towards its end, whatever the reading direction) while
   it can go that way; at that end, or when it doesn't scroll, the page gets the wheel. A sideways wheel
-  or trackpad swipe, and a pinch, are left to the browser. Each end with more beyond it **fades**
+  or trackpad swipe, and a pinch, are left to the browser. Each end with more beyond it (scrolled
+  away, or cards not drawn yet: the rail draws a run of them) **fades**
   (`data-gallerist-more-start` / `data-gallerist-more-end` on the rail, the theme's mask, 40px by
   `--gallerist-rail-fade`), on a side rail too. On a sideways rail, **‹ ›** buttons at those ends
   (`.gallerist-rail-page`, in the rail region) show while a mouse is over the rail and page it by 80%
@@ -51,8 +55,10 @@ mount(viewer)
   animates its height (a side rail's width) over `--gallerist-dur-panel` (220ms), so the stage refits
   smoothly and a zoomed image keeps its view; the item column beside the stage does the same as it
   opens and closes (the items toggle, **`e`**). On its way out a panel is `inert`, then
-  `display: none` as before; a collapse that would take the focus with it hands it to the viewer. No
-  motion under `prefers-reduced-motion`, or where the browser has no Web Animations.
+  `display: none` as before; a collapse that would take the focus with it (a card in the rail or in
+  the item column) hands it to the viewer, while the handle keeps it. No motion under
+  `prefers-reduced-motion`, with a `--gallerist-dur-panel` of 0, or where the browser has no Web
+  Animations.
 - **Live-preview card.** The active multi-item group's card mirrors the currently-viewed item's
   image; it reverts to the group cover once the group is no longer active.
 - **Vertical item column (default).** The active group's items stack in a column floating above the
@@ -200,7 +206,7 @@ refreshRail(viewer)
 - **`renderGroupMeta(group, index, { display, place })`**: `display` is `'flat'` or `'stacked'`
   (an index rail draws none). Flat: `place: 'label'`, at the end of the group's label line; the group
   widens to fit the label and the meta, the label still ending in an ellipsis past three card heights
-  (its whole text in its `title`). Stacked: `'below'`, under the card at its width (every card is
+  (its whole text in its `title` while cut). Stacked: `'below'`, under the card at its width (every card is
   wrapped, so the rail's height grows by that line), and with a `timeline` also `'label'`, at the end
   of the card's time label: a label longer than its card widens the card's column so it shows whole,
   clear of the next card's label, up to three card heights, then ends in an ellipsis (its whole text
@@ -217,7 +223,8 @@ refreshRail(viewer)
   before) or `"start"` (a new one after another).
 - **`markers(collection)`** returns `RailMarker`s: `{ id, after?, before?, label, caption?, render?,
   tip? }`. A marker is drawn after the group `after` names (else before `before`'s), in the order
-  given, on flat and stacked rails; one whose group isn't in the collection is not drawn. It is not
+  given, on flat and stacked rails; one whose group isn't in the collection, or whose `id` an earlier
+  marker already has, is not drawn. It is not
   part of the collection: never a stop for the arrows, Home/End or a click, not counted, not in the
   hash, and windowed with its group (drawn when its group's end, or start for `before`, is drawn). It
   is a dashed box the height of the rail's cards under a label line (`.gallerist-rail-marker`, `-cap`,
@@ -232,7 +239,7 @@ refreshRail(viewer)
   marker's `title` is its `label`. Put what matters in `label`: the tip can't be reached from the
   keyboard.
 - **`refreshRail(viewer)`**: draws the decorations and the markers again in place (the cards, the
-  thumbs, the scroll and focus stay). A new collection (`setCollection`) needs no call. The
+  thumbs, the scroll and focus stay; a marker's open tip shows again, with the new data). A new collection (`setCollection`) needs no call. The
   instance's `refresh()` does the same.
 
 ## Data

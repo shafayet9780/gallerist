@@ -7,17 +7,24 @@ import { viewerSettled } from './settled'
 
 const REVIEWER = '/layout.html?preset=reviewer&skin=console&display=flat&custom=short'
 
-const open = async (page: Page, query: string) => {
+// The glides run over 1s here, so even a slow, loaded frame rate shows several steps of them.
+const open = async (page: Page, query: string, duration = '1000ms') => {
   await page.goto(query)
   await viewerSettled(page)
   await expect(page.locator('.gallerist-thumb-item').first()).toBeVisible()
+  await page.evaluate((d) => {
+    ;(document.querySelector('.gallerist') as HTMLElement).style.setProperty(
+      '--gallerist-dur-panel',
+      d,
+    )
+  }, duration)
 }
 
 type Frame = { stage: number; panel: number; display: string; inert: boolean }
 
 // Run `act` in the page, then record the stage's size along `dim` and the panel's, frame by frame,
 // for `ms`.
-const frames = (page: Page, act: string, panel: string, dim: 'width' | 'height', ms = 450) =>
+const frames = (page: Page, act: string, panel: string, dim: 'width' | 'height', ms = 1200) =>
   page.evaluate(
     async ({ act, panel, dim, ms }) => {
       const stage = document.querySelector('.gallerist-main') as HTMLElement
@@ -140,4 +147,41 @@ test("a stacked rail's item column glides shut and open beside the stage", async
   glided(back)
   await expect(column).toBeVisible()
   expect(Math.round(back[back.length - 1]?.stage ?? 0)).toBe(Math.round(shut[0]?.stage ?? 0))
+})
+
+test('Enter on the focused handle collapses the rail and Enter again brings it back', async ({
+  page,
+}) => {
+  for (const query of [REVIEWER, '/layout.html?g=1']) {
+    await open(page, query)
+    const handle = page.locator('.gallerist-rail-toggle')
+    await handle.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-rail', 'collapsed')
+    await expect(handle).toBeFocused() // the handle stays; so does focus on it
+    await page.keyboard.press('Enter')
+    await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-rail', 'expanded')
+  }
+})
+
+for (const reduced of [false, true]) {
+  test(`\`t\` with focus in a stacked rail's item column: focus goes to the viewer, the keys work${
+    reduced ? ' (reduced motion)' : ''
+  }`, async ({ page }) => {
+    if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' })
+    await open(page, '/layout.html?g=1')
+    await page.locator('.gallerist-thumbs-aside .gallerist-thumb-item').nth(1).focus()
+    await expect(page.locator('.gallerist-counter')).toHaveText('2 / 12')
+    await page.keyboard.press('t')
+    await expect(page.locator('.gallerist')).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('.gallerist-counter')).toHaveText('3 / 12')
+  })
+}
+
+test('a --gallerist-dur-panel of 0 collapses the rail at once', async ({ page }) => {
+  await open(page, REVIEWER, '0ms')
+  const shut = await frames(page, 'toggle', '.gallerist-thumbs-region', 'height', 120)
+  expect(shut[1]?.display).toBe('none')
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0)
 })

@@ -1,6 +1,8 @@
 // Windowing helpers for the rail: which run of cards to draw, and how to change it without the
 // visible cards jumping. Pure or DOM-reading only; the plugin owns the DOM writes.
 
+const INF = Number.POSITIVE_INFINITY
+
 export type Axis = 'x' | 'y'
 
 /**
@@ -53,7 +55,7 @@ export function measureRun(
   hosts: Element[],
   axis: Axis,
 ): { stride: number; perLine: number } | null {
-  let stride = Number.POSITIVE_INFINITY
+  let stride = INF
   let perLine = 1
   let line = 1
   let prev = hosts[0]?.getBoundingClientRect()
@@ -66,7 +68,7 @@ export function measureRun(
     } else perLine = Math.max(perLine, ++line)
     prev = r
   }
-  return stride < Number.POSITIVE_INFINITY ? { stride, perLine } : null
+  return stride < INF ? { stride, perLine } : null
 }
 
 /**
@@ -77,7 +79,7 @@ export function middleOf(scroller: Element, hosts: Element[], axis: Axis): numbe
   const box = scroller.getBoundingClientRect()
   const mid = (edge(box, axis) + far(box, axis)) / 2
   let best = 0
-  let gap = Number.POSITIVE_INFINITY
+  let gap = INF
   for (let k = 0; k < hosts.length; k++) {
     const r = (hosts[k] as Element).getBoundingClientRect()
     if (edge(r, axis) <= mid && far(r, axis) >= mid) return k

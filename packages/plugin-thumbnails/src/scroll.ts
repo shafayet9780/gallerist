@@ -1,10 +1,11 @@
 // The rail as a strip to pull rather than a box with a scrollbar. The theme hides the scrollbar;
 // this module gives back what it did, and more:
-//  • a mouse or pen drags the strip (past a few px it's a drag: the press never clicks a card; short
-//    of that it's a click). Touch keeps the browser's own scrolling, momentum included.
+//  • a mouse or pen drags the strip (past a few px along it, it's a drag: the press never clicks a
+//    card; short of that, or across it, it's a click). Touch keeps the browser's own scrolling,
+//    momentum included. The native drag of a card (`dragstart`) is cancelled in the strip.
 //  • a vertical wheel scrolls a sideways strip, while it can scroll that way (at its end the page
 //    gets the wheel). A wheel or trackpad already moving sideways is left to the browser.
-//  • each end that has more beyond it fades (`data-gallerist-more-start` / `-end`; the theme's mask),
+//  • each end that has more beyond it (scrolled out of view, or not drawn yet) fades (`data-gallerist-more-start` / `-end`; the theme's mask),
 //    updated as it scrolls or resizes.
 //  • on a sideways strip, ‹ › buttons at those ends (shown on hover, with a fine pointer) page it by
 //    most of its width. They're out of the tab order and hidden from assistive tech: the keys already
@@ -12,9 +13,10 @@
 // Reading direction is the strip's own: in a right-to-left rail the start is on the right.
 
 import { ICONS } from '@gallerist/core/internal'
+import { reduced } from './motion'
 import type { Axis } from './strip'
 
-/** How far the pointer moves before a press becomes a drag, in px. */
+/** How far the pointer moves along the strip before a press becomes a drag, in px (a pen: twice). */
 export const DRAG_SLOP = 5
 /** A page button scrolls by this share of what shows. */
 export const PAGE = 0.8
@@ -26,7 +28,6 @@ export interface Strip {
   destroy(): void
 }
 
-const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 const ease = (t: number) => 1 - (1 - t) ** 3
 
 /**
@@ -37,6 +38,8 @@ export function attachStrip(
   scroller: HTMLElement,
   host: HTMLElement | null,
   axisOf: () => Axis | null,
+  /** whether cards not drawn yet lie before / after the drawn ones (a windowed rail) */
+  more?: () => readonly [boolean, boolean],
 ): Strip {
   const rtl = () => getComputedStyle(scroller).direction === 'rtl'
   // scroll by `by` px along the axis, towards the end when positive (whatever the direction)
@@ -61,16 +64,29 @@ export function attachStrip(
     e.preventDefault()
     e.stopPropagation()
   }
+  // The press is over: its pointerup, a cancel, the capture lost, or (released off the strip before
+  // it was a drag, so no capture brought the pointerup here) the next move with no button held.
+  const endDrag = () => {
+    press = null
+    if (!dragging) return
+    dragging = false
+    scroller.removeAttribute('data-gallerist-dragging')
+    // the click (if any) follows the pointerup in the same task
+    setTimeout(() => scroller.removeEventListener('click', swallowClick, true))
+  }
   const onDown = (e: PointerEvent) => {
+    endDrag() // anything left of an earlier press
     if (e.pointerType === 'touch' || e.button !== 0 || !axisOf()) return
     press = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY }
-    dragging = false
   }
   const onMove = (e: PointerEvent) => {
     const axis = axisOf()
     if (!press || e.pointerId !== press.id || !axis) return
+    if (!(e.buttons & 1)) return endDrag()
     if (!dragging) {
-      if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < DRAG_SLOP) return
+      // along the strip: a wobble across it is still a click
+      const by = axis === 'y' ? e.clientY - press.y : e.clientX - press.x
+      if (Math.abs(by) < DRAG_SLOP * (e.pointerType === 'pen' ? 2 : 1)) return
       dragging = true
       scroller.setAttribute('data-gallerist-dragging', '')
       scroller.setPointerCapture?.(e.pointerId)
@@ -85,15 +101,10 @@ export function attachStrip(
     e.preventDefault()
   }
   const onUp = (e: PointerEvent) => {
-    if (!press || e.pointerId !== press.id) return
-    press = null
-    if (!dragging) return
-    dragging = false
-    scroller.removeAttribute('data-gallerist-dragging')
-    // the click (if any) follows this pointerup in the same task
-    setTimeout(() => scroller.removeEventListener('click', swallowClick, true))
+    if (press && e.pointerId === press.id) endDrag()
   }
-  // no native drag of a thumbnail image (it would take the pointer away mid-drag)
+  // no native drag of a thumbnail image (it would take the pointer away mid-drag); the page buttons
+  // use it too, to keep focus where it is
   const onDragStart = (e: Event) => e.preventDefault()
 
   // ── wheel ─────────────────────────────────────────────────────────────────
@@ -102,7 +113,9 @@ export function attachStrip(
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? scroller.clientWidth : 1
     const by = e.deltaY * unit
     const { pos, max } = reach('x')
-    if (max < 1 || (by > 0 && pos >= max - 1) || (by < 0 && pos <= 1)) return // the page's
+    const [before, after] = more?.() ?? []
+    // the page's at the end it is going to, unless cards not drawn yet lie beyond it
+    if (by > 0 ? pos >= max - 1 && !after : pos <= 1 && !before) return
     along('x', by)
     e.preventDefault()
   }
@@ -139,8 +152,8 @@ export function attachStrip(
     btn.innerHTML = dir > 0 ? ICONS.next : ICONS.prev
     btn.hidden = true
     // keep focus where it is (the buttons are for the pointer only)
-    btn.addEventListener('pointerdown', (e) => e.preventDefault())
-    btn.addEventListener('mousedown', (e) => e.preventDefault())
+    btn.addEventListener('pointerdown', onDragStart)
+    btn.addEventListener('mousedown', onDragStart)
     btn.addEventListener('click', () => page(dir))
     btn.addEventListener('wheel', onWheel, { passive: false }) // over a button, the wheel is the strip's
     return btn
@@ -157,9 +170,11 @@ export function attachStrip(
   const update = () => {
     const axis = axisOf()
     const { pos, max } = axis ? reach(axis) : { pos: 0, max: 0 }
-    const before = !!axis && pos > 1
-    const after = !!axis && pos < max - 1
-    if (axis) scroller.setAttribute('data-gallerist-scroll', axis)
+    const [undrawnBefore, undrawnAfter] = more?.() ?? []
+    const before = !!axis && (pos > 1 || !!undrawnBefore)
+    const after = !!axis && (pos < max - 1 || !!undrawnAfter)
+    if (axis && scroller.getAttribute('data-gallerist-scroll') !== axis)
+      scroller.setAttribute('data-gallerist-scroll', axis)
     mark('data-gallerist-more-start', before)
     mark('data-gallerist-more-end', after)
     if (!host || !toStart || !toEnd) return
@@ -182,24 +197,24 @@ export function attachStrip(
     for (const b of [l, r]) b.style.top = `${top}px`
   }
 
-  scroller.addEventListener('pointerdown', onDown)
-  scroller.addEventListener('pointermove', onMove)
-  scroller.addEventListener('pointerup', onUp)
-  scroller.addEventListener('pointercancel', onUp)
-  scroller.addEventListener('dragstart', onDragStart)
-  scroller.addEventListener('wheel', onWheel, { passive: false })
+  const listeners: Array<[string, (e: never) => void]> = [
+    ['pointerdown', onDown],
+    ['pointermove', onMove],
+    ['pointerup', onUp],
+    ['pointercancel', onUp],
+    ['lostpointercapture', endDrag],
+    ['dragstart', onDragStart],
+    ['wheel', onWheel],
+  ]
+  for (const [type, fn] of listeners)
+    scroller.addEventListener(type, fn as EventListener, { passive: false })
 
   return {
     update,
     destroy() {
       if (glide) cancelAnimationFrame(glide)
       glide = 0
-      scroller.removeEventListener('pointerdown', onDown)
-      scroller.removeEventListener('pointermove', onMove)
-      scroller.removeEventListener('pointerup', onUp)
-      scroller.removeEventListener('pointercancel', onUp)
-      scroller.removeEventListener('dragstart', onDragStart)
-      scroller.removeEventListener('wheel', onWheel)
+      for (const [type, fn] of listeners) scroller.removeEventListener(type, fn as EventListener)
       scroller.removeEventListener('click', swallowClick, true)
       toStart?.remove()
       toEnd?.remove()

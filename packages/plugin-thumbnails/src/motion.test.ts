@@ -4,7 +4,7 @@ import { createViewer } from '@gallerist/core'
 import { mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { thumbnails } from './index'
-import { GLIDE, createGlides } from './motion'
+import { GLIDE, createGlides, toMs } from './motion'
 
 // A stand-in for Web Animations: records each call, finishes when told to.
 type Fake = { keyframes: Record<string, string[]>; options: KeyframeAnimationOptions }
@@ -114,6 +114,29 @@ describe('glides', () => {
     expect(animations).toHaveLength(0)
     expect(end).toHaveBeenCalledTimes(3)
     expect(el.hasAttribute(GLIDE)).toBe(false)
+  })
+})
+
+describe('the duration token', () => {
+  it('reads ms and s; 220 when unset or not a time', () => {
+    expect(toMs('220ms')).toBe(220)
+    expect(toMs(' 0.3s')).toBe(300)
+    expect(toMs('1s ')).toBe(1000)
+    expect(toMs('0ms')).toBe(0)
+    expect(toMs('0')).toBe(0)
+    expect(toMs('')).toBe(220)
+    expect(toMs('fast')).toBe(220)
+  })
+
+  it('a duration of 0 is no glide: done at once', () => {
+    reduceMotion(false)
+    const el = document.createElement('div')
+    el.animate = fakeAnimate
+    const end = vi.fn()
+    createGlides(() => toMs('0ms')).glide(el, 'height', 94, 0, end)
+    expect(animations).toHaveLength(0)
+    expect(end).toHaveBeenCalledTimes(1)
+    expect(el.inert).toBe(false)
   })
 })
 
