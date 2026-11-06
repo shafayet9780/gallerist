@@ -36,17 +36,32 @@ const setup = (
 const q = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel)
 const root = () => q('.gallerist') as HTMLElement
 const btn = () => q('.gallerist-view-btn') as HTMLButtonElement
-const menu = () => q('[role="menu"]')
-const items = () => [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')]
+const menu = () => q('.gallerist-view-menu[role="dialog"]')
+const items = () => [...document.querySelectorAll<HTMLElement>('[role="radio"]')]
 const labels = () => items().map((i) => i.textContent)
 const checked = () =>
   items()
     .filter((i) => i.getAttribute('aria-checked') === 'true')
     .map((i) => i.textContent)
 const itemNamed = (name: string) => items().find((i) => i.textContent === name) as HTMLElement
+const groupNames = () =>
+  [...document.querySelectorAll('[role="radiogroup"]')].map(
+    (g) => document.getElementById(g.getAttribute('aria-labelledby') ?? '')?.textContent,
+  )
+// a choice by pointer: opens the popover if it's closed, clicks the segment
+const pick = (name: string) => {
+  if (!menu()) btn().click()
+  itemNamed(name).click()
+}
 const keydown = (el: Element, key: string, init: KeyboardEventInit = {}) =>
   el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }))
 const focused = () => document.activeElement as HTMLElement
+// plugin-shortcuts' instance, as the popover's footer row finds it
+const fakeHelp = (label = 'Keyboard shortcuts') => {
+  const open = vi.fn()
+  const plugin: Plugin = () => ({ name: 'shortcuts', label, open }) as PluginInstance
+  return { plugin, open }
+}
 const railOf = (v: ReturnType<typeof createViewer>) =>
   getInternals(v)
     .getPlugins()
@@ -89,39 +104,40 @@ const menuWidth = (w: number) => {
   }
 }
 
-describe('plugin-view — the menu button', () => {
-  it('adds one bar tool: a named menu button with the shared icon', () => {
+describe('plugin-view — the button', () => {
+  it('adds one bar tool: a named button that opens a dialog, with the shared icon', () => {
     setup()
     expect(document.querySelectorAll('.gallerist-region-toolbar .gallerist-view-btn').length).toBe(
       1,
     )
     expect(btn().getAttribute('aria-label')).toBe('View')
-    expect(btn().getAttribute('aria-haspopup')).toBe('menu')
+    expect(btn().getAttribute('aria-haspopup')).toBe('dialog')
     expect(btn().getAttribute('aria-expanded')).toBe('false')
     expect(btn().hasAttribute('aria-controls')).toBe(false)
     expect(btn().querySelector('svg.gallerist-icon')).not.toBeNull()
     expect(menu()).toBeNull()
   })
 
-  it('a click opens the menu: Rail and Scheme groups of radio items, the first one focused', () => {
+  it('a click opens the popover: a Layout and a Theme radio group, focus on the first checked', () => {
     setup()
     btn().click()
     const m = menu() as HTMLElement
     expect(m.getAttribute('aria-label')).toBe('View')
+    expect(m.hasAttribute('aria-modal')).toBe(false) // a popover: the viewer stays usable
     expect(btn().getAttribute('aria-expanded')).toBe('true')
     expect(btn().getAttribute('aria-controls')).toBe(m.id)
-    const groups = [...m.querySelectorAll('[role="group"]')]
-    expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Rail', 'Scheme'])
-    // the visible headings are the groups' names, not read twice
-    expect(
-      [...m.querySelectorAll('.gallerist-view-heading')].map((h) => h.getAttribute('aria-hidden')),
-    ).toEqual(['true', 'true'])
+    // each group is named by its visible label
+    expect(groupNames()).toEqual(['Layout', 'Theme'])
     expect(labels()).toEqual(['Stacked', 'Row', 'Dark', 'Light'])
     expect(checked()).toEqual(['Stacked', 'Dark'])
-    expect(items().every((i) => i.tabIndex === -1)).toBe(true)
-    expect(focused()).toBe(items()[0])
+    // every segment is a button with a glyph; roving focus: one tab stop per group, the checked one
+    expect(items().every((i) => i.tagName === 'BUTTON' && i.querySelector('svg'))).toBe(true)
+    expect(items().map((i) => i.tabIndex)).toEqual([0, -1, 0, -1])
+    expect(focused()).toBe(itemNamed('Stacked'))
     // it lives in the viewer, outside the toolbar's scrolling strip
     expect(m.parentElement).toBe(root())
+    // no shortcut row without plugin-shortcuts
+    expect(q('.gallerist-view-foot')).toBeNull()
   })
 
   it('a second click on the button closes it', () => {
@@ -133,64 +149,74 @@ describe('plugin-view — the menu button', () => {
     expect(btn().hasAttribute('aria-controls')).toBe(false)
   })
 
-  it('↓ / ↑ on the button open it on the first / last item, without moving the viewer', () => {
+  it('↓ / ↑ on the button open it on the first / last stop, without moving the viewer', () => {
     const { v } = setup()
     v.goTo(1, 1)
     btn().focus()
     keydown(btn(), 'ArrowDown')
-    expect(focused()).toBe(items()[0])
+    expect(focused()).toBe(itemNamed('Stacked'))
     keydown(focused(), 'Escape')
     keydown(btn(), 'ArrowUp')
-    expect(focused()).toBe(items()[3])
+    expect(focused()).toBe(itemNamed('Dark'))
     expect(v.getState().cursor).toMatchObject({ g: 1, i: 1 })
   })
 })
 
-describe('plugin-view — keyboard inside the menu', () => {
-  it('↑/↓ move through every item and wrap; Home/End jump; ←/→ stay', () => {
-    const { v } = setup()
+describe('plugin-view — keyboard inside the popover', () => {
+  it('←/→ move through a group and choose the segment they reach, wrapping; ↑/↓ too', () => {
+    const onChange = vi.fn()
+    const { v } = setup({ onChange })
     btn().click()
-    keydown(focused(), 'ArrowDown')
+    keydown(focused(), 'ArrowRight')
+    expect(focused().textContent).toBe('Row')
+    expect(checked()).toEqual(['Row', 'Dark']) // selection follows focus
+    expect(railOf(v).display).toBe('flat')
+    expect(itemNamed('Row').tabIndex).toBe(0)
+    expect(itemNamed('Stacked').tabIndex).toBe(-1)
+    keydown(focused(), 'ArrowRight') // wraps, within the group
+    expect(focused().textContent).toBe('Stacked')
+    keydown(focused(), 'ArrowLeft')
     expect(focused().textContent).toBe('Row')
     keydown(focused(), 'ArrowDown')
-    expect(focused().textContent).toBe('Dark') // across the group boundary
-    keydown(focused(), 'End')
-    expect(focused().textContent).toBe('Light')
-    keydown(focused(), 'ArrowDown')
-    expect(focused().textContent).toBe('Stacked') // wraps
+    expect(focused().textContent).toBe('Stacked')
     keydown(focused(), 'ArrowUp')
-    expect(focused().textContent).toBe('Light')
-    keydown(focused(), 'Home')
-    expect(focused().textContent).toBe('Stacked')
-    keydown(focused(), 'ArrowRight')
-    keydown(focused(), 'ArrowLeft')
-    expect(focused().textContent).toBe('Stacked')
+    expect(focused().textContent).toBe('Row')
+    expect(menu()).not.toBeNull() // it stays open
+    expect(onChange.mock.calls.map(([c]) => c)).toEqual([
+      { rail: 'flat' },
+      { rail: 'stacked' },
+      { rail: 'flat' },
+      { rail: 'stacked' },
+      { rail: 'flat' },
+    ])
     expect(v.getState().cursor).toMatchObject({ g: 0, i: 0 }) // the viewer didn't move
   })
 
-  it('a letter moves to the next item starting with it', () => {
+  it('right to left, ← moves to the next segment and → to the previous', () => {
     setup()
+    root().setAttribute('data-gallerist-dir', 'rtl')
     btn().click()
-    keydown(focused(), 'l')
-    expect(focused().textContent).toBe('Light')
-    keydown(focused(), 'R')
+    keydown(focused(), 'ArrowLeft')
     expect(focused().textContent).toBe('Row')
-    keydown(focused(), 'z') // no match: stays
-    expect(focused().textContent).toBe('Row')
+    keydown(focused(), 'ArrowRight')
+    expect(focused().textContent).toBe('Stacked')
   })
 
-  it('handled keys are kept from the viewer and the page', () => {
-    setup()
+  it('every key but Tab is kept from the viewer and the page; handled ones are prevented', () => {
+    const { v } = setup()
     btn().click()
-    const ev = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
     const seen = vi.fn()
     root().addEventListener('keydown', seen)
-    focused().dispatchEvent(ev)
-    expect(ev.defaultPrevented).toBe(true)
+    for (const key of ['ArrowRight', 'End', 'f', 't', '1']) {
+      const ev = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      focused().dispatchEvent(ev)
+      expect(ev.defaultPrevented).toBe(key === 'ArrowRight')
+    }
     expect(seen).not.toHaveBeenCalled()
+    expect(v.getState().cursor).toMatchObject({ g: 0, i: 0 })
   })
 
-  it('Escape closes the menu, focus back on the button; the viewer stays open', () => {
+  it('Escape closes the popover, focus back on the button; the viewer stays open', () => {
     const { v } = setup()
     btn().click()
     keydown(focused(), 'Escape')
@@ -200,49 +226,122 @@ describe('plugin-view — keyboard inside the menu', () => {
     expect(q('.gallerist')).not.toBeNull()
   })
 
-  it('Tab closes the menu and leaves focus to move on from the button', () => {
+  it('Tab moves between the groups; past the last stop it closes and moves on from the button', () => {
     setup()
     btn().click()
-    const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
-    // what the menu did with it (the viewer's own focus trap handles Tab after it)
-    let prevented: boolean | undefined
-    menu()?.addEventListener('keydown', (e) => {
-      prevented = e.defaultPrevented
-    })
-    focused().dispatchEvent(ev)
+    // the stops in order: each group's checked segment
+    const tab = (shiftKey = false) => {
+      const ev = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      })
+      // what the popover did with it (the viewer's own focus trap handles Tab after it)
+      let prevented: boolean | undefined
+      menu()?.addEventListener('keydown', (e) => {
+        prevented = e.defaultPrevented
+      })
+      focused().dispatchEvent(ev)
+      return prevented
+    }
+    expect(tab()).toBe(false) // the browser moves on to Dark
+    expect(menu()).not.toBeNull()
+    itemNamed('Dark').focus()
+    expect(tab()).toBe(false) // the browser's Tab goes on from the button
     expect(menu()).toBeNull()
     expect(focused()).toBe(btn())
-    expect(prevented).toBe(false) // the browser's Tab goes on from there
+    btn().click()
+    expect(tab(true)).toBe(true) // back from the first stop: to the button, and no further
+    expect(menu()).toBeNull()
+    expect(focused()).toBe(btn())
   })
 
-  it('Enter chooses the focused item and closes; Space too', () => {
+  it('Enter chooses the focused segment and closes; Space chooses and stays', () => {
     const { v } = setup()
     btn().click()
-    keydown(focused(), 'ArrowDown') // Row
+    itemNamed('Row').focus()
     keydown(focused(), 'Enter')
     expect(menu()).toBeNull()
     expect(focused()).toBe(btn())
     expect(railOf(v).display).toBe('flat')
     btn().click()
-    keydown(focused(), 'End') // Light
-    keydown(focused(), ' ')
-    expect(menu()).toBeNull()
+    itemNamed('Light').focus()
+    const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+    focused().dispatchEvent(space)
+    expect(space.defaultPrevented).toBe(false) // the button's own activation chooses it
+    focused().click()
+    expect(menu()).not.toBeNull()
     expect(root().getAttribute('data-gallerist-scheme')).toBe('light')
   })
 })
 
+describe('plugin-view — the shortcut list row', () => {
+  it('with plugin-shortcuts: a footer row named by its label, after the groups', () => {
+    const help = fakeHelp()
+    const v = createViewer({
+      collection: collection(),
+      plugins: [thumbnails(), view(), help.plugin],
+    })
+    mount(v)
+    v.open()
+    btn().click()
+    const foot = q('.gallerist-view-foot') as HTMLButtonElement
+    expect(foot.tagName).toBe('BUTTON')
+    expect(foot.textContent).toBe('Keyboard shortcuts?')
+    expect(foot.querySelector('kbd')?.getAttribute('aria-hidden')).toBe('true')
+    expect(menu()?.lastElementChild).toBe(foot)
+    // a tab stop after the groups: ↑ on the button opens on it
+    keydown(focused(), 'Escape')
+    keydown(btn(), 'ArrowUp')
+    expect(focused()).toBe(q('.gallerist-view-foot'))
+  })
+
+  it('pressing it closes the popover, focus on the button, and opens the list', () => {
+    const help = fakeHelp('Gestures')
+    const v = createViewer({
+      collection: collection(),
+      plugins: [thumbnails(), view(), help.plugin],
+    })
+    mount(v)
+    v.open()
+    btn().click()
+    const foot = q('.gallerist-view-foot') as HTMLButtonElement
+    expect(foot.textContent).toBe('Gestures?') // the list's own label: gestures on a touch screen
+    foot.click()
+    expect(menu()).toBeNull()
+    expect(focused()).toBe(btn())
+    expect(help.open).toHaveBeenCalledWith()
+  })
+
+  it('? in the popover opens the keys, from the button', () => {
+    const help = fakeHelp()
+    const v = createViewer({
+      collection: collection(),
+      plugins: [thumbnails(), view(), help.plugin],
+    })
+    mount(v)
+    v.open()
+    btn().click()
+    keydown(focused(), '?', { shiftKey: true })
+    expect(menu()).toBeNull()
+    expect(focused()).toBe(btn())
+    expect(help.open).toHaveBeenCalledWith(true)
+  })
+})
+
 describe('plugin-view — pointer', () => {
-  it('a click on an item chooses it and closes the menu', () => {
+  it('a click on a segment chooses it; the popover stays open, showing it', () => {
     const { v } = setup()
     v.goTo(1, 1)
-    btn().click()
-    itemNamed('Row').click()
-    expect(menu()).toBeNull()
+    pick('Row')
+    expect(menu()).not.toBeNull()
     expect(railOf(v).display).toBe('flat')
+    expect(checked()).toEqual(['Row', 'Dark'])
     expect(v.getState().cursor).toMatchObject({ g: 1, i: 1 })
     expect(root().getAttribute('data-gallerist-linear')).toBe('true')
-    btn().click()
-    expect(checked()).toEqual(['Row', 'Dark'])
+    itemNamed('Light').click()
+    expect(checked()).toEqual(['Row', 'Light'])
   })
 
   it('a press outside closes it without taking focus; a press inside does not', () => {
@@ -257,11 +356,11 @@ describe('plugin-view — pointer', () => {
     expect(btn().getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('a mouse press in the menu doesn’t move focus out of it', () => {
+  it('a mouse press in the popover doesn’t move focus out of it', () => {
     setup()
     btn().click()
     const ev = new MouseEvent('mousedown', { bubbles: true, cancelable: true })
-    q('.gallerist-view-heading')?.dispatchEvent(ev)
+    q('.gallerist-view-label')?.dispatchEvent(ev)
     expect(ev.defaultPrevented).toBe(true)
   })
 
@@ -289,7 +388,7 @@ describe('plugin-view — pointer', () => {
     }
   })
 
-  it('a press inside the menu of a viewer in a shadow root keeps it open', () => {
+  it('a press inside the popover of a viewer in a shadow root keeps it open', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const container = document.createElement('div')
@@ -299,12 +398,12 @@ describe('plugin-view — pointer', () => {
     v.open()
     const button = container.querySelector('.gallerist-view-btn') as HTMLButtonElement
     button.click()
-    const inside = container.querySelector('[role="menuitemradio"]') as HTMLElement
+    const inside = container.querySelector('[role="radio"]') as HTMLElement
     expect(inside).not.toBeNull()
     inside.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }))
-    expect(container.querySelector('[role="menu"]')).not.toBeNull()
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull()
     document.body.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }))
-    expect(container.querySelector('[role="menu"]')).toBeNull()
+    expect(container.querySelector('.gallerist-view-menu')).toBeNull()
   })
 
   it('follows its button when the toolbar’s strip scrolls', () => {
@@ -335,9 +434,7 @@ describe('plugin-view — sections and choices', () => {
   it('no Rail section without a thumbnails rail', () => {
     setup(undefined, { rail: false })
     btn().click()
-    expect(
-      [...document.querySelectorAll('[role="group"]')].map((g) => g.getAttribute('aria-label')),
-    ).toEqual(['Scheme'])
+    expect(groupNames()).toEqual(['Theme'])
     expect(labels()).toEqual(['Dark', 'Light'])
   })
 
@@ -357,9 +454,7 @@ describe('plugin-view — sections and choices', () => {
     expect(btn().getAttribute('aria-label')).toBe('Ansicht')
     btn().click()
     expect(menu()?.getAttribute('aria-label')).toBe('Ansicht')
-    expect(
-      [...document.querySelectorAll('[role="group"]')].map((g) => g.getAttribute('aria-label')),
-    ).toEqual(['Leiste', 'Scheme'])
+    expect(groupNames()).toEqual(['Leiste', 'Theme'])
     expect(labels()).toEqual(['Reihe', 'Stacked', 'Index', 'Light', 'Dark', 'System'])
   })
 
@@ -432,16 +527,13 @@ describe('plugin-view — who applies a choice', () => {
   it('uncontrolled: the plugin applies it and reports the one setting picked', () => {
     const onChange = vi.fn()
     const { v } = setup({ onChange })
-    btn().click()
-    itemNamed('Row').click()
+    pick('Row')
     expect(railOf(v).display).toBe('flat')
     expect(onChange).toHaveBeenLastCalledWith({ rail: 'flat' })
-    btn().click()
-    itemNamed('Light').click()
+    pick('Light')
     expect(root().getAttribute('data-gallerist-scheme')).toBe('light')
     expect(onChange).toHaveBeenLastCalledWith({ scheme: 'light' })
-    btn().click()
-    itemNamed('Stacked').click()
+    pick('Stacked')
     expect(railOf(v).display).toBe('stacked')
     expect(onChange).toHaveBeenLastCalledWith({ rail: 'stacked' })
     expect(onChange).toHaveBeenCalledTimes(3)
@@ -450,12 +542,10 @@ describe('plugin-view — who applies a choice', () => {
   it('choosing what is already stored reports nothing', () => {
     const onChange = vi.fn()
     setup({ onChange }, { mountOpts: { scheme: 'dark' } })
-    btn().click()
-    itemNamed('Stacked').click()
-    btn().click()
-    itemNamed('Dark').click()
+    pick('Stacked')
+    pick('Dark')
     expect(onChange).not.toHaveBeenCalled()
-    expect(menu()).toBeNull()
+    expect(checked()).toEqual(['Stacked', 'Dark'])
   })
 
   it('on a viewer following the system (auto): a rail change reports the rail only', () => {
@@ -492,23 +582,23 @@ describe('plugin-view — who applies a choice', () => {
     }
   })
 
-  it('controlled: the choice is only reported; the menu shows what the host applies', () => {
+  it('controlled: the choice is only reported; the popover shows what the host applies', async () => {
     const onChange = vi.fn()
     const { v } = setup({ controlled: true, onChange })
-    btn().click()
-    itemNamed('Row').click()
+    pick('Row')
     expect(onChange).toHaveBeenLastCalledWith({ rail: 'flat' })
     expect(railOf(v).display).toBe('stacked') // not applied
-    btn().click()
-    itemNamed('Light').click()
+    pick('Light')
     expect(onChange).toHaveBeenLastCalledWith({ scheme: 'light' })
     expect(root().hasAttribute('data-gallerist-scheme')).toBe(false)
-    btn().click()
     expect(checked()).toEqual(['Stacked', 'Dark'])
-    keydown(focused(), 'Escape')
-    // the host applies them its own way
+    // the host applies them its own way, later (a React render): the open popover follows
     railOf(v).setDisplay('flat')
     applyAppearance(root(), { scheme: 'light' })
+    await new Promise((r) => setTimeout(r))
+    expect(checked()).toEqual(['Row', 'Light'])
+    expect(itemNamed('Row').tabIndex).toBe(0)
+    keydown(focused(), 'Escape')
     btn().click()
     expect(checked()).toEqual(['Row', 'Light'])
   })
@@ -516,11 +606,9 @@ describe('plugin-view — who applies a choice', () => {
   it('controlled per setting: the plugin applies the rest', () => {
     const onChange = vi.fn()
     const { v } = setup({ controlled: ['scheme'], onChange })
-    btn().click()
-    itemNamed('Row').click()
+    pick('Row')
     expect(railOf(v).display).toBe('flat')
-    btn().click()
-    itemNamed('Light').click()
+    pick('Light')
     expect(root().hasAttribute('data-gallerist-scheme')).toBe(false)
     expect(onChange).toHaveBeenLastCalledWith({ scheme: 'light' })
   })
@@ -537,8 +625,7 @@ describe('plugin-view — who applies a choice', () => {
     await Promise.resolve()
     expect(railOf(v).display).toBe('flat') // the plugin's
     expect(root().getAttribute('data-gallerist-scheme')).toBe('dark') // the host's
-    btn().click()
-    itemNamed('Light').click()
+    pick('Light')
     expect(onChange).toHaveBeenLastCalledWith({ scheme: 'light' })
     expect(root().getAttribute('data-gallerist-scheme')).toBe('dark')
   })
@@ -577,8 +664,7 @@ describe('plugin-view — who applies a choice', () => {
     const v = createViewer({ collection: collection(), plugins: [thumbnails(), view()] })
     const first = mount(v)
     v.open()
-    btn().click()
-    itemNamed('Light').click()
+    pick('Light')
     first.destroy()
     mount(v)
     await Promise.resolve()
@@ -590,10 +676,8 @@ describe('plugin-view — who applies a choice', () => {
     const a = createViewer({ collection: collection(), plugins: [thumbnails(), plugin] })
     const first = mount(a)
     a.open()
-    btn().click()
-    itemNamed('Light').click()
-    btn().click()
-    itemNamed('Row').click()
+    pick('Light')
+    pick('Row')
     first.destroy()
     const b = createViewer({ collection: collection(), plugins: [thumbnails(), plugin] })
     mount(b)

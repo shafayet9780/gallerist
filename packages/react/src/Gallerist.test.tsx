@@ -634,9 +634,14 @@ describe('<Gallerist> — a live rail layout and scheme (plugin-view)', () => {
     getInternals(v)
       .getPlugins()
       .find((p) => p.name === 'thumbnails') as ThumbnailsInstance
-  const choose = (label: string) => {
+  // the View popover stays open after a choice: open it only when it's closed
+  const openMenu = () => {
+    if (document.querySelector('.gallerist-view-menu')) return
     act(() => (document.querySelector('.gallerist-view-btn') as HTMLButtonElement).click())
-    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+  }
+  const choose = (label: string) => {
+    openMenu()
+    const item = [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find(
       (i) => i.textContent === label,
     )
     act(() => item?.click())
@@ -720,7 +725,7 @@ describe('<Gallerist> — a live rail layout and scheme (plugin-view)', () => {
     expect(display()).toBe('flat')
   })
 
-  it('controlled: the host owns scheme and groupDisplay; the menu reports and follows', () => {
+  it('controlled: the host owns scheme and groupDisplay; the menu reports and follows', async () => {
     const changes: ViewChange[] = []
     function Host() {
       const [prefs, setPrefs] = useState<ViewState>({ rail: 'stacked', scheme: 'dark' })
@@ -752,8 +757,9 @@ describe('<Gallerist> — a live rail layout and scheme (plugin-view)', () => {
     choose('Light')
     expect(root()).toBe(first) // never remounted
     expect(root().getAttribute('data-gallerist-scheme')).toBe('light')
-    act(() => (document.querySelector('.gallerist-view-btn') as HTMLButtonElement).click())
-    const checked = [...document.querySelectorAll('[role="menuitemradio"][aria-checked="true"]')]
+    openMenu()
+    await act(async () => {}) // the open popover repaints once the host's scheme lands
+    const checked = [...document.querySelectorAll('[role="radio"][aria-checked="true"]')]
     expect(checked.map((i) => i.textContent)).toEqual(['Row', 'Light'])
   })
 

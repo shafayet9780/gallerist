@@ -131,7 +131,7 @@ describe('strings audit', () => {
     expect(untranslated()).toEqual([])
   })
 
-  it('the View menu, open, with every choice (plugin-view, not in this bundle)', () => {
+  it('the View popover, open, with every choice (plugin-view, not in this bundle)', () => {
     const v = createViewer({
       collection: collection(),
       plugins: [
@@ -146,7 +146,7 @@ describe('strings audit', () => {
     mount(v, { strings: mark(DEFAULT_STRINGS) })
     v.open()
     ;(document.querySelector('.gallerist-view-btn') as HTMLButtonElement).click()
-    expect(document.querySelectorAll('[role="menuitemradio"]').length).toBe(6)
+    expect(document.querySelectorAll('[role="radio"]').length).toBe(6)
     expect(untranslated()).toEqual([])
   })
 

@@ -24,17 +24,22 @@ const viewer = createViewer({ groups, plugins: [thumbnails(), view()] })
 mount(viewer, { preset: 'reviewer' })
 ```
 
-One tool joins the toolbar (a sliders icon, named "View"). It opens a small menu under itself with
-two groups of choices:
+One tool joins the toolbar (a sliders icon, named "View"). It opens a small popover under itself
+with a segmented control per setting, each segment an icon and a name, the current one raised:
 
-- **Rail**: *Stacked* (one card per group) or *Row* (every item side by side, `groupDisplay: 'flat'`).
+- **Layout** (the rail): *Stacked* (one card per group) or *Row* (every item side by side, `groupDisplay: 'flat'`).
   Shown only while a thumbnails rail is mounted. The switch keeps the current item, and the viewer's
   keys follow the rail: a row walks every item in order with ←/→ (linear traversal, unless `mount()`
   was given `linear`), a stacked rail moves between groups with ←/→ and within one with ↑/↓.
-- **Scheme**: *Dark* or *Light*, the viewer's `data-gallerist-scheme`, in whatever skin is loaded.
+- **Theme** (the scheme): *Dark* or *Light*, the viewer's `data-gallerist-scheme`, in whatever skin is loaded.
+- With [`@gallerist/plugin-shortcuts`](../plugin-shortcuts/README.md) registered, a last row,
+  **Keyboard shortcuts `?`**, opens the shortcut list (on a touch screen it reads **Gestures** and
+  opens the gestures).
 
-The menu shows what the viewer shows each time it opens (the rail's display, the scheme in effect),
-so it always agrees with the viewer, however the setting was last changed. With nothing to offer
+A choice applies at once and the popover stays open, so both settings can be changed in one visit.
+It shows what the viewer shows when it opens (the rail's display, the scheme in effect) and whenever
+either changes while it is open, so it always agrees with the viewer, however the setting was last
+changed (a host applying a controlled choice a render later included). With nothing to offer
 (`scheme: false` and no thumbnails rail mounted; one registered on a viewer no renderer has built
 counts as none) the tool is hidden; it shows when a rail is added.
 
@@ -47,7 +52,7 @@ counts as none) the tool is hidden; it shows when a rail is added.
 | `initial` | — | `{ rail?, scheme? }` the plugin applies when the viewer mounts, e.g. restored from storage; over the rail's and the renderer's own values. An unknown value is ignored, and so is one for a setting the host controls |
 | `controlled` | `false` | settings the host applies itself: `true` for both, or `['scheme']`, `['rail']` (or mark them on the viewer, below) |
 | `onChange(change)` | — | called on every choice that changes the stored value, with that one setting: `{ rail: 'flat' }` or `{ scheme: 'light' }` (`ViewChange`) |
-| `strings` | English | every label, for translation; defaults in `DEFAULT_VIEW_STRINGS` (`menu`, `rail`, `scheme`, `stacked`, `flat`, `index`, `dark`, `light`, `auto`) |
+| `strings` | English | every label, for translation; defaults in `DEFAULT_VIEW_STRINGS` (`menu`: "View", `rail`: "Layout", `scheme`: "Theme", `stacked`, `flat`: "Row", `index`, `dark`, `light`, `auto`). The shortcut row's text is plugin-shortcuts' own (its `title`, or `gestures`) |
 
 ## What `onChange` reports
 
@@ -118,43 +123,50 @@ render is ignored.
 
 ## Keyboard, pointer and screen readers
 
-The [menu button pattern](https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/): the tool is a
-`button` with `aria-haspopup="menu"` and `aria-expanded`, and `aria-controls` while the menu is open.
-The menu is `role="menu"` with a `role="group"` per section (named "Rail", "Scheme"; the visible
-headings are those names, hidden from screen readers so they aren't read twice) of `menuitemradio`
-items with `aria-checked`.
+The tool is a `button` with `aria-haspopup="dialog"` and `aria-expanded` (`aria-controls` while
+open). The popover is a non-modal `role="dialog"` named "View": the viewer stays usable around it.
+Each setting is a [radio group](https://www.w3.org/WAI/ARIA/apg/patterns/radio/) named by its
+visible label ("Layout", "Theme"), its segments `button`s with `role="radio"` and `aria-checked`,
+one tab stop per group (the checked segment, roving `tabindex`).
 
-- **Enter**, **Space** or a click on the tool opens the menu on its first item; **↓** opens it on
-  the first, **↑** on the last.
-- In the menu, **↑ / ↓** move through every item (wrapping), **Home / End** go to the first / last,
-  and a letter moves to the next item starting with it.
-- **Enter**, **Space** or a click chooses an item and closes the menu; focus goes back to the tool.
-- **Escape** closes the menu without closing the viewer; focus goes back to the tool. **Tab** closes
-  it and moves on from the tool.
-- A press anywhere outside the menu closes it, and leaves focus where it lands (the press's path is
-  checked, so a viewer inside a shadow root works). The menu also closes when the viewer closes.
-- The keys the menu handles stay in it: the viewer doesn't navigate, zoom or close underneath. There
-  is no shortcut key for the menu itself.
+- **Enter**, **Space** or a click on the tool opens the popover with focus on the first group's
+  checked segment; **↓** opens it there too, **↑** on the last stop (the shortcut row, if shown).
+- **← / →** (and **↑ / ↓**) move through a group's segments, wrapping, and choose the one they reach,
+  as radio buttons do; right to left, ← moves to the next segment. **Space** or a click chooses the
+  segment. The popover stays open.
+- **Enter** chooses the focused segment and closes the popover; focus goes back to the tool.
+- **Tab** / **Shift+Tab** move between the groups and the shortcut row. Tab past the last stop closes
+  the popover and moves on from the tool; Shift+Tab before the first closes it, on the tool.
+- **Escape** closes it without closing the viewer; focus goes back to the tool. **?** opens the
+  shortcut list (with plugin-shortcuts), as the row does.
+- A press anywhere outside closes it, and leaves focus where it lands (the press's path is checked,
+  so a viewer inside a shadow root works). It also closes when the viewer closes.
+- Every key but Tab stays in the popover: the viewer doesn't navigate, zoom or close underneath.
+  There is no shortcut key for the popover itself.
 
-On a touch screen it works with taps: tap the tool, tap a choice, tap outside to dismiss. Items are
-44px tall there.
+On a touch screen it works with taps: tap the tool, tap a segment, tap outside to dismiss. Segments
+are 36px tall there, and the shortcut row has no key cap.
 
-While the menu is open the plugin listens on the document (`pointerdown` and `scroll`, both in the
-capture phase) and on the window (`resize`), to close it on a press outside and to keep it under its
-tool. Closing the menu, closing the viewer or disposing the plugin removes them. If the renderer is
-destroyed under an open menu (`handle.destroy()` with the viewer still open), the menu goes with the
-viewer's root, and the listeners go at the next press, scroll or resize.
+While the popover is open the plugin listens on the document (`pointerdown` and `scroll`, both in
+the capture phase) and on the window (`resize`), to close it on a press outside and to keep it under
+its tool, and watches the viewer's root for the rail's display and the scheme. Closing the popover,
+closing the viewer or disposing the plugin removes them. If the renderer is destroyed under an open
+popover (`handle.destroy()` with the viewer still open), the popover goes with the viewer's root, and
+the listeners go at the next press, scroll or resize.
 
 ## Look
 
 The tool is a bar button like the others, so it takes each skin's tool style (and the hover look
-while its menu is open). The menu (`.gallerist-view-menu`) is a small panel in the skin's panel
-colour with a hairline border, hung under its tool with its inline end on the tool's (start, right
-to left) and kept 8px inside the viewer, so it fits a 390px phone and covers only the top edge of
-the stage; it follows the tool when the toolbar's strip scrolls. The checked choice has a filled mark
-in the skin's selection colour; the item under the pointer takes the tool hover fill, and the item
-focused from the keyboard the skin's focus ring, so the two never look alike. The styles ship in
-`@gallerist/theme-default` (`base.css`); every skin and scheme gets them.
+while its popover is open). The popover (`.gallerist-view-menu`) is a small panel in
+`--gallerist-popover-bg` with a hairline border and `--gallerist-popover-shadow`, hung under its tool
+with its inline end on the tool's (start, right to left) and kept 8px inside the viewer, about 300px
+wide, so it fits a 390px phone and covers only the top edge of the stage; it follows the tool when
+the toolbar's strip scrolls. Each segmented control is a recessed track (`--gallerist-seg-track`)
+with the checked segment raised on it (`--gallerist-seg-on`, `--gallerist-seg-on-shadow`), its text
+at full strength and its glyph in the skin's selection colour. The segment focused from the keyboard
+takes the skin's focus ring, never the selection colour, so focus and the checked value never look
+alike. Every skin and scheme gets the styles (`@gallerist/theme-default`, `base.css`); Console sets
+its own popover and segment colours, the others derive them from their panel, ground and surface.
 
 ## Not in the CDN bundle
 

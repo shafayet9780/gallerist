@@ -1,19 +1,21 @@
 // @gallerist/plugin-view — a View menu in the viewer's toolbar: switch the thumbnails rail's layout
 // (stacked or one row) and the colour scheme (dark or light) on an open viewer.
 //
-// One bar tool opens a small menu (the ARIA menu button pattern) with a group of radio items per
-// setting. Who applies a choice is per setting: the plugin itself (the default), or the host, which
+// One bar tool opens a small popover (a non-modal dialog) with a segmented control per setting (a
+// radio group with roving focus), and a row for the shortcut list when plugin-shortcuts is there.
+// Who applies a choice is per setting: the plugin itself (the default), or the host, which
 // hears about it through `onChange` and applies it its own way. A host takes a setting with the
 // `controlled` option or by marking it on the viewer (`Symbol.for('gallerist.controlled')`, which
 // React's `scheme` and `groupDisplay` props set while they're passed); the plugin then never
-// writes it. The menu is built each time it opens from what the viewer shows then (the rail's
-// display, the scheme in effect), so it never contradicts a host that applies its own, and
-// `onChange` reports the value picked, never one resolved from the system or the skin.
+// writes it. The popover shows what the viewer shows (the rail's display, the scheme in effect),
+// when it opens and whenever either changes while it's open, so it never contradicts a host that
+// applies its own, and `onChange` reports the value picked, never one resolved from the system or
+// the skin.
 //
 // The rail is found among the viewer's plugin instances: plugin-thumbnails' instance carries
 // `display` and `setDisplay()` (see its README), so this plugin doesn't import it. The scheme is the
 // root's `data-gallerist-scheme`, the attribute the renderer's `scheme` option (applyAppearance)
-// writes.
+// writes. The shortcut list is the instance named `shortcuts` with an `open()` (plugin-shortcuts).
 
 import type { Plugin, PluginInstance, ViewerApi } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
@@ -36,9 +38,9 @@ export interface ViewState {
 export type ViewChange = { rail: ViewRail; scheme?: never } | { scheme: ViewScheme; rail?: never }
 
 export interface ViewStrings {
-  /** the toolbar button's and the menu's accessible name */
+  /** the toolbar button's and the popover's accessible name */
   menu: string
-  /** the sections' names */
+  /** the settings' names (Layout, Theme) */
   rail: string
   scheme: string
   /** the choices */
@@ -52,8 +54,8 @@ export interface ViewStrings {
 
 export const DEFAULT_VIEW_STRINGS: ViewStrings = {
   menu: 'View',
-  rail: 'Rail',
-  scheme: 'Scheme',
+  rail: 'Layout',
+  scheme: 'Theme',
   stacked: 'Stacked',
   flat: 'Row',
   index: 'Index',
@@ -88,10 +90,31 @@ export interface ViewOptions {
 const ICON =
   '<svg class="gallerist-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></svg>'
 
+// a segment's glyph per value, drawn like the shared icon family at the segment's size
+const icon = (body: string) =>
+  `<svg class="gallerist-view-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`
+const ICONS: Record<string, string> = {
+  stacked: icon(
+    '<rect x="3" y="8" width="13" height="12" rx="2"/><path d="M7 4h11a2 2 0 0 1 2 2v10"/>',
+  ),
+  flat: icon('<path d="M3 7h5v10H3zm6.5 0h5v10h-5zM16 7h5v10h-5z"/>'),
+  index: icon('<path d="M9 6h12M9 12h12M9 18h12M4 6h0m0 6h0m0 6h0"/>'),
+  dark: icon('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'),
+  light: icon(
+    '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  ),
+  auto: icon(
+    '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor"/>',
+  ),
+}
+
 type Rail = PluginInstance & {
   readonly display?: ViewRail
   setDisplay?(display: ViewRail): void
 }
+
+// plugin-shortcuts' instance: what its list is called now, and how to open it (`true`: the keys)
+type Help = PluginInstance & { readonly label?: string; open?(keys?: boolean): void }
 
 let menus = 0 // ids, for the button's aria-controls
 const SCHEMES: readonly string[] = ['dark', 'light', 'auto']
@@ -133,10 +156,20 @@ export function view(opts: ViewOptions = {}): Plugin {
       !listed(opts.controlled, s) && !listed((viewer as { [HOST]?: unknown })[HOST], s)
     let btn: HTMLButtonElement | null = null
     let menu: HTMLElement | null = null
+    // the open popover's segments, with the setting and value each stands for
+    let radios: Array<[HTMLElement, ViewSetting, string]> = []
+    let watch: MutationObserver | null = null
     let unsub: (() => void) | null = null
     let offPlugins: (() => void) | null = null
     const id = `gallerist-view-${++menus}`
     const root = () => btn?.closest<HTMLElement>('.gallerist') ?? null
+    const rtl = () => root()?.getAttribute('data-gallerist-dir') === 'rtl'
+    const help = () =>
+      getInternals(viewer)
+        .getPlugins()
+        .find((p) => p.name === 'shortcuts' && typeof (p as Help).open === 'function') as
+        | Help
+        | undefined
 
     // the mounted thumbnails rail, if any (the last one registered owns the rail region)
     const rail = () =>
@@ -201,10 +234,8 @@ export function view(opts: ViewOptions = {}): Plugin {
     }
     const resync = () => sync() && viewer.refresh()
 
-    const items = () => [...(menu?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])]
-
-    // A press outside closes the menu (the event's path, so a viewer in a shadow root works), and so
-    // does any press once the renderer has gone (the button left the document under an open menu).
+    // A press outside closes the popover (the event's path, so a viewer in a shadow root works), and
+    // so does any press once the renderer has gone (the button left the document under it).
     const onOutside = (e: Event) => {
       if (!btn?.isConnected || !e.composedPath().some((n) => n === menu || n === btn)) close()
     }
@@ -212,6 +243,8 @@ export function view(opts: ViewOptions = {}): Plugin {
       if (!menu) return
       menu.remove()
       menu = null
+      radios = []
+      watch?.disconnect()
       btn?.setAttribute('aria-expanded', 'false')
       btn?.removeAttribute('aria-controls')
       document.removeEventListener('pointerdown', onOutside, true)
@@ -221,8 +254,8 @@ export function view(opts: ViewOptions = {}): Plugin {
     }
 
     // Under the button, its inline end on the button's, inside the viewer (a phone's narrow bar); again
-    // when the window resizes or the toolbar's strip scrolls. A renderer destroyed under the open menu
-    // took the button out of the document: then it closes.
+    // when the window resizes or the toolbar's strip scrolls. A renderer destroyed under the open
+    // popover took the button out of the document: then it closes.
     function place() {
       const r = root()
       if (!menu || !btn?.isConnected || !r) return close()
@@ -230,7 +263,7 @@ export function view(opts: ViewOptions = {}): Plugin {
       const at = btn.getBoundingClientRect()
       const w = menu.offsetWidth
       const top = at.bottom - box.top + 6
-      const x = r.getAttribute('data-gallerist-dir') === 'rtl' ? at.left : at.right - w
+      const x = rtl() ? at.left : at.right - w
       Object.assign(menu.style, {
         top: `${top}px`,
         left: `${Math.max(8, Math.min(x - box.left, box.width - w - 8))}px`,
@@ -238,91 +271,116 @@ export function view(opts: ViewOptions = {}): Plugin {
       })
     }
 
-    // Menu keys (APG menu): ↑/↓ move (wrapping), Home/End, a letter jumps to the next item starting
-    // with it, Enter/Space choose and close, Escape closes, Tab closes and moves on from the button.
-    // Keys stay in the menu, so the viewer doesn't navigate or close under it.
-    const onMenuKey = (e: KeyboardEvent) => {
-      const list = items()
-      const at = list.indexOf(document.activeElement as HTMLElement)
-      const n = list.length
-      let to = -1
-      switch (e.key) {
-        case 'ArrowDown':
-          to = (at + 1) % n
-          break
-        case 'ArrowUp':
-          to = at < 0 ? n - 1 : (at - 1 + n) % n
-          break
-        case 'Home':
-          to = 0
-          break
-        case 'End':
-          to = n - 1
-          break
-        case 'Enter':
-        case ' ':
-          list[at]?.click()
-          break
-        case 'Escape':
-          close(true)
-          break
-        case 'Tab':
-          close(true) // the browser then moves focus on from the button
-          return
-        case 'ArrowLeft':
-        case 'ArrowRight':
-          break // nothing beside a menu item, but the viewer mustn't move either
-        default: {
-          if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return
-          const k = e.key.toLowerCase()
-          for (let d = 1; d <= n; d++) {
-            const item = list[(at + d) % n]
-            if (item?.textContent?.toLowerCase().startsWith(k)) {
-              to = (at + d) % n
-              break
-            }
-          }
-        }
+    // Each segment shows what the viewer shows now: after a choice, and when a host applies one
+    // (its rail switch or scheme lands while the popover is open). A group whose value isn't offered
+    // keeps its first segment in the tab order.
+    const paint = () => {
+      const now: ViewState = { rail: rail()?.display, scheme: shown() }
+      for (const [r, s, value] of radios) {
+        r.setAttribute('aria-checked', String(now[s] === value))
+        r.tabIndex =
+          now[s] === value ||
+          (!r.previousElementSibling && !radios.some(([, o, v]) => o === s && now[o] === v))
+            ? 0
+            : -1
       }
-      list[to]?.focus()
-      e.preventDefault()
+    }
+    // the popover's tab stops: a segment per group (the checked one), then the footer
+    const stops = () => [...(menu?.querySelectorAll<HTMLElement>('[tabindex="0"]') ?? [])]
+
+    // Popover keys (APG radio group, in a non-modal dialog): ←/→ (↑/↓ too) move through a group's
+    // segments, wrapping, and choose the one they reach (mirrored right to left); Enter chooses and
+    // closes; Space chooses; Tab moves between the groups and the footer, and on past either end
+    // closes; Escape closes; ? opens the shortcut list. Every key but Tab stays in the popover, so
+    // the viewer doesn't navigate or close under it.
+    const onMenuKey = (e: KeyboardEvent) => {
+      const at = e.target as HTMLElement
+      const radio = at.getAttribute('role') === 'radio'
+      const flip = rtl() ? -1 : 1
+      const step = radio
+        ? (
+            { ArrowRight: flip, ArrowLeft: -flip, ArrowDown: 1, ArrowUp: -1 } as Record<
+              string,
+              number
+            >
+          )[e.key]
+        : undefined
+      if (e.key === 'Tab') {
+        const list = stops()
+        const i = list.indexOf(at)
+        if (e.shiftKey ? i <= 0 : i === list.length - 1) {
+          close(true) // forward, the browser then moves on from the button
+          if (e.shiftKey) e.preventDefault()
+        }
+        return
+      }
       e.stopPropagation()
+      if (step) {
+        const group = [...(at.parentElement?.children ?? [])] as HTMLElement[]
+        const to = group[(group.indexOf(at) + step + group.length) % group.length]
+        to?.focus()
+        to?.click()
+      } else if (e.key === 'Escape') close(true)
+      else if (e.key === 'Enter' && radio) {
+        at.click()
+        close(true)
+      } else if (e.key === '?' && help()) {
+        close(true)
+        help()?.open?.(true)
+      } else return
+      e.preventDefault()
     }
 
     const open = (last: boolean) => {
       const r = root()
       if (menu || !btn || !r) return
-      const sections: Array<[ViewSetting, readonly string[], string | undefined]> = []
-      const shows = rail()?.display
-      if (shows && choices.rail.length) sections.push(['rail', choices.rail, shows])
-      if (choices.scheme.length) sections.push(['scheme', choices.scheme, shown()])
+      const sections: Array<[ViewSetting, readonly string[]]> = []
+      if (rail()?.display && choices.rail.length) sections.push(['rail', choices.rail])
+      if (choices.scheme.length) sections.push(['scheme', choices.scheme])
       if (!sections.length) return
-      const m = el('div', 'gallerist-view-menu', { id, role: 'menu', 'aria-label': t.menu })
-      for (const [s, values, current] of sections) {
-        const group = el('div', 'gallerist-view-group', { role: 'group', 'aria-label': t[s] })
-        // the group's name already
-        const head = el('div', 'gallerist-view-heading', { 'aria-hidden': 'true' })
-        head.textContent = t[s]
-        group.appendChild(head)
+      const m = el('div', 'gallerist-view-menu', { id, role: 'dialog', 'aria-label': t.menu })
+      for (const [s, values] of sections) {
+        const label = el('span', 'gallerist-view-label', { id: `${id}-${s}` })
+        label.textContent = t[s]
+        const group = el('div', 'gallerist-view-seg', {
+          role: 'radiogroup',
+          'aria-labelledby': label.id,
+        })
         for (const value of values) {
-          const item = el('div', 'gallerist-view-item', {
-            role: 'menuitemradio',
-            'aria-checked': String(value === current),
-            tabindex: '-1',
-          })
-          item.textContent = t[value as keyof ViewStrings] ?? value
+          const item = el('button', 'gallerist-view-item', { type: 'button', role: 'radio' })
+          item.innerHTML = ICONS[value] ?? ''
+          item.append(t[value as keyof ViewStrings] ?? value)
           item.addEventListener('click', () => {
-            close(true)
             choose(s, value as ViewRail | ViewScheme)
+            paint()
           })
+          radios.push([item, s, value])
           group.appendChild(item)
         }
-        m.appendChild(group)
+        m.append(label, group)
+      }
+      // the shortcut list's row, while plugin-shortcuts is registered
+      const h = help()
+      if (h) {
+        const foot = el('button', 'gallerist-view-foot', { type: 'button', tabindex: '0' })
+        foot.textContent = h.label ?? ''
+        foot.appendChild(el('kbd', '', { 'aria-hidden': 'true' })).textContent = '?'
+        foot.addEventListener('click', () => {
+          close(true)
+          h.open?.()
+        })
+        m.appendChild(foot)
       }
       m.addEventListener('keydown', onMenuKey)
       m.addEventListener('mousedown', (e) => e.preventDefault()) // a click doesn't move focus
       r.appendChild(m)
       menu = m
+      paint()
+      // a host applying a choice while the popover is open: the rail's display, the root's scheme
+      if (typeof MutationObserver !== 'undefined') {
+        watch = new MutationObserver(paint)
+        watch.observe(r, { subtree: true, attributeFilter: [SCHEME, 'data-display'] })
+      }
       // a button the toolbar's strip has scrolled partly out of view (a narrow bar) is shown whole
       const strip = btn.parentElement
       if (strip) {
@@ -336,7 +394,7 @@ export function view(opts: ViewOptions = {}): Plugin {
       document.addEventListener('pointerdown', onOutside, true)
       document.addEventListener('scroll', place, true) // the toolbar's strip (scroll doesn't bubble)
       window.addEventListener('resize', place)
-      const list = items()
+      const list = stops()
       list[last ? list.length - 1 : 0]?.focus()
     }
 
@@ -345,12 +403,12 @@ export function view(opts: ViewOptions = {}): Plugin {
       const b = el('button', 'gallerist-view-btn', {
         type: 'button',
         'aria-label': t.menu,
-        'aria-haspopup': 'menu',
+        'aria-haspopup': 'dialog',
         'aria-expanded': 'false',
       })
       b.innerHTML = ICON
       b.addEventListener('click', () => (menu ? close() : open(false)))
-      // ↓ / ↑ open the menu on its first / last item (and don't move the viewer)
+      // ↓ / ↑ open the popover on its first / last stop (and don't move the viewer)
       b.addEventListener('keydown', (e) => {
         if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
         e.preventDefault()
