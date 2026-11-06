@@ -14,7 +14,7 @@ timeline of captures, rooms in a listing. Rendering is windowed, so the DOM stay
 of groups (a single group draws all its item thumbs unless you use the `flat` rail), and it ships keyboard, touch, RTL and screen-reader support.
 
 **Look elsewhere if** you have one flat strip of photos and already have a lightbox you like, if you need
-Vue or Svelte today (React and plain DOM only; Vue is planned for 0.4), or if you want a stories player.
+Vue or Svelte today (React and plain DOM only; Vue is planned for 0.5), or if you want a stories player.
 Bundle size is also a real cost: core + renderer is about 16 KB gzipped, more than the smallest flat
 lightboxes.
 

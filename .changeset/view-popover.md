@@ -1,6 +1,6 @@
 ---
-"@gallerist/plugin-view": patch
-"@gallerist/theme-default": patch
+"@gallerist/plugin-view": minor
+"@gallerist/theme-default": minor
 ---
 
 **The View menu is a compact popover with segmented controls.** Layout [Stacked | Row] and Theme

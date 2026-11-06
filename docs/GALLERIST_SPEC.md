@@ -596,8 +596,8 @@ Full option list with defaults lives in §8.1; defaults summary: `loop:true`, `i
 
 | Metric | Target |
 |---|---|
-| Core (`@gallerist/core` + `renderer-dom`, gz) | ≤ 16.65 KB (16 KB until 2026-11-03, then 16.5 KB for the keyboard-scrollable caption band, plan P2-R; 16.65 KB from 0.3.4 for the toolbar focus ring) |
-| Core + thumbnails + image, gz | ≤ 25.5 KB (24 KB until 0.3.4, raised for the rail's host hooks; ≈ lighter than lightGallery+plugins and ~PhotoSwipe) |
+| Core (`@gallerist/core` + `renderer-dom`, gz) | ≤ 16.65 KB (16 KB until 2026-11-03, then 16.5 KB for the keyboard-scrollable caption band, plan P2-R; 16.65 KB from 0.4.0 for the toolbar focus ring) |
+| Core + thumbnails + image, gz | ≤ 25.5 KB (24 KB until 0.4.0, raised for the rail's host hooks; ≈ lighter than lightGallery+plugins and ~PhotoSwipe) |
 | Cold open → first slide painted | < 100 ms (cached) |
 | Navigation frame rate | 60 fps (no long tasks > 50 ms) |
 | Thumbnail rail, 10,000 items | smooth scroll, < 200 DOM nodes live |
@@ -683,7 +683,8 @@ Note on D7: pure MIT + DCO means the open core cannot be *unilaterally* re-licen
 
 > **Current plan (Oct 2026):** `plans/phase-2-product.md` supersedes the Phase 2/3 ordering below:
 > chrome architecture and skins first, 0.3 with Gallery, Console, Editorial, Tour and pins, then
-> Atlas and the review plugins in 0.4, and Stories behind a go/no-go.
+> Atlas and the review plugins in 0.5 (0.4 went to the Apploye reviewer's viewer work), and Stories
+> behind a go/no-go.
 
 **Phase 0 — Engine MVP (the foundation, ~the half-the-project the spec buys).**
 Core: data model + normalization, FSM, store, two-axis nav, zoom/pan + arbitration, overlay layer (both anchor types), slide windowing, a11y baseline, events. Renderer-dom + default theme. Image adapter. Vanilla API. → *At this point Gallerist already does something nobody else does: native grouped navigation with image-space overlays.*

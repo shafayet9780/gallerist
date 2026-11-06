@@ -1,7 +1,7 @@
 ---
-"@gallerist/theme-default": patch
-"@gallerist/renderer-dom": patch
-"@gallerist/plugin-view": patch
+"@gallerist/theme-default": minor
+"@gallerist/renderer-dom": minor
+"@gallerist/plugin-view": minor
 ---
 
 **A toolbar tool with keyboard focus shows its whole focus ring.** The toolbar's tools (fullscreen,

@@ -1,6 +1,6 @@
 ---
-"@gallerist/plugin-thumbnails": patch
-"@gallerist/theme-default": patch
+"@gallerist/plugin-thumbnails": minor
+"@gallerist/theme-default": minor
 ---
 
 **Host hooks in the rail.** Four new `thumbnails()` options let a host show its own data where it
@@ -16,5 +16,7 @@ again in place after the host's data changed. A stacked timeline label longer th
 with a note count) now widens its card's column to show whole, clear of the next card's label, up to
 three card heights, then ends in an ellipsis with the whole label in its `title` (down a side rail it
 keeps the rail's width). On a phone (600px or less) the bar leaves out the zoom
-tool and fullscreen (a pinch zooms; the viewer fills the screen); `--gallerist-phone-zoom` and
-`--gallerist-phone-fullscreen` keep them.
+tool (a pinch zooms; the renderer's reset shows while zoomed) and an overlay viewer's fullscreen (it
+fills the screen; an inline viewer keeps it); `--gallerist-phone-zoom` and
+`--gallerist-phone-fullscreen` keep them. Markers whose group isn't in the collection, or whose id
+repeats an earlier one, aren't drawn.

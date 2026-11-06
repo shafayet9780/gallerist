@@ -1,5 +1,5 @@
 ---
-"@gallerist/renderer-dom": patch
+"@gallerist/renderer-dom": minor
 ---
 
 **The viewer leaves a key a host already took.** Any key a handler inside the viewer already took

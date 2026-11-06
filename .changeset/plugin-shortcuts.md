@@ -1,6 +1,6 @@
 ---
-"@gallerist/plugin-shortcuts": patch
-"@gallerist/theme-default": patch
+"@gallerist/plugin-shortcuts": minor
+"@gallerist/theme-default": minor
 ---
 
 **New: `@gallerist/plugin-shortcuts`.** `shortcuts()` lists the viewer's keyboard shortcuts in a modal
