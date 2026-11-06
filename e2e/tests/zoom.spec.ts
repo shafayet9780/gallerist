@@ -144,6 +144,24 @@ for (const scheme of ['dark', 'light']) {
   })
 }
 
+test('a hidden tool stays hidden: [hidden] wins over its display', async ({ page }) => {
+  await open(page)
+  const tool = page.locator('.gallerist-zoom-tool')
+  await expect(tool).toBeVisible()
+  await tool.evaluate((el) => {
+    ;(el as HTMLElement).hidden = true
+  })
+  await expect(tool).toBeHidden()
+  // a phone that keeps the tool keeps a hidden one hidden too
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.addStyleTag({ content: '.gallerist { --gallerist-phone-zoom: flex }' })
+  await expect(tool).toBeHidden()
+  await tool.evaluate((el) => {
+    ;(el as HTMLElement).hidden = false
+  })
+  await expect(tool).toBeVisible()
+})
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
 

@@ -1160,6 +1160,9 @@
   align-items: center;
   gap: 2px;
 }
+.gallerist-zoom-tool[hidden] {
+  display: none;
+}
 .gallerist-bar .gallerist-zoom-level {
   min-width: 4.5em;
   padding: 0 4px;
@@ -1188,7 +1191,7 @@
    double tap zooms, and the viewer fills the screen already. A page keeps them by setting
    --gallerist-phone-zoom: flex and --gallerist-phone-fullscreen: grid (their own display). */
 @media (max-width: 600px) {
-  .gallerist-bar .gallerist-zoom-tool {
+  .gallerist-bar .gallerist-zoom-tool:not([hidden]) {
     display: var(--gallerist-phone-zoom, none);
   }
   .gallerist-bar .gallerist-fullscreen-btn:not([hidden]) {
