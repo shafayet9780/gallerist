@@ -64,6 +64,14 @@
     "gzip": true
   },
   {
+    "name": "@gallerist/plugin-view (gz)",
+    "path": "packages/plugin-view/dist/index.js",
+    "import": "{ view }",
+    "ignore": ["@gallerist/core"],
+    "limit": "2.4 kB",
+    "gzip": true
+  },
+  {
     "name": "theme base.css (gz)",
     "path": "packages/theme-default/src/base.css",
     "limit": "10 kB",

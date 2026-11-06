@@ -6,6 +6,7 @@ import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
 import { download } from '@gallerist/plugin-save'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
+import { type ViewChange, view } from '@gallerist/plugin-view'
 import {
   type ArrowLayout,
   type ColorScheme,
@@ -19,8 +20,9 @@ import '@gallerist/theme-default/console.css'
 import '@gallerist/theme-default/editorial.css'
 
 const p = new URLSearchParams(location.search)
-// wide=1: a 3:1 panorama, which fills the stage's width at most sizes (the reviewer's gutters)
-const W = p.get('wide') === '1' ? 3200 : 1600
+// wide=1: a 3:1 panorama, which fills the stage's width at most sizes (the reviewer's gutters) ·
+// tall=1: a 9:16 phone screenshot, which fills its height
+const W = p.get('wide') === '1' ? 3200 : p.get('tall') === '1' ? 600 : 1600
 const svg = (color: string, label: string) =>
   `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="1067"><rect width="100%" height="100%" fill="${color}"/><text x="40" y="120" fill="white" font-size="110">${label}</text></svg>`,
@@ -49,11 +51,29 @@ const palette = ['#c0392b', '#2980b9', '#27ae60', '#f39c12', '#8e44ad', '#16a085
 const sizes = [1, 3, 2, 1, 5, 12, 1, 4, 2, 1, 3, 2]
   .slice(0, Number(p.get('groups')) || undefined)
   .map((n) => (p.get('one') === '1' ? 1 : n))
+// labels=uneven: short and longer group names (an index chip's width follows its name), so the
+// chips differ in width whatever the fonts: on a phone a longer chip is too wide for centring a
+// short one beside it to show it whole, though the two with another short one fit the strip.
+// labels=uneven-wide: the same at a 900px window, with much longer names.
+const LONGER = ['Laundry room', 'Drawing room', 'Morning room', 'Library wing']
+const WIDE = [
+  'The long gallery upstairs, with the portraits along its north wall',
+  'The garden room and terrace that look out over the orchard below',
+]
+const label = (g: number) => {
+  const mode = p.get('labels')
+  if (mode !== 'uneven' && mode !== 'uneven-wide') return undefined
+  const names = mode === 'uneven' ? LONGER : WIDE
+  // short, longer, short, short, longer, … (a longer one every third group, one between two shorts)
+  return g % 3 === 1
+    ? names[Math.floor(g / 3) % names.length]
+    : ['Hall', 'WC', 'Den', 'Loft'][g % 4]
+}
 const collection: Collection = {
   meta: { title: 'Fixture house' },
   groups: sizes.map((n, g) => ({
     id: `g${g}`,
-    caption: captionMode === '1' ? `Group ${g + 1} title` : undefined,
+    caption: captionMode === '1' ? `Group ${g + 1} title` : label(g),
     // the reviewer timeline's labels: 09:12, 09:19, … every 7 minutes
     meta: {
       subtitle: captionMode === '1' ? `Floor ${(g % 3) + 1}` : undefined,
@@ -116,8 +136,19 @@ const viewer = createViewer({
           fullscreen(),
           download(),
           ...customCaption,
+          // view=1: the View menu (rail layout + scheme); its choices are recorded for the spec
+          ...(p.get('view') === '1'
+            ? [
+                view({
+                  onChange: (change) => {
+                    ;(window as unknown as { viewChanges: ViewChange[] }).viewChanges.push(change)
+                  },
+                }),
+              ]
+            : []),
         ],
 })
+;(window as unknown as { viewChanges: ViewChange[] }).viewChanges = []
 mount(viewer, {
   preset: (p.get('preset') ?? undefined) as PresetName | undefined,
   arrows: (p.get('arrows') ?? undefined) as ArrowLayout | undefined,
@@ -126,7 +157,7 @@ mount(viewer, {
   linear: p.get('linear') ? p.get('linear') === '1' : undefined,
   itemIndicator: (p.get('indicator') ?? undefined) as ItemIndicator | undefined,
   controls: p.get('controls') !== '0',
-  autoHide: false, // deterministic: chrome never fades mid-measurement
+  autoHide: p.get('autohide') === '1', // off unless asked: chrome never fades mid-measurement
   skin: p.get('skin') ?? undefined,
   accent: p.get('accent') ?? undefined,
   scheme: (p.get('scheme') ?? undefined) as ColorScheme | undefined,

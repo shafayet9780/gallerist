@@ -1,5 +1,103 @@
 # Changelog
 
+## v0.3.3
+
+### A View menu: the rail's layout and the scheme, in the open viewer (from the Apploye reviewer)
+- **plugin-view (new)**: `view()` adds one toolbar tool, "View", that opens a small menu with a
+  **Rail** group (Stacked or Row, shown while a thumbnails rail is mounted) and a **Scheme** group
+  (Dark or Light). The choices offered, their labels (`strings`), start values (`initial`) and
+  `onChange(change)` are options. `onChange` reports the one setting picked, `{ rail: 'flat' }` or
+  `{ scheme: 'light' }`, when it differs from the stored value, and never a scheme resolved from the
+  system or the skin: a rail choice on a viewer following the system (`auto`, or no scheme set)
+  leaves it following the system, and Dark picked there stores `dark`. Merge each change into what
+  you keep (`{ ...saved, ...change }`), so a saved choice holds only what the user picked. By default
+  the plugin applies a choice itself; a host that owns a setting gets only the report, and the plugin
+  never writes that setting (`initial` and past choices included): `controlled` (`true`,
+  `['scheme']`, `['rail']`), or a mark on the viewer, `Symbol.for('gallerist.controlled')`, which
+  React's `scheme` and `groupDisplay` props set while they're passed. Unknown `initial` values (old
+  or edited storage) are ignored; the user's choices are kept per viewer, so one `view()` can serve
+  several viewers. With nothing to offer (`scheme: false` and no rail built) the tool is hidden, and
+  it shows once a rail is built, whatever the plugin order. It follows the ARIA menu button pattern
+  (`aria-haspopup`, `aria-expanded`, `role="menu"` with a named `menuitemradio` group per section;
+  ↑/↓, Home/End, a letter, Enter/Space, Escape and Tab; focus back on the tool; a press outside
+  closes it, also for a viewer in a shadow root) and keeps the keys it handles from the viewer. It
+  hangs under its tool inside the viewer, follows it when the toolbar strip scrolls, fits a 390px
+  phone, and takes each skin's look in both schemes. While open it listens on the document
+  (`pointerdown`, `scroll`) and the window (`resize`); a renderer destroyed under an open menu drops
+  them at the next such event. `view({ initial })` is read once per viewer, like other plugin
+  options: in React, build the plugins once (`useState`). It isn't in the `@gallerist/cdn` bundle,
+  which it would take past its size budget (its own budget is 2.4 kB; 2,392 B gzipped).
+- **plugin-thumbnails (new)**: `setGroupDisplay(viewer, display)` switches a mounted rail between
+  `stacked`, `flat` and `index` in place (with several thumbnails plugins, the last registered, whose
+  rail shows), and `getGroupDisplay(viewer)` reads it. The current item stays, the rail is drawn
+  again around it, a zoomed image stays zoomed, and the preset rules hold (`timeline` carries into
+  `flat`; `itemAxis` and `numberItems` belong to the preset's own display). Called before the rail
+  mounts, it sets the display the rail mounts with.
+- **plugin-thumbnails (changed)**: a rail keeps its items toggle and its `aside` column for every
+  display it can switch to, instead of leaving them out: on a flat rail the toolbar holds the toggle
+  `hidden` and marked `data-gallerist-off`, and the aside region holds the column `hidden` (it takes
+  no room). A flat rail still doesn't claim `e`, so another plugin's `e` works there; a rail
+  switched to stacked or index takes it back. A rail not built yet (or never, under another
+  renderer) doesn't claim `e` either.
+- **renderer-dom (changed)**: `viewer.refresh()` also reads the rail's `data-gallerist-linear` and the
+  plugins' keymaps again, so a rail switched to or from `flat` turns linear traversal on or off at
+  once, with the counter, the item navigator and the arrows' names (an explicit `linear` still wins),
+  and hands `e` over. With `controls: false` the bar hides when every tool it holds is marked
+  `data-gallerist-off` (a tool its plugin keeps for a later layout); a tool that only sets `hidden`
+  still shows the bar, as before.
+- **react (new)**: a reactive `groupDisplay` prop switches the mounted rail without a remount. While
+  `scheme` or `groupDisplay` is passed it owns that setting: a View menu only reports a choice for
+  it, and doesn't apply its `initial` over it, so the prop and the menu never resolve opposite ways
+  (StrictMode, Fast Refresh, `<Activity>`), and the rail is built once. `<Gallerist>` owns the
+  `Symbol.for('gallerist.controlled')` mark and writes it on every commit, so a mark set by hand
+  through `ref` is overwritten; use `view({ controlled })` instead.
+- **react (fixed)**: `skin`, `accent` and `scheme` are each written only when they change; before,
+  changing one wrote all three, so a scheme set another way (the View menu) was cleared by an accent
+  change.
+- **theme (new)**: the View menu's styles: the item under the pointer takes the tool hover fill and
+  the keyboard's item the focus ring (3:1 or more on the panel in every skin and scheme), so the two
+  never look alike; a rail's hidden `aside` column takes no room.
+
+### Keyboard focus on touch, and zoom through a resize (from the Apploye reviewer)
+- **theme (fixed)**: a docked arrow focused from a keyboard on a touch screen no longer covers the
+  media. With `arrows: 'docked'` (the `reviewer` preset) the group arrows are visually hidden on
+  touch and the stage takes the full width; a keyboard or switch user who tabbed to one got it back
+  over the image (on a 390×844 phone, over the start of a full-width screenshot). Now the stage makes
+  room only while a group arrow has keyboard focus, as much on each side, so letterboxed media holds
+  still: on a landscape screen a gutter at each side, on a portrait one a band above and below the
+  stage, with the arrows in the bottom band (↑ in the top one on a vertical group axis). Landscape or
+  portrait is the screen's, not the viewer's. This holds on stacked and flat rails, left to right and
+  right to left. A focused docked arrow also stays above the zoom minimap, which could cover it on a
+  short stage, with a mouse too. In `immersive` held sideways, its navigator can still cover a
+  focused →.
+- **renderer-dom (fixed)**: zoomed in, a stage that shrinks and grows back returns to the same view.
+  The pan was clamped to the smaller stage and stayed clamped: zoomed 2× at a panorama's right edge
+  on a touch tablet, tabbing past a docked arrow left the view about 140px short of that edge, and a
+  rotation there and back did the same. Now the part of the image at the stage's centre stays there
+  through a resize, and the view comes back as it was. The view remembered through a resize belongs
+  to the current item and to the box it was clamped against: moving to another item in between (the
+  zoom carries over within a group, and across groups with `keepZoomOnNav`), a load that sizes the
+  image, or a frame inset that changes at a breakpoint never pans to a view nobody saw. A load or
+  `viewer.refresh()` re-clamps the view shown, not the remembered one. A stage with no size (a
+  hidden container) commits nothing and fires no `zoom`/`zoomEnd`.
+- **renderer-dom (known limitation)**: a resize in the middle of a pinch, or before a wheel zoom
+  settles (~90 ms), shows the re-clamped view for a frame; the gesture then commits from where it
+  began, in the old stage's pixels (clamped to the new stage), so the re-clamp's view is lost. This
+  predates 0.3.3; deferring the re-clamp to the gesture's end doesn't fit the core + renderer-dom size
+  budget (16,497 of 16,500 B gzipped).
+- **theme (fixed)**: idle auto-hide no longer fades a control that has keyboard focus, nor the band
+  (or `immersive` rail) it is in, so a keyboard user who pauses on one still sees where focus is.
+  Browsers without `:has()` or `:focus-visible` (iOS Safari 15.0–15.3) fade all the chrome as in
+  0.3.2. The exemption adds no specificity, so a page's own idle style still applies. A click or tap
+  on the stage moves focus to the viewer, so the chrome fades again after keyboard use; a swipe or
+  pinch moves no focus, as a page scroll doesn't.
+
+### Index chips of different widths
+- **plugin-thumbnails (fixed)**: with index chips of different widths (a chip is as wide as its
+  group's name), the rail now shows the current chip's neighbours whenever the three fit. Before,
+  centring the current chip could leave a wider neighbour cut off (from 0.3.2). Now the rail goes on
+  from the centre only as far as shows all three, and still centres the chip where they don't fit.
+
 ## v0.3.2
 
 ### Pin cards and the rail on phones (from the Apploye reviewer)

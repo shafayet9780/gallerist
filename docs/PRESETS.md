@@ -92,6 +92,13 @@ carries over unless you pass `timeline: false`.
   and item count; the active group's items expand under its row. At 900px wide or less, or on a
   bottom rail, it's a strip of chips instead, which don't expand.
 
+**Switching at run time.** The display of a mounted rail can change without a remount:
+`setGroupDisplay(viewer, 'flat')` (from `@gallerist/plugin-thumbnails`), React's reactive
+`groupDisplay` prop, or the View menu (`@gallerist/plugin-view`). The current item stays, the rail is
+drawn again around it, and the switch counts as an explicit `groupDisplay`, so the rules above hold:
+under `reviewer`, a switch to `flat` keeps the timeline and drops the numbering, and a switch back to
+`stacked` (the preset's own display) brings the numbering back. Linear traversal follows (below).
+
 ## Linear traversal (`mount({ linear })`, `<Gallerist linear>`)
 
 In linear traversal ←/→ (↑/↓ beside a side rail) walk the flattened item sequence across groups
@@ -103,9 +110,11 @@ It follows the rail by default: a flat thumbnails rail (`thumbnails({ groupDispl
 it on, since that rail shows every item in one run; a stacked or index rail, or no rail, leaves it
 off. The thumbnails plugin marks its region with `data-gallerist-linear` in flat mode and the renderer
 reads that whenever the plugin set changes, so a rail added or removed after mount (or a new mount
-with another preset) updates it. An explicit option wins either way: `linear: false` (React:
-`linear={false}`) keeps the group and item axes under a flat rail, and `linear: true` makes any rail
-linear. React passes nothing when the prop is omitted, so the rail decides there too.
+with another preset) updates it, and again on `viewer.refresh()`, which a rail switched at run time
+calls: the counter, the item navigator and the arrows follow at once. An explicit option wins either
+way: `linear: false` (React: `linear={false}`) keeps the group and item axes under a flat rail, and
+`linear: true` makes any rail linear. React passes nothing when the prop is omitted, so the rail
+decides there too.
 
 ## Arrow placement (`data-gallerist-arrows`)
 
@@ -118,18 +127,18 @@ The ←/→ group arrows stay on the side edges; the option places the **item na
 - `split` — ↑ at top-centre with the position under it, ↓ at bottom-centre.
 - `docked` (the `reviewer` preset) — nothing over the media, for review that needs every pixel,
   corners included. The group arrows sit in gutters the stage leaves at its sides (on touch, where
-  swipes stand in for them, the stage takes the full width). The navigator leaves the stage: the
-  `n / N` count over ↑ ↓, as a header on the `aside` item column while that shows (a `stacked`
-  rail's vertical item stack, over 600px wide, rail expanded), otherwise at the end of the caption
-  row, beside a text caption or a designed one (`plugin-captions`, `<Gallerist.Caption>`), which make
-  room for it. It shows the count rather than pills or dots. While any group has several items it
-  keeps its room on a one-item group, so neither the stage nor the item column moves (not in
-  `linear` mode, which has no navigator). A one-group collection has no group arrows and no
-  gutters (in `linear` mode the arrows walk the items, so they stay). Keyboard order follows the
-  layout: the caption band, then the navigator, then the item column it heads. One exception, by
-  design: the zoom minimap (the `reviewer`'s zoom navigator) still sits in the stage's corner over
-  the media; it shows only while zoomed in and is the zoom tool itself. An open pin card
-  (`plugin-pins`) keeps clear of it. With other presets:
+  swipes stand in for them, the stage takes the full width until one has keyboard focus, below).
+  The navigator leaves the stage: the `n / N` count over ↑ ↓, as a header on the `aside` item
+  column while that shows (a `stacked` rail's vertical item stack, over 600px wide, rail expanded),
+  otherwise at the end of the caption row, beside a text caption or a designed one
+  (`plugin-captions`, `<Gallerist.Caption>`), which make room for it. It shows the count rather
+  than pills or dots. While any group has several items it keeps its room on a one-item group, so
+  neither the stage nor the item column moves (not in `linear` mode, which has no navigator). A
+  one-group collection has no group arrows and no gutters (in `linear` mode the arrows walk the
+  items, so they stay). Keyboard order follows the layout: the caption band, then the navigator,
+  then the item column it heads. One exception, by design: the zoom minimap (the `reviewer`'s zoom
+  navigator) still sits in the stage's corner over the media; it shows only while zoomed in and is
+  the zoom tool itself. An open pin card (`plugin-pins`) keeps clear of it. With other presets:
   `editorial` without a placard ends its caption column with the navigator, under the caption;
   `immersive`, whose stage runs under every band, puts it in the stage's bottom inline-end corner
   above the caption band, as `corner-br` does, so there it sits over the media.
@@ -141,7 +150,22 @@ count, up to 12 items), or `counter` (always `n / N`).
 On a touch screen the on-image arrows are visually hidden (swipes navigate; screen readers still
 reach them) and the navigator shows only the `n / N` position, at the bottom centre of the stage
 (`docked`: where it docks, with its ↑ ↓). A group arrow focused from a keyboard on a touch screen
-comes back over the stage edge while it has focus, `docked` included.
+(a tablet's keyboard, switch access) comes back while it has focus: over the stage edge in the other
+layouts, beside the media in `docked`. There the stage makes room for it only while a group arrow
+has keyboard focus (`:focus-visible`; an arrow a script focuses after a tap stays hidden and takes
+no room), as much on each side, so letterboxed media holds still: on a landscape screen a gutter at
+each side (on a vertical group axis too, where a mouse gets only the inline-end one); on a portrait
+one a band above and below the stage, with the arrows in the bottom band (on a vertical group axis
+↑ takes the top one). `immersive`, whose navigator holds that corner, keeps the gutters upright
+too; there, held sideways on a short stage, its navigator can cover a focused → (as it can with a
+mouse). Zoomed in, the part of the image at the stage's centre stays there while the stage makes
+room, and the view comes back as it was when focus moves on (as after a rotation there and back).
+A focused docked arrow also stays above the zoom minimap.
+
+Landscape or portrait here is the screen's (a media query), not the viewer's: an inline viewer that
+is wide but short on a portrait screen still gets the bands, which take from its height. Following
+the viewer's own shape needs container queries, which iOS Safari has only from 16, above the
+library's iOS 15 floor.
 
 ## Layout areas, rail collapse & idle auto-hide
 
@@ -162,9 +186,11 @@ when they shrink). Keep them a steady height if the image shouldn't move between
   item stack. Entering fullscreen collapses it by default and exit restores the prior state.
 - **Auto-hide chrome on idle** (`autoHide`, default `true`) flags `data-gallerist-idle` after
   inactivity; the chrome fades but keeps its place, so nothing jumps. Plugin tools in the bar fade
-  with it on purpose; they come back on the next pointer move or key press. It is **inert under
-  `prefers-reduced-motion`**. The `immersive` preset additionally fades the rail + toolbar, and
-  there the floating bar and caption let clicks through to the image except on their buttons.
+  with it on purpose; they come back on the next pointer move or key press. A control with keyboard
+  focus doesn't fade, nor the band or rail it is in, so a keyboard user who pauses still sees where
+  focus is. It is **inert under `prefers-reduced-motion`**. The `immersive` preset additionally
+  fades the rail + toolbar, and there the floating bar and caption let clicks through to the image
+  except on their buttons.
 - **Zoom reset** appears only while zoomed in.
 - **Framed media** (`frame: true`, on in `editorial`): the work hangs inside the stage with room
   around it (the skin's `--gallerist-frame-inset`), and the media element is sized to the image so
@@ -216,6 +242,12 @@ mount(viewer, { skin: 'console', accent: 'cyan', scheme: 'auto' })
 ```tsx
 <Gallerist skin="console" accent="cyan" scheme="auto" … /> // React: all three are reactive
 ```
+
+To let people switch the scheme (and the rail's layout) from inside the viewer, add the View menu,
+`@gallerist/plugin-view`. It sets `data-gallerist-scheme` itself, or, for a host that owns the scheme
+(`controlled`; in React, while the `scheme` prop is passed), reports the choice for the host to
+apply. React writes each appearance prop only when it changes, so a scheme the menu set stays while
+the host's other props move.
 
 Without its stylesheet a skin falls back to Gallery, and an accent the skin doesn't name falls back
 to the skin's default. Gallery uses Instrument Sans when the page has loaded it and the system sans

@@ -1025,6 +1025,71 @@ describe('mount — chrome structure (M15)', () => {
     expect(document.querySelector('.gallerist-bar .gallerist-region-toolbar')).not.toBeNull()
     expect(document.querySelector('.gallerist-close')).toBeNull()
   })
+
+  it('without built-in controls, a tool that starts hidden still shows the bar (it may show itself)', () => {
+    const tool = document.createElement('button')
+    tool.hidden = true
+    const v = createViewer({
+      collection: collection(),
+      plugins: [() => ({ name: 'tool', regions: { toolbar: () => tool } })],
+    })
+    mount(v, { controls: false })
+    v.open()
+    const bar = document.querySelector('.gallerist-bar') as HTMLElement
+    expect(bar.hidden).toBe(false)
+    tool.hidden = false // no refresh
+    expect(bar.hidden).toBe(false)
+  })
+
+  it('without built-in controls, a bar of tools marked off hides until one is not (refresh)', () => {
+    const tool = document.createElement('button')
+    tool.hidden = true
+    tool.setAttribute('data-gallerist-off', '')
+    const v = createViewer({
+      collection: collection(),
+      plugins: [() => ({ name: 'tool', regions: { toolbar: () => tool } })],
+    })
+    mount(v, { controls: false })
+    v.open()
+    const bar = document.querySelector('.gallerist-bar') as HTMLElement
+    expect(bar.hidden).toBe(true)
+    tool.hidden = false
+    tool.removeAttribute('data-gallerist-off')
+    v.refresh()
+    expect(bar.hidden).toBe(false)
+  })
+
+  it('reads the plugins’ keymaps again on viewer.refresh()', () => {
+    const a = vi.fn()
+    const b = vi.fn()
+    let keymap: Record<string, () => void> | undefined = { q: a }
+    const v = createViewer({
+      collection: collection(),
+      plugins: [
+        () => ({ name: 'other', keymap: { q: b } }),
+        () => ({
+          name: 'switching',
+          get keymap() {
+            return keymap
+          },
+        }),
+      ],
+    })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const press = () =>
+      root.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', bubbles: true }))
+    press()
+    expect(a).toHaveBeenCalledTimes(1)
+    keymap = undefined
+    press() // not read yet
+    expect(a).toHaveBeenCalledTimes(2)
+    v.refresh()
+    press()
+    expect(b).toHaveBeenCalledTimes(1)
+    expect(a).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('mount — strings (translation)', () => {
@@ -1362,6 +1427,25 @@ describe('mount — linear follows the rail (a flat rail asks for it)', () => {
     expect(w.getState().cursor).toEqual({ g: 2, i: 0 })
   })
 
+  it('reads the marker again on viewer.refresh(): a rail that switches its display', () => {
+    const node = document.createElement('div')
+    const v = openWith([() => ({ name: 'rail', regions: { thumbnails: () => node } })])
+    v.goTo(1, 1)
+    expect(counter()).toContain('2 / 3')
+    node.setAttribute('data-gallerist-linear', '') // the rail went flat; nothing re-mounted
+    expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+    v.refresh()
+    expect(root().getAttribute('data-gallerist-linear')).toBe('true')
+    expect(counter()).toContain('3 / 6')
+    expect((document.querySelector('.gallerist-itemnav') as HTMLElement).hidden).toBe(true)
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+    node.removeAttribute('data-gallerist-linear')
+    v.refresh()
+    expect(root().hasAttribute('data-gallerist-linear')).toBe(false)
+    expect(counter()).toContain('2 / 3')
+  })
+
   it('follows a rail added and removed after mount, chrome included', () => {
     const v = openWith([])
     v.goTo(1, 1)
@@ -1548,6 +1632,206 @@ describe('mount — resize re-clamp (C2)', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+
+  // A stage that shrinks and grows back: on touch, `docked` makes room for a focused group arrow
+  // (gutters, or bands above and below) and gives it back when focus moves on; a rotation there and
+  // back. The zoom's pan is in stage pixels; the view must come back, not stay clamped to the
+  // smaller stage. A 2:1 image, zoomed 2× into its bottom inline-end corner of a 1000×800 stage.
+  describe('a stage that shrinks and grows back returns to the same view', () => {
+    const corner = { scale: 2, x: -1000, y: -500 }
+    const open = (
+      items: Item[] = [{ ...item('w'), naturalSize: { w: 1000, h: 500 } }],
+      opts: Parameters<typeof mount>[1] = {},
+    ) => {
+      const roCbs: (() => void)[] = []
+      class FakeRO {
+        constructor(cb: () => void) {
+          roCbs.push(cb)
+        }
+        observe() {}
+        disconnect() {}
+      }
+      vi.stubGlobal('ResizeObserver', FakeRO)
+      // a frame runs at once; id 0, so the renderer's one-frame debounce lets the next one through
+      vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
+        cb()
+        return 0
+      })
+      vi.stubGlobal('cancelAnimationFrame', () => {})
+      const v = createViewer({ collection: { groups: [{ id: 'g', items }] } })
+      const h = mount(v, opts)
+      v.open()
+      const stage = document.querySelector('.gallerist-stage') as HTMLElement
+      let size = { w: 1000, h: 800 }
+      vi.spyOn(stage, 'getBoundingClientRect').mockImplementation(
+        () =>
+          ({ width: size.w, height: size.h, left: 0, top: 0, x: 0, y: 0 }) as unknown as DOMRect,
+      )
+      const resize = (w: number, hh: number) => {
+        size = { w, h: hh }
+        for (const cb of roCbs) cb()
+      }
+      return { v, h, resize }
+    }
+    const expectZoom = (v: ReturnType<typeof createViewer>, z: typeof corner) => {
+      const now = v.getState().zoom
+      expect(now.scale).toBe(z.scale)
+      expect(now.x).toBeCloseTo(z.x, 6)
+      expect(now.y).toBeCloseTo(z.y, 6)
+    }
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('gutters: narrower, then back', () => {
+      const { v, h, resize } = open()
+      getInternals(v).setZoom(corner) // the painted 1000×500 box, scaled to 2000×1000: its corner
+      expectZoom(v, corner)
+      resize(600, 800) // the box is 600×300 now (1200×600 zoomed, under the stage's height: centred)
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      resize(1000, 800)
+      expectZoom(v, corner) // the old code kept x at -600: 400px short of the edge it was at
+      h.destroy()
+    })
+
+    it('a rotation and back', () => {
+      const { v, h, resize } = open()
+      getInternals(v).setZoom(corner)
+      resize(800, 1000) // 800×400 at y 300: x clamps to its edge, y centres
+      expectZoom(v, { scale: 2, x: -800, y: -500 })
+      resize(1000, 800)
+      expectZoom(v, corner) // the old code came back at x -800
+      h.destroy()
+    })
+
+    it('bands: shorter, then back, the box held by its height in between', () => {
+      const { v, h, resize } = open()
+      getInternals(v).setZoom(corner)
+      resize(1000, 400) // the box is 800×400 at x 100: x clamps to its edge (-800)
+      expectZoom(v, { scale: 2, x: -800, y: -280 })
+      resize(1000, 800)
+      expectZoom(v, corner) // the old code came back at (-800, -400)
+      h.destroy()
+    })
+
+    it('a pan in between is the view that comes back', () => {
+      const { v, h, resize } = open()
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      getInternals(v).setZoom({ scale: 2, x: 0, y: -400 }) // panned to the image's start edge
+      resize(1000, 800)
+      expectZoom(v, { scale: 2, x: 0, y: -400 }) // still at that edge, the same height
+      h.destroy()
+    })
+
+    it('at fit there is nothing to keep: it stays centred', () => {
+      const { v, h, resize } = open()
+      resize(600, 800)
+      resize(1000, 800)
+      expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+      h.destroy()
+    })
+
+    // What is kept for the way back belongs to the item it was worked out for, against the box it
+    // was clamped to. The gutters shrink above clamps the corner's height: it aimed for y -460.
+    // An adapter whose natural size and load the test drives.
+    const driven = () => {
+      const media = new Map<string, { size: { w: number; h: number } | null; load(): void }>()
+      const adapter = {
+        type: 'image',
+        mount: (it: Item, slot: HTMLElement) => {
+          const img = document.createElement('img')
+          slot.appendChild(img)
+          const m = { size: it.naturalSize ?? null, load: () => {} }
+          const ready = new Promise<void>((resolve) => {
+            m.load = resolve
+          })
+          media.set(it.id, m)
+          return {
+            element: img,
+            ready,
+            supportsZoom: true,
+            naturalSize: () => m.size,
+            destroy: () => img.remove(),
+          }
+        },
+      }
+      return { media, adapters: [adapter] }
+    }
+    const flush = () => new Promise((r) => setTimeout(r, 0))
+    // a portrait 3:4 image: at 600×800 it fills the stage, 1200×1600 at 2×, room for y -460
+    const pair = () => [
+      { ...item('w'), naturalSize: { w: 1000, h: 500 } },
+      { ...item('p'), naturalSize: { w: 600, h: 800 } },
+    ]
+
+    it('the next item, loading in between, opens at the view shown, not the last item’s aim', async () => {
+      const { media, adapters } = driven()
+      const { v, h, resize } = open(pair(), { adapters })
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      v.nextItem() // the zoom carries over, as it is
+      media.get('p')?.load()
+      await flush()
+      expectZoom(v, { scale: 2, x: -600, y: -400 }) // the old code panned to the last item's -460
+      resize(1000, 800) // back: the portrait is 600 wide at x 200, x clamps to its edge
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      h.destroy()
+    })
+
+    it('the next item, not loaded yet, does not take the last item’s aim on the way back', () => {
+      const { adapters } = driven()
+      const { v, h, resize } = open(pair(), { adapters })
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      v.nextItem()
+      resize(1000, 800)
+      expectZoom(v, { scale: 2, x: -600, y: -400 }) // the old code went to the last item's -460
+      h.destroy()
+    })
+
+    it('a load in between that sizes the image: the view shown stays, and is the one that returns', async () => {
+      const { media, adapters } = driven()
+      const { v, h, resize } = open(undefined, { adapters })
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      const m = media.get('w')
+      if (m) m.size = { w: 1000, h: 700 } // the hint was off: 600×420 at y 190, y in [-420, -380]
+      m?.load()
+      await flush()
+      expectZoom(v, { scale: 2, x: -600, y: -400 }) // the old code moved to -420, toward the aim
+      resize(1000, 800) // 1000×700 at y 50: the image's middle, as shown, at its end edge
+      expectZoom(v, { scale: 2, x: -1000, y: -400 })
+      h.destroy()
+    })
+
+    it('a frame inset that changes with the stage (a breakpoint) still returns', () => {
+      const { v, h, resize } = open(undefined, { frame: true })
+      const root = document.querySelector('.gallerist') as HTMLElement
+      getInternals(v).setZoom(corner) // no inset yet: the box is the same as unframed
+      root.style.setProperty('--gallerist-frame-inset', '50px')
+      resize(600, 800) // 500×250 at (50, 275): x clamps to its edge, y centres
+      expectZoom(v, { scale: 2, x: -500, y: -400 })
+      root.style.setProperty('--gallerist-frame-inset', '0px')
+      resize(1000, 800)
+      expectZoom(v, corner) // the old code mapped from the box at the new inset: x -963
+      h.destroy()
+    })
+
+    it('a stage with no size in between commits nothing, and the way back still returns', () => {
+      const { v, h, resize } = open()
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      const zoomEnd = vi.fn()
+      v.on('zoomEnd', zoomEnd)
+      resize(0, 0) // hidden (display: none)
+      expect(zoomEnd).not.toHaveBeenCalled() // the old code committed the aim, unclamped
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      resize(1000, 800)
+      expectZoom(v, corner)
+      h.destroy()
+    })
   })
 })
 

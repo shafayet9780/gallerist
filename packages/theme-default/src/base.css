@@ -551,8 +551,10 @@
   padding: 8px;
   padding-inline-start: 0;
 }
-/* collapsing the rail puts its item stack away too (fullscreen, `t`, rail: 'hidden') */
-.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside {
+/* collapsing the rail puts its item stack away too (fullscreen, `t`, rail: 'hidden'); a rail switched
+   to flat or index leaves the column hidden */
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside,
+.gallerist-thumbs-aside[hidden] {
   display: none;
 }
 .gallerist-thumb-item {
@@ -857,6 +859,89 @@
   height: 22px;
   display: block;
   pointer-events: none;
+}
+
+/* ── the View menu (plugin-view): a dropdown under its bar tool ──────────────────── */
+/* The plugin puts it in the viewer root (the toolbar strip scrolls, so it would clip it) and sets its
+   top / left under the button; it is as small as its choices, so it covers only the stage's top edge. */
+.gallerist-view-menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  min-width: 168px;
+  max-width: calc(100% - 16px);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-panel);
+  backdrop-filter: var(--gallerist-blur);
+  box-shadow: var(--gallerist-shadow);
+  color: var(--gallerist-fg);
+  font: 400 14px / 1.3 var(--gallerist-font);
+}
+.gallerist-view-group + .gallerist-view-group {
+  margin-block-start: 4px;
+  padding-block-start: 4px;
+  border-block-start: 1px solid var(--gallerist-hairline);
+}
+.gallerist-view-heading {
+  padding: 6px 10px 4px;
+  color: var(--gallerist-fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.gallerist-view-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding-inline: 10px 14px;
+  border-radius: min(var(--gallerist-radius), 6px);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* a radio mark: a ring, filled in the selection colour for the checked choice */
+.gallerist-view-item::before {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.6;
+}
+.gallerist-view-item[aria-checked="true"]::before {
+  border-color: var(--gallerist-selection);
+  background: radial-gradient(circle, var(--gallerist-selection) 0 3px, transparent 3.5px);
+  opacity: 1;
+}
+/* the pointer's item takes the tool hover fill, the keyboard's the focus ring: the two never look
+   alike (nor like the checked mark) when they are different items */
+.gallerist-view-item:hover {
+  background: var(--gallerist-tool-hover-bg);
+}
+.gallerist-view-item:focus {
+  outline: none;
+}
+.gallerist-view-item:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: -2px;
+}
+/* its button reads as held while the menu is open */
+.gallerist-bar button[aria-expanded="true"] {
+  background: var(--gallerist-tool-hover-bg);
+}
+@media (pointer: coarse) {
+  .gallerist-view-item {
+    min-height: var(--gallerist-target);
+  }
 }
 
 /* ── top bar: counter → title → tools → zoom reset → close ─────────────────────── */
@@ -1659,13 +1744,34 @@
 .gallerist-caption {
   transition: opacity var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
 }
-.gallerist[data-gallerist-idle] .gallerist-bar,
-.gallerist[data-gallerist-idle] .gallerist-controls > button,
-.gallerist[data-gallerist-idle] .gallerist-itemnav,
-.gallerist[data-gallerist-idle] .gallerist-navigator,
-.gallerist[data-gallerist-idle] .gallerist-caption {
-  opacity: 0;
-  pointer-events: none;
+/* except what has keyboard focus, and the band holding it (WCAG 2.4.7): a keyboard user who pauses
+   on a control still sees where focus is. Without :has() and :focus-visible (iOS Safari before
+   15.4) all of it fades, as before; an unforgiving :not() there would drop the whole rule. The
+   exemption sits in :where(), so the rule keeps the specificity host overrides were written for. */
+@supports not selector(:has(:focus-visible)) {
+  .gallerist[data-gallerist-idle] .gallerist-bar,
+  .gallerist[data-gallerist-idle] .gallerist-controls > button,
+  .gallerist[data-gallerist-idle] .gallerist-itemnav,
+  .gallerist[data-gallerist-idle] .gallerist-navigator,
+  .gallerist[data-gallerist-idle] .gallerist-caption {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+@supports selector(:has(:focus-visible)) {
+  .gallerist[data-gallerist-idle] .gallerist-bar:where(:not(:focus-visible, :has(:focus-visible))),
+  .gallerist[data-gallerist-idle]
+    .gallerist-controls
+    > button:where(:not(:focus-visible, :has(:focus-visible))),
+  .gallerist[data-gallerist-idle]
+    .gallerist-itemnav:where(:not(:focus-visible, :has(:focus-visible))),
+  .gallerist[data-gallerist-idle]
+    .gallerist-navigator:where(:not(:focus-visible, :has(:focus-visible))),
+  .gallerist[data-gallerist-idle]
+    .gallerist-caption:where(:not(:focus-visible, :has(:focus-visible))) {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 /* ── a11y live region (visually hidden) ────────────────────────────────────── */
@@ -1747,10 +1853,20 @@
   pointer-events: none; /* a fading viewer must not take clicks meant for the page */
 }
 
-/* immersive preset: chrome AND the rail fade together on idle (UX-E). */
-.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-thumbnails {
-  opacity: 0;
-  pointer-events: none;
+/* immersive preset: chrome AND the rail fade together on idle (UX-E), unless focus is in it (as
+   above: where :has() is unsupported it fades all the same). */
+@supports not selector(:has(:focus-visible)) {
+  .gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-thumbnails {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+@supports selector(:has(:focus-visible)) {
+  .gallerist[data-gallerist-preset="immersive"][data-gallerist-idle]
+    .gallerist-region-thumbnails:where(:not(:has(:focus-visible))) {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 .gallerist[data-gallerist-preset="immersive"] .gallerist-region-thumbnails {
   transition: opacity var(--gallerist-dur-gentle) var(--gallerist-ease-out);
@@ -1985,23 +2101,68 @@
 
 /* ── docked controls (`arrows: 'docked'`, the reviewer preset): nothing over the media ─────────
    Review needs every pixel, corners included. The group arrows sit in gutters the stage leaves at
-   its sides (none on touch, where swipes stand in for them). The item navigator is a grid item of
-   the root, the count over ↑ ↓: a header on the aside item column while that shows, else at the
-   end of the caption row, which makes room for it. While any group has several items it keeps its
-   room on a one-item group, so the stage and the item column hold still. Last in the file, so it
-   wins over the arrow layouts and the touch chip above. Where no row or column beside the stage is
-   free (immersive) it falls back to the stage's corner; the zoom minimap stays over the media (it
-   shows only while zoomed, and is the zoom tool itself). */
+   its sides (on touch, where swipes stand in for them, only while one has keyboard focus). The
+   item navigator is a grid item of the root, the count over ↑ ↓: a header on the aside item column
+   while that shows, else at the end of the caption row, which makes room for it. While any group
+   has several items it keeps its room on a one-item group, so the stage and the item column hold
+   still. Last in the file, so it wins over the arrow layouts and the touch chip above. Where no row
+   or column beside the stage is free (immersive) it falls back to the stage's corner; the zoom
+   minimap stays over the media (it shows only while zoomed, and is the zoom tool itself). */
 .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
   inset-inline: calc(var(--gallerist-arrow-size) + 24px);
 }
 .gallerist[data-gallerist-arrows="docked"][data-gallerist-axis="vertical"] .gallerist-stage {
   inset-inline-start: 0; /* both group arrows stack at the inline end */
 }
+/* touch: the stage takes the full width. A keyboard or switch user on touch still reaches the
+   arrows, which then come back beside the media, never over it: the stage makes room for them only
+   while one has keyboard focus (:focus-visible; one focused by a script after a tap stays hidden,
+   and takes no room), as much on each side, so letterboxed media holds still. Held sideways that is
+   a gutter at each side (on a vertical group axis too, where a mouse gets only the end one);
+   upright, where most photos and screenshots leave their spare room above and below, it is a band
+   at the top and the bottom instead, the arrows in the bottom one (↑ in the top one on a vertical
+   axis), 12px from either edge as in a gutter, which leaves the focus ring 8px clear; not in
+   immersive, whose navigator has that corner. Sideways or upright is the screen's, not the
+   viewer's: a container query would follow the viewer, but needs Safari 16. */
 @media (pointer: coarse) {
   .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
     inset-inline: 0;
   }
+  .gallerist[data-gallerist-arrows="docked"]:has(
+      .gallerist-controls > :is(.gallerist-prev, .gallerist-next):focus-visible
+    )
+    .gallerist-stage {
+    inset-inline: calc(var(--gallerist-arrow-size) + 24px);
+  }
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-preset="immersive"]):has(
+      .gallerist-controls > :is(.gallerist-prev, .gallerist-next):focus-visible
+    )
+    .gallerist-stage {
+    inset: calc(var(--gallerist-arrow-size) + 24px) 0;
+  }
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-preset="immersive"])
+    .gallerist-controls
+    > :is(.gallerist-prev, .gallerist-next):focus-visible {
+    top: auto;
+    bottom: 12px;
+    transform: none;
+  }
+  .gallerist[data-gallerist-arrows="docked"][data-gallerist-axis="vertical"]:not(
+      [data-gallerist-preset="immersive"]
+    )
+    .gallerist-controls
+    > .gallerist-prev:focus-visible {
+    top: 12px;
+    bottom: auto;
+  }
+}
+/* and above the zoom minimap, which can reach a gutter on a short stage */
+.gallerist[data-gallerist-arrows="docked"]
+  .gallerist-controls
+  > :is(.gallerist-prev, .gallerist-next):focus-visible {
+  z-index: 5;
 }
 /* one group (and no linear walk): the group arrows have nowhere to go, so they and their gutters go */
 .gallerist[data-gallerist-arrows="docked"][data-gallerist-one-group]:not([data-gallerist-linear])

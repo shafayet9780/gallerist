@@ -1,7 +1,7 @@
 # @gallerist/cdn
 
 Gallerist as one `<script>`, for pages with no build step: the core, the DOM renderer and every plugin
-on a global `Gallerist`. Using a bundler? Install the packages you need instead; they tree-shake.
+but `plugin-view` (kept out to hold the bundle under its size budget) on a global `Gallerist`. Using a bundler? Install the packages you need instead; they tree-shake.
 
 ```html
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gallerist/theme-default/src/gallerist.css" />

@@ -13,6 +13,20 @@ const ready = async (page: Page, query = '') => {
     'data-gallerist-loaded',
     '',
   )
+  // The renderer paints the pins again as the image loads and when the stage's first resize
+  // observation re-anchors them (a frame or two after mount). On a slow machine (Linux WebKit in CI)
+  // that repaint can land after the load, and a pin measured or focused just then is a node that is
+  // leaving the page ("pin b not visible"): wait until the pins have stayed the same for 5 frames.
+  await page.evaluate(async () => {
+    const frame = () => new Promise((r) => requestAnimationFrame(r))
+    let pin = document.querySelector('.gallerist-pin')
+    for (let same = 0; same < 5; ) {
+      await frame()
+      const now = document.querySelector('.gallerist-pin')
+      same = now === pin ? same + 1 : 0
+      pin = now
+    }
+  })
 }
 // the painted image box (object-fit: contain) in screen px
 const imageBox = (page: Page) =>

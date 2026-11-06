@@ -3,8 +3,10 @@
 import type { Collection, MediaAdapter, Plugin, RegionCtx, ViewerApi } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { StrictMode, createRef, useState } from 'react'
+import { StrictMode, createRef, useEffect, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { type ThumbnailsInstance, thumbnails } from '../../plugin-thumbnails/src/index'
+import { type ViewChange, type ViewState, view } from '../../plugin-view/src/index'
 import { Gallerist } from './Gallerist'
 import { useViewerContext } from './context'
 import { useCurrentItem } from './useCurrentItem'
@@ -609,5 +611,254 @@ describe('portal bridge', () => {
       act(() => ref.current?.open({ g: 2 }))
       expect(counter()).toContain('3 / 3')
     })
+  })
+})
+
+describe('<Gallerist> — a live rail layout and scheme (plugin-view)', () => {
+  const threeGroups: Collection = {
+    groups: [
+      { id: 'g0', items: [{ id: 'a0', type: 'image', source: 'a0.jpg' }] },
+      {
+        id: 'g1',
+        items: [
+          { id: 'b0', type: 'image', source: 'b0.jpg' },
+          { id: 'b1', type: 'image', source: 'b1.jpg' },
+        ],
+      },
+      { id: 'g2', items: [{ id: 'c0', type: 'image', source: 'c0.jpg' }] },
+    ],
+  }
+  const root = () => document.querySelector('.gallerist') as HTMLElement
+  const display = () => document.querySelector('.gallerist-thumbs')?.getAttribute('data-display')
+  const railOf = (v: ViewerApi) =>
+    getInternals(v)
+      .getPlugins()
+      .find((p) => p.name === 'thumbnails') as ThumbnailsInstance
+  const choose = (label: string) => {
+    act(() => (document.querySelector('.gallerist-view-btn') as HTMLButtonElement).click())
+    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+      (i) => i.textContent === label,
+    )
+    act(() => item?.click())
+  }
+
+  it('groupDisplay switches the mounted rail in place: no remount, the item kept', () => {
+    const ref = createRef<ViewerApi>()
+    const plugins = [thumbnails()]
+    const { rerender } = render(
+      <Gallerist ref={ref} collection={threeGroups} open plugins={plugins} groupDisplay="flat" />,
+    )
+    const first = root()
+    const rail = document.querySelector('.gallerist-thumbs')
+    expect(display()).toBe('flat') // built flat, not switched after mount
+    expect(first.getAttribute('data-gallerist-linear')).toBe('true')
+    act(() => ref.current?.goTo(1, 1))
+    rerender(
+      <Gallerist
+        ref={ref}
+        collection={threeGroups}
+        open
+        plugins={plugins}
+        groupDisplay="stacked"
+      />,
+    )
+    expect(root()).toBe(first)
+    expect(document.querySelector('.gallerist-thumbs')).toBe(rail)
+    expect(display()).toBeNull()
+    expect(first.hasAttribute('data-gallerist-linear')).toBe(false)
+    expect(ref.current?.getState().cursor).toMatchObject({ g: 1, i: 1 })
+    // omitted: the rail keeps what it shows
+    rerender(<Gallerist ref={ref} collection={threeGroups} open plugins={plugins} />)
+    expect(railOf(ref.current as ViewerApi).display).toBe('stacked')
+  })
+
+  it('groupDisplay under StrictMode: the rail of the second mount gets it', () => {
+    render(
+      <StrictMode>
+        <Gallerist collection={threeGroups} open plugins={[thumbnails()]} groupDisplay="flat" />
+      </StrictMode>,
+    )
+    expect(document.querySelectorAll('.gallerist-thumbs').length).toBe(1)
+    expect(display()).toBe('flat')
+  })
+
+  it('a scheme set on the root another way stays when the accent changes', () => {
+    const { rerender } = render(<Gallerist collection={threeGroups} open accent="mint" />)
+    root().setAttribute('data-gallerist-scheme', 'light') // e.g. an uncontrolled View menu
+    rerender(<Gallerist collection={threeGroups} open accent="amber" />)
+    expect(root().getAttribute('data-gallerist-accent')).toBe('amber')
+    expect(root().getAttribute('data-gallerist-scheme')).toBe('light')
+    rerender(<Gallerist collection={threeGroups} open accent="amber" scheme="dark" />)
+    expect(root().getAttribute('data-gallerist-scheme')).toBe('dark') // a changed prop is written
+  })
+
+  it('uncontrolled: the menu applies the choice, React leaves it alone', async () => {
+    const onChange = vi.fn()
+    const { rerender } = render(
+      <Gallerist
+        collection={threeGroups}
+        open
+        accent="mint"
+        plugins={[thumbnails(), view({ initial: { scheme: 'light' }, onChange })]}
+      />,
+    )
+    await act(async () => {}) // the initial scheme lands once the button is in the viewer
+    expect(root().getAttribute('data-gallerist-scheme')).toBe('light')
+    choose('Row')
+    expect(display()).toBe('flat')
+    choose('Dark')
+    expect(onChange).toHaveBeenLastCalledWith({ scheme: 'dark' })
+    rerender(
+      <Gallerist
+        collection={threeGroups}
+        open
+        accent="amber"
+        plugins={[thumbnails(), view({ onChange })]}
+      />,
+    )
+    expect(root().getAttribute('data-gallerist-scheme')).toBe('dark')
+    expect(display()).toBe('flat')
+  })
+
+  it('controlled: the host owns scheme and groupDisplay; the menu reports and follows', () => {
+    const changes: ViewChange[] = []
+    function Host() {
+      const [prefs, setPrefs] = useState<ViewState>({ rail: 'stacked', scheme: 'dark' })
+      const [plugins] = useState(() => [
+        thumbnails(),
+        view({
+          controlled: true,
+          onChange: (change) => {
+            changes.push(change)
+            setPrefs((p) => ({ ...p, ...change }))
+          },
+        }),
+      ])
+      return (
+        <Gallerist
+          collection={threeGroups}
+          open
+          plugins={plugins}
+          scheme={prefs.scheme}
+          groupDisplay={prefs.rail}
+        />
+      )
+    }
+    render(<Host />)
+    const first = root()
+    choose('Row')
+    expect(changes.at(-1)).toEqual({ rail: 'flat' })
+    expect(display()).toBe('flat') // applied by the host's prop
+    choose('Light')
+    expect(root()).toBe(first) // never remounted
+    expect(root().getAttribute('data-gallerist-scheme')).toBe('light')
+    act(() => (document.querySelector('.gallerist-view-btn') as HTMLButtonElement).click())
+    const checked = [...document.querySelectorAll('[role="menuitemradio"][aria-checked="true"]')]
+    expect(checked.map((i) => i.textContent)).toEqual(['Row', 'Light'])
+  })
+
+  // a thumbnails plugin that counts the switches of a built rail (each one draws the rail again)
+  const counted = (count: { switches: number }): Plugin => {
+    const make = thumbnails()
+    return (v) => {
+      const inst = make(v) as ThumbnailsInstance
+      const set = inst.setDisplay
+      inst.setDisplay = (d) => {
+        if (inst.display && inst.display !== d) count.switches++
+        set(d)
+      }
+      return inst
+    }
+  }
+
+  for (const strict of [false, true]) {
+    it(`props own their settings over the menu’s initial values, one build and no switch${strict ? ' (StrictMode)' : ''}`, async () => {
+      const count = { switches: 0 }
+      const onChange = vi.fn()
+      const plugins = [
+        counted(count),
+        view({ initial: { rail: 'flat', scheme: 'light' }, onChange }),
+      ]
+      const tree = (
+        <Gallerist
+          collection={threeGroups}
+          open
+          groupDisplay="stacked"
+          scheme="dark"
+          plugins={plugins}
+        />
+      )
+      render(strict ? <StrictMode>{tree}</StrictMode> : tree)
+      await act(async () => {})
+      expect(display()).toBeNull() // stacked, the prop's
+      expect(root().getAttribute('data-gallerist-scheme')).toBe('dark') // the prop's
+      expect(count.switches).toBe(0)
+      // the menu only reports a choice for them; the props stay
+      choose('Row')
+      expect(onChange).toHaveBeenLastCalledWith({ rail: 'flat' })
+      choose('Light')
+      expect(onChange).toHaveBeenLastCalledWith({ scheme: 'light' })
+      await act(async () => {})
+      expect(display()).toBeNull()
+      expect(root().getAttribute('data-gallerist-scheme')).toBe('dark')
+      expect(count.switches).toBe(0)
+    })
+  }
+
+  it('a prop owns only its own setting: the menu applies the other', async () => {
+    const count = { switches: 0 }
+    render(
+      <StrictMode>
+        <Gallerist
+          collection={threeGroups}
+          open
+          scheme="dark"
+          plugins={[counted(count), view({ initial: { rail: 'flat', scheme: 'light' } })]}
+        />
+      </StrictMode>,
+    )
+    await act(async () => {})
+    expect(display()).toBe('flat') // the menu's
+    expect(count.switches).toBe(0) // built flat
+    expect(root().getAttribute('data-gallerist-scheme')).toBe('dark') // the prop's
+    choose('Stacked')
+    expect(display()).toBeNull()
+  })
+
+  it('a remembered choice: the menu owns a setting until the host has a value for it', async () => {
+    const KEY = 'gallerist-view-test'
+    localStorage.removeItem(KEY)
+    function Host() {
+      const [prefs, setPrefs] = useState<ViewState>(() =>
+        JSON.parse(localStorage.getItem(KEY) ?? '{}'),
+      )
+      useEffect(() => localStorage.setItem(KEY, JSON.stringify(prefs)), [prefs])
+      const [plugins] = useState(() => [
+        thumbnails(),
+        view({ onChange: (change) => setPrefs((p) => ({ ...p, ...change })) }),
+      ])
+      return (
+        <Gallerist
+          collection={threeGroups}
+          open
+          plugins={plugins}
+          scheme={prefs.scheme}
+          groupDisplay={prefs.rail}
+        />
+      )
+    }
+    const { unmount } = render(<Host />)
+    choose('Light')
+    expect(root().getAttribute('data-gallerist-scheme')).toBe('light')
+    expect(JSON.parse(localStorage.getItem(KEY) ?? '{}')).toEqual({ scheme: 'light' })
+    unmount()
+    render(<Host />)
+    await act(async () => {})
+    expect(root().getAttribute('data-gallerist-scheme')).toBe('light')
+    expect(display()).toBeNull() // the rail was never picked: its own
+    choose('Row')
+    expect(display()).toBe('flat')
+    expect(JSON.parse(localStorage.getItem(KEY) ?? '{}')).toEqual({ scheme: 'light', rail: 'flat' })
+    localStorage.removeItem(KEY)
   })
 })

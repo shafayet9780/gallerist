@@ -307,7 +307,7 @@ const { emit, getPlugins, onPluginsChanged } = getInternals(viewer)
 - `emit(event, payload)`: surface an event (the renderer emits load/overlay events, plugins their own). Off the public API so app code can't forge, say, a `loaded` event.
 - `getPlugins()` / `onPluginsChanged(fn)`: the plugin registry the renderer mounts regions, adapters and overlays from.
 - `setZoom(transform)`: commit a full `{scale, x, y}` (gesture end, resize re-clamp).
-- `onRefresh(fn)`: run when the app calls `viewer.refresh()`; the DOM renderer re-measures and re-clamps zoom.
+- `onRefresh(fn)`: run when the app calls `viewer.refresh()`; the DOM renderer re-measures, re-clamps zoom, and reads again what its plugins ask for (a rail's `data-gallerist-linear` and the keymaps, after a rail switched its display; which tools are marked `data-gallerist-off` under `controls: false`).
 - `setLifecycleDriver({ opening?(done), closing?(done) })`: stretch open/close over a real transition. `opened` / `closed` fire when the renderer calls `done()`; a `done()` from a superseded transition is ignored, and removing the driver settles one in flight. The DOM renderer settles when the theme's phase animation on the root (`data-gallerist-phase`) ends.
 - `setZoomBounds({ center, constrain })`: the renderer lends the core its stage geometry. Every committed zoom, from `zoomTo`, `resetZoom` or `setZoom`, passes through `constrain` (scale into [fit, max], pan so the content covers the stage, centred at fit), and `zoomTo` without a focal point pivots on `center()`.
 - The engine building blocks: normalize, store, FSM, nav, windowing, springs, gesture arbitration and zoom math.
@@ -385,7 +385,7 @@ Default transition = transform-based slide (`translate3d`) on a track, or per-sl
 
 ### 10.5 Resize
 
-A single `ResizeObserver` on the stage re-measures and re-picks `srcset` candidates and re-clamps zoom bounds. Debounced to a frame.
+A single `ResizeObserver` on the stage re-measures and re-picks `srcset` candidates and re-clamps zoom bounds. Debounced to a frame. Zoomed in, the media point under the stage centre is put back under it (as a share of the painted media box) before the clamp, and while the zoom is the one the last re-clamp left, that starts from the view it aimed for: a stage that shrinks and grows back (a rotation and back, room for a focused docked arrow on touch) returns to the same view rather than the one the smaller stage clamped it to.
 
 ---
 

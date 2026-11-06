@@ -37,7 +37,15 @@ bar up for every item (`plugin-captions` is the reference). A `thumbnails` node 
 an element with) `data-gallerist-linear` asks the DOM renderer for linear traversal: unless `mount()`
 got an explicit `linear`, ←/→ then walk every item in order across groups. The renderer reads it each
 time the plugin set changes, so it follows the rail being added or removed; `plugin-thumbnails` marks
-its region this way in `flat` mode.
+its region this way in `flat` mode. A plugin that changes the marker on a region already mounted (the
+rail switching its display at run time) calls `viewer.refresh()` after, and the renderer reads it
+again, with the counter, the item navigator and the arrows' names. The plugins' keymaps are read at
+the same times, so a `keymap` getter can drop a key a layout doesn't use and leave it to an earlier
+plugin (a flat rail leaves `e`). Without built-in controls (`controls: false`) the bar shows while the
+toolbar holds a tool, but for tools marked `data-gallerist-off`: a tool its plugin keeps hidden for a
+later layout (a flat rail's items toggle, a View menu with nothing to offer) carries that marker
+beside `hidden`, and the plugin calls `viewer.refresh()` when it changes. A tool that only toggles
+`hidden` itself still shows the bar, as before.
 
 A region renderer gets `ctx = { viewer, preset? }`. `preset` is the renderer's mounted layout preset as
 `PresetDefaults`, a map keyed by what each entry configures (the DOM renderer passes `resolvePreset()`'s
@@ -68,6 +76,25 @@ its UI from `ctx.preset` builds it again for that mount (see `plugin-thumbnails`
   `destroy()`. See `plugin-video`.
 - **An event**: surface one with `getInternals(viewer).emit('fullscreenChange', …)` (from
   `@gallerist/core/internal`); consumers subscribe via the `on` option or `viewer.on(...)`.
+- **A setting other code can change at run time**: put it on the instance your factory returns, and
+  let the region nodes you hand the renderer stay (they are cached per mount); redraw what's inside
+  them. `plugin-thumbnails`' instance carries `display` and `setDisplay(display)`, and exports
+  `getGroupDisplay(viewer)` / `setGroupDisplay(viewer, display)` that look it up. Code that shouldn't
+  import the plugin finds it the same way, among `getInternals(viewer).getPlugins()` by its name and
+  that method: `plugin-view` and React's `groupDisplay` prop do.
+- **A menu from the toolbar** (`plugin-view`): a menu button (`aria-haspopup="menu"`,
+  `aria-expanded`) whose menu is appended to the viewer root (`button.closest('.gallerist')`, which is
+  positioned), not to the toolbar region, which scrolls sideways on a narrow screen and would clip it.
+  Stop the keys the menu handles (`stopPropagation`, `preventDefault`) so the viewer's keymap doesn't
+  navigate, zoom or close under it, close it on a press outside (check `event.composedPath()`, so a
+  viewer in a shadow root works) and when the viewer closes, and return focus to the button. The
+  renderer can be destroyed under an open menu without telling plugins: close it from the next
+  document or window event that finds the button disconnected (`!button.isConnected`).
+- **A setting the host may own** (`plugin-view`): read `viewer[Symbol.for('gallerist.controlled')]`
+  (`true` or a list of setting names) each time before applying a value of your own. A host or an
+  adapter sets it for the settings it applies itself; React's `<Gallerist>` lists `scheme` and
+  `rail` while its `scheme` and `groupDisplay` props are passed. Report a choice for such a setting,
+  don't apply it.
 
 ## Rules
 
