@@ -84,24 +84,43 @@ test('the percentage follows a wheel zoom while it moves, and a double click', a
   const stage = await page.locator('.gallerist-stage').boundingBox()
   if (!stage) throw new Error('no stage')
   await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2)
-  // a short burst: the renderer commits it only once the wheel rests
-  const seen = await page.evaluate(async () => {
-    const stageEl = document.querySelector('.gallerist-stage') as HTMLElement
-    const r = stageEl.getBoundingClientRect()
-    const at = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }
-    for (let k = 0; k < 4; k++)
-      stageEl.dispatchEvent(
-        new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true, ...at }),
-      )
-    for (let k = 0; k < 3; k++) await new Promise((r) => requestAnimationFrame(r))
-    const v = (window as unknown as { viewer: { getState(): { zoom: { scale: number } } } }).viewer
-    return {
-      shown: document.querySelector('.gallerist-zoom-level')?.textContent,
-      committed: v.getState().zoom.scale,
+  // A short burst: the renderer shows it live in the next frame and commits it only once the wheel
+  // rests (90ms on). Record what the percentage says, and what the viewer has committed, at every
+  // change of the percentage until the commit: it must read 175% (1.15⁴ ≈ 1.75) while the viewer
+  // is still at 1. A loaded browser can draw its next frame after the commit, which then shows no
+  // live step at all; that run proves nothing, so it is zoomed back and tried again.
+  await expect(async () => {
+    if ((await scale(page)) !== 1) {
+      await page.locator('.gallerist').focus()
+      await page.keyboard.press('0')
+      await expect.poll(() => scale(page)).toBe(1)
+      await expect(level(page)).toHaveText('100%')
     }
-  })
-  expect(seen.committed).toBe(1) // not committed yet…
-  expect(seen.shown).toBe('175%') // …but shown: 1.15⁴ ≈ 1.75
+    const seen = await page.evaluate(async () => {
+      const v = (window as unknown as { viewer: { getState(): { zoom: { scale: number } } } })
+        .viewer
+      const stageEl = document.querySelector('.gallerist-stage') as HTMLElement
+      const label = document.querySelector('.gallerist-zoom-level') as HTMLElement
+      const shown: Array<{ text: string | null; committed: number }> = []
+      const watch = new MutationObserver(() =>
+        shown.push({ text: label.textContent, committed: v.getState().zoom.scale }),
+      )
+      watch.observe(label, { childList: true, characterData: true, subtree: true })
+      const r = stageEl.getBoundingClientRect()
+      const at = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }
+      for (let k = 0; k < 4; k++)
+        stageEl.dispatchEvent(
+          new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true, ...at }),
+        )
+      const t0 = performance.now()
+      while (v.getState().zoom.scale === 1 && performance.now() - t0 < 3000)
+        await new Promise((r) => setTimeout(r, 10))
+      watch.disconnect()
+      return { shown, committed: v.getState().zoom.scale }
+    })
+    expect(seen.committed).toBeGreaterThan(1.7) // committed in the end
+    expect(seen.shown, 'live before the commit').toContainEqual({ text: '175%', committed: 1 })
+  }).toPass({ timeout: 20_000 })
   await expect.poll(() => scale(page)).toBeGreaterThan(1.7)
   await expect(level(page)).toHaveText('175%')
   await page.locator('.gallerist').focus()
