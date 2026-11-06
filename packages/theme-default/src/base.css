@@ -1659,11 +1659,16 @@
 .gallerist-caption {
   transition: opacity var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
 }
-.gallerist[data-gallerist-idle] .gallerist-bar,
-.gallerist[data-gallerist-idle] .gallerist-controls > button,
-.gallerist[data-gallerist-idle] .gallerist-itemnav,
-.gallerist[data-gallerist-idle] .gallerist-navigator,
-.gallerist[data-gallerist-idle] .gallerist-caption {
+/* except what has keyboard focus, and the band holding it (WCAG 2.4.7): a keyboard user who pauses
+   on a control still sees where focus is */
+.gallerist[data-gallerist-idle]
+  :is(
+    .gallerist-bar,
+    .gallerist-controls > button,
+    .gallerist-itemnav,
+    .gallerist-navigator,
+    .gallerist-caption
+  ):not(:focus-visible, :has(:focus-visible)) {
   opacity: 0;
   pointer-events: none;
 }
@@ -1747,8 +1752,9 @@
   pointer-events: none; /* a fading viewer must not take clicks meant for the page */
 }
 
-/* immersive preset: chrome AND the rail fade together on idle (UX-E). */
-.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-thumbnails {
+/* immersive preset: chrome AND the rail fade together on idle (UX-E), unless focus is in it. */
+.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle]
+  .gallerist-region-thumbnails:not(:has(:focus-visible)) {
   opacity: 0;
   pointer-events: none;
 }
@@ -1985,23 +1991,68 @@
 
 /* ── docked controls (`arrows: 'docked'`, the reviewer preset): nothing over the media ─────────
    Review needs every pixel, corners included. The group arrows sit in gutters the stage leaves at
-   its sides (none on touch, where swipes stand in for them). The item navigator is a grid item of
-   the root, the count over ↑ ↓: a header on the aside item column while that shows, else at the
-   end of the caption row, which makes room for it. While any group has several items it keeps its
-   room on a one-item group, so the stage and the item column hold still. Last in the file, so it
-   wins over the arrow layouts and the touch chip above. Where no row or column beside the stage is
-   free (immersive) it falls back to the stage's corner; the zoom minimap stays over the media (it
-   shows only while zoomed, and is the zoom tool itself). */
+   its sides (on touch, where swipes stand in for them, only while one has keyboard focus). The
+   item navigator is a grid item of the root, the count over ↑ ↓: a header on the aside item column
+   while that shows, else at the end of the caption row, which makes room for it. While any group
+   has several items it keeps its room on a one-item group, so the stage and the item column hold
+   still. Last in the file, so it wins over the arrow layouts and the touch chip above. Where no row
+   or column beside the stage is free (immersive) it falls back to the stage's corner; the zoom
+   minimap stays over the media (it shows only while zoomed, and is the zoom tool itself). */
 .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
   inset-inline: calc(var(--gallerist-arrow-size) + 24px);
 }
 .gallerist[data-gallerist-arrows="docked"][data-gallerist-axis="vertical"] .gallerist-stage {
   inset-inline-start: 0; /* both group arrows stack at the inline end */
 }
+/* touch: the stage takes the full width. A keyboard or switch user on touch still reaches the
+   arrows, which then come back beside the media, never over it: the stage makes room for them only
+   while one has keyboard focus (:focus-visible; one focused by a script after a tap stays hidden,
+   and takes no room), as much on each side, so letterboxed media holds still. Held sideways that is
+   a gutter at each side (on a vertical group axis too, where a mouse gets only the end one);
+   upright, where most photos and screenshots leave their spare room above and below, it is a band
+   at the top and the bottom instead, the arrows in the bottom one (↑ in the top one on a vertical
+   axis), 12px from either edge as in a gutter, which leaves the focus ring 8px clear; not in
+   immersive, whose navigator has that corner. Sideways or upright is the screen's, not the
+   viewer's: a container query would follow the viewer, but needs Safari 16. */
 @media (pointer: coarse) {
   .gallerist[data-gallerist-arrows="docked"]:has(.gallerist-prev) .gallerist-stage {
     inset-inline: 0;
   }
+  .gallerist[data-gallerist-arrows="docked"]:has(
+      .gallerist-controls > :is(.gallerist-prev, .gallerist-next):focus-visible
+    )
+    .gallerist-stage {
+    inset-inline: calc(var(--gallerist-arrow-size) + 24px);
+  }
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-preset="immersive"]):has(
+      .gallerist-controls > :is(.gallerist-prev, .gallerist-next):focus-visible
+    )
+    .gallerist-stage {
+    inset: calc(var(--gallerist-arrow-size) + 24px) 0;
+  }
+  .gallerist[data-gallerist-arrows="docked"]:not([data-gallerist-preset="immersive"])
+    .gallerist-controls
+    > :is(.gallerist-prev, .gallerist-next):focus-visible {
+    top: auto;
+    bottom: 12px;
+    transform: none;
+  }
+  .gallerist[data-gallerist-arrows="docked"][data-gallerist-axis="vertical"]:not(
+      [data-gallerist-preset="immersive"]
+    )
+    .gallerist-controls
+    > .gallerist-prev:focus-visible {
+    top: 12px;
+    bottom: auto;
+  }
+}
+/* and above the zoom minimap, which can reach a gutter on a short stage */
+.gallerist[data-gallerist-arrows="docked"]
+  .gallerist-controls
+  > :is(.gallerist-prev, .gallerist-next):focus-visible {
+  z-index: 5;
 }
 /* one group (and no linear walk): the group arrows have nowhere to go, so they and their gutters go */
 .gallerist[data-gallerist-arrows="docked"][data-gallerist-one-group]:not([data-gallerist-linear])

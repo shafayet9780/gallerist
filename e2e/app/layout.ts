@@ -19,8 +19,9 @@ import '@gallerist/theme-default/console.css'
 import '@gallerist/theme-default/editorial.css'
 
 const p = new URLSearchParams(location.search)
-// wide=1: a 3:1 panorama, which fills the stage's width at most sizes (the reviewer's gutters)
-const W = p.get('wide') === '1' ? 3200 : 1600
+// wide=1: a 3:1 panorama, which fills the stage's width at most sizes (the reviewer's gutters) ·
+// tall=1: a 9:16 phone screenshot, which fills its height
+const W = p.get('wide') === '1' ? 3200 : p.get('tall') === '1' ? 600 : 1600
 const svg = (color: string, label: string) =>
   `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="1067"><rect width="100%" height="100%" fill="${color}"/><text x="40" y="120" fill="white" font-size="110">${label}</text></svg>`,
@@ -126,7 +127,7 @@ mount(viewer, {
   linear: p.get('linear') ? p.get('linear') === '1' : undefined,
   itemIndicator: (p.get('indicator') ?? undefined) as ItemIndicator | undefined,
   controls: p.get('controls') !== '0',
-  autoHide: false, // deterministic: chrome never fades mid-measurement
+  autoHide: p.get('autohide') === '1', // off unless asked: chrome never fades mid-measurement
   skin: p.get('skin') ?? undefined,
   accent: p.get('accent') ?? undefined,
   scheme: (p.get('scheme') ?? undefined) as ColorScheme | undefined,
