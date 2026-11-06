@@ -111,6 +111,108 @@ test('stacked: the meta sits under each card at its width, the note count on its
   ).toHaveCount(1)
 })
 
+// A stacked time label longer than its card (a range with the note count at its end) runs past the
+// card: its column widens, so the label shows whole and ends a rail gap before the next card's (or
+// the marker's) label; no title while it isn't cut. RTL mirrors it, a phone does the same, and a side
+// rail keeps it to the rail's width (cut, the whole label in its title on hover).
+const labels = (page: Page) =>
+  page.evaluate(() => {
+    const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+    const rtl = getComputedStyle(rail).direction === 'rtl'
+    const W = document.documentElement.clientWidth
+    const x = (el: Element): [number, number] => {
+      const r = el.getBoundingClientRect()
+      return rtl ? [W - r.right, W - r.left] : [r.left, r.right]
+    }
+    const hosts = [...rail.children].filter((el) =>
+      el.matches('.gallerist-thumb-wrap, .gallerist-rail-marker'),
+    )
+    return {
+      gap: Number.parseFloat(getComputedStyle(rail).columnGap),
+      hosts: hosts.map((h) => {
+        const label = h.querySelector(
+          '.gallerist-thumb-time, .gallerist-rail-marker-cap',
+        ) as Element
+        const text = h.querySelector('.gallerist-thumb-time-text')
+        return {
+          id: (h as HTMLElement).dataset.group ?? 'marker',
+          card: x(h.querySelector('.gallerist-thumb, .gallerist-rail-marker-body') as Element),
+          label: x(label),
+          cut: !!text && text.scrollWidth > text.clientWidth,
+        }
+      }),
+    }
+  })
+
+for (const [name, query, width] of [
+  ['ltr', 'display=stacked', 1280],
+  ['rtl', 'display=stacked&dir=rtl', 1280],
+  ['console', 'display=stacked&skin=console', 1280],
+  ['phone', 'display=stacked', 390],
+] as const) {
+  test(`stacked: a long time label runs past its card, clear of the next label, ${name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 })
+    // (a phone shows no item column: the cards are what to wait for)
+    await page.goto(`/hooks.html?${query}`)
+    await viewerSettled(page)
+    await expect(page.locator('.gallerist-thumb-wrap').first()).toBeVisible()
+    const { gap, hosts } = await labels(page)
+    expect(hosts.length).toBeGreaterThan(4)
+    hosts.forEach((h, k) => {
+      expect(h.cut, `${h.id}: cut`).toBe(false)
+      expect(Math.abs(h.label[0] - h.card[0]), `${h.id}: starts with its card`).toBeLessThan(0.5)
+      expect(h.label[1], `${h.id}: ends at or past its card`).toBeGreaterThan(h.card[1] - 0.5)
+      const next = hosts[k + 1]
+      if (next)
+        expect(next.label[0] - h.label[1], `${h.id}: clear of the next`).toBeGreaterThan(gap - 0.5)
+    })
+    // the label with the note count is the one longer than its card
+    const notes = hosts.find((h) => h.id === 'tf60')
+    expect((notes?.label[1] ?? 0) - (notes?.card[1] ?? 0)).toBeGreaterThan(8)
+    const label = page.locator('[data-group="tf60"] .gallerist-thumb-time')
+    await label.hover()
+    await expect(label).not.toHaveAttribute('title')
+  })
+}
+
+test('stacked: past three card heights a time label ends in an ellipsis, whole in its title', async ({
+  page,
+}) => {
+  await open(page, 'display=stacked')
+  const long = await page.evaluate(() => {
+    const label = document.querySelector('[data-group="tf60"] .gallerist-thumb-time') as HTMLElement
+    const text = label.querySelector('.gallerist-thumb-time-text') as HTMLElement
+    text.textContent = 'Monday 3 November, 11:00 am to 11:10 am'
+    const h = Number.parseFloat(getComputedStyle(label).getPropertyValue('--gallerist-thumb-h'))
+    return {
+      width: label.getBoundingClientRect().width,
+      cap: 3 * h,
+      cut: text.scrollWidth > text.clientWidth,
+    }
+  })
+  expect(long.cut).toBe(true)
+  expect(Math.abs(long.width - long.cap)).toBeLessThan(0.5)
+  const label = page.locator('[data-group="tf60"] .gallerist-thumb-time')
+  await label.hover()
+  await expect(label).toHaveAttribute('title', '11:00 – 11:10')
+})
+
+test('stacked down a side rail: a time label keeps to the rail, cut, whole in its title', async ({
+  page,
+}) => {
+  await open(page, 'display=stacked&preset=contact')
+  const { hosts } = await labels(page)
+  const notes = hosts.find((h) => h.id === 'tf60')
+  expect(notes).toBeTruthy()
+  for (const h of hosts) if (h.id !== 'marker') expect(h.label[1]).toBeLessThan(h.card[1] + 0.5)
+  expect(notes?.cut).toBe(true)
+  const label = page.locator('[data-group="tf60"] .gallerist-thumb-time')
+  await label.hover()
+  await expect(label).toHaveAttribute('title', '11:00 – 11:10')
+})
+
 for (const display of ['flat', 'stacked'] as const) {
   test(`monitor badges: in the top end corner, named, clear of the number, ${display}`, async ({
     page,

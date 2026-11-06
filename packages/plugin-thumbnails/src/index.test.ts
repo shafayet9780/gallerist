@@ -2341,7 +2341,7 @@ describe('plugin-thumbnails — live display switch (setDisplay)', () => {
 })
 
 describe('plugin-thumbnails — long labels', () => {
-  it('a flat group label and a timeline label carry their whole text in a title', () => {
+  it('a flat group label carries its whole text in a title, a stacked one while it is cut', () => {
     const label = '10:49 – 10:50 am'
     const flat = createViewer({
       collection: collection(),
@@ -2360,6 +2360,17 @@ describe('plugin-thumbnails — long labels', () => {
     })
     mount(stacked)
     stacked.open()
-    expect((document.querySelector('.gallerist-thumb-time') as HTMLElement).title).toBe(label)
+    // stacked: the title only while the label is cut (read as the pointer comes over it)
+    const time = document.querySelector('.gallerist-thumb-time') as HTMLElement
+    const text = time.querySelector('.gallerist-thumb-time-text') as HTMLElement
+    time.dispatchEvent(new Event('pointerenter'))
+    expect(time.hasAttribute('title')).toBe(false)
+    Object.defineProperty(text, 'scrollWidth', { value: 120, configurable: true })
+    Object.defineProperty(text, 'clientWidth', { value: 80, configurable: true })
+    time.dispatchEvent(new Event('pointerenter'))
+    expect(time.title).toBe(label)
+    Object.defineProperty(text, 'scrollWidth', { value: 80, configurable: true })
+    time.dispatchEvent(new Event('pointerenter'))
+    expect(time.hasAttribute('title')).toBe(false)
   })
 })

@@ -745,8 +745,10 @@
   align-items: center;
   gap: 6px;
   height: 14px;
-  /* a label never widens its card's column: long ones end in an ellipsis */
-  max-width: calc(var(--gallerist-thumb-h) * 1.4);
+  /* a label longer than its card (a range with a host's meta at its end) runs past it: its column
+     widens, so it shows whole and clear of the next card's label; past three card heights it ends
+     in an ellipsis, the whole label in its title (as a flat rail's group label does) */
+  max-width: calc(var(--gallerist-thumb-h) * 3);
   font: 500 11px var(--gallerist-mono);
   font-variant-numeric: tabular-nums;
   color: var(--gallerist-fg-muted);
@@ -757,13 +759,22 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* a side rail runs top to bottom: no horizontal track between the cards */
+/* a side rail runs top to bottom: no horizontal track between the cards, and a label keeps to the
+   rail's width (a card's) */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-time {
+  max-width: calc(var(--gallerist-thumb-h) * 1.4);
+}
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-time::after {
   display: none;
 }
-/* a timeline label sits above the card, so the touch expand caret moves down onto the card */
+/* a timeline label sits above the card, so the touch expand caret moves down onto the card (its
+   left corner: right to left, the card keeps to the right of a column a long label widened) */
 .gallerist-thumbs[data-timeline] .gallerist-thumb-expand {
   top: calc(14px + 6px + 4px);
+}
+.gallerist[data-gallerist-dir="rtl"] .gallerist-thumbs[data-timeline] .gallerist-thumb-expand {
+  left: auto;
+  right: calc(var(--gallerist-thumb-h) * 1.4 - 26px);
 }
 /* a side rail's band edge faces the stage, not the bar */
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs-region {

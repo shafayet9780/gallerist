@@ -730,7 +730,12 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         const text = document.createElement('span')
         text.className = 'gallerist-thumb-time-text'
         text.textContent = time ?? ''
-        if (time) label.title = time // cut to the card's width when longer
+        // the whole label as its title while it's cut (past three card heights, the theme's cap)
+        if (time)
+          label.addEventListener('pointerenter', () => {
+            if (text.scrollWidth > text.clientWidth) label.title = time
+            else label.removeAttribute('title')
+          })
         label.appendChild(text)
         wrap.prepend(label)
       }
