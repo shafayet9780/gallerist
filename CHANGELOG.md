@@ -1,5 +1,265 @@
 # Changelog
 
+## v0.4.0
+
+A minor release: every package goes from 0.3.3 to 0.4.0, and some things behave differently (the
+Upgrading list below). Two new packages join the fixed version group at 0.4.0: `@gallerist/plugin-zoom`
+(a "− 100% +" toolbar tool) and `@gallerist/plugin-shortcuts` (the keyboard shortcut list on `?`). The
+rail gains host hooks (group meta, item badges, clusters, markers), the View menu becomes a segmented
+popover, toolbar tools show their whole focus ring, and the rail glides, drags and fades. Four size
+budgets go up (see the end). Peer ranges stay `>=0.3.0 <1`; keep every `@gallerist/*` package on one
+version.
+
+### Upgrading: what behaves differently
+- **theme-default**: the rail's band (background, rule, blur) is painted on `.gallerist-thumbs-region`,
+  not `.gallerist-thumbs`; a page that styled the strip's background or border should move that to the
+  region.
+- **theme-default**: the toolbar's strip takes the bar's free space and lets pointers through except on
+  its tools, the 6px between two tools included: a drag or wheel that starts there is the bar's (under
+  the `immersive` bar, the image's), and no longer scrolls the strip. A page that styled the strip's
+  `margin`, `padding`, `flex`, `::before` or `::after` should check it.
+- **theme-default**: on a phone (600px wide or less) the bar leaves out the zoom tool, and an overlay
+  viewer's bar leaves out fullscreen (an inline viewer keeps it); `--gallerist-phone-zoom: flex` and
+  `--gallerist-phone-fullscreen: grid` keep them. A phone bar whose only tools are those two, with
+  `controls: false`, shows empty: leave the plugins out there or keep the tools.
+- **theme-default**: a new token, `--gallerist-divider`, paints the lines between a flat rail's groups.
+  It defaults to `--gallerist-hairline`, but each skin's dark scheme sets its own (about 2:1), so a page
+  that darkened or lightened `--gallerist-hairline` to restyle those dividers should set
+  `--gallerist-divider` too. The divider's selector keeps 0.3's specificity (two classes), so a page's
+  rule for `.gallerist-thumb-group + .gallerist-thumb-group` still wins.
+- **plugin-view**: the menu's DOM and roles changed. The popover is `role="dialog"` (was `menu`) and
+  the tool `aria-haspopup="dialog"` (was `menu`); each choice is a `button` with `role="radio"` (was
+  a `div` with `role="menuitemradio"`) in a `role="radiogroup"`; `.gallerist-view-group` and
+  `.gallerist-view-heading` are gone (`.gallerist-view-label` and `.gallerist-view-seg` instead). A
+  test or style that found the menu by those roles or classes needs updating.
+- **renderer-dom**: the viewer ignores any key a handler before it already took with
+  `preventDefault()` (until now only Escape), so a host handler that calls it on a key the viewer also
+  uses (an arrow, Home, a digit, a plugin's letter) now keeps that key to itself.
+- **plugin-zoom** (new): with it registered, `+` / `=`, `-` and `0` pressed in the viewer stop at the
+  viewer's root (`keys: false` leaves them to the renderer, which lets them bubble), except in a field,
+  a dialog or menu in the viewer, a slider, spinbutton, tree or grid. While the item can't zoom (a
+  video) they go on to the page, marked taken (`preventDefault()`), so no plugin's `keymap` runs on
+  them either.
+- **renderer-dom**: a key from a text field inside an open shadow root in the viewer stays in the field
+  (the viewer reads the event's first target), and a plugin's key typed with AltGr (Ctrl + Alt on
+  Windows) reaches the plugin instead of counting as a browser chord.
+- **plugin-view**: the menu is a popover that stays open on a choice (Enter chooses and closes); its
+  letter keys and Home/End are gone; the default `rail` / `scheme` strings read "Layout" / "Theme".
+- **plugin-thumbnails**: a stacked timeline label longer than its card widens its card's column instead
+  of being cut; a flat group label and a stacked timeline label have a `title` only while cut. A marker
+  whose `id` repeats an earlier one is not drawn. The rail cancels `dragstart` (no native drag of a
+  card).
+
+### Host hooks: the rail and the keys (owner-approved, for the Apploye reviewer)
+- **plugin-thumbnails (new)**: `renderGroupMeta(group, index, { display, place })` draws a host's
+  decoration per group: on a flat rail at the end of the group's label line (`place: 'label'`; the
+  group widens to fit the label and the meta, the label still ending in an ellipsis past three card
+  heights), on a stacked rail under the card at its width (`'below'`; every card is then wrapped) and,
+  with a `timeline`, at the end of its time label (`'label'`). Not on an index rail.
+- **plugin-thumbnails, theme-default (changed)**: a stacked timeline label longer than its card (a
+  range, with a note count from `renderGroupMeta` at its end) was cut to the card's width
+  ("11:00 – 1…"). The card's column now widens to fit it, so the label shows whole and ends a rail gap
+  before the next card's (or marker's) label; past three card heights (the flat rail's cap) it ends in
+  an ellipsis, with the whole label in its `title` while it is cut. Right to left mirrors it (a touch
+  caret keeps to its card's corner), a phone's bottom rail does the same, and down a side rail the
+  label keeps to the rail's width.
+- **plugin-thumbnails (new)**: `renderItemBadge(item, g, i)` puts a host's badge in each item thumb's
+  top end corner (a flat rail, the item column, the peek, an index section), clear of the
+  `numberItems` number at the top start and of the focus ring.
+- **plugin-thumbnails (new)**: `cluster(item, g, i)`: consecutive items with the same key sit 2px
+  apart and 8px between clusters, in rows and columns, right to left too (`data-cluster="in"` /
+  `"start"`; theme tokens `--gallerist-cluster-inner`, `--gallerist-cluster-gap`). Visual only.
+- **plugin-thumbnails (new)**: `markers(collection)` returns `RailMarker`s (`id`, `after` or `before`
+  a group id, `label`, `caption`, `render`, `tip`), drawn in order between groups on flat and stacked
+  rails as a dashed box the height of the cards under a label line. They are not in the collection:
+  never a stop for the arrows, Home/End or a click, not counted, not in the hash, and windowed with
+  their group. Not focusable (information, not an action); a named `role="group"`, its label shown in
+  the box. `tip` shows a host tooltip while a mouse or pen is over it and after a 500ms long press on
+  touch (until the next press), in the rail's region, so the rail doesn't clip it; without one, the
+  label is the `title`. A marker whose group isn't in the collection, or whose `id` an earlier one
+  has, isn't drawn.
+- **plugin-thumbnails (new)**: what a decoration or badge says joins the card's, group's or thumb's
+  accessible name (a node's `aria-label`, else the text drawn: a fragment's or a number's too); the
+  drawn node is hidden from assistive tech. `refreshRail(viewer)` (and the instance's `refresh()`)
+  draws decorations and markers again in place after the host's data changed: the cards, the thumbs,
+  the scroll and focus stay, and a marker's open tip shows again with the new data.
+- **renderer-dom (changed)**: the viewer leaves any key a handler before it already took
+  (`preventDefault()`), not only Escape, so a host popover in the caption can walk its own list with
+  the arrows and close itself on Escape before the viewer. Keys typed in an `input`, `textarea`,
+  `select` or contenteditable inside the viewer stay there (unchanged; Escape still closes from a
+  field nobody handled it in).
+- **plugin-captions (docs)**: a popover from the caption goes in the viewer root, not the caption:
+  the caption band scrolls when tall, and a scroller clips it (checked: a popover kept in the band is
+  cut off where it rises over the stage). In the root at `z-index` 10 it shows over the stage and the
+  rail; Escape, typing and a key that opens it are covered in the README.
+- **theme-default (changed)**: on a phone (600px wide or less) the bar leaves out the zoom tool (a
+  pinch or a double tap zooms, and the renderer's reset shows while zoomed) and an overlay viewer's
+  fullscreen (it fills the screen; an inline viewer keeps it). `--gallerist-phone-zoom: flex` and
+  `--gallerist-phone-fullscreen: grid` keep them. The reviewer preset with View, save and Close then
+  fits a 390px bar without scrolling.
+
+### The toolbar's focus ring
+- **theme-default (fixed)**: a toolbar tool with keyboard focus (fullscreen, save, View, the rail's
+  items toggle, the grid, any plugin tool in the strip) shows its whole focus ring. The strip the
+  tools sit in scrolls sideways on a narrow screen, and a scroller clips on both axes, so since 0.3.0
+  the ring was cut to a bracket on each side, in every skin and both schemes; Close, outside the
+  strip, had it whole. The strip keeps room for the ring on every side (4px; 5px at its ends, where
+  Chromium rounds an RTL scroll range down), given back by a negative margin, so the counter, title,
+  tools and Close keep their places. The exception is a shown title beside tools that scroll: the
+  title can end up to half a pixel shorter or longer, the tools moving with it, and the strip's scroll
+  range 1px longer. The strip takes the bar's free space itself (a shown title shares it), its tools
+  still at the end, so its box is wider than its tools; it uses its own `::before` and `::after`. Like
+  every region it lets pointer events through except on its tools, so that free space stays the
+  bar's, and under the `immersive` bar the image's. A drag or a wheel that starts in the 6px between
+  two tools no longer scrolls the strip; one that starts on a tool does.
+- **renderer-dom (fixed)**: where the strip scrolls, a tool reached from the keyboard is brought
+  fully into view with its ring, by scrolling the strip (not the page). Browsers leave a tool 32px or
+  more in view where it is, cut by the strip's edge; a pointer's focus leaves the strip as it is.
+- **plugin-view (fixed)**: opened by a pointer while the strip hides part of it, the View tool comes
+  into view with the same room for its ring (the strip's `scroll-padding`), not flush with its edge.
+
+### A zoom tool (owner-approved, for the Apploye reviewer)
+- **plugin-zoom (new)**: `zoom()` adds a "− 100% +" group to the toolbar. − and + step through stops of
+  the zoom range (`stops`, default fit, 150%, 200%, 300%, 400%: the DOM renderer's range, 100% being
+  the image fitted to the stage), pivoting on the stage's centre (`viewer.zoomTo`). The percentage
+  shows the current zoom and fits the image again when pressed. It follows every zoom as it happens: a
+  pinch, a wheel or a double click shows its percentage while it moves (the plugin reads the transform
+  the renderer gives the current slide before it commits), and another group shows its own. − and +
+  are `aria-disabled` (still focusable) at either end of the range and while the current item can't
+  zoom: not an image (`zoomable`), still loading, failed. The percentage is unavailable at fit. While
+  the viewer has focus, `+` / `=`, `-` and `0` take the same stops in place of the renderer's own ×1.25
+  steps, except where they are someone else's (a text field, one in an open shadow root too; a dialog
+  or menu in the viewer, such as the View popover; a slider, spinbutton, tree or grid) and with Ctrl,
+  ⌘ or Alt; a key it takes stops at the viewer's root (`keys: false` leaves them to the renderer).
+  While the item can't zoom its keys do nothing and go on to the page. Stops outside the renderer's
+  range (fit to 400%) are brought into it, so − and + never do nothing. A zoom from the tool or its
+  keys is announced in the viewer's live region. Translated labels in `strings`. Not in the
+  `@gallerist/cdn` bundle. No core change.
+- **theme-default (new)**: the tool's look in every skin and scheme (a tabular percentage of one
+  width); the renderer's zoom-reset button stays out of a bar that shows the tool (unchanged without
+  it, with a `hidden` tool, and on a phone, which leaves the tool's percentage out).
+  A phone (600px wide or less) leaves the tool out of the bar (see the phone bar under Host hooks);
+  where a page keeps it (`--gallerist-phone-zoom: flex`) only − and + show. A tool given `hidden`
+  stays hidden (its `display: flex` no longer beats the attribute).
+
+### The View menu: a popover with segmented controls (owner-approved 1A, for the Apploye reviewer)
+- **plugin-view (changed)**: the menu's radio list becomes a compact popover (about 280px wide, inside
+  a 390px phone): two labelled segmented controls with icons, Layout [Stacked | Row] and Theme
+  [Dark | Light] (Index and Auto when offered). The current value is raised on a recessed track, its
+  text at full strength and its glyph in the skin's selection colour; the segment focused from the
+  keyboard takes the neutral focus ring, so focus never reads as the selection. A choice applies at
+  once and the popover stays open, so both settings change in one visit; it repaints when a host
+  applies a controlled choice while it is open (the rail's `data-display` and the root's scheme are
+  watched), so host-owned settings (`controlled`, `Symbol.for('gallerist.controlled')`, React's props)
+  still show what the host applied, and `onChange` still reports only the setting changed. The API is
+  unchanged; the default `rail` / `scheme` strings now read "Layout" / "Theme", as in the mockup.
+- **plugin-view (changed, a11y)**: the tool is `aria-haspopup="dialog"`; the popover a non-modal
+  `role="dialog"` named "View"; each setting a `radiogroup` named by its visible label, its segments
+  `button`s with `role="radio"` and roving `tabindex` (APG radio group). Enter, Space or ↓ on the tool
+  open it on the first group's checked segment, ↑ on the last stop; ←/→ (↑/↓) move and choose, wrapping,
+  mirrored right to left; Space or a click chooses; Enter chooses and closes; Tab moves between the
+  groups and the shortcut row, and past either end closes (forward on from the tool, back onto it);
+  Escape closes with focus on the tool; `?` opens the shortcut list. Every key but Tab stays in the
+  popover. The menu's letter keys and Home/End are gone (two choices a group).
+- **plugin-view (new)**: with `@gallerist/plugin-shortcuts` registered, a last row, "Keyboard
+  shortcuts ?" ("Gestures", without the key cap, on a coarse pointer), opens the list; focus comes
+  back to the View tool when it closes.
+- **theme-default (new)**: tokens `--gallerist-popover-bg`, `--gallerist-popover-shadow`,
+  `--gallerist-seg-track`, `--gallerist-seg-on`, `--gallerist-seg-on-shadow`. Every skin derives them
+  (panel, shadow, ground, surface and a hairline ring); Console sets the mockup's (dark #1b1d21 /
+  #111215 / #2b2f35, light #fff / #eceef1 / #fff). Segments are 36px tall on a coarse pointer.
+
+### A keyboard shortcut list on ? (owner-approved 3c, for the Apploye reviewer)
+- **plugin-shortcuts (new)**: `shortcuts()` shows the viewer's keyboard shortcuts in a modal dialog:
+  on `?` while the viewer has focus (not in a text field, not with Ctrl, ⌘ or Alt), from the View
+  menu's last row, or from the host (`open(keys?)` / `close()` on the plugin; the instance, named
+  `shortcuts`, has them too, with `isOpen` and `label`). No toolbar tool. The list is built each time
+  it opens from what the viewer does then: Move (groups on ←/→ and items on ↑/↓, Home/End, 1–9 while
+  items are grouped; a row rail or one item a group: ←/→ and Home/End through every item; a side rail
+  turns the axes; right to left shows → ← for previous / next), Zoom (`+` `−` `0`, the renderer's or
+  plugin-zoom's), Viewer (F with plugin-fullscreen where the browser can fullscreen an element, T with
+  a rail, E with a stacked rail, G, P, C with `onPlace`, D or plugin-save's `key`, each only while its
+  plugin holds the key; `?`; Esc on an overlay viewer), then the host's entries
+  (`shortcuts: [{ keys, label, gesture?, section? }]`, into Viewer, a named built-in section or a new
+  one). Opened by a touch (a coarse pointer, without `?`) it lists the gestures instead: swipe left or
+  right, swipe up within a group, pinch or double-tap, drag while zoomed, swipe down to close (an
+  overlay viewer), the host's, and a note that `?` lists the keys with a keyboard.
+- **plugin-shortcuts (a11y)**: `role="dialog"`, `aria-modal="true"`, named by its title; it sits in
+  the viewer's root over a scrim, the rest of the viewer `inert` while it shows; focus moves to it and
+  Tab stays inside (the close button, then the list, a focus stop the keys scroll when the viewer is
+  short; no role or name of its own, so the title is announced once); Escape (or `?`, AltGr's too, the close button, a click on the
+  scrim) closes it, and only it, with focus back where it was. A `window` capture-phase listener takes
+  every key pressed in the viewer while it shows, so nothing moves, zooms or closes under it; it goes
+  with the next key or press if the renderer goes away with the list open. Zoom keys (and pinch and
+  drag) are listed only while the collection has an item that can zoom: an image, or what
+  plugin-zoom's `zoomable` accepts when it is registered (its instance exposes `zoomable`). Translated text in `strings` (key names
+  included; `toClose` puts the Esc key cap at its `{key}`).
+- **theme-default (new)**: the dialog in every skin and scheme: centred, up to 720px, the sections side
+  by side (Move widest); key caps in the surface colour and monospace face; a sheet from the bottom
+  edge, one column, at 600px wide or less; a fade in, none under reduced motion; right to left. The
+  dialog keeps inside the viewer however short it is (an inline viewer included), its list scrolling.
+- **theme-default (new, a11y)**: under `forced-colors: active` the View popover's chosen segment takes
+  the system's selection colours (its raised surface and shadow are dropped there) and focus rings the
+  text colour. A focused thumb in a cluster draws its ring over its neighbours.
+
+### The rail (from the Apploye reviewer)
+- **plugin-thumbnails (changed)**: collapsing the rail (the handle, `t`, fullscreen) and bringing it
+  back glides its height (a side rail's width) between its size and none over `--gallerist-dur-panel`
+  (220ms, new token; the handle's chevron turns over the same time), so the stage refits a little each
+  frame instead of jumping, and a zoomed image keeps its view. A stacked rail's item column beside the
+  stage does the same when the items toggle or `e` opens or closes it. One Web Animation per panel,
+  clipped, its contents kept to the handle's side. On its way out a panel is `inert`, then
+  `display: none` as before; a collapse that takes the focus with it (a card in the rail or in the item
+  column) hands it to the viewer, while the handle keeps it; reversing midway turns back from where it
+  got to. No motion under `prefers-reduced-motion`, with a `--gallerist-dur-panel` of 0 (`ms` or `s`),
+  or without Web Animations.
+- **plugin-thumbnails (changed)**: the rail shows no scrollbar, in every engine. A mouse or pen drags
+  it: past 5px along it (10px with a pen) a press is a drag, which never clicks the card it started on;
+  short of that, or across the rail, it is a click, which selects. A press released off the rail before
+  it was a drag ends at the next move without a button, so a hover never drags. A grab cursor shows
+  between cards while it can scroll; nothing in it is selected or dragged out as an image. Touch keeps
+  the browser's own scrolling. A vertical wheel
+  scrolls a sideways rail towards its end while it can; at that end, or when it can't scroll, the page
+  gets the wheel, and a sideways wheel, a trackpad swipe or a pinch is left to the browser. Each end
+  with more beyond it, scrolled away or not drawn yet, fades (`data-gallerist-more-start` / `-end`;
+  `--gallerist-rail-fade`, 40px), a side rail's too, and follows the cards' sizes as fonts and a host's
+  decorations arrive. On a sideways rail, ‹ › buttons at those ends (`.gallerist-rail-page`) show on hover
+  with a fine pointer and page it by 80% of its width, gliding unless reduced motion; they are out of
+  the tab order and hidden from assistive tech, as the keys already walk the rail and bring the current
+  card into view. A page goes the whole way even when a frame comes late or runs into cards not drawn
+  yet (it carries on once they are, at most 30 frames, and stops at the rail's true end), under reduced
+  motion too; a press or the wheel on the rail stops it. The rail's scrolls land at once whatever the
+  page's CSS says (`.gallerist-thumbs` gets an inline `scroll-behavior: auto`). Right to left throughout. The item column beside the stage drags too and keeps its
+  scrollbar.
+- **plugin-thumbnails (changed)**: a flat rail's group label, and a stacked timeline label, carry
+  their whole text in a `title` while cut (see Host hooks).
+- **theme-default (changed)**: the rail's band (background, rule, blur) is painted by
+  `.gallerist-thumbs-region` rather than `.gallerist-thumbs`, so the strip can fade its ends without
+  fading the band. A page that styled the strip's background or border should move that to the region.
+- **theme-default (fixed)**: in a dark scheme the dividers between a flat ("Row") rail's groups all but
+  vanished (the hairline, 1.3–1.4:1). A new token, `--gallerist-divider`, defaults to the hairline; each
+  skin's dark scheme lifts it to about 2:1 (Console #464c54, 2.05:1; Gallery white at 22%, 1.93:1;
+  Editorial Night #4d4840, 1.96:1). The light schemes keep their hairline.
+- **theme-default (fixed)**: a flat rail's group label wider than its items (a time range such as
+  "10:49 – 10:50 am" over a one-item group) was cut with an ellipsis. It now widens its group, so it
+  shows whole and clear of the next group's divider, up to three card heights; past that it ends in an
+  ellipsis. Down a side rail a group stays the rail's width.
+
+### Sizes and budgets (gzipped; 0.3.3 → 0.4.0)
+- core + renderer-dom 16,497 → 16,650 B; its budget goes from 16.5 to 16.65 kB (owner-approved, for the
+  toolbar focus ring; the key a host took is 1 B more, a field in a shadow root and AltGr 34 B), and
+  it is now at the limit.
+- core + renderer-dom + thumbnails 21.99 → 25.48 kB (25,484 B); its budget goes from 24 to 25.5 kB
+  (owner-approved, for the rail's motion, drag and the host hooks; the pre-release review's fixes fit
+  in it after a trim).
+- plugin-view 2,392 → 2,959 B; its budget goes from 2.4 to 3 kB (owner-approved: the segment glyphs,
+  the radio-group keys, the live repaint and the shortcut row).
+- `@gallerist/cdn` 34.62 → 38.24 kB (38,244 B); its budget goes from 35 to 40 kB (owner-approved). It
+  bundles neither plugin-zoom nor plugin-shortcuts.
+- New: plugin-zoom 1,645 B (budget 1.65 kB); plugin-shortcuts 2,834 B (budget 2.85 kB).
+- theme-default base.css 7.60 → 9.39 kB (limit 10 kB); console.css 1.21 → 1.30 kB. Core unchanged
+  (3.10 kB).
+
 ## v0.3.3
 
 ### A View menu: the rail's layout and the scheme, in the open viewer (from the Apploye reviewer)

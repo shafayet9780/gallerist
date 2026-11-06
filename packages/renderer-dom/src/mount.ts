@@ -181,9 +181,9 @@ function focusableWithin(root: HTMLElement): HTMLElement[] {
   )
 }
 /** True when the key event originates from a control where typing must not be hijacked. */
-function isEditableTarget(target: EventTarget | null): boolean {
+function isEditableTarget(target?: EventTarget | null): boolean {
   const node = target as HTMLElement | null
-  return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName ?? ''))
+  return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName))
 }
 
 /** Longest animation (delay + duration × iterations) in ms from a computed style's comma lists.
@@ -402,6 +402,22 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     footer: el('div', 'gallerist-region gallerist-region-footer'),
     caption: el('div', 'gallerist-region gallerist-region-caption'),
   }
+  // A tool given keyboard focus in the toolbar strip (it scrolls on a narrow screen) shows whole,
+  // with the room its ring takes (the strip's scroll-padding, sized for it by the theme). A browser
+  // leaves a tool 32px or more in view where it is, cut by the strip's edge. The strip itself
+  // scrolls, not the page (scrollIntoView would move an inline viewer's host page); deltas are
+  // visual, so RTL too.
+  const strip = regionHosts.toolbar
+  strip.addEventListener('focusin', (e) => {
+    const tool = e.target as HTMLElement
+    try {
+      if (!tool.matches(':focus-visible')) return // a pointer's focus: no ring, and the tool stays put
+    } catch {} // no :focus-visible: reveal it anyway
+    const t = tool.getBoundingClientRect()
+    const s = strip.getBoundingClientRect()
+    const pad = Number.parseFloat(getComputedStyle(strip).scrollPaddingLeft) || 0
+    strip.scrollLeft += Math.min(0, t.left - s.left - pad) || Math.max(0, t.right - s.right + pad)
+  })
   // The caption bar holds the item's text caption, or a plugin's caption node in its region
   // (plugin-captions), which then replaces the text. Either is the viewer's accessible description.
   const caption = el('div', 'gallerist-caption')
@@ -1120,10 +1136,11 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const setDir = () => root.setAttribute('data-gallerist-dir', isRtl() ? 'rtl' : 'ltr')
 
   const onKey = (e: KeyboardEvent) => {
-    // Don't hijack typing inside an embedded control (overlay input/textarea/etc); Escape still
-    // closes from anywhere (I-UX2), unless a handler before ours called preventDefault() on it
-    // (a host form keeping Escape for itself).
-    if (isEditableTarget(e.target) && e.key !== 'Escape') return
+    // A key a handler before ours took (preventDefault: a host popover closing on Escape, a host
+    // list walking its own ↑/↓) is not ours. Don't hijack typing inside an embedded control (overlay
+    // input/textarea/select/contenteditable); Escape still closes from anywhere (I-UX2).
+    // (A field in an open shadow root counts by itself: the event's first target, not its host.)
+    if (e.defaultPrevented || (isEditableTarget(e.composedPath()[0]) && e.key !== 'Escape')) return
     // A focused caption band scrolls with ↑/↓/Home/End rather than navigating. Scrolled here, not
     // left to the browser: WebKit on Linux (GTK/WPE) leaves the placard's band unscrolled.
     const by =
@@ -1167,7 +1184,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         break
       }
       case 'Escape':
-        if (!e.defaultPrevented) viewer.close()
+        viewer.close()
         break
       case '+':
       case '=':
@@ -1198,8 +1215,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         } else viewer.goTo(viewer.getCollection().groups.length - 1)
         break
       default:
-        // Modified chords (Ctrl/Cmd/Alt) belong to the browser/OS, not our single-letter map.
-        if (e.ctrlKey || e.metaKey || e.altKey) return
+        // Modified chords (Ctrl/Cmd/Alt) belong to the browser/OS, not our single-letter map; a key
+        // typed with AltGr (Ctrl + Alt on Windows: `?` on some layouts) is still that key.
+        if ((e.ctrlKey || e.metaKey || e.altKey) && !e.getModifierState?.('AltGraph')) return
         // Within-group digit jumps are meaningless in linear mode (the pills retire), so skip them.
         if (!linear && /^[1-9]$/.test(e.key)) {
           viewer.goTo(viewer.getState().cursor.g, Number(e.key) - 1)

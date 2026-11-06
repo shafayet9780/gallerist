@@ -1893,6 +1893,78 @@ describe('mount — modal accessibility (WS-3)', () => {
     expect(v.getState().phase).toBe('closed')
   })
 
+  it('leaves every key a host handler already took (defaultPrevented), not only Escape', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    // a host list in the caption walks its own entries with the arrows and keeps them
+    const list = document.createElement('div')
+    list.tabIndex = 0
+    root.appendChild(list)
+    list.addEventListener('keydown', (e) => e.preventDefault())
+    const before = { ...v.getState().cursor }
+    for (const k of ['ArrowRight', 'ArrowDown', 'End', 't', '+', '2'])
+      list.dispatchEvent(key({ key: k, cancelable: true }))
+    expect(v.getState().cursor).toEqual(before)
+    expect(v.getState().zoom.scale).toBe(1)
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
+    // the same key from elsewhere still navigates
+    root.dispatchEvent(key({ key: 'ArrowRight', cancelable: true }))
+    expect(v.getState().cursor).not.toEqual(before)
+  })
+
+  it('ignores the viewer keys from a textarea, a select and contenteditable inside it', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const fields = [document.createElement('textarea'), document.createElement('select')]
+    const editable = document.createElement('div')
+    editable.contentEditable = 'true'
+    // happy-dom doesn't compute isContentEditable from the attribute
+    Object.defineProperty(editable, 'isContentEditable', { value: true })
+    const before = { ...v.getState().cursor }
+    for (const field of [...fields, editable]) {
+      root.appendChild(field)
+      for (const k of ['ArrowRight', 'End', 't', '0', '2'])
+        field.dispatchEvent(key({ key: k, cancelable: true }))
+    }
+    expect(v.getState().cursor).toEqual(before)
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
+  })
+
+  it('a field inside a shadow root keeps its keys too (the event’s first target, not its host)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const host = root.appendChild(document.createElement('div'))
+    const input = host.attachShadow({ mode: 'open' }).appendChild(document.createElement('input'))
+    const before = { ...v.getState().cursor }
+    for (const k of ['ArrowRight', 'End', 't', '2'])
+      input.dispatchEvent(key({ key: k, cancelable: true, composed: true }))
+    expect(v.getState().cursor).toEqual(before)
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
+  })
+
+  it('a plugin key typed with AltGr (Ctrl + Alt on Windows) is still that key; another chord is not', () => {
+    const hit = vi.fn()
+    const v = createViewer({
+      collection: collection(),
+      plugins: [() => ({ name: 'help', keymap: { '?': hit } })],
+    })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    root.dispatchEvent(key({ key: '?', ctrlKey: true, cancelable: true }))
+    expect(hit).not.toHaveBeenCalled()
+    const altGr = key({ key: '?', ctrlKey: true, altKey: true, cancelable: true })
+    Object.defineProperty(altGr, 'getModifierState', { value: (m: string) => m === 'AltGraph' })
+    root.dispatchEvent(altGr)
+    expect(hit).toHaveBeenCalledTimes(1)
+  })
+
   it('describes the viewer with the caption (aria-describedby)', () => {
     const v = createViewer({
       collection: {

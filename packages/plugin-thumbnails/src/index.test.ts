@@ -1285,6 +1285,57 @@ describe('plugin-thumbnails — windowing (U17)', () => {
     expect(drawn()).toEqual(range(0, 18))
   })
 
+  it('a card or marker drawn out is no longer watched for its size; nor is any after a display switch', async () => {
+    const watched = new Set<Element>()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(el: Element) {
+          watched.add(el)
+        }
+        unobserve(el: Element) {
+          watched.delete(el)
+        }
+        disconnect() {
+          watched.clear()
+        }
+      },
+    )
+    try {
+      const markers = (col: Collection) =>
+        col.groups
+          .filter((_, g) => g % 20 === 0)
+          .map((g) => ({ id: `m-${g.id}`, label: g.id, after: g.id }))
+      const v = createViewer({ collection: many(2000), plugins: [thumbnails({ markers })] })
+      mount(v)
+      v.open()
+      layOut()
+      await scrollTo(0)
+      expect(document.querySelector('[data-marker="m-g0"]')).not.toBeNull()
+      // the rail's own (the renderer watches its caption band with the same mock)
+      const cards = () => [...watched].filter((el) => el !== rail && rail.contains(el))
+      const first = cards()
+      expect(first.length).toBeGreaterThan(10)
+      for (const x of [1000, 2000, 3000, 4000]) await scrollTo(x)
+      expect(document.querySelector('[data-marker="m-g0"]')).toBeNull() // drawn out
+      const stale = () => [...watched].filter((el) => !el.isConnected)
+      expect(stale()).toEqual([])
+      expect(first.filter((el) => !el.isConnected).length).toBeGreaterThan(5) // drawn out, let go
+      expect(watched.has(rail)).toBe(true)
+      const inst = getInternals(v)
+        .getPlugins()
+        .find((p) => p.name === 'thumbnails') as ThumbnailsInstance
+      const before = cards()
+      inst.setDisplay('flat') // everything drawn afresh
+      expect(stale()).toEqual([])
+      expect(before.some((el) => watched.has(el))).toBe(false)
+      expect(watched.has(rail)).toBe(true)
+      expect(cards().length).toBeGreaterThan(10) // the flat rail's cards are watched
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('follows the rail scroll, inserting and removing only the cards that cross the edges', async () => {
     open(many(2000))
     layOut()
@@ -2337,5 +2388,45 @@ describe('plugin-thumbnails — live display switch (setDisplay)', () => {
     expect(toggle.hasAttribute('data-gallerist-off')).toBe(false)
     expect(toggle.hidden).toBe(false)
     expect(bar.hidden).toBe(false)
+  })
+})
+
+describe('plugin-thumbnails — long labels', () => {
+  it('a flat or stacked group label carries its whole text in a title while it is cut', () => {
+    const label = '10:49 – 10:50 am'
+    const flat = createViewer({
+      collection: collection(),
+      plugins: [thumbnails({ groupDisplay: 'flat', timeline: () => label })],
+    })
+    mount(flat)
+    flat.open()
+    const cap = document.querySelector('.gallerist-thumb-group-cap') as HTMLElement
+    expect(cap.textContent).toBe(label)
+    cap.dispatchEvent(new Event('pointerenter'))
+    expect(cap.hasAttribute('title')).toBe(false) // shown whole
+    Object.defineProperty(cap, 'scrollWidth', { value: 120, configurable: true })
+    Object.defineProperty(cap, 'clientWidth', { value: 80, configurable: true })
+    cap.dispatchEvent(new Event('pointerenter'))
+    expect(cap.title).toBe(label)
+    flat.destroy()
+    document.body.innerHTML = ''
+    const stacked = createViewer({
+      collection: collection(),
+      plugins: [thumbnails({ timeline: () => label })],
+    })
+    mount(stacked)
+    stacked.open()
+    // stacked: the title only while the label is cut (read as the pointer comes over it)
+    const time = document.querySelector('.gallerist-thumb-time') as HTMLElement
+    const text = time.querySelector('.gallerist-thumb-time-text') as HTMLElement
+    time.dispatchEvent(new Event('pointerenter'))
+    expect(time.hasAttribute('title')).toBe(false)
+    Object.defineProperty(text, 'scrollWidth', { value: 120, configurable: true })
+    Object.defineProperty(text, 'clientWidth', { value: 80, configurable: true })
+    time.dispatchEvent(new Event('pointerenter'))
+    expect(time.title).toBe(label)
+    Object.defineProperty(text, 'scrollWidth', { value: 80, configurable: true })
+    time.dispatchEvent(new Event('pointerenter'))
+    expect(time.hasAttribute('title')).toBe(false)
   })
 })

@@ -13,7 +13,7 @@
       "packages/core/dist/index.js": "{ createViewer }",
       "packages/renderer-dom/dist/index.js": "{ mount }"
     },
-    "limit": "16.5 kB",
+    "limit": "16.65 kB",
     "gzip": true
   },
   {
@@ -28,7 +28,7 @@
       "packages/renderer-dom/dist/index.js": "{ mount }",
       "packages/plugin-thumbnails/dist/index.js": "{ thumbnails }"
     },
-    "limit": "24 kB",
+    "limit": "25.5 kB",
     "gzip": true
   },
   {
@@ -68,7 +68,23 @@
     "path": "packages/plugin-view/dist/index.js",
     "import": "{ view }",
     "ignore": ["@gallerist/core"],
-    "limit": "2.4 kB",
+    "limit": "3 kB",
+    "gzip": true
+  },
+  {
+    "name": "@gallerist/plugin-zoom (gz)",
+    "path": "packages/plugin-zoom/dist/index.js",
+    "import": "{ zoom }",
+    "ignore": ["@gallerist/core"],
+    "limit": "1.65 kB",
+    "gzip": true
+  },
+  {
+    "name": "@gallerist/plugin-shortcuts (gz)",
+    "path": "packages/plugin-shortcuts/dist/index.js",
+    "import": "{ shortcuts }",
+    "ignore": ["@gallerist/core"],
+    "limit": "2.85 kB",
     "gzip": true
   },
   {
@@ -98,7 +114,7 @@
   {
     "name": "@gallerist/cdn global build (gz)",
     "path": "packages/cdn/dist/gallerist.umd.js",
-    "limit": "35 kB",
+    "limit": "40 kB",
     "gzip": true
   }
 ]

@@ -27,8 +27,16 @@
 // display of a mounted rail. The nodes the renderer holds (the rail region, the aside column, the
 // toolbar toggle) stay; what's in them is drawn again for the new display around the current item,
 // and `viewer.refresh()` tells the renderer to read the region's linear marker again.
+//
+// Motion (motion.ts): the rail collapsing to its handle (the renderer's `data-gallerist-rail`, from
+// the handle, `t` or fullscreen) and a stacked rail's item column opening and closing glide to their
+// new size instead of jumping, unless the user prefers reduced motion.
+//
+// Pull, don't scroll (scroll.ts): the rail shows no scrollbar. A mouse or pen drags it, a vertical
+// wheel scrolls a sideways rail, its ends fade where there's more, and ‹ › buttons there page it.
 
 import type {
+  Collection,
   Group,
   Item,
   MediaSource,
@@ -38,6 +46,8 @@ import type {
   ViewerApi,
 } from '@gallerist/core'
 import { ICONS, getInternals } from '@gallerist/core/internal'
+import { GLIDE, createGlides, sizeOf, toMs } from './motion'
+import { type Strip, attachStrip } from './scroll'
 import { type Axis, axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
 
 /** Cards drawn beyond the visible ones on each side, so a step or a short scroll lands on drawn cards. */
@@ -87,8 +97,74 @@ export interface ThumbnailsOptions {
   timeline?: boolean | ((group: Group, index: number) => string | undefined)
   /** Number the item thumbs (1, 2, 3…) in the item stack and peek, so items can be referred to. */
   numberItems?: boolean
+  /**
+   * A host's decoration for each group (an activity meter, a note count), drawn by the rail: on a
+   * `flat` rail at the end of the group's label line (`place: 'label'`; the group widens to fit its
+   * label and this, the label still ending in an ellipsis past three card heights), on a `stacked`
+   * rail under the card at its width (`'below'`) and, with a `timeline`, also at the end of the
+   * card's time label (`'label'`). Not drawn on an `index` rail. Called for each group as it is
+   * drawn (the rail draws only a run of them) and again on `refreshRail()`. A string shows as text.
+   * Its text joins the group's accessible name: a node's `aria-label` if it has one, else its text.
+   * Presentational: no controls (it sits in a card, a button).
+   */
+  renderGroupMeta?: (group: Group, index: number, ctx: GroupMetaContext) => Decoration
+  /**
+   * A host's badge for each item thumb (a monitor number, a state), in the thumb's top end corner
+   * (the `numberItems` number takes the top start), wherever item thumbs show: a flat rail, the item
+   * column, the peek, an index section. Its text joins the thumb's accessible name, as for
+   * `renderGroupMeta`. Called as each thumb is drawn and on `refreshRail()`.
+   */
+  renderItemBadge?: (item: Item, g: number, i: number) => Decoration
+  /**
+   * Clusters within a group: consecutive items with the same key (not `null`/`undefined`) sit close
+   * together (`--gallerist-cluster-inner`, 2px), with a wider gap where the key changes
+   * (`--gallerist-cluster-gap`, 8px). Visual only: traversal, counts and names don't change.
+   */
+  cluster?: (item: Item, g: number, i: number) => string | number | null | undefined
+  /**
+   * Markers between groups, which are not items: drawn in the rail (`flat` and `stacked`) in order
+   * at their place, but never a stop for the keys, never counted, and not focusable. Read for each
+   * new collection and on `refreshRail()`. See `RailMarker`.
+   */
+  markers?: (collection: Collection) => readonly RailMarker[] | null | undefined
   /** UI text overrides, for translation; merged over English. */
   strings?: Partial<ThumbnailsStrings>
+}
+
+/** What a host's render function returns: a node, a string (shown as text), or nothing. */
+export type Decoration = Node | string | null | undefined
+
+/** Where a group's decoration goes: see `ThumbnailsOptions.renderGroupMeta`. */
+export interface GroupMetaContext {
+  /** the rail's display */
+  readonly display: 'flat' | 'stacked'
+  /** `label`: the end of the group's label line; `below`: under a stacked card */
+  readonly place: 'label' | 'below'
+}
+
+/**
+ * Something in the rail between groups that is not an item (time logged without a screenshot, a
+ * break). Drawn after the group `after` names, else before the one `before` names; a marker whose
+ * group isn't in the collection isn't drawn. It is drawn with its group (windowing included).
+ */
+export interface RailMarker {
+  /** unique among the markers */
+  id: string
+  /** the id of the group it follows */
+  after?: string
+  /** the id of the group it comes before (used when `after` isn't given) */
+  before?: string
+  /** its accessible name, also shown in the marker when there's no `render` */
+  label: string
+  /** a short heading on the label line over it (like a group's label), e.g. "Manual" */
+  caption?: string
+  /** what shows in the marker's box, in place of `label` (e.g. "✎ 25m") */
+  render?: (marker: RailMarker) => Decoration
+  /**
+   * A tooltip, shown while a mouse or pen is over the marker and after a long press on touch (until
+   * the next press). Without one, the marker's `title` is its `label`.
+   */
+  tip?: (marker: RailMarker) => Decoration
 }
 
 /** How the rail shows groups: see `ThumbnailsOptions.groupDisplay`. */
@@ -104,6 +180,8 @@ export interface ThumbnailsInstance extends PluginInstance {
   readonly display: GroupDisplay | undefined
   /** Switch this viewer's rail to `display` (see `setGroupDisplay`). */
   setDisplay(display: GroupDisplay): void
+  /** Draw this rail's host decorations and markers again (see `refreshRail`). */
+  refresh(): void
 }
 
 // the viewer's thumbnails rails (one owns the rail region: the last registered)
@@ -133,6 +211,18 @@ export function setGroupDisplay(viewer: ViewerApi, display: GroupDisplay): boole
   const rail = railsOf(viewer).pop() // the one whose rail shows
   rail?.setDisplay(display)
   return !!rail
+}
+
+/**
+ * Draw the viewer's rail decorations again after the data they read changed in place (a note
+ * added, activity recomputed): `renderGroupMeta` and `renderItemBadge` for what is drawn, `cluster`,
+ * and `markers` read anew. Nothing else is drawn again, the rail keeps its scroll, and focus stays.
+ * A new collection (`setCollection`) needs no call. Returns whether the viewer has a rail.
+ */
+export function refreshRail(viewer: ViewerApi): boolean {
+  const rails = railsOf(viewer)
+  for (const r of rails) r.refresh()
+  return rails.length > 0
 }
 
 export interface ThumbnailsStrings {
@@ -168,15 +258,11 @@ export const DEFAULT_THUMBNAILS_STRINGS: ThumbnailsStrings = {
   toggleItems: 'Toggle group items',
 }
 
-const metaTime = (group: Group): string | undefined => {
-  const time = (group.meta as { time?: unknown } | undefined)?.time
-  return typeof time === 'string' ? time : undefined
-}
-
-const metaSubtitle = (group: Group): string | undefined => {
-  const subtitle = (group.meta as { subtitle?: unknown } | undefined)?.subtitle
-  return typeof subtitle === 'string' ? subtitle : undefined
-}
+/** `v` if it is a string (an untyped caption or meta field). */
+const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
+const metaOf = (group: Group, key: 'time' | 'subtitle') =>
+  str((group.meta as Record<string, unknown> | undefined)?.[key])
+const metaTime = (group: Group) => metaOf(group, 'time')
 
 function thumbUrl(source: MediaSource | undefined): string | null {
   if (!source) return null
@@ -192,8 +278,7 @@ function groupThumb(group: Group): string | null {
 }
 
 function lazyImg(src: string | null, observer: IntersectionObserver | null): HTMLImageElement {
-  const img = document.createElement('img')
-  img.className = 'gallerist-thumb-img'
+  const img = make('img', 'gallerist-thumb-img')
   img.decoding = 'async'
   img.loading = 'lazy'
   img.alt = '' // decorative — the enclosing button carries the accessible name
@@ -208,22 +293,43 @@ function lazyImg(src: string | null, observer: IntersectionObserver | null): HTM
 }
 
 /** Display caption string, if one was explicitly provided (no `alt` fallback — UX-G). */
-function captionOf(x: { caption?: unknown }): string | undefined {
-  return typeof x.caption === 'string' ? x.caption : undefined
+const captionOf = (x: { caption?: unknown }) => str(x.caption)
+
+/** A new `tag` element of class `cls` (with `text`). */
+const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string) => {
+  const node = document.createElement(tag)
+  node.className = cls
+  if (text) node.textContent = text
+  return node
 }
 
 function appendCaption(btn: HTMLElement, text: string | undefined): void {
   if (!text) return
-  const cap = document.createElement('span')
-  cap.className = 'gallerist-thumb-caption'
-  cap.textContent = text
+  const cap = make('span', 'gallerist-thumb-caption', text)
   btn.appendChild(cap)
 }
 
-function toggleAriaCurrent(btn: HTMLElement, on: boolean): void {
-  if (on) btn.setAttribute('aria-current', 'true')
-  else btn.removeAttribute('aria-current')
+/** A host's decoration in a `span.cls` hidden from assistive tech, and the text it adds to a name
+ *  instead: a node's `aria-label`, else its text. `null` when there's nothing to draw. */
+function decoration(d: Decoration, cls: string): [HTMLElement, string] | null {
+  if (d == null || d === '') return null
+  const el = make('span', cls)
+  el.setAttribute('aria-hidden', 'true')
+  el.append(d)
+  // from the wrapper: a fragment is empty once appended, and a number has no text of its own
+  const text = (d as Element).getAttribute?.('aria-label') ?? el.textContent
+  return [el, text?.trim() ?? '']
 }
+
+/** An accessible name with the decorations' texts after it. */
+const named = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(', ')
+
+/** `whole` as `on`'s title while `text` is cut (read on hover: a label's width settles late). */
+const titleWhenCut = (on: HTMLElement, text: HTMLElement, whole: string) =>
+  on.addEventListener('pointerenter', () => {
+    if (text.scrollWidth > text.clientWidth) on.title = whole
+    else on.removeAttribute('title')
+  })
 
 /** Mark a thumb (or a card's wrapper, which only takes `data-active`) active or not; a no-op when it
  *  already is, so a step writes to the two thumbs that changed and nothing else. */
@@ -233,7 +339,7 @@ function setActiveAttr(el: HTMLElement, active: boolean): void {
   if (el.tagName !== 'BUTTON') return
   // index rows are plain buttons (their list holds a listbox of items, which can't nest in another)
   if (el.getAttribute('role') === 'option') el.setAttribute('aria-selected', String(active))
-  else toggleAriaCurrent(el, active)
+  else toggleAttr(el, 'aria-current', active, 'true')
 }
 
 /** Place a listbox option in its whole list: the rail draws only a run of it. */
@@ -242,15 +348,14 @@ function setPos(el: HTMLElement, pos: number, size: number): void {
   el.setAttribute('aria-setsize', String(size))
 }
 
-function toggleAttr(el: HTMLElement, name: string, on: boolean): void {
-  if (on) el.setAttribute(name, '')
+function toggleAttr(el: HTMLElement, name: string, on: boolean, value = ''): void {
+  if (on) el.setAttribute(name, value)
   else el.removeAttribute(name)
 }
 
 function thumbButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
-  const btn = document.createElement('button')
+  const btn = make('button', className)
   btn.type = 'button'
-  btn.className = className
   btn.setAttribute('role', 'option')
   btn.setAttribute('aria-selected', 'false')
   btn.setAttribute('aria-label', label)
@@ -307,8 +412,7 @@ function centreBy(
 
 /** Whether the primary pointer can hover (desktop). Defaults true when undetectable (SSR/test). */
 function canHover(): boolean {
-  if (typeof window === 'undefined') return true
-  return window.matchMedia?.('(hover: hover)').matches ?? true
+  return globalThis.matchMedia?.('(hover: hover)').matches ?? true
 }
 
 const DISPLAYS = ['stacked', 'flat', 'index'] as const
@@ -387,6 +491,16 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let toolbarBtn: HTMLButtonElement | null = null
     let unsub: (() => void) | null = null
     let hoverCapable = true
+    // the viewer's root, once the rail is in it, and what it last said about the rail's collapse
+    let viewerRoot: HTMLElement | null = null
+    let strip: Strip | null = null // the rail's drag, wheel, end fades and page buttons
+    let railObs: MutationObserver | null = null
+    let railCollapsed = false
+    const glides = createGlides(() =>
+      toMs(
+        viewerRoot ? getComputedStyle(viewerRoot).getPropertyValue('--gallerist-dur-panel') : '',
+      ),
+    )
 
     // Reconcile state. Group cards + item buttons are keyed by id so we can flip active state and
     // reorder without destroying nodes.
@@ -411,7 +525,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // peek (stacked mode): a transient flyout previewing a non-active group's items.
     let peekRow: HTMLElement | null = null
     let peekGroupId: string | null = null
-    let peekTimer: ReturnType<typeof setTimeout> | null = null
+    let peekTimer: ReturnType<typeof setTimeout> | undefined
 
     // flat mode: a flattened (g,i) sequence + the group wrappers that bracket runs of items.
     let flat: FlatEntry[] = []
@@ -442,14 +556,29 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       btn.dataset.item = item.id
       btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
       if (o.numberItems) {
-        const num = document.createElement('span')
-        num.className = 'gallerist-thumb-num'
+        const num = make('span', 'gallerist-thumb-num', String(iIndex + 1))
         num.setAttribute('aria-hidden', 'true') // the label already says "Item n"
-        num.textContent = String(iIndex + 1)
         btn.appendChild(num)
       }
       appendCaption(btn, captionOf(item))
+      decorateItem(btn, item, gIndex, iIndex)
       return btn
+    }
+
+    // The host's badge (its text in the thumb's name) and the thumb's place in its cluster: `in` sits
+    // close to the item before it, `start` begins a new cluster after another item.
+    const decorateItem = (btn: HTMLElement, item: Item, g: number, i: number) => {
+      btn.querySelector('.gallerist-thumb-badge')?.remove()
+      const badge = decoration(o.renderItemBadge?.(item, g, i), 'gallerist-thumb-badge')
+      if (badge) btn.append(badge[0])
+      btn.setAttribute('aria-label', named(t.item(i + 1), badge?.[1]))
+      const before = viewer.getCollection().groups[g]?.items[i - 1]
+      const own = o.cluster?.(item, g, i) ?? null
+      const prev = before ? (o.cluster?.(before, g, i - 1) ?? null) : null
+      const at =
+        prev !== null && prev === own ? 'in' : before && (prev ?? own) !== null ? 'start' : ''
+      if (at) btn.dataset.cluster = at
+      else delete btn.dataset.cluster
     }
 
     // Fill a column/flyout with one item button per group item; `track` registers them in itemBtns
@@ -465,18 +594,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     // ── peek flyout ──────────────────────────────────────────────────────────
     const removePeek = () => {
-      if (peekRow) {
-        peekRow.remove()
-        peekRow = null
-      }
-      peekGroupId = null
+      peekRow?.remove()
+      peekRow = peekGroupId = null
     }
-    const cancelPeekClose = () => {
-      if (peekTimer != null) {
-        clearTimeout(peekTimer)
-        peekTimer = null
-      }
-    }
+    const cancelPeekClose = () => clearTimeout(peekTimer)
     const closePeek = () => {
       cancelPeekClose()
       removePeek()
@@ -494,8 +615,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (peekGroupId === group.id) return // already open
       cancelPeekClose()
       removePeek()
-      const col = document.createElement('div')
-      col.className = 'gallerist-thumb-peek'
+      const col = make('div', 'gallerist-thumb-peek')
       // its own listbox (a sibling of the rail on the region host, not nested in it) → valid `option`
       // children. aria-label distinguishes it from the rail's "Thumbnails" listbox.
       col.setAttribute('role', 'listbox')
@@ -520,7 +640,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // ── index mode ───────────────────────────────────────────────────────────
     const buildIndexRow = (group: Group, gIndex: number): HTMLButtonElement => {
       const name = captionOf(group) ?? t.group(gIndex + 1)
-      const subtitle = metaSubtitle(group)
+      const subtitle = metaOf(group, 'subtitle')
       const count = group.items.length
       const label = t.section(name, subtitle, count)
       const btn = thumbButton(label, 'gallerist-thumb-row', () => viewer.goTo(gIndex))
@@ -528,25 +648,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       btn.removeAttribute('aria-selected')
       btn.dataset.group = group.id
       btn.appendChild(lazyImg(groupThumb(group), observer))
-      const text = document.createElement('span')
-      text.className = 'gallerist-thumb-row-text'
-      const nameEl = document.createElement('span')
-      nameEl.className = 'gallerist-thumb-row-name'
-      nameEl.textContent = name
-      text.appendChild(nameEl)
-      if (subtitle) {
-        const sub = document.createElement('span')
-        sub.className = 'gallerist-thumb-row-sub'
-        sub.textContent = subtitle
-        text.appendChild(sub)
-      }
-      btn.appendChild(text)
-      const badge = document.createElement('span')
-      badge.className = 'gallerist-thumb-row-count'
-      badge.textContent = String(count)
-      btn.appendChild(badge)
-      const wrap = document.createElement('div')
-      wrap.className = 'gallerist-thumb-section'
+      const text = make('span', 'gallerist-thumb-row-text')
+      text.appendChild(make('span', 'gallerist-thumb-row-name', name))
+      if (subtitle) text.appendChild(make('span', 'gallerist-thumb-row-sub', subtitle))
+      btn.append(text, make('span', 'gallerist-thumb-row-count', String(count)))
+      const wrap = make('div', 'gallerist-thumb-section')
       wrap.dataset.group = group.id
       wrap.appendChild(btn)
       cardHost.set(group.id, wrap)
@@ -567,9 +673,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       coverUrls.set(group.id, cover)
       btn.appendChild(lazyImg(cover, observer))
       if (multi) {
-        const badge = document.createElement('span')
-        badge.className = 'gallerist-thumb-count'
-        badge.textContent = String(group.items.length)
+        const badge = make('span', 'gallerist-thumb-count', String(group.items.length))
         btn.appendChild(badge)
       }
       appendCaption(btn, captionOf(group))
@@ -581,8 +685,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const time = timeLabel?.(group, gIndex)
       const wrapCard = () => {
         if (host !== btn) return host
-        const wrap = document.createElement('div')
-        wrap.className = 'gallerist-thumb-wrap'
+        const wrap = make('div', 'gallerist-thumb-wrap')
         wrap.dataset.group = group.id
         wrap.appendChild(btn)
         host = wrap
@@ -590,16 +693,15 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
       if (timeLabel) {
         const wrap = wrapCard()
-        const label = document.createElement('span')
-        label.className = 'gallerist-thumb-time'
+        const label = make('span', 'gallerist-thumb-time')
         label.setAttribute('aria-hidden', 'true') // folded into the card's name below
-        const text = document.createElement('span')
-        text.className = 'gallerist-thumb-time-text'
-        text.textContent = time ?? ''
+        const text = make('span', 'gallerist-thumb-time-text', time ?? '')
+        // the whole label as its title while it's cut (past three card heights, the theme's cap)
+        if (time) titleWhenCut(label, text, time)
         label.appendChild(text)
         wrap.prepend(label)
-        if (time) btn.setAttribute('aria-label', t.groupAt(gIndex + 1, time))
       }
+      if (o.renderGroupMeta) wrapCard() // the meta goes under the card
       if (multi) {
         btn.addEventListener('focusin', () => openPeek(group, gIndex, host))
         btn.addEventListener('focusout', schedulePeekClose)
@@ -608,9 +710,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           btn.addEventListener('mouseleave', schedulePeekClose)
         } else {
           const wrap = wrapCard()
-          const caret = document.createElement('button')
+          const caret = make('button', 'gallerist-thumb-expand')
           caret.type = 'button'
-          caret.className = 'gallerist-thumb-expand'
           caret.setAttribute('aria-label', t.previewButton(gIndex + 1))
           caret.addEventListener('click', (e) => {
             e.stopPropagation()
@@ -620,19 +721,48 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
       }
       cardHost.set(group.id, host)
+      decorateCard(btn, group, gIndex)
       return btn
     }
 
-    // a removed card's lazy image stops being watched (it would otherwise stay observed, detached)
+    // A stacked card's name (with its time) and the host's meta: at the end of its time label, and
+    // under the card. Drawn again on refresh.
+    const decorateCard = (btn: HTMLElement, group: Group, g: number) => {
+      const host = cardHost.get(group.id)
+      for (const el of host?.querySelectorAll('.gallerist-thumb-meta') ?? []) el.remove()
+      const meta = (place: GroupMetaContext['place']) =>
+        decoration(
+          o.renderGroupMeta?.(group, g, { display: 'stacked', place }),
+          'gallerist-thumb-meta',
+        )
+      const label = host?.querySelector('.gallerist-thumb-time')
+      const top = label ? meta('label') : null
+      if (top) label?.append(top[0])
+      const below = host !== btn ? meta('below') : null
+      if (below) btn.after(below[0])
+      const time = timeLabel?.(group, g)
+      btn.setAttribute(
+        'aria-label',
+        named(time ? t.groupAt(g + 1, time) : t.group(g + 1), top?.[1], below?.[1]),
+      )
+    }
+
+    // a removed card (or marker) stops being watched, its lazy image too (either would otherwise
+    // keep it alive, detached)
     const drop = (el: Element) => {
       el.remove()
+      resizeObs?.unobserve(el)
       for (const img of el.querySelectorAll('img')) observer?.unobserve(img)
     }
+
+    // what has focus in the viewer's document or shadow root
+    const active = () =>
+      ((regionEl ?? document).getRootNode() as Document | ShadowRoot).activeElement
 
     // Run `redraw`; a focused thumb it took out of the document hands focus to the viewer, so the
     // keys keep working (focus would fall to <body>).
     const keepFocus = (redraw: () => void) => {
-      const focused = document.activeElement
+      const focused = active()
       const viewerEl = regionEl?.closest<HTMLElement>('.gallerist')
       redraw()
       if (focused instanceof HTMLElement && !focused.isConnected) {
@@ -642,9 +772,123 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     // Put `node` right after `prev` (or first in `parent`), unless it already is there: cards that stay
     // in the run are already in order, so only the ones entering it are inserted.
+    // Each is watched for size changes (a font, a host's late decoration): the ends' fades follow.
     const place = (parent: Element, node: Element, prev: Element | null) => {
       const at = prev ? prev.nextSibling : parent.firstChild
       if (at !== node) parent.insertBefore(node, at)
+      resizeObs?.observe(node)
+    }
+
+    // ── markers (not items): drawn with their group, never a stop ──────────────
+    let markerList: RailMarker[] = []
+    const markerEls = new Map<string, HTMLElement>()
+    let tipEl: HTMLElement | null = null
+    let tipFor: HTMLElement | null = null // the marker it's for
+    let pressTimer: ReturnType<typeof setTimeout> | undefined
+    const hideTip = () => {
+      clearTimeout(pressTimer)
+      tipEl?.remove()
+      tipEl = tipFor = null
+      document.removeEventListener('pointerdown', hideTip, true)
+    }
+    // the tooltip goes in the region (the rail clips), beside a side rail's marker, else over or
+    // under it (towards the viewer's middle), kept inside the viewer
+    const showTip = (m: RailMarker, el: HTMLElement) => {
+      hideTip()
+      const tip = decoration(m.tip?.(m), 'gallerist-rail-tip')
+      if (!tip || !regionEl) return
+      tipEl = tip[0]
+      tipFor = el
+      tipEl.setAttribute('role', 'tooltip')
+      tipEl.removeAttribute('aria-hidden')
+      regionEl.append(tipEl)
+      placeTip()
+      document.addEventListener('pointerdown', hideTip, true) // until the next press anywhere
+    }
+    // where its marker is now (it follows the rail's scroll; a marker drawn out takes it with it)
+    const placeTip = () => {
+      const el = tipFor
+      const base = regionEl
+      const box = viewerRoot ?? base
+      if (!tipEl || !base || !box || !el?.isConnected) return hideTip()
+      const r = el.getBoundingClientRect()
+      const b = base.getBoundingClientRect()
+      const v = box.getBoundingClientRect()
+      const w = tipEl.offsetWidth
+      const h = tipEl.offsetHeight
+      const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(x, hi - 8))
+      let x = r.left + r.width / 2 - w / 2
+      let y = r.top + r.height / 2 > v.top + v.height / 2 ? r.top - h - 8 : r.bottom + 8
+      if (axis === 'y') {
+        x = r.left + r.width / 2 > v.left + v.width / 2 ? r.left - w - 8 : r.right + 8
+        y = r.top + r.height / 2 - h / 2
+      }
+      tipEl.style.left = `${clamp(x, v.left + 8, v.right - w) - b.left}px`
+      tipEl.style.top = `${clamp(y, v.top + 8, v.bottom - h) - b.top}px`
+    }
+    const readMarkers = (col: Collection) => {
+      const ids = new Set(col.groups.map((g) => g.id))
+      const seen = new Set<string>()
+      // a marker by a group that isn't there, or with an id already used, isn't drawn
+      markerList = isIndex
+        ? []
+        : (o.markers?.(col) ?? []).filter(
+            (m) => ids.has(m.after ?? m.before ?? '') && !seen.has(m.id) && !!seen.add(m.id),
+          )
+    }
+    const buildMarker = (m: RailMarker) => {
+      const el = make('div', 'gallerist-rail-marker')
+      el.dataset.marker = m.id
+      // a named group (the one role a listbox may hold besides its options), with no option in it
+      el.setAttribute('role', 'group')
+      el.setAttribute('aria-label', m.label)
+      if (m.caption || timeLabel) {
+        const cap = make('span', 'gallerist-rail-marker-cap', m.caption ?? '')
+        cap.setAttribute('aria-hidden', 'true')
+        el.append(cap)
+      }
+      const body = decoration(m.render?.(m) ?? m.label, 'gallerist-rail-marker-body')
+      if (body) el.append(body[0])
+      if (!m.tip) el.title = m.label
+      else {
+        el.addEventListener('pointerenter', (e) => {
+          if (e.pointerType !== 'touch') showTip(m, el)
+        })
+        el.addEventListener('pointerleave', (e) => {
+          if (e.pointerType !== 'touch') hideTip()
+        })
+        // touch: a long press shows it, until the next press anywhere
+        el.addEventListener('pointerdown', (e) => {
+          if (e.pointerType !== 'touch') return
+          hideTip()
+          pressTimer = setTimeout(() => showTip(m, el), 500)
+        })
+        for (const type of ['pointerup', 'pointercancel'])
+          el.addEventListener(type, () => clearTimeout(pressTimer))
+        el.addEventListener('contextmenu', (e) => e.preventDefault())
+      }
+      markerEls.set(m.id, el)
+      return el
+    }
+    // Put the markers before (`after: false`) or after group `id` right after `prev`; returns the last
+    // node placed. `drawn` collects the markers in the run.
+    const placeMarks = (id: string, after: boolean, prev: Element | null, drawn: Set<string>) => {
+      let last = prev
+      for (const m of markerList) {
+        if (!root || (m.after ?? m.before) !== id || (m.after != null) !== after) continue
+        const el = markerEls.get(m.id) ?? buildMarker(m)
+        place(root, el, last)
+        last = el
+        drawn.add(m.id)
+      }
+      return last
+    }
+    const dropMarks = (drawn: Set<string>) => {
+      for (const [id, el] of markerEls)
+        if (!drawn.has(id)) {
+          drop(el)
+          markerEls.delete(id)
+        }
     }
 
     // redraw the group rail as groups start..end, keeping the cards that stay (identity preserved)
@@ -668,6 +912,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
       }
       let prev: Element | null = null
+      const marks = new Set<string>()
       for (let g = start; g <= end; g++) {
         const group = col.groups[g]
         if (!group) continue
@@ -677,9 +922,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           groupBtns.set(group.id, btn)
         }
         const host = cardHost.get(group.id) ?? btn
+        prev = placeMarks(group.id, false, prev, marks)
         place(root, host, prev)
-        prev = host
+        prev = placeMarks(group.id, true, host, marks)
       }
+      dropMarks(marks)
       // the active item column lives on the region host (see rebuildItemColumn), not the rail.
     }
 
@@ -704,13 +951,14 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         (activeGroup.items.length > 1 || (itemAxis === 'vertical' && collectionHasMulti))
       if (show && activeGroup) {
         if (!itemRow) {
-          itemRow = document.createElement('div')
-          itemRow.className = 'gallerist-thumb-items'
+          itemRow = make('div', 'gallerist-thumb-items')
           // its own listbox (host-mounted sibling of the rail, not nested) → valid `option` children
           itemRow.setAttribute('role', 'listbox')
           itemRow.setAttribute('aria-label', t.groupItems)
           itemRow.setAttribute('aria-orientation', itemAxis)
           itemRow.dataset.axis = itemAxis
+          // a mouse drags the stack too (it keeps its scrollbar: it sits on a panel)
+          if (itemAxis === 'vertical') attachStrip(itemRow, null, () => 'y')
         }
         fillColumn(itemRow, activeGroup, gIndex, true)
         mountEl.appendChild(itemRow)
@@ -809,12 +1057,61 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       applyActive(col, cur.g, cur.i)
     }
 
+    // The item column beside the stage glides to its new width: open, it grows to the stack; closed,
+    // the stack stays (inert) while the column narrows, then goes.
     const toggleActivePanel = () => {
       if (isFlat) return // a flat rail has no item panel (the toggle is hidden; `e` isn't claimed)
       panelOpen = !panelOpen
       toolbarBtn?.setAttribute('aria-pressed', String(panelOpen))
       if (panelOpen) closePeek() // the persistent panel supersedes a transient peek
+      const column = !isIndex && itemAxis === 'vertical' && asideEl?.isConnected ? asideEl : null
+      if (!column) return syncPanel()
+      const from = sizeOf(column, 'width') // mid-glide: as far as it got
+      glides.stop(column)
+      const leaving = itemRow
       syncPanel()
+      const to = sizeOf(column, 'width')
+      if (leaving && !leaving.isConnected) {
+        column.append(leaving)
+        glides.glide(column, 'width', from, to, () => leaving.remove())
+      } else glides.glide(column, 'width', from, to)
+    }
+
+    // The rail collapsing or coming back (the renderer flips `data-gallerist-rail` on its root): the
+    // rail glides between its height (its width on a side rail) and none, and a stacked rail's item
+    // column beside the stage between its width and none. A collapse that takes focus with it hands
+    // focus to the viewer first.
+    const onRailChange = () => {
+      const collapsed = viewerRoot?.getAttribute('data-gallerist-rail') === 'collapsed'
+      if (!viewerRoot || !regionEl || collapsed === railCollapsed) return
+      railCollapsed = collapsed
+      // focus in the rail or the item column (not on the handle, which stays) goes to the viewer
+      if (collapsed && [regionEl, asideEl].some((n) => n?.contains(active())))
+        viewerRoot.focus({ preventScroll: true })
+      const side = viewerRoot.getAttribute('data-gallerist-orientation') === 'vertical'
+      for (const [el, dim] of [
+        [regionEl, side ? 'width' : 'height'],
+        [asideEl, 'width'],
+      ] as const) {
+        if (!el?.isConnected || el.hidden) continue
+        const mid = glides.moving(el)
+        el.setAttribute(GLIDE, '') // displayed (and so measured) while it moves
+        const now = sizeOf(el, dim)
+        glides.stop(el)
+        el.setAttribute(GLIDE, '')
+        const full = sizeOf(el, dim)
+        if (collapsed) glides.glide(el, dim, now, 0)
+        else glides.glide(el, dim, mid ? now : 0, full)
+      }
+    }
+    const watchRail = () => {
+      const root = regionEl?.closest<HTMLElement>('.gallerist') ?? null
+      if (!root || root === viewerRoot || typeof MutationObserver === 'undefined') return
+      railObs?.disconnect()
+      viewerRoot = root
+      railCollapsed = root.getAttribute('data-gallerist-rail') === 'collapsed'
+      railObs = new MutationObserver(onRailChange)
+      railObs.observe(root, { attributeFilter: ['data-gallerist-rail'] })
     }
 
     // ── flat mode ────────────────────────────────────────────────────────────
@@ -833,23 +1130,45 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     // A group's label (the timeline's, else its caption) heads it and joins its accessible name.
     const buildGroupWrapper = (group: Group, gIndex: number): HTMLElement => {
-      const wrap = document.createElement('div')
-      wrap.className = 'gallerist-thumb-group'
+      const wrap = make('div', 'gallerist-thumb-group')
       wrap.dataset.group = group.id
       wrap.setAttribute('role', 'group')
-      const label = timeLabel?.(group, gIndex) ?? captionOf(group)
-      wrap.setAttribute('aria-label', label ? t.groupAt(gIndex + 1, label) : t.group(gIndex + 1))
-      if (label) {
-        const cap = document.createElement('span')
-        cap.className = 'gallerist-thumb-group-cap'
-        cap.setAttribute('aria-hidden', 'true') // already in the group's name
-        cap.textContent = label
-        wrap.appendChild(cap)
+      const label = groupLabel(group, gIndex)
+      // with a host's meta, the label and the meta share a line
+      let line: HTMLElement = wrap
+      if (o.renderGroupMeta) {
+        line = make('div', 'gallerist-thumb-group-head')
+        wrap.appendChild(line)
       }
-      const row = document.createElement('div')
-      row.className = 'gallerist-thumb-group-row'
+      if (label) {
+        const cap = make('span', 'gallerist-thumb-group-cap', label)
+        cap.setAttribute('aria-hidden', 'true') // already in the group's name
+        titleWhenCut(cap, cap, label) // one too long even for a widened group
+        line.appendChild(cap)
+      }
+      const row = make('div', 'gallerist-thumb-group-row')
       wrap.appendChild(row)
+      decorateFlat(wrap, group, gIndex)
       return wrap
+    }
+    const groupLabel = (group: Group, g: number) => timeLabel?.(group, g) ?? captionOf(group)
+
+    // A flat group's name (with its label) and the host's meta at the end of its label line
+    const decorateFlat = (wrap: HTMLElement, group: Group, g: number) => {
+      const line = wrap.querySelector('.gallerist-thumb-group-head')
+      line?.querySelector('.gallerist-thumb-meta')?.remove()
+      const meta = line
+        ? decoration(
+            o.renderGroupMeta?.(group, g, { display: 'flat', place: 'label' }),
+            'gallerist-thumb-meta',
+          )
+        : null
+      if (meta) line?.append(meta[0])
+      const label = groupLabel(group, g)
+      wrap.setAttribute(
+        'aria-label',
+        named(label ? t.groupAt(g + 1, label) : t.group(g + 1), meta?.[1]),
+      )
     }
 
     const rebuildRailFlat = (
@@ -860,15 +1179,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (!root) return
       const desiredItemIds = new Set<string>()
       const desiredGroupIds = new Set<string>()
-      const minI = new Map<string, number>()
-      const maxI = new Map<string, number>()
       for (let fi = start; fi <= end; fi++) {
         const e = flat[fi]
         if (!e) continue
         desiredItemIds.add(e.itemId)
         desiredGroupIds.add(e.groupId)
-        minI.set(e.groupId, Math.min(minI.get(e.groupId) ?? e.i, e.i))
-        maxI.set(e.groupId, Math.max(maxI.get(e.groupId) ?? e.i, e.i))
       }
       // evict nodes that left the window
       for (const [id, btn] of itemBtns) {
@@ -884,10 +1199,23 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
       }
       // place in window order, inserting only what entered (the rest is already in order)
-      let curGroupId: string | null = null
+      // the group being placed, its wrapper, and the last of its items placed (the flat list runs
+      // in order: a group's first item placed is its first drawn)
+      let curGrp: Group | undefined
+      let curWrap: HTMLElement | undefined
+      let lastI = 0
       let prevWrap: Element | null = null
       let row: Element = root
       let prevBtn: Element | null = null
+      // a group's markers show where its start (before) or its end (after) is drawn
+      const marks = new Set<string>()
+      // past a group's last item drawn: it's cut there unless that's its last
+      const after = () => {
+        if (!curGrp || !curWrap) return
+        const whole = lastI === curGrp.items.length - 1
+        toggleAttr(curWrap, 'data-partial-end', !whole)
+        if (whole) prevWrap = placeMarks(curGrp.id, true, prevWrap, marks)
+      }
       for (let fi = start; fi <= end; fi++) {
         const e = flat[fi]
         if (!e) continue
@@ -899,10 +1227,16 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           wrap = buildGroupWrapper(grp, e.g)
           groupWraps.set(e.groupId, wrap)
         }
-        if (e.groupId !== curGroupId) {
+        if (grp !== curGrp) {
+          after()
+          if (e.i === 0) prevWrap = placeMarks(e.groupId, false, prevWrap, marks)
           place(root, wrap, prevWrap)
-          prevWrap = wrap
-          curGroupId = e.groupId
+          prevWrap = curWrap = wrap
+          curGrp = grp
+          // cut at its start: the label shows only over a group's start
+          toggleAttr(wrap, 'data-partial-start', e.i > 0)
+          const line = wrap.firstElementChild as HTMLElement | null // the label line, if any
+          if (line && !line.classList.contains('gallerist-thumb-group-row')) line.hidden = e.i > 0
           row = wrap.querySelector('.gallerist-thumb-group-row') ?? wrap
           prevBtn = null
         }
@@ -913,32 +1247,28 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
         place(row, ib, prevBtn)
         prevBtn = ib
+        lastI = e.i
       }
-      // partial-edge flags (a group the drawn run cuts); the label shows only over a group's start
-      for (const [id, wrap] of groupWraps) {
-        const gi = groupIndexById.get(id)
-        if (gi == null) continue
-        const grp = col.groups[gi]
-        if (!grp) continue
-        const mn = minI.get(id) ?? 0
-        const mx = maxI.get(id) ?? 0
-        toggleAttr(wrap, 'data-partial-start', mn > 0)
-        toggleAttr(wrap, 'data-partial-end', mx < grp.items.length - 1)
-        const cap = wrap.querySelector<HTMLElement>('.gallerist-thumb-group-cap')
-        if (cap) cap.hidden = mn > 0
-      }
+      after()
+      dropMarks(marks)
     }
 
     // wipe everything (collection identity changed — ids may be entirely different)
     const resetAll = () => {
-      if (root) root.replaceChildren()
-      observer?.disconnect() // every lazy image went with it
+      observer?.disconnect() // every lazy image went with it, and every card watched for its size
+      resizeObs?.disconnect()
+      if (root) {
+        root.replaceChildren()
+        resizeObs?.observe(root)
+      }
       groupBtns.clear()
       itemBtns.clear()
       coverUrls.clear()
       cardHost.clear()
       groupWraps.clear()
       removePeek()
+      hideTip()
+      markerEls.clear()
       itemRow?.remove() // itemRow lives on the region host, so root.replaceChildren() won't catch it
       itemRow = null
       liveCardId = null
@@ -1030,27 +1360,32 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       frame = requestAnimationFrame(() => {
         frame = 0
         rewindow()
+        strip?.update()
+        if (tipEl) placeTip()
       })
     }
 
     // The rail first renders before it has any layout, so a viewer opening on a far group has to
     // reveal the active thumb once it's on screen.
     let wasClosed = true
+    // its first layout: show the current card with its neighbours, and size the run to the rail
+    const firstLayout = () =>
+      requestAnimationFrame(() => {
+        if (!root) return
+        const { g, i } = viewer.getState().cursor
+        revealActive(viewer.getCollection(), g, i)
+        rewindow()
+        strip?.update()
+      })
     const revealOnOpen = () => {
       const closed = viewer.getState().phase === 'closed'
-      if (wasClosed && !closed) {
-        requestAnimationFrame(() => {
-          if (!root) return
-          const { g, i } = viewer.getState().cursor
-          revealActive(viewer.getCollection(), g, i)
-          rewindow() // the first layout: size the run to the rail
-        })
-      }
+      if (wasClosed && !closed) firstLayout()
       wasClosed = closed
     }
 
     const render = () => {
       if (!root) return
+      if (!railObs) watchRail()
       revealOnOpen()
       const col = viewer.getCollection()
       const cur = viewer.getState().cursor
@@ -1060,6 +1395,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (colChanged) {
         keepFocus(resetAll) // new data: every thumb is drawn afresh
         collectionHasMulti = col.groups.some((g) => g.items.length > 1)
+        readMarkers(col)
       }
 
       if (isFlat && colChanged) buildFlatModel(col)
@@ -1082,6 +1418,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         if (peekGroupId && peekGroupId === activeGroupId) closePeek() // navigated into the peeked group
       }
       applyActive(col, cur.g, cur.i)
+      strip?.update()
 
       lastCol = col
       lastG = cur.g
@@ -1089,25 +1426,32 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     // Drop the rail's DOM and listeners (destroy, or a new mount that builds it again).
-    const teardown = () => {
-      unsub?.()
-      unsub = null
-      resizeObs?.disconnect()
-      resizeObs = null
-      root?.removeEventListener('scroll', scheduleRewindow)
+    // Forget what's drawn and measured: the next render draws everything again.
+    const forget = () => {
       if (frame) cancelAnimationFrame(frame)
       frame = 0
       cancelPeekClose()
       resetAll()
-      toolbarBtn?.removeEventListener('click', toggleActivePanel)
-      toolbarBtn = null
-      asideEl = null
-      regionEl = null
-      root = null
       lastCol = null
       lastG = lastI = -1
       axis = null
       perView = 0
+    }
+    const teardown = () => {
+      unsub?.()
+      unsub = null
+      railObs?.disconnect()
+      railObs = null
+      viewerRoot = null
+      glides.stopAll()
+      strip?.destroy()
+      strip = null
+      resizeObs?.disconnect()
+      resizeObs = null
+      root?.removeEventListener('scroll', scheduleRewindow)
+      forget()
+      toolbarBtn?.removeEventListener('click', toggleActivePanel)
+      toolbarBtn = asideEl = regionEl = root = null
       wasClosed = true
     }
 
@@ -1126,7 +1470,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       if (asideEl) asideEl.hidden = groupDisplay !== 'stacked'
       if (toolbarBtn) {
         // a focused toggle that hides hands focus to the viewer (else it falls to <body>)
-        if (isFlat && document.activeElement === toolbarBtn)
+        if (isFlat && active() === toolbarBtn)
           regionEl.closest<HTMLElement>('.gallerist')?.focus({ preventScroll: true })
         toolbarBtn.hidden = isFlat
         toggleAttr(toolbarBtn, 'data-gallerist-off', isFlat)
@@ -1141,26 +1485,56 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       want = display
       if (!root || display === groupDisplay) return
       keepFocus(() => {
-        cancelPeekClose()
-        if (frame) cancelAnimationFrame(frame)
-        frame = 0
-        resetAll()
-        lastCol = null // draw everything again (render)
-        lastG = lastI = -1
-        axis = null // a new layout: measured again
-        perView = 0
+        forget() // draw everything again, measured again (a new layout)
         layout()
         render()
       })
-      // its first layout: show the current card with its neighbours, and size the run to the rail
-      if (typeof requestAnimationFrame !== 'undefined')
-        requestAnimationFrame(() => {
-          if (!root) return
-          const { g, i } = viewer.getState().cursor
-          revealActive(viewer.getCollection(), g, i)
-          rewindow()
-        })
+      if (typeof requestAnimationFrame !== 'undefined') firstLayout()
       viewer.refresh()
+    }
+
+    // Draw the host's decorations and markers again, in place: the cards and thumbs stay, and the
+    // card in the middle of the rail stays where it is on screen.
+    const refresh = () => {
+      const col = viewer.getCollection()
+      if (!root || col !== lastCol) return // not drawn yet, or about to be drawn afresh
+      const scroller = root
+      const gAt = new Map<string, number>()
+      const at = new Map<string, [number, number]>()
+      col.groups.forEach((group, g) => {
+        gAt.set(group.id, g)
+        group.items.forEach((item, i) => at.set(item.id, [g, i]))
+      })
+      const hosts = drawnHosts(col)
+      const ref = axis ? hosts[middleOf(scroller, hosts, axis)] : undefined
+      const tipped = tipFor?.dataset.marker // an open tip shows again on its marker, drawn anew
+      hideTip()
+      keepFocus(() =>
+        keepPlace(scroller, ref, axis, () => {
+          for (const [id, el] of [...groupBtns, ...groupWraps]) {
+            const g = gAt.get(id) ?? -1
+            const group = col.groups[g]
+            if (!group || isIndex) continue
+            if (isFlat) decorateFlat(el, group, g)
+            else decorateCard(el, group, g)
+          }
+          const thumbs = [...itemBtns.values(), ...(peekRow?.children ?? [])] as HTMLElement[]
+          for (const btn of thumbs) {
+            const [g, i] = at.get(btn.dataset.item ?? '') ?? [-1, -1]
+            const item = col.groups[g]?.items[i]
+            if (item) decorateItem(btn, item, g, i)
+          }
+          for (const el of markerEls.values()) drop(el)
+          markerEls.clear()
+          readMarkers(col)
+          if (isFlat) rebuildRailFlat(col, winStart, winEnd)
+          else rebuildRail(col, winStart, winEnd)
+        }),
+      )
+      const m = markerList.find((x) => x.id === tipped)
+      const el = m && markerEls.get(m.id)
+      if (el?.isConnected) showTip(m as RailMarker, el)
+      strip?.update()
     }
 
     // Build the rail when its region mounts, with the mounted preset's defaults (configure). No DOM
@@ -1178,25 +1552,28 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       preset = (defaults && typeof defaults === 'object' ? defaults : {}) as ThumbnailsOptions
       configure()
       panelOpen = o.expandActive ?? true
-      regionEl = document.createElement('div')
-      regionEl.className = 'gallerist-thumbs-region'
-      root = document.createElement('div')
-      root.className = 'gallerist-thumbs'
+      regionEl = make('div', 'gallerist-thumbs-region')
+      root = make('div', 'gallerist-thumbs')
       root.setAttribute('aria-label', t.rail)
       regionEl.appendChild(root)
       root.style.overflowAnchor = 'none' // keepPlace corrects the offset itself
       root.addEventListener('scroll', scheduleRewindow, { passive: true })
+      const rail = root
+      strip = attachStrip(
+        rail,
+        regionEl,
+        () => axis ?? axisOf(rail),
+        () => [winStart > 0, winEnd < seqLength(viewer.getCollection()) - 1],
+      )
       if (typeof ResizeObserver !== 'undefined') {
         resizeObs = new ResizeObserver(scheduleRewindow)
         resizeObs.observe(root)
       }
       if (oneOf(AXES, settle(opts, preset, 'stacked').itemAxis) === 'vertical') {
-        asideEl = document.createElement('div')
-        asideEl.className = 'gallerist-thumbs-aside'
+        asideEl = make('div', 'gallerist-thumbs-aside')
       }
-      toolbarBtn = document.createElement('button')
+      toolbarBtn = make('button', 'gallerist-items-toggle')
       toolbarBtn.type = 'button'
-      toolbarBtn.className = 'gallerist-items-toggle'
       toolbarBtn.setAttribute('aria-label', t.toggleItems)
       toolbarBtn.setAttribute('aria-pressed', String(panelOpen))
       toolbarBtn.innerHTML = ICONS.itemStack
@@ -1204,6 +1581,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       layout()
       render()
       unsub = viewer.subscribe(render)
+      queueMicrotask(watchRail) // once the renderer has put the rail in the viewer
     }
 
     // Which regions to claim is decided now, before the preset is known (and the display can change
@@ -1240,6 +1618,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         return root ? groupDisplay : undefined
       },
       setDisplay,
+      refresh,
       init() {
         hoverCapable = canHover()
       },

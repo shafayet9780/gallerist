@@ -82,14 +82,27 @@ its UI from `ctx.preset` builds it again for that mount (see `plugin-thumbnails`
   `getGroupDisplay(viewer)` / `setGroupDisplay(viewer, display)` that look it up. Code that shouldn't
   import the plugin finds it the same way, among `getInternals(viewer).getPlugins()` by its name and
   that method: `plugin-view` and React's `groupDisplay` prop do.
-- **A menu from the toolbar** (`plugin-view`): a menu button (`aria-haspopup="menu"`,
-  `aria-expanded`) whose menu is appended to the viewer root (`button.closest('.gallerist')`, which is
+- **A popover from the toolbar** (`plugin-view`): a button (`aria-haspopup="dialog"`,
+  `aria-expanded`) whose popover (a non-modal `role="dialog"`, radio groups inside) is appended to the viewer root (`button.closest('.gallerist')`, which is
   positioned), not to the toolbar region, which scrolls sideways on a narrow screen and would clip it.
-  Stop the keys the menu handles (`stopPropagation`, `preventDefault`) so the viewer's keymap doesn't
+  Stop the keys it handles (`stopPropagation`, `preventDefault`) so the viewer's keymap doesn't
   navigate, zoom or close under it, close it on a press outside (check `event.composedPath()`, so a
   viewer in a shadow root works) and when the viewer closes, and return focus to the button. The
   renderer can be destroyed under an open menu without telling plugins: close it from the next
   document or window event that finds the button disconnected (`!button.isConnected`).
+- **Following a gesture's zoom** (`plugin-zoom`): `viewer.getState().zoom` is the committed zoom;
+  a pinch, a wheel or a double click shows its transform on the current slide's content
+  (`.gallerist-content[data-gallerist-current]`, `transform: translate(…) scale(s)`) before it
+  commits. Watch `style` on the viewer root's subtree with a `MutationObserver` to read it live, and
+  ignore a scale below 1 (a drag to dismiss shrinks the content too). To take a key from the
+  renderer's own keymap (`+`, `-`, `0` are built in, not plugin keymap entries), listen on the root in
+  the capture phase and `stopImmediatePropagation()`; skip text fields and modified keys.
+- **A modal layer over the viewer** (`plugin-shortcuts`): put it in the viewer's root (found from a
+  hidden node in a region, marked `data-gallerist-off` so a bar shows not for it alone), set `inert`
+  on the root's other children while it shows (and only on those not inert already), and take keys in
+  a `window` capture-phase listener while it's open: it runs before the root's own listeners (the
+  renderer's keymap, plugin-zoom's capture listener), so `stopPropagation()` there keeps every key
+  from the viewer. Restore focus to the element focused before it opened.
 - **A setting the host may own** (`plugin-view`): read `viewer[Symbol.for('gallerist.controlled')]`
   (`true` or a list of setting names) each time before applying a value of your own. A host or an
   adapter sets it for the settings it applies itself; React's `<Gallerist>` lists `scheme` and

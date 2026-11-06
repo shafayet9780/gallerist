@@ -55,7 +55,7 @@ and where a canvas and this plan disagree, the plan wins.
 | P2-S | Reviewer controls off the media (owner, 2026-11-03) | In `reviewer` no control covers the media, corners included (a screenshot's taskbar clock sits bottom-right). A preset layout, not a reviewer special case: a new arrow layout `arrows: 'docked'` (renderer option + theme CSS). Group arrows in gutters the stage leaves beside it (none on touch); the item navigator (`n / N` over ↑ ↓) is a grid item of the root, the aside item column's header while that shows, else the end of the caption row (coexisting with a text or designed caption). `reviewer` switches from `corner-br`; other presets keep their placement. Fits the 16.5 KB budget (+29 B). The one intended exception: the zoom minimap (`.gallerist-navigator`) stays in the stage's corner over the zoomed media; it shows only while zoomed and is the zoom tool itself (owner, 2026-11-03). Review fixes: one group drops the group arrows and their gutters (`data-gallerist-one-group`); `linear` keeps no navigator room; the docked box takes the skin's panel radius at most (no stadium in `gallery`); the caption precedes the navigator in DOM (tab order matches the caption row); `editorial` without a placard ends its caption column with the navigator, `immersive` puts it in the stage's bottom inline-end corner (over the media there, as immersive's bands are). +15 B (16,241). |
 | P2-T | Pin cards follow the host (owner, 2026-11-03) | A card holds its contents only while open: `renderCard` runs on open and on redraw, and `onCardRemove(pin, node)` hands each returned node back exactly once (close, redraw, item change, pin gone, destroy) so hosts can unmount portals/roots. Focus leaving a card goes to its pin, else the add-pin button, else the viewer, never `<body>`. `open(id, { focus })`; `onOpenChange` context carries `previous` (`PinOpenChange`). |
 
-Backlog for 0.4 from the same pass: per-item `zoomable: false`, and a built-in pins compose UI.
+Backlog for 0.5 from the same pass: per-item `zoomable: false`, and a built-in pins compose UI.
 
 ## Architecture changes in the code
 
@@ -94,10 +94,10 @@ merges on its own. Estimates are solo-developer weeks.
 | **Release 0.3** | Honest positioning, docs site with a live playground that switches skin × preset, then publish (no migration notes: nothing was ever published) (repo public, `NPM_TOKEN`, manual release workflow). | 1.5 | 5 |
 | **M22 Atlas** | Renderer `peek`, `plugin-atlas` (skyline minimap, map mode on the grid), first-run hint. | 1.5 | — |
 | **M23 Review plugins** | `triage` and `compare` first (Console), then `slideshow`, `rotate`, `share`, `info`, `timeline`, `filter`, `redaction`, each styled by tokens in all three skins. | 3 | 6 |
-| **Release 0.4** | Atlas + review plugins, Vue adapter. | 1 | 5 |
+| **Release 0.5** | Atlas + review plugins, Vue adapter. | 1 | 5 |
 | **M24 Stories (go/no-go)** | Review demand and the ReelKit overlap first; if go: `mode: 'stories'`, segments, tap zones, auto-advance, story tray, phone-first examples. | 2–3 | — |
 
-Rough total: about 11 weeks to 0.3 and about 16 to 0.4, before Stories. That is longer than the
+Rough total: about 11 weeks to 0.3 and about 16 to 0.5, before Stories. That is longer than the
 earlier "4–6 weeks to 0.3" because every look is now in scope; the release cut below keeps the
 first publish from waiting on Atlas and the review plugins.
 
@@ -105,7 +105,9 @@ first publish from waiting on Atlas and the review plugins.
 
 - **0.3:** Gallery (default), Console + reviewer, Editorial, Tour, pins, parity. Enough to show the
   positioning (structured review) and the mainstream default.
-- **0.4:** Atlas, the review plugins, Vue.
+- **0.4:** the Apploye reviewer's viewer work (a zoom tool, a shortcut list, rail host hooks, the View
+  popover), released as a minor.
+- **0.5:** Atlas, the review plugins, Vue.
 - **0.5 or later:** Stories, if it passes go/no-go.
 
 ## Budgets

@@ -5,8 +5,10 @@ import { captions } from '@gallerist/plugin-captions'
 import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { grid } from '@gallerist/plugin-grid'
 import { download } from '@gallerist/plugin-save'
+import { shortcuts } from '@gallerist/plugin-shortcuts'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import { type ViewChange, view } from '@gallerist/plugin-view'
+import { zoom } from '@gallerist/plugin-zoom'
 import {
   type ArrowLayout,
   type ColorScheme,
@@ -69,15 +71,25 @@ const label = (g: number) => {
     ? names[Math.floor(g / 3) % names.length]
     : ['Hall', 'WC', 'Den', 'Loft'][g % 4]
 }
+// the reviewer timeline's labels: 09:12, 09:19, … every 7 minutes. time=range: "09:12 – 09:13 am"
+// (a start and an end, wider than a one-item group) · time=long: far longer than any group
+const clock = (m: number) =>
+  `${String(9 + Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const timeOf = (g: number) => {
+  const at = 12 + g * 7
+  if (p.get('time') === 'range') return `${clock(at)} – ${clock(at + 1)} am`
+  if (p.get('time') === 'long')
+    return `${clock(at)} – ${clock(at + 1)} am, Weekly review of the dashboard`
+  return clock(at)
+}
 const collection: Collection = {
   meta: { title: 'Fixture house' },
   groups: sizes.map((n, g) => ({
     id: `g${g}`,
     caption: captionMode === '1' ? `Group ${g + 1} title` : label(g),
-    // the reviewer timeline's labels: 09:12, 09:19, … every 7 minutes
     meta: {
       subtitle: captionMode === '1' ? `Floor ${(g % 3) + 1}` : undefined,
-      time: `${String(9 + Math.floor((12 + g * 7) / 60)).padStart(2, '0')}:${String((12 + g * 7) % 60).padStart(2, '0')}`,
+      time: timeOf(g),
     },
     items: Array.from({ length: n }, (_, i) =>
       img(
@@ -114,6 +126,13 @@ const customCaption: Plugin[] = customMode
     ]
   : []
 
+// shortcuts=1: the shortcut list on ?, with one host entry (and its gesture); `open()` for a spec
+const shortcutsPlugin = shortcuts({
+  shortcuts: [{ keys: ['N'], label: 'Add a note', gesture: 'Long press' }],
+})
+;(window as unknown as { shortcutsPlugin: typeof shortcutsPlugin }).shortcutsPlugin =
+  shortcutsPlugin
+
 if (p.get('dir') === 'rtl') document.documentElement.dir = 'rtl'
 const rail = (p.get('rail') ?? undefined) as RailPlacement | undefined
 const viewer = createViewer({
@@ -133,6 +152,8 @@ const viewer = createViewer({
               ? { layout: 'sections', startOpen: true, strings: { start: 'Start tour' } }
               : {},
           ),
+          // zoom-tool=1: the zoom tool (− 100% +) before the other tools
+          ...(p.get('zoom-tool') === '1' ? [zoom()] : []),
           fullscreen(),
           download(),
           ...customCaption,
@@ -146,10 +167,21 @@ const viewer = createViewer({
                 }),
               ]
             : []),
+          ...(p.get('shortcuts') === '1' ? [shortcutsPlugin] : []),
         ],
 })
 ;(window as unknown as { viewChanges: ViewChange[] }).viewChanges = []
+// inline=N: an inline viewer N px tall, in the page (a host's section), instead of the overlay
+const inline = Number(p.get('inline')) || 0
+let container: HTMLElement | undefined
+if (inline) {
+  container = document.createElement('section')
+  container.className = 'fixture-host'
+  container.style.cssText = `position: relative; height: ${inline}px; margin: 40px 0`
+  document.body.append(container)
+}
 mount(viewer, {
+  container,
   preset: (p.get('preset') ?? undefined) as PresetName | undefined,
   arrows: (p.get('arrows') ?? undefined) as ArrowLayout | undefined,
   rail,

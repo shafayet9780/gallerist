@@ -232,7 +232,7 @@ afterSlide`, **cancelable** `beforeSlide`), item axis (`beforeItem/item/afterIte
 - **Tests:** vitest **node** env for pure logic; **happy-dom** (per-file pragma) for DOM units;
   **Playwright** (chromium) for real gestures, axe a11y, and overlay zoom-tracking.
 - **Gates (CI = `.github/workflows/ci.yml`):** lint (Biome) → typecheck → unit → build →
-  size-limit (`core ≤ 12 KB`, `core+renderer ≤ 16.5 KB`) → Playwright e2e (incl. axe).
+  size-limit (`core ≤ 12 KB`, `core+renderer ≤ 16.65 KB`) → Playwright e2e (incl. axe).
 - **Deferred budget:** the 60fps frame-trace assertion is flaky as a gate → dedicated perf job;
   size and the DOM-bound memory claim are gated now.
 

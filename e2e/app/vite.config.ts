@@ -21,6 +21,8 @@ export default defineConfig({
       '@gallerist/plugin-pins': r('../../packages/plugin-pins/src/index.ts'),
       '@gallerist/plugin-captions': r('../../packages/plugin-captions/src/index.ts'),
       '@gallerist/plugin-view': r('../../packages/plugin-view/src/index.ts'),
+      '@gallerist/plugin-zoom': r('../../packages/plugin-zoom/src/index.ts'),
+      '@gallerist/plugin-shortcuts': r('../../packages/plugin-shortcuts/src/index.ts'),
     },
   },
 })

@@ -32,6 +32,7 @@
     --gallerist-dur-snappy: 340ms;
     --gallerist-dur-gentle: 280ms;
     --gallerist-dur-exit: 180ms; /* exits run shorter than entrances */
+    --gallerist-dur-panel: 220ms; /* the rail collapsing, the item column opening (plugin-thumbnails) */
 
     /* the accent: each skin names its accents as a dark/light pair, the scheme picks one */
     --gallerist-accent: var(--gallerist-accent-dark);
@@ -79,6 +80,21 @@
     --gallerist-enter-group: gallerist-enter-group;
     --gallerist-enter-item: gallerist-enter-item;
     --gallerist-rail-track-gap: var(--gallerist-rail-bg); /* the ring that cuts the track at a tick */
+    /* the line between a flat rail's groups: the hairline, unless a skin's dark scheme lifts it (a
+       hairline that reads on a light band all but disappears on a dark one) */
+    --gallerist-divider: var(--gallerist-hairline);
+    --gallerist-rail-fade: 40px; /* how far a rail's end fades where it has more beyond it */
+    /* item clusters (thumbnails `cluster`): the gap inside one, and between two */
+    --gallerist-cluster-inner: 2px;
+    --gallerist-cluster-gap: 8px;
+
+    /* popovers (the View menu, the shortcut list) sit a step above the bands; a segmented control
+       is a recessed track with its checked segment raised */
+    --gallerist-popover-bg: var(--gallerist-panel);
+    --gallerist-popover-shadow: var(--gallerist-shadow);
+    --gallerist-seg-track: var(--gallerist-bg);
+    --gallerist-seg-on: var(--gallerist-surface);
+    --gallerist-seg-on-shadow: 0 0 0 1px var(--gallerist-hairline), 0 1px 2px rgb(0 0 0 / 0.25);
 
     /* hover: unchanged unless a skin sets one */
     --gallerist-arrow-hover-bg: var(--gallerist-arrow-bg);
@@ -355,16 +371,56 @@
   pointer-events: auto;
 }
 .gallerist-region-toolbar {
+  --_gap: 6px; /* between tools: ::before and ::after cancel it */
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-inline-start: auto; /* tools sit at the end of the bar, after the title */
+  gap: var(--_gap);
+  /* a scroller clips at its padding box, both ways: room for a focused tool's ring (2px + 2px
+     offset; +1px at the ends, where Chromium rounds an RTL scroll range down), given back by the
+     margin so nothing moves. A tool focus scrolls in stops as far in. The end's room is ::after. */
+  padding: 4px 0;
+  padding-inline-start: 5px;
+  margin: -4px -5px;
+  scroll-padding-inline: 5px;
   /* on a narrow screen the tools scroll sideways so the counter and Close always fit */
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  pointer-events: auto;
+  /* no pointer-events: like every region it passes them through but on its tools, so the bar's
+     free space it spans is the bar's (in immersive, the image's under it), and so is the 1px its
+     margin takes from what is before it on a phone (the bar's gap is 4px there) */
+}
+/* tools sit at the end of the bar: the strip takes the free space (a shown title shares it), its
+   tools after this auto margin (0 once they overflow; the gap after it cancelled) */
+.gallerist-region-toolbar::before {
+  content: "";
+  margin-inline: auto calc(-1 * var(--_gap));
+}
+/* the room after the last tool, as a box: WebKit leaves a flex scroller's end padding out of its
+   scroll range */
+.gallerist-region-toolbar::after {
+  content: "";
+  flex: none;
+  width: 5px;
+  margin-inline-start: calc(-1 * var(--_gap));
+}
+/* no tools, or (where :has() works) none shown: no room either, so nothing else moves */
+.gallerist-region-toolbar:empty {
+  padding: 0;
+  margin: 0;
+}
+.gallerist-region-toolbar:empty::before,
+.gallerist-region-toolbar:empty::after {
+  display: none;
+}
+.gallerist-region-toolbar:not(:has(> :not([hidden]))) {
+  padding: 0;
+  margin: 0;
+}
+.gallerist-region-toolbar:not(:has(> :not([hidden])))::before,
+.gallerist-region-toolbar:not(:has(> :not([hidden])))::after {
+  display: none;
 }
 .gallerist-region-toolbar::-webkit-scrollbar {
   display: none;
@@ -415,26 +471,120 @@
 
 /* ── thumbnails rail (plugin-thumbnails) ───────────────────────────────────── */
 /* the region wrapper: holds the scrollable rail plus the floating item/peek panels as siblings, so
-   the panels escape the rail's overflow-clip yet still ride along when the region is re-mounted. */
+   the panels escape the rail's overflow-clip yet still ride along when the region is re-mounted. It
+   paints the rail's band, so the strip inside can fade its ends without fading the band. */
 .gallerist-thumbs-region {
   position: relative;
   display: flex;
   align-items: center;
   min-width: 0;
+  background: var(--gallerist-rail-bg);
+  border-block-start: var(--gallerist-rail-border);
+  backdrop-filter: var(--gallerist-blur);
 }
 .gallerist-thumbs-region > .gallerist-thumbs {
   flex: 1 1 auto;
   min-width: 0;
 }
+/* the strip: no scrollbar (a mouse drags it, a wheel scrolls it, ‹ › page it; plugin-thumbnails),
+   no text or image selection while it's pulled; an end with more beyond it fades */
 .gallerist-thumbs {
+  --_fade-to: to right;
+  --_fade-start: 0px;
+  --_fade-end: 0px;
   display: flex;
   gap: 8px;
   align-items: center;
   padding: 8px 12px;
   overflow-x: auto;
-  background: var(--gallerist-rail-bg);
-  border-block-start: var(--gallerist-rail-border);
+  scrollbar-width: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.gallerist-thumbs::-webkit-scrollbar {
+  display: none;
+}
+.gallerist-thumbs img {
+  -webkit-user-drag: none;
+}
+.gallerist-thumbs[data-gallerist-scroll="y"] {
+  --_fade-to: to bottom;
+}
+.gallerist[data-gallerist-dir="rtl"] .gallerist-thumbs[data-gallerist-scroll="x"] {
+  --_fade-to: to left;
+}
+.gallerist-thumbs[data-gallerist-more-start] {
+  --_fade-start: var(--gallerist-rail-fade);
+}
+.gallerist-thumbs[data-gallerist-more-end] {
+  --_fade-end: var(--gallerist-rail-fade);
+}
+.gallerist-thumbs:is([data-gallerist-more-start], [data-gallerist-more-end]) {
+  -webkit-mask-image: linear-gradient(
+    var(--_fade-to),
+    transparent,
+    #000 var(--_fade-start),
+    #000 calc(100% - var(--_fade-end)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    var(--_fade-to),
+    transparent,
+    #000 var(--_fade-start),
+    #000 calc(100% - var(--_fade-end)),
+    transparent
+  );
+}
+@media (pointer: fine) {
+  .gallerist-thumbs:is([data-gallerist-more-start], [data-gallerist-more-end]) {
+    cursor: grab;
+  }
+}
+.gallerist-thumbs[data-gallerist-dragging],
+.gallerist-thumbs[data-gallerist-dragging] * {
+  cursor: grabbing;
+}
+/* ‹ › at a sideways strip's ends, while there's more that way: for a mouse, on hover (the keys
+   already walk the rail, so they're out of the tab order and hidden from assistive tech) */
+.gallerist-rail-page {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-inline: 6px;
+  padding: 0;
+  translate: 0 -50%;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: 50%;
+  background: var(--gallerist-chrome-bg);
+  color: var(--gallerist-fg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
   backdrop-filter: var(--gallerist-blur);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--gallerist-dur-exit) var(--gallerist-ease-out);
+}
+.gallerist-rail-page[hidden] {
+  display: none;
+}
+.gallerist-rail-page .gallerist-icon {
+  width: 16px;
+  height: 16px;
+}
+.gallerist[data-gallerist-dir="rtl"] .gallerist-rail-page .gallerist-icon {
+  transform: scaleX(-1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .gallerist-thumbs-region:hover > .gallerist-rail-page {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .gallerist-rail-page:hover {
+    background: var(--gallerist-tool-hover-bg, var(--gallerist-chrome-bg));
+  }
 }
 /* cards stack image + (optional) caption band; height grows for the caption */
 .gallerist-thumb {
@@ -553,7 +703,7 @@
 }
 /* collapsing the rail puts its item stack away too (fullscreen, `t`, rail: 'hidden'); a rail switched
    to flat or index leaves the column hidden */
-.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside,
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-aside:not([data-gallerist-glide]),
 .gallerist-thumbs-aside[hidden] {
   display: none;
 }
@@ -590,18 +740,16 @@
 .gallerist-thumbs[data-timeline] {
   align-items: flex-start;
 }
-.gallerist-thumbs[data-timeline] .gallerist-thumb-wrap {
-  flex-direction: column;
-  gap: 6px;
-}
 .gallerist-thumb-time {
   position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
   height: 14px;
-  /* a label never widens its card's column: long ones end in an ellipsis */
-  max-width: calc(var(--gallerist-thumb-h) * 1.4);
+  /* a label longer than its card (a range with a host's meta at its end) runs past it: its column
+     widens, so it shows whole and clear of the next card's label; past three card heights it ends
+     in an ellipsis, the whole label in its title (as a flat rail's group label does) */
+  max-width: calc(var(--gallerist-thumb-h) * 3);
   font: 500 11px var(--gallerist-mono);
   font-variant-numeric: tabular-nums;
   color: var(--gallerist-fg-muted);
@@ -612,22 +760,31 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* a side rail runs top to bottom: no horizontal track between the cards */
+/* a side rail runs top to bottom: no horizontal track between the cards, and a label keeps to the
+   rail's width (a card's) */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-time {
+  max-width: calc(var(--gallerist-thumb-h) * 1.4);
+}
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-time::after {
   display: none;
 }
-/* a timeline label sits above the card, so the touch expand caret moves down onto the card */
+/* a timeline label sits above the card, so the touch expand caret moves down onto the card (its
+   left corner: right to left, the card keeps to the right of a column a long label widened) */
 .gallerist-thumbs[data-timeline] .gallerist-thumb-expand {
   top: calc(14px + 6px + 4px);
 }
+.gallerist[data-gallerist-dir="rtl"] .gallerist-thumbs[data-timeline] .gallerist-thumb-expand {
+  left: auto;
+  right: calc(var(--gallerist-thumb-h) * 1.4 - 26px);
+}
 /* a side rail's band edge faces the stage, not the bar */
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs {
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs-region {
   border-block-start: 0 none;
 }
-.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumbs {
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumbs-region {
   border-right: var(--gallerist-rail-border);
 }
-.gallerist[data-gallerist-rail-pos="right"] .gallerist-thumbs {
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-thumbs-region {
   border-left: var(--gallerist-rail-border);
 }
 .gallerist-thumb-time::before {
@@ -710,6 +867,8 @@
   position: relative;
   flex: 0 0 auto;
   display: flex;
+  flex-direction: column; /* a label over the card, a host's meta under it (the caret floats) */
+  gap: 6px;
 }
 .gallerist-thumb-expand {
   position: absolute;
@@ -748,13 +907,21 @@
   justify-content: flex-end; /* the item rows line up, labelled or not */
   gap: 6px;
 }
-/* the divider: the same room on both sides of it (the rail's gap, then this padding) */
-.gallerist-thumb-group + .gallerist-thumb-group {
+/* the divider: the same room on both sides of it (the rail's gap, then this padding); a marker
+   between two groups has one on each side */
+/* (as specific as 0.3's `.gallerist-thumb-group + .gallerist-thumb-group`, so a page's rule for it
+   still wins) */
+.gallerist-thumbs:where([data-display="flat"])
+  > :where(.gallerist-thumb-group, .gallerist-rail-marker)
+  + :is(.gallerist-thumb-group, .gallerist-rail-marker) {
   padding-inline-start: 12px;
-  border-inline-start: 1px solid var(--gallerist-hairline);
+  border-inline-start: 1px solid var(--gallerist-divider);
 }
+/* a label wider than its items widens its group (a one-item group under a time range), so it shows
+   whole and clear of the next group's divider; past three card heights it ends in an ellipsis (the
+   whole label in its title) */
 .gallerist-thumb-group-cap {
-  contain: inline-size; /* a long label ends in an ellipsis instead of widening its group */
+  max-width: calc(var(--gallerist-thumb-h) * 3);
   font: 500 11px / 14px var(--gallerist-font);
   color: var(--gallerist-fg-muted);
   white-space: nowrap;
@@ -764,7 +931,7 @@
 .gallerist-thumbs[data-timeline] .gallerist-thumb-group-cap {
   font-family: var(--gallerist-mono);
 }
-.gallerist-thumb-group[data-active] > .gallerist-thumb-group-cap {
+.gallerist-thumb-group[data-active] .gallerist-thumb-group-cap {
   color: var(--gallerist-accent);
 }
 .gallerist-thumb-group-row {
@@ -784,10 +951,154 @@
   flex-direction: column;
   align-items: flex-start;
 }
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group + .gallerist-thumb-group {
+/* down a side rail a group is the rail's width: a long label ends in an ellipsis there */
+.gallerist[data-gallerist-orientation="vertical"]
+  :is(.gallerist-thumb-group-cap, .gallerist-thumb-group-head) {
+  contain: inline-size;
+}
+.gallerist[data-gallerist-orientation="vertical"]
+  .gallerist-thumbs:where([data-display="flat"])
+  > :where(.gallerist-thumb-group, .gallerist-rail-marker)
+  + :is(.gallerist-thumb-group, .gallerist-rail-marker) {
   padding: 12px 0 0;
   border-inline-start: 0;
-  border-block-start: 1px solid var(--gallerist-hairline);
+  border-block-start: 1px solid var(--gallerist-divider);
+}
+
+/* ── host decorations (thumbnails `renderGroupMeta`, `renderItemBadge`, `cluster`, `markers`) ──── */
+/* a group's meta: at the end of its label line (flat: the group widens for it, the label still
+   capped at three card heights), under a stacked card at its width, or at the end of its time label */
+.gallerist-thumb-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font: 500 11px / 14px var(--gallerist-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--gallerist-fg-muted);
+  white-space: nowrap;
+}
+.gallerist-thumb-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 14px;
+}
+.gallerist-thumb-group-head[hidden] {
+  display: none;
+}
+:is(.gallerist-thumb-group-head, .gallerist-thumb-time) > .gallerist-thumb-meta {
+  flex: none;
+  margin-inline-start: auto;
+}
+.gallerist-thumb-wrap > .gallerist-thumb-meta {
+  box-sizing: border-box;
+  width: calc(var(--gallerist-thumb-h) * 1.4);
+  min-height: 14px;
+}
+/* an item's badge: the top end corner (a number from `numberItems` has the start) */
+.gallerist-thumb-badge {
+  position: absolute;
+  top: 3px;
+  inset-inline-end: 3px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: 2px;
+  background: var(--gallerist-badge-bg);
+  color: var(--gallerist-fg);
+  font: 600 9px / 14px var(--gallerist-mono);
+  pointer-events: none;
+}
+.gallerist-thumb-badge svg {
+  width: 10px;
+  height: 10px;
+}
+/* clusters: close inside one, a wider gap where a new one starts (the rows' gap is 6px) */
+.gallerist-thumb-item[data-cluster="in"] {
+  --_cluster: calc(var(--gallerist-cluster-inner) - 6px);
+}
+.gallerist-thumb-item[data-cluster="start"] {
+  --_cluster: calc(var(--gallerist-cluster-gap) - 6px);
+}
+.gallerist-thumb-item[data-cluster]:not(:first-child) {
+  margin-inline-start: var(--_cluster);
+}
+/* 2px apart, a neighbour would paint over part of a focused thumb's ring */
+.gallerist-thumb-item:focus-visible {
+  z-index: 1;
+}
+:is(
+    .gallerist-thumb-items[data-axis="vertical"],
+    .gallerist-thumb-peek:not([data-axis="horizontal"]),
+    .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group-row,
+    .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-items
+  )
+  > .gallerist-thumb-item[data-cluster]:not(:first-child) {
+  margin-inline-start: 0;
+  margin-block-start: var(--_cluster);
+}
+/* a marker between groups (not an item): a dashed box the height of the rail's cards, under a
+   label line like a group's */
+.gallerist-rail-marker {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* flat: in line with the item rows */
+  gap: 6px;
+  -webkit-touch-callout: none; /* a long press shows its tip, not the system menu */
+}
+.gallerist-rail-marker-cap {
+  height: 14px;
+  font: 500 11px / 14px var(--gallerist-font);
+  color: var(--gallerist-fg-muted);
+  white-space: nowrap;
+}
+.gallerist-rail-marker-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  min-width: calc(var(--gallerist-thumb-h) * 0.8);
+  height: calc(var(--gallerist-thumb-h) * 0.7 + 4px);
+  padding: 0 10px;
+  border: 1px dashed var(--gallerist-fg-muted);
+  border-radius: var(--gallerist-thumb-radius);
+  color: var(--gallerist-fg-muted);
+  font: 500 11px / 1.2 var(--gallerist-mono);
+  white-space: nowrap;
+}
+/* stacked: the cards' height, under the time labels' line */
+.gallerist-thumbs:not([data-display]) > .gallerist-rail-marker {
+  justify-content: flex-start;
+}
+.gallerist-thumbs:not([data-display]) .gallerist-rail-marker-body {
+  height: calc(var(--gallerist-thumb-h) + 4px);
+}
+/* down a side rail: a short box across the rail */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-rail-marker-body {
+  height: 32px;
+}
+/* a marker's tip (hover, long press): in the rail's region, which doesn't clip */
+.gallerist-rail-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 8;
+  box-sizing: border-box;
+  max-width: min(280px, 80vw);
+  padding: 8px 10px;
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-flyout-bg);
+  color: var(--gallerist-fg);
+  box-shadow: var(--gallerist-shadow);
+  backdrop-filter: var(--gallerist-blur);
+  font: 12px / 1.4 var(--gallerist-font);
+  pointer-events: none;
 }
 
 /* ── chrome buttons (one look for bar tools, arrows, item navigator, plugin buttons) ───────── */
@@ -861,86 +1172,392 @@
   pointer-events: none;
 }
 
-/* ── the View menu (plugin-view): a dropdown under its bar tool ──────────────────── */
+/* ── the zoom tool (plugin-zoom): − 100% + ───────────────────────────────────────── */
+.gallerist-zoom-tool {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.gallerist-zoom-tool[hidden] {
+  display: none;
+}
+.gallerist-bar .gallerist-zoom-level {
+  min-width: 4.5em;
+  padding: 0 4px;
+  font: 600 13px / 1 var(--gallerist-mono);
+  font-variant-numeric: tabular-nums;
+}
+/* at fit there's nothing to reset: the percentage keeps its colour */
+.gallerist-bar .gallerist-zoom-level[aria-disabled="true"] {
+  opacity: 1;
+  cursor: default;
+}
+.gallerist-bar .gallerist-zoom-level[aria-disabled="true"]:hover {
+  background: var(--gallerist-tool-bg);
+}
+/* the percentage resets the zoom: the renderer's own reset button would say it twice (while the
+   tool shows: a hidden one, or one a phone leaves out, leaves the reset where it was) */
+.gallerist-bar:has(.gallerist-zoom-tool:not([hidden])) > .gallerist-zoom-reset {
+  display: none;
+}
+/* a narrow screen keeps − and + (a pinch zooms there, a double tap fits), where it keeps the tool */
+@media (max-width: 600px) {
+  .gallerist-bar .gallerist-zoom-level {
+    display: none;
+  }
+}
+/* A phone (600px wide or less) leaves the zoom tool out of the bar (a pinch or a double tap zooms),
+   and an overlay viewer's fullscreen (it fills the screen already; an inline one keeps it). A page
+   keeps them by setting --gallerist-phone-zoom: flex and --gallerist-phone-fullscreen: grid (their
+   own display). The renderer's reset shows there while zoomed, as without the tool: the percentage,
+   which resets, is the part of the tool a phone never shows. */
+@media (max-width: 600px) {
+  .gallerist-bar .gallerist-zoom-tool:not([hidden]) {
+    display: var(--gallerist-phone-zoom, none);
+  }
+  .gallerist-bar:has(.gallerist-zoom-tool:not([hidden])) > .gallerist-zoom-reset:not([hidden]) {
+    display: grid;
+  }
+  .gallerist[data-gallerist-mode="overlay"] .gallerist-bar .gallerist-fullscreen-btn:not([hidden]) {
+    display: var(--gallerist-phone-fullscreen, none);
+  }
+}
+
+/* ── the View menu (plugin-view): a popover under its bar tool ───────────────────── */
 /* The plugin puts it in the viewer root (the toolbar strip scrolls, so it would clip it) and sets its
-   top / left under the button; it is as small as its choices, so it covers only the stage's top edge. */
+   top / left under the button; it is as small as its choices, so it covers only the stage's top edge.
+   A grid of two columns: each setting's name, then its segmented control; the shortcut row spans. */
 .gallerist-view-menu {
   position: absolute;
   top: 0;
   left: 0;
   z-index: 10;
   box-sizing: border-box;
-  min-width: 168px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px 10px;
+  width: max-content;
   max-width: calc(100% - 16px);
   overflow-y: auto;
-  padding: 4px;
+  padding: 12px 12px 6px;
+  padding-inline-start: 16px;
   border: 1px solid var(--gallerist-hairline);
-  border-radius: var(--gallerist-radius);
-  background: var(--gallerist-panel);
+  border-radius: calc(var(--gallerist-radius) + 3px);
+  background: var(--gallerist-popover-bg);
   backdrop-filter: var(--gallerist-blur);
-  box-shadow: var(--gallerist-shadow);
+  box-shadow: var(--gallerist-popover-shadow);
   color: var(--gallerist-fg);
-  font: 400 14px / 1.3 var(--gallerist-font);
+  font: 400 12.5px / 1.3 var(--gallerist-font);
 }
-.gallerist-view-group + .gallerist-view-group {
-  margin-block-start: 4px;
-  padding-block-start: 4px;
-  border-block-start: 1px solid var(--gallerist-hairline);
-}
-.gallerist-view-heading {
-  padding: 6px 10px 4px;
+.gallerist-view-label {
   color: var(--gallerist-fg-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 500;
+}
+/* a segmented control: a recessed track, the checked segment raised on it */
+.gallerist-view-seg {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: calc(var(--gallerist-radius) + 1px);
+  background: var(--gallerist-seg-track);
 }
 .gallerist-view-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 36px;
-  padding-inline: 10px 14px;
-  border-radius: min(var(--gallerist-radius), 6px);
+  justify-content: center;
+  gap: 7px;
+  height: 28px;
+  margin: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: max(0px, var(--gallerist-radius) - 1px);
+  background: transparent;
+  color: var(--gallerist-fg-muted);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
 }
-/* a radio mark: a ring, filled in the selection colour for the checked choice */
-.gallerist-view-item::before {
-  content: "";
+.gallerist-view-icon {
   flex: none;
-  box-sizing: border-box;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
-  opacity: 0.6;
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.75;
 }
-.gallerist-view-item[aria-checked="true"]::before {
-  border-color: var(--gallerist-selection);
-  background: radial-gradient(circle, var(--gallerist-selection) 0 3px, transparent 3.5px);
-  opacity: 1;
-}
-/* the pointer's item takes the tool hover fill, the keyboard's the focus ring: the two never look
-   alike (nor like the checked mark) when they are different items */
 .gallerist-view-item:hover {
-  background: var(--gallerist-tool-hover-bg);
+  color: var(--gallerist-fg);
 }
-.gallerist-view-item:focus {
+/* the checked segment: raised, full-strength text, its glyph in the selection colour */
+.gallerist-view-item[aria-checked="true"] {
+  background: var(--gallerist-seg-on);
+  box-shadow: var(--gallerist-seg-on-shadow);
+  color: var(--gallerist-fg);
+}
+.gallerist-view-item[aria-checked="true"] .gallerist-view-icon {
+  color: var(--gallerist-selection);
+}
+/* the keyboard's segment takes the skin's focus ring, never the selection colour, so focus and the
+   checked value don't look alike */
+.gallerist-view-item:focus,
+.gallerist-view-foot:focus {
   outline: none;
 }
-.gallerist-view-item:focus-visible {
+.gallerist-view-item:focus-visible,
+.gallerist-view-foot:focus-visible {
+  position: relative;
   outline: 2px solid var(--gallerist-focus);
-  outline-offset: -2px;
+  outline-offset: 1px;
 }
-/* its button reads as held while the menu is open */
+/* the shortcut list's row (plugin-shortcuts): spans both columns under a hairline */
+.gallerist-view-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  margin-inline: -10px -6px;
+  padding: 9px 6px 3px;
+  padding-inline: 10px 6px;
+  border: 0;
+  border-block-start: 1px solid var(--gallerist-hairline);
+  border-radius: 0 0 5px 5px;
+  background: transparent;
+  color: var(--gallerist-fg-muted);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.gallerist-view-foot:hover {
+  color: var(--gallerist-fg);
+}
+/* a key, as the shortcut list draws them */
+.gallerist-view-foot kbd,
+.gallerist-shortcuts kbd {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--gallerist-hairline);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--gallerist-surface);
+  color: var(--gallerist-fg);
+  font: 500 11.5px / 1 var(--gallerist-mono);
+}
+/* its button reads as held while the popover is open */
 .gallerist-bar button[aria-expanded="true"] {
   background: var(--gallerist-tool-hover-bg);
 }
+/* a finger gets taller segments, and no key to press */
 @media (pointer: coarse) {
   .gallerist-view-item {
-    min-height: var(--gallerist-target);
+    height: 36px;
+  }
+  .gallerist-view-foot kbd {
+    display: none;
+  }
+}
+/* forced colours drop the checked segment's raised surface and shadow: it takes the system's
+   selection colours, and a focus ring the text colour, so focus and the choice still differ */
+@media (forced-colors: active) {
+  .gallerist-view-item[aria-checked="true"] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .gallerist-view-item[aria-checked="true"] .gallerist-view-icon {
+    color: inherit;
+  }
+  :is(
+      .gallerist-view-item,
+      .gallerist-view-foot,
+      .gallerist-shortcuts-close,
+      .gallerist-shortcuts-body
+    ):focus-visible {
+    outline-color: CanvasText;
+  }
+}
+
+/* ── the shortcut list (plugin-shortcuts): a modal dialog over the viewer ────────── */
+/* The plugin puts a scrim over the whole viewer (the rest of it inert) and the dialog in its middle:
+   a header (the title, Esc to close), then a column per section, the moves widest. On a narrow
+   screen it is a sheet from the bottom edge, one column. */
+.gallerist-shortcuts-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  /* one cell the scrim's size, so the dialog's max-height holds and its list scrolls */
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  padding: 16px;
+  background: var(--gallerist-scrim);
+  animation: gallerist-fade var(--gallerist-dur-exit) var(--gallerist-ease-out);
+}
+.gallerist-shortcuts {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  max-height: 100%;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: calc(var(--gallerist-radius) + 5px);
+  background: var(--gallerist-popover-bg);
+  backdrop-filter: var(--gallerist-blur);
+  box-shadow: var(--gallerist-popover-shadow);
+  color: var(--gallerist-fg);
+  font: 400 13px / 1.35 var(--gallerist-font);
+}
+.gallerist-shortcuts:focus {
+  outline: none; /* focus starts on the dialog, so a screen reader reads it whole; the ring is the close button's */
+}
+.gallerist-shortcuts-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  padding-inline-start: 20px;
+  border-block-end: 1px solid var(--gallerist-hairline);
+}
+.gallerist-shortcuts-head .gallerist-icon {
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+.gallerist-shortcuts-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.gallerist-shortcuts-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin-inline-start: auto;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--gallerist-control-radius, 6px);
+  background: transparent;
+  color: var(--gallerist-fg-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.gallerist-shortcuts-close:hover {
+  background: var(--gallerist-tool-hover-bg);
+  color: var(--gallerist-fg);
+}
+.gallerist-shortcuts-close:focus {
+  outline: none;
+}
+.gallerist-shortcuts-close:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: 1px;
+}
+.gallerist-shortcuts-body {
+  display: flex;
+  min-height: 0;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  overflow-y: auto;
+  padding: 16px 20px 18px;
+}
+/* the list takes focus (Tab) so the keys can scroll it when the viewer is short */
+.gallerist-shortcuts-body:focus {
+  outline: none;
+}
+.gallerist-shortcuts-body:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: -2px;
+}
+.gallerist-shortcuts-body section {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.gallerist-shortcuts-body section:first-child {
+  flex: 1.7 1 250px;
+}
+.gallerist-shortcuts h3 {
+  margin: 0 0 6px;
+  color: var(--gallerist-fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.gallerist-shortcuts dl {
+  margin: 0;
+}
+.gallerist-shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+}
+.gallerist-shortcuts dd {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  margin: 0;
+  color: var(--gallerist-fg-muted);
+}
+.gallerist-shortcuts-note {
+  margin: 0;
+  padding: 11px 20px;
+  border-block-start: 1px solid var(--gallerist-hairline);
+  color: var(--gallerist-fg-muted);
+  font-size: 12.5px;
+}
+/* the gestures: one list, a hairline between rows */
+.gallerist-shortcuts[data-gallerist-list="gestures"] .gallerist-shortcuts-body {
+  padding-block: 4px;
+}
+.gallerist-shortcuts[data-gallerist-list="gestures"] .gallerist-shortcuts-row {
+  min-height: 42px;
+}
+.gallerist-shortcuts[data-gallerist-list="gestures"]
+  .gallerist-shortcuts-row
+  + .gallerist-shortcuts-row {
+  border-block-start: 1px solid var(--gallerist-hairline);
+}
+@media (max-width: 600px) {
+  .gallerist-shortcuts-scrim {
+    place-items: end stretch;
+    padding: 16px 0 0;
+  }
+  .gallerist-shortcuts {
+    width: 100%;
+    border-width: 1px 0 0;
+    border-radius: 14px 14px 0 0;
+  }
+  .gallerist-shortcuts-body {
+    flex-direction: column;
+    gap: 14px;
+    padding-inline: 16px;
+  }
+  .gallerist-shortcuts-body section,
+  .gallerist-shortcuts-body section:first-child {
+    flex: none;
+  }
+  .gallerist-shortcuts-head {
+    padding-inline-start: 16px;
+  }
+  .gallerist-shortcuts-note {
+    padding: 12px 16px 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gallerist-shortcuts-scrim {
+    animation: none;
   }
 }
 
@@ -1418,8 +2035,16 @@
   display: flex;
   flex-direction: column;
 }
-.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-region {
+.gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-region:not([data-gallerist-glide]) {
   display: none;
+}
+/* gliding open or shut (plugin-thumbnails animates its size, clipped): the strip keeps to the edge
+   by its handle, so it slides out past the viewer's edge rather than squeezing */
+.gallerist-thumbs-region[data-gallerist-glide] {
+  align-items: flex-start;
+}
+.gallerist-thumbs-aside[data-gallerist-glide] {
+  justify-content: flex-start;
 }
 /* the pull-handle: a grip tab on the rail's edge — clearly part of the gallery */
 .gallerist-rail-handle {
@@ -1462,7 +2087,7 @@
 .gallerist-rail-toggle .gallerist-icon {
   width: 16px;
   height: 16px;
-  transition: transform var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
+  transition: transform var(--gallerist-dur-panel, 220ms) var(--gallerist-ease-out, ease);
 }
 /* expanded = chevron points down (pull down to hide); collapsed = points up (pull up to show) */
 .gallerist-rail-toggle[aria-pressed="true"] .gallerist-icon {
@@ -1653,8 +2278,18 @@
   min-height: 0;
 }
 .gallerist[data-gallerist-orientation="vertical"][data-gallerist-rail="collapsed"]
-  .gallerist-thumbs-region {
+  .gallerist-thumbs-region:not([data-gallerist-glide]) {
   display: none;
+}
+/* a side rail slides out sideways: its strip keeps to the handle's side (the stage's) */
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-thumbs-region[data-gallerist-glide],
+.gallerist[data-gallerist-dir="rtl"][data-gallerist-rail-pos="right"]
+  .gallerist-thumbs-region[data-gallerist-glide] {
+  align-items: flex-end;
+}
+.gallerist[data-gallerist-dir="rtl"][data-gallerist-rail-pos="left"]
+  .gallerist-thumbs-region[data-gallerist-glide] {
+  align-items: flex-start;
 }
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs {
   flex: 1 1 auto;
@@ -1729,7 +2364,8 @@
 .gallerist[data-gallerist-preset="immersive"] .gallerist-caption {
   pointer-events: none;
 }
-.gallerist[data-gallerist-preset="immersive"] .gallerist-bar > * {
+/* (the tools' strip, a region, passes them through itself: it spans the bar's free space) */
+.gallerist[data-gallerist-preset="immersive"] .gallerist-bar > :not(.gallerist-region-toolbar) {
   pointer-events: auto;
 }
 .gallerist[data-gallerist-preset="immersive"] .gallerist-caption {
@@ -2063,6 +2699,7 @@
     .gallerist-region-thumbnails:has(.gallerist-thumbs[data-display="index"])
     .gallerist-thumbs-region {
     align-items: stretch;
+    border-inline: 0 none;
   }
   .gallerist[data-gallerist-orientation="vertical"]
     .gallerist-region-thumbnails:has(.gallerist-thumbs[data-display="index"])
@@ -2076,7 +2713,6 @@
     padding: 8px 12px;
     overflow-x: auto;
     overflow-y: hidden;
-    border-inline: 0 none;
   }
   .gallerist[data-gallerist-orientation="vertical"]
     .gallerist-thumbs[data-display="index"]

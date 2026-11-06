@@ -54,6 +54,36 @@ test('a pairing sets all the controls; position survives a change', async ({ pag
   await expect(page.locator(`${root} .gallerist-title`)).toHaveText('Afternoon')
 })
 
+test('the Time tracking pairing turns the host hooks on; the checkbox and other pairings off', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('/index.html')
+  const hooks = page.getByRole('checkbox', { name: 'Rail decorations' })
+  await expect(hooks).not.toBeChecked()
+  await expect(page.locator(`${root} .gallerist-rail-marker`)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Time tracking' }).click()
+  await expect(page.locator('input[name="preset"][value="reviewer"]')).toBeChecked()
+  await expect(hooks).toBeChecked()
+  // the reviewer's stacked rail: the manual-time marker, each card's activity, screen badges
+  await expect(page.locator(`${root} .gallerist-rail-marker`)).toHaveCount(1)
+  await expect(
+    page.locator(`${root} .gallerist-thumb-wrap > .gallerist-thumb-meta`).first(),
+  ).toHaveText('82% active')
+  await expect(page.locator(`${root} .gallerist-thumb-badge`).first()).toHaveText('▣ 1')
+  await expect(page.locator('#snippet')).toContainText('renderGroupMeta')
+  await hooks.uncheck()
+  await expect(page.locator(`${root} .gallerist-rail-marker`)).toHaveCount(0)
+  await expect(page.locator('#snippet')).not.toContainText('renderGroupMeta')
+  await hooks.check()
+  await expect(page.locator(`${root} .gallerist-rail-marker`)).toHaveCount(1)
+  await page.getByRole('button', { name: 'Review' }).click()
+  await expect(hooks).not.toBeChecked()
+  await expect(page.locator(`${root} .gallerist-rail-marker`)).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
 test('closing the viewer offers the way back', async ({ page }) => {
   await page.goto('/index.html')
   await page.locator(`${root} .gallerist-close`).click()

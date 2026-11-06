@@ -1,0 +1,132 @@
+/* The host's own look for what it draws through the hooks (e2e/app/hooks.ts) */
+.hk-line,
+.hk-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hk-meter {
+  position: relative;
+  display: inline-block;
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+  overflow: hidden;
+}
+.hk-wide {
+  flex: 1;
+}
+.hk-wide .hk-meter {
+  flex: 1;
+}
+.hk-meter > i {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  background: var(--hk-level);
+}
+.hk-pct {
+  color: var(--hk-level);
+  font-weight: 600;
+}
+.hk-low {
+  --hk-level: #f0616d;
+}
+.hk-mid {
+  --hk-level: #f5c542;
+}
+.hk-high {
+  --hk-level: #2cc4b0;
+}
+.hk-idle {
+  color: #f5a142;
+  font-weight: 600;
+}
+/* a chip: its padding keeps a stacked label with a note count longer than its card whatever
+   the fonts' widths (e2e/tests/hooks.spec.ts) */
+.hk-notes {
+  padding-inline: 4px;
+  font-family: var(--gallerist-font);
+}
+.hk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.hk-tip strong {
+  display: block;
+  margin-bottom: 2px;
+}
+.hk-muted {
+  color: var(--gallerist-fg-muted);
+}
+
+/* the caption bar: where, when, and the note button at the end */
+.hk-caption {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+}
+.hk-where {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hk-when {
+  font-family: var(--gallerist-mono);
+  white-space: nowrap;
+}
+.hk-note-btn {
+  min-width: 44px;
+  min-height: 32px;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* the notes popover: in the viewer root, over the stage, above its note button */
+.hk-popover {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 300px;
+  padding: 12px;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: 10px;
+  background: var(--gallerist-flyout-bg);
+  color: var(--gallerist-fg);
+  box-shadow: var(--gallerist-shadow);
+  font-size: 13px;
+}
+.hk-note-list {
+  margin: 0;
+  padding-inline-start: 18px;
+}
+.hk-note-box {
+  min-height: 56px;
+  resize: vertical;
+  font: inherit;
+}
+.hk-add {
+  align-self: flex-end;
+}
+/* a phone: a bottom sheet */
+@media (max-width: 600px) {
+  .hk-popover {
+    inset: auto 0 0;
+    width: auto;
+    border-radius: 14px 14px 0 0;
+  }
+  .hk-when {
+    display: none;
+  }
+}

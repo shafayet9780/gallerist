@@ -41,6 +41,10 @@ Browsers only enter fullscreen from a user gesture (a click or a key press); a r
 ignored. iPhone Safari has no element fullscreen (only `<video>`), so there the button does nothing;
 hide it with CSS (`.gallerist-fullscreen-btn`) if you'd rather not show it.
 
+On a phone (600px wide or less) `@gallerist/theme-default` leaves the button out of an **overlay**
+viewer's bar, which already fills the screen; an **inline** viewer keeps it. Set
+`--gallerist-phone-fullscreen: grid` on `.gallerist` to keep it in an overlay too.
+
 See [Plugin authoring](https://github.com/shafayet9780/gallerist/blob/main/docs/PLUGIN-AUTHORING.md):
 this plugin is the small example of a toolbar button.
 

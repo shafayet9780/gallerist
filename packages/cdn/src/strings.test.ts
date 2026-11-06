@@ -9,8 +9,10 @@ import { DEFAULT_FULLSCREEN_STRINGS, fullscreen } from '../../plugin-fullscreen/
 import { DEFAULT_GRID_STRINGS, grid } from '../../plugin-grid/src/index'
 import { DEFAULT_PINS_STRINGS, type Pin, pins } from '../../plugin-pins/src/index'
 import { DEFAULT_DOWNLOAD_STRINGS, download } from '../../plugin-save/src/index'
+import { DEFAULT_SHORTCUTS_STRINGS, shortcuts } from '../../plugin-shortcuts/src/index'
 import { DEFAULT_THUMBNAILS_STRINGS, thumbnails } from '../../plugin-thumbnails/src/index'
 import { DEFAULT_VIEW_STRINGS, view } from '../../plugin-view/src/index'
+import { DEFAULT_ZOOM_STRINGS, zoom } from '../../plugin-zoom/src/index'
 import { DEFAULT_STRINGS, type MountOptions, mount } from '../../renderer-dom/src/index'
 
 const mark = <T extends object>(defaults: T): T =>
@@ -119,7 +121,18 @@ describe('strings audit', () => {
     expect(untranslated()).toEqual([])
   })
 
-  it('the View menu, open, with every choice (plugin-view, not in this bundle)', () => {
+  it('the zoom tool (plugin-zoom, not in this bundle)', () => {
+    const v = createViewer({
+      collection: collection(),
+      plugins: [zoom({ strings: mark(DEFAULT_ZOOM_STRINGS) })],
+    })
+    mount(v, { strings: mark(DEFAULT_STRINGS) })
+    v.open()
+    expect(document.querySelectorAll('.gallerist-zoom-tool button').length).toBe(3)
+    expect(untranslated()).toEqual([])
+  })
+
+  it('the View popover, open, with every choice (plugin-view, not in this bundle)', () => {
     const v = createViewer({
       collection: collection(),
       plugins: [
@@ -134,8 +147,38 @@ describe('strings audit', () => {
     mount(v, { strings: mark(DEFAULT_STRINGS) })
     v.open()
     ;(document.querySelector('.gallerist-view-btn') as HTMLButtonElement).click()
-    expect(document.querySelectorAll('[role="menuitemradio"]').length).toBe(6)
+    expect(document.querySelectorAll('[role="radio"]').length).toBe(6)
     expect(untranslated()).toEqual([])
+  })
+
+  it('the shortcut list, keys and gestures, and its View row (plugin-shortcuts, not in this bundle)', () => {
+    // the close text is split at its key cap (`{key}`): each side is marked on its own
+    const list = shortcuts({
+      strings: { ...mark(DEFAULT_SHORTCUTS_STRINGS), toClose: '⟦close with⟧ {key} ⟦to close⟧' },
+    })
+    const v = createViewer({
+      collection: collection(),
+      plugins: [
+        thumbnails({ strings: thumbStrings }),
+        ...shared(),
+        view({ strings: mark(DEFAULT_VIEW_STRINGS) }),
+        list,
+      ],
+    })
+    mount(v, { strings: mark(DEFAULT_STRINGS) })
+    v.open()
+    // key caps are keys, not words: a single character (←, ?, F, −) or a digit range is left alone
+    const words = () => untranslated().filter((t) => !/^text "(.|1–9)"$/u.test(t))
+    ;(document.querySelector('.gallerist-view-btn') as HTMLButtonElement).click()
+    expect(document.querySelector('.gallerist-view-foot')).not.toBeNull()
+    expect(words()).toEqual([])
+    list.open(true)
+    expect(document.querySelectorAll('.gallerist-shortcuts-row').length).toBeGreaterThan(8)
+    expect(words()).toEqual([])
+    list.close()
+    list.open(false)
+    expect(document.querySelector('.gallerist-shortcuts-note')).not.toBeNull()
+    expect(words()).toEqual([])
   })
 
   it('peek flyout and its touch button', () => {

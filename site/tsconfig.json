@@ -12,7 +12,9 @@
       "@gallerist/plugin-grid": ["./packages/plugin-grid/src/index.ts"],
       "@gallerist/plugin-pins": ["./packages/plugin-pins/src/index.ts"],
       "@gallerist/plugin-thumbnails": ["./packages/plugin-thumbnails/src/index.ts"],
-      "@gallerist/plugin-view": ["./packages/plugin-view/src/index.ts"]
+      "@gallerist/plugin-view": ["./packages/plugin-view/src/index.ts"],
+      "@gallerist/plugin-zoom": ["./packages/plugin-zoom/src/index.ts"],
+      "@gallerist/plugin-shortcuts": ["./packages/plugin-shortcuts/src/index.ts"]
     }
   },
   "include": ["src"]

@@ -13,8 +13,8 @@ const open = async (page: Page, query = REVIEWER) => {
 }
 const root = (page: Page) => page.locator('.gallerist')
 const tool = (page: Page) => page.locator('.gallerist-view-btn')
-const menu = (page: Page) => page.getByRole('menu', { name: 'View' })
-const choice = (page: Page, name: string) => page.getByRole('menuitemradio', { name })
+const menu = (page: Page) => page.getByRole('dialog', { name: 'View', exact: true })
+const choice = (page: Page, name: string) => page.getByRole('radio', { name, exact: true })
 const counter = (page: Page) => page.locator('.gallerist-counter')
 const rail = (page: Page) => page.locator('.gallerist-thumbs')
 // keys for the viewer itself (focus on its root, as after opening)
@@ -34,16 +34,20 @@ test('the keyboard switches Stacked → Row → Stacked; the item stays and the 
   await page.keyboard.press('Enter')
   await expect(menu(page)).toBeVisible()
   await expect(tool(page)).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByRole('radiogroup', { name: 'Layout' })).toBeVisible()
+  await expect(page.getByRole('radiogroup', { name: 'Theme' })).toBeVisible()
   await expect(choice(page, 'Stacked')).toBeFocused()
   await expect(choice(page, 'Stacked')).toHaveAttribute('aria-checked', 'true')
-  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('ArrowRight') // moves and chooses, as radio buttons do
   await expect(choice(page, 'Row')).toBeFocused()
-  await page.keyboard.press('Enter')
+  await expect(choice(page, 'Row')).toHaveAttribute('aria-checked', 'true')
+  await expect(rail(page)).toHaveAttribute('data-display', 'flat')
+  await expect(menu(page)).toBeVisible() // still open
+  await page.keyboard.press('Enter') // done: closes
 
   await expect(menu(page)).toBeHidden()
   await expect(tool(page)).toBeFocused()
   await expect(tool(page)).toHaveAttribute('aria-expanded', 'false')
-  await expect(rail(page)).toHaveAttribute('data-display', 'flat')
   await expect(root(page)).toHaveAttribute('data-gallerist-linear', 'true')
   await expect(counter(page)).toHaveText('3 / 37') // the same item, counted among all
   await expect(page.locator('.gallerist-thumb-item[data-active]')).toHaveAttribute(
@@ -61,11 +65,13 @@ test('the keyboard switches Stacked → Row → Stacked; the item stays and the 
   )
 
   await tool(page).focus()
-  await page.keyboard.press('ArrowDown') // opens on the first item
-  await expect(choice(page, 'Row')).toHaveAttribute('aria-checked', 'true')
-  await expect(choice(page, 'Stacked')).toBeFocused()
-  await page.keyboard.press('Enter')
+  await page.keyboard.press('ArrowDown') // opens on the checked segment
+  await expect(choice(page, 'Row')).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await expect(choice(page, 'Stacked')).toHaveAttribute('aria-checked', 'true')
+  await page.keyboard.press('Escape')
   await expect(menu(page)).toBeHidden()
+  await expect(tool(page)).toBeFocused()
   await expect(rail(page)).not.toHaveAttribute('data-display', /./)
   await expect(root(page)).not.toHaveAttribute('data-gallerist-linear', /./)
   await expect(counter(page)).toHaveText('3 / 12')
@@ -82,10 +88,13 @@ test('clicks switch Stacked → Row → Stacked, and the cards navigate in each'
   await open(page)
   await tool(page).click()
   await choice(page, 'Row').click()
-  await expect(menu(page)).toBeHidden()
+  await expect(menu(page)).toBeVisible() // a segmented control: it stays open, showing the choice
+  await expect(choice(page, 'Row')).toHaveAttribute('aria-checked', 'true')
   await expect(rail(page)).toHaveAttribute('data-display', 'flat')
   await expect(counter(page)).toHaveText('2 / 37') // group 2, item 1
+  // a press on a card closes the popover and the click goes on to the card
   await page.locator('.gallerist-thumb-item[data-item="g4i3"]').click()
+  await expect(menu(page)).toBeHidden()
   await expect(counter(page)).toHaveText('11 / 37')
   await tool(page).click()
   await choice(page, 'Stacked').click()
@@ -115,7 +124,6 @@ test('Dark ↔ Light switches the scheme of the open viewer', async ({ page }) =
   await expect(root(page)).toHaveAttribute('data-gallerist-scheme', 'light')
   expect(await scheme()).toBe('light')
   expect(await bar()).not.toBe(darkBar)
-  await tool(page).click()
   await expect(choice(page, 'Light')).toHaveAttribute('aria-checked', 'true')
   await choice(page, 'Dark').click()
   await expect(root(page)).toHaveAttribute('data-gallerist-scheme', 'dark')
@@ -135,32 +143,46 @@ test.describe('on a viewer following a dark system (auto)', () => {
     await expect(rail(page)).toHaveAttribute('data-display', 'flat')
     await expect(root(page)).toHaveAttribute('data-gallerist-scheme', 'auto') // still the system's
     expect(await changes()).toEqual([{ rail: 'flat' }])
-    await tool(page).click()
     await choice(page, 'Dark').click()
     await expect(root(page)).toHaveAttribute('data-gallerist-scheme', 'dark')
     expect(await changes()).toEqual([{ rail: 'flat' }, { scheme: 'dark' }])
   })
 })
 
-test('the item under the pointer and the focused one look different', async ({ page }) => {
+test('focus, hover and the checked segment each look different; focus is not the accent', async ({
+  page,
+}) => {
   await open(page)
   await tool(page).focus()
   await page.keyboard.press('Enter') // opens on Stacked, focused from the keyboard
   await expect(choice(page, 'Stacked')).toBeFocused()
+  await page.keyboard.press('Tab') // to the Theme group: Dark, checked
+  await expect(choice(page, 'Dark')).toBeFocused()
   await choice(page, 'Light').hover()
   const look = (name: string) =>
     choice(page, name).evaluate((el) => {
       const s = getComputedStyle(el)
-      return { bg: s.backgroundColor, ring: s.outlineStyle }
+      const glyph = el.querySelector('svg') as SVGElement
+      return {
+        bg: s.backgroundColor,
+        ring: s.outlineStyle,
+        ringColor: s.outlineColor,
+        glyph: getComputedStyle(glyph).color,
+      }
     })
-  const focused = await look('Stacked')
+  const focused = await look('Dark') // focused and checked
+  const checked = await look('Stacked') // checked, not focused
   const hovered = await look('Light')
   expect(focused.ring).toBe('solid')
+  expect(checked.ring).toBe('none')
   expect(hovered.ring).toBe('none')
-  expect(focused.bg).not.toBe(hovered.bg)
+  expect(checked.bg).not.toBe(hovered.bg) // the checked segment is raised
+  // the ring is the neutral focus colour, never the accent the checked glyph takes
+  expect(focused.ringColor).not.toBe(checked.glyph)
+  expect(checked.glyph).not.toBe(hovered.glyph)
 })
 
-test('Escape and a press outside close the menu, not the viewer', async ({ page }) => {
+test('Escape and a press outside close the popover, not the viewer', async ({ page }) => {
   await open(page)
   await tool(page).click()
   await page.keyboard.press('Escape')
@@ -171,37 +193,52 @@ test('Escape and a press outside close the menu, not the viewer', async ({ page 
   await page.locator('.gallerist-stage').click({ position: { x: 200, y: 300 } })
   await expect(menu(page)).toBeHidden()
   await expect(root(page)).toHaveAttribute('data-gallerist-phase', 'open')
-  // the viewer's keys don't act under an open menu
+  // the viewer's keys don't act under an open popover
   await tool(page).click()
-  await page.keyboard.press('ArrowRight')
-  await page.keyboard.press('End')
+  for (const key of ['End', 'Home', 't', '3', 'f']) await page.keyboard.press(key)
   await expect(counter(page)).toHaveText('2 / 12')
-  await expect(choice(page, 'Light')).toBeFocused()
+  await expect(root(page)).toHaveAttribute('data-gallerist-rail', 'expanded')
+  await expect(choice(page, 'Stacked')).toBeFocused()
+  await expect(menu(page)).toBeVisible()
 })
 
-test('Space chooses and closes; the release doesn’t open the menu again', async ({ page }) => {
+test('Enter closes and its release doesn’t open it again; Space chooses and stays', async ({
+  page,
+}) => {
   await open(page)
   await tool(page).focus()
-  await page.keyboard.press('ArrowUp') // opens on the last item
-  await expect(choice(page, 'Light')).toBeFocused()
-  await page.keyboard.press('ArrowUp')
-  await page.keyboard.press('ArrowUp')
-  await expect(choice(page, 'Row')).toBeFocused()
-  await page.keyboard.press(' ')
+  await page.keyboard.press('ArrowDown')
+  await expect(choice(page, 'Stacked')).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('Enter')
   await expect(rail(page)).toHaveAttribute('data-display', 'flat')
   await page.waitForTimeout(100)
   await expect(menu(page)).toBeHidden()
   await expect(tool(page)).toHaveAttribute('aria-expanded', 'false')
   await expect(tool(page)).toBeFocused()
+  await page.keyboard.press(' ') // the tool: opens
+  await expect(choice(page, 'Row')).toBeFocused()
+  await page.keyboard.press(' ')
+  await page.waitForTimeout(100)
+  await expect(menu(page)).toBeVisible()
+  await expect(choice(page, 'Row')).toHaveAttribute('aria-checked', 'true')
 })
 
-test('Tab closes the menu and moves on from the tool', async ({ page }) => {
+test('Tab moves between the groups, then closes the popover and moves on from the tool', async ({
+  page,
+}) => {
   test.skip(
     test.info().project.name === 'webkit',
     'headless WebKit does not deliver Tab focus traversal',
   )
   await open(page)
   await tool(page).click()
+  await expect(choice(page, 'Stacked')).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(choice(page, 'Dark')).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(choice(page, 'Stacked')).toBeFocused()
+  await page.keyboard.press('Tab')
   await page.keyboard.press('Tab')
   await expect(menu(page)).toBeHidden()
   const next = await page.evaluate(() => {
@@ -215,7 +252,7 @@ test('Tab closes the menu and moves on from the tool', async ({ page }) => {
 })
 
 for (const scheme of ['dark', 'light'] as const) {
-  test(`no axe violations with the menu closed and open (${scheme})`, async ({ page }) => {
+  test(`no axe violations with the popover closed and open (${scheme})`, async ({ page }) => {
     await open(page, `${REVIEWER}&scheme=${scheme}`)
     const axe = () =>
       new AxeBuilder({ page })
@@ -226,14 +263,16 @@ for (const scheme of ['dark', 'light'] as const) {
     await tool(page).click()
     await expect(menu(page)).toBeVisible()
     expect((await axe()).violations).toEqual([])
-    // and on a row, with the menu open over it
+    // and on a row, with the popover open over it
     await choice(page, 'Row').click()
-    await tool(page).click()
+    await expect(rail(page)).toHaveAttribute('data-display', 'flat')
     expect((await axe()).violations).toEqual([])
   })
 }
 
-test('under its tool, small, and inside the viewer on a wide screen', async ({ page }) => {
+test('under its tool, under 300px wide, and inside the viewer on a wide screen', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await open(page)
   await tool(page).click()
@@ -243,18 +282,34 @@ test('under its tool, small, and inside the viewer on a wide screen', async ({ p
   if (!m || !b || !bar) throw new Error('no layout')
   expect(m.y).toBeGreaterThanOrEqual(b.y + b.height)
   expect(Math.abs(m.x + m.width - (b.x + b.width))).toBeLessThan(1) // end on the tool's end
-  expect(m.width).toBeLessThan(260)
-  expect(m.height).toBeLessThan(300)
+  expect(m.width).toBeLessThan(300)
+  expect(m.height).toBeLessThan(160)
   expect(m.y).toBeLessThan(bar.y + bar.height + 12) // hung from the bar, over the stage's top edge
+  // the two controls line up: the same start, the same width
+  const seg = await page.getByRole('radiogroup').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect()
+      return [r.left, r.width]
+    }),
+  )
+  expect(seg[0]).toEqual(seg[1])
 })
 
-test('right to left, the menu starts at its tool', async ({ page }) => {
+test('right to left, the popover starts at its tool and ← chooses the next segment', async ({
+  page,
+}) => {
   await open(page, `${REVIEWER}&dir=rtl`)
   await tool(page).click()
   const m = await menu(page).boundingBox()
   const b = await tool(page).boundingBox()
   if (!m || !b) throw new Error('no layout')
   expect(Math.abs(m.x - b.x)).toBeLessThan(1)
+  const stacked = await choice(page, 'Stacked').boundingBox()
+  const row = await choice(page, 'Row').boundingBox()
+  expect((row?.x ?? 0) < (stacked?.x ?? 0)).toBe(true) // the segments run right to left
+  await page.keyboard.press('ArrowLeft')
+  await expect(choice(page, 'Row')).toBeFocused()
+  await expect(rail(page)).toHaveAttribute('data-display', 'flat')
 })
 
 test.describe('on a 390px phone', () => {
@@ -270,24 +325,22 @@ test.describe('on a 390px phone', () => {
     expect(m.x).toBeGreaterThanOrEqual(8 - 0.5)
     expect(m.x + m.width).toBeLessThanOrEqual(390 - 8 + 0.5)
     expect(m.y).toBeGreaterThanOrEqual(b.y + b.height)
-    expect(m.y + m.height).toBeLessThan(844 / 2) // the top of the stage only
-    // the toolbar's strip scrolls sideways on a phone: the tool shows whole under its menu
+    expect(m.y + m.height).toBeLessThan(844 / 3) // the top of the stage only
+    // the toolbar's strip scrolls sideways on a phone: the tool shows whole under its popover
     const strip = await page.locator('.gallerist-region-toolbar').boundingBox()
     if (!strip) throw new Error('no layout')
     expect(b.x).toBeGreaterThanOrEqual(strip.x - 0.5)
     expect(b.x + b.width).toBeLessThanOrEqual(strip.x + strip.width + 0.5)
-    for (const item of await page.getByRole('menuitemradio').all()) {
+    for (const item of await page.getByRole('radio').all()) {
       const box = await item.boundingBox()
       expect(box?.height).toBeGreaterThanOrEqual(36)
     }
     await choice(page, 'Row').tap()
-    await expect(menu(page)).toBeHidden()
+    await expect(menu(page)).toBeVisible()
     await expect(rail(page)).toHaveAttribute('data-display', 'flat')
     await expect(counter(page)).toHaveText('2 / 37')
-    await tool(page).tap()
     await choice(page, 'Light').tap()
     await expect(root(page)).toHaveAttribute('data-gallerist-scheme', 'light')
-    await tool(page).tap()
     await counter(page).tap() // somewhere that does nothing itself
     await expect(menu(page)).toBeHidden()
     await tool(page).tap()
@@ -295,4 +348,57 @@ test.describe('on a 390px phone', () => {
     await expect(rail(page)).not.toHaveAttribute('data-display', /./)
     await expect(counter(page)).toHaveText('2 / 12')
   })
+})
+
+test.describe('on a 320px phone', () => {
+  test.use({ viewport: { width: 320, height: 640 }, hasTouch: true })
+
+  for (const dir of ['ltr', 'rtl']) {
+    test(`opened while the strip hides part of it, the tool shows whole with its ring's room (${dir})`, async ({
+      page,
+    }) => {
+      await open(page, `${REVIEWER}${dir === 'rtl' ? '&dir=rtl' : ''}`)
+      const strip = page.locator('.gallerist-region-toolbar')
+      // the strip at its start, the tool (the last) partly past its end; a click that doesn't
+      // scroll it first, as a pointer's doesn't
+      const cut = await strip.evaluate((s) => {
+        s.scrollLeft = 0
+        const r = s.getBoundingClientRect()
+        const b = (s.querySelector('.gallerist-view-btn') as HTMLElement).getBoundingClientRect()
+        return b.right > r.right || b.left < r.left
+      })
+      expect(cut, 'the tool starts cut by the strip').toBe(true)
+      await tool(page).evaluate((b: HTMLElement) => b.click())
+      await expect(menu(page)).toBeVisible()
+      const { s, b, pad } = await strip.evaluate((el) => ({
+        s: el.getBoundingClientRect().toJSON(),
+        b: (el.querySelector('.gallerist-view-btn') as HTMLElement)
+          .getBoundingClientRect()
+          .toJSON(),
+        pad: Number.parseFloat(getComputedStyle(el).scrollPaddingLeft),
+      }))
+      // (within the 1px of slack the room has: the strip scrolls in whole pixels)
+      expect(pad).toBeGreaterThanOrEqual(4)
+      expect(b.left).toBeGreaterThanOrEqual(s.left + pad - 1)
+      expect(b.right).toBeLessThanOrEqual(s.right - pad + 1)
+    })
+  }
+})
+
+test('forced colours: the checked segment takes the system selection colours', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'forced colours are emulated in Chromium only')
+  await page.emulateMedia({ forcedColors: 'active' })
+  await open(page)
+  await tool(page).click()
+  await expect(menu(page)).toBeVisible()
+  const look = await page.evaluate(() => {
+    const on = document.querySelector('.gallerist-view-item[aria-checked="true"]') as HTMLElement
+    const off = document.querySelector('.gallerist-view-item[aria-checked="false"]') as HTMLElement
+    return [getComputedStyle(on).backgroundColor, getComputedStyle(off).backgroundColor]
+  })
+  expect(look[0]).not.toBe(look[1])
+  expect(look[0]).not.toBe('rgba(0, 0, 0, 0)')
 })
