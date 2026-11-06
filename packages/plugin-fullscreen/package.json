@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-fullscreen",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Gallerist plugin — native Fullscreen API toggle (toolbar button + 'f' key).",
   "license": "MIT",
   "type": "module",

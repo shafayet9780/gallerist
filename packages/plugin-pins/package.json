@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-pins",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Gallerist plugin — pins anchored to the image: comment threads, product tags or feature notes.",
   "license": "MIT",
   "type": "module",

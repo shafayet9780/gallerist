@@ -134,6 +134,14 @@
   - **Open**: S4 above (a host box with `overflow: hidden`, ellipsis or line-clamp whose contents overflow keeps a wheel, so nothing scrolls or zooms there; needs ~38 B or a budget call). A closed shadow root's scroller is still not seen (`composedPath()` hides it from the card).
 
 ## Release 0.4
+- [ ] **Size:** core + renderer-dom is at 16,497 of 16,500 B after 0.3.3. Any renderer change needs a trim first or an owner-approved raise.
+- [ ] Zoom through a resize, follow-ups from the 0.3.3 reviews: a resize mid-pinch or before a wheel zoom settles loses the re-clamped view (documented limitation; defer the re-clamp to gesture end); a `setCollection` that only re-indexes the current item drops its remembered view (compare item ids in `tagAxis`); the 0×0 early return skips `updateNavigator()`; tests for `viewer.refresh()` clearing the remembered view and for a group change with `keepZoomOnNav`; `tagAxis` clearing zoom memory is a hidden side effect (rename or comment)
+- [ ] Idle fade: guard the two copies of the idle rules (with and without `:has()`) against drifting apart (compare selectors and declarations in the CSSOM test); `layout.spec.ts` reads `base.css` relative to the working directory (use `import.meta.url`)
+- [ ] Docked arrows on touch: portrait/landscape follows the screen, not the viewer (container queries once the floor reaches Safari 16); in `immersive` landscape its navigator can cover a focused →; the focused ← sits on the minimap's corner when zoomed in portrait
+- [ ] Rail look-ahead: the product counts three cards as fitting within 1 px but `rail.spec.ts` allows 0.5 px (align the slack; possible flake); up to ~2 px of a card can be cut inside that 1 px band; add a unit case with a small `overscan` and a wide card just past the drawn run
+- [ ] Pins: every stage resize rebuilds all pin nodes; check that an open card and text typed into a host's form survive a window or rail resize (Apploye's note form); cap the pins e2e `ready()` wait (~120 frames) so a repaint loop fails with a message instead of a bare timeout
+- [ ] CI: the last WebKit shard takes ~12–14 min while the others take 1–6 (tests that skip themselves on WebKit still count when Playwright splits the suite); rebalance
+- [ ] plugin-thumbnails README line ~100 not re-wrapped
 - [ ] Per-item `zoomable: false`: placeholder items (a "no screenshot" card) shouldn't zoom or show the navigator (from the Apploye integration)
 - [ ] Pins compose UI: a built-in draft card for a placed comment (text field, save / cancel), instead of each host building its own around `onPlace` (from the Apploye integration)
 - [ ] Pin cards open above/below the pin when the side room is narrow: at 390×844 a centred pin's card is 161px wide (113px content box), so Apploye's Discard/Save row starts outside the content box (from the Apploye integration, 447ea05)

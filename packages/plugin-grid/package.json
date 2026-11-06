@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-grid",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Gallerist plugin — in-viewer contact-sheet grid (grouped, windowed); click a cell to jump.",
   "license": "MIT",
   "type": "module",
