@@ -90,6 +90,13 @@ its UI from `ctx.preset` builds it again for that mount (see `plugin-thumbnails`
   viewer in a shadow root works) and when the viewer closes, and return focus to the button. The
   renderer can be destroyed under an open menu without telling plugins: close it from the next
   document or window event that finds the button disconnected (`!button.isConnected`).
+- **Following a gesture's zoom** (`plugin-zoom`): `viewer.getState().zoom` is the committed zoom;
+  a pinch, a wheel or a double click shows its transform on the current slide's content
+  (`.gallerist-content[data-gallerist-current]`, `transform: translate(…) scale(s)`) before it
+  commits. Watch `style` on the viewer root's subtree with a `MutationObserver` to read it live, and
+  ignore a scale below 1 (a drag to dismiss shrinks the content too). To take a key from the
+  renderer's own keymap (`+`, `-`, `0` are built in, not plugin keymap entries), listen on the root in
+  the capture phase and `stopImmediatePropagation()`; skip text fields and modified keys.
 - **A setting the host may own** (`plugin-view`): read `viewer[Symbol.for('gallerist.controlled')]`
   (`true` or a list of setting names) each time before applying a value of your own. A host or an
   adapter sets it for the settings it applies itself; React's `<Gallerist>` lists `scheme` and

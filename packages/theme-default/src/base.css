@@ -998,6 +998,37 @@
   pointer-events: none;
 }
 
+/* ── the zoom tool (plugin-zoom): − 100% + ───────────────────────────────────────── */
+.gallerist-zoom-tool {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.gallerist-bar .gallerist-zoom-level {
+  min-width: 4.5em;
+  padding: 0 4px;
+  font: 600 13px / 1 var(--gallerist-mono);
+  font-variant-numeric: tabular-nums;
+}
+/* at fit there's nothing to reset: the percentage keeps its colour */
+.gallerist-bar .gallerist-zoom-level[aria-disabled="true"] {
+  opacity: 1;
+  cursor: default;
+}
+.gallerist-bar .gallerist-zoom-level[aria-disabled="true"]:hover {
+  background: var(--gallerist-tool-bg);
+}
+/* the percentage resets the zoom: the renderer's own reset button would say it twice */
+.gallerist-bar:has(.gallerist-zoom-tool) > .gallerist-zoom-reset {
+  display: none;
+}
+/* a narrow screen keeps − and + (a pinch zooms there, a double tap fits) */
+@media (max-width: 600px) {
+  .gallerist-bar .gallerist-zoom-level {
+    display: none;
+  }
+}
+
 /* ── the View menu (plugin-view): a dropdown under its bar tool ──────────────────── */
 /* The plugin puts it in the viewer root (the toolbar strip scrolls, so it would clip it) and sets its
    top / left under the button; it is as small as its choices, so it covers only the stage's top edge. */

@@ -7,6 +7,7 @@ import { grid } from '@gallerist/plugin-grid'
 import { download } from '@gallerist/plugin-save'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import { type ViewChange, view } from '@gallerist/plugin-view'
+import { zoom } from '@gallerist/plugin-zoom'
 import {
   type ArrowLayout,
   type ColorScheme,
@@ -143,6 +144,8 @@ const viewer = createViewer({
               ? { layout: 'sections', startOpen: true, strings: { start: 'Start tour' } }
               : {},
           ),
+          // zoom-tool=1: the zoom tool (− 100% +) before the other tools
+          ...(p.get('zoom-tool') === '1' ? [zoom()] : []),
           fullscreen(),
           download(),
           ...customCaption,

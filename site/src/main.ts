@@ -6,6 +6,7 @@ import { type Pin, pins } from '@gallerist/plugin-pins'
 import { download } from '@gallerist/plugin-save'
 import { thumbnails } from '@gallerist/plugin-thumbnails'
 import { view } from '@gallerist/plugin-view'
+import { zoom } from '@gallerist/plugin-zoom'
 import {
   type ColorScheme,
   type PresetName,
@@ -168,6 +169,7 @@ function render() {
       thumbnails(),
       grid(state.preset === 'tour' ? { layout: 'sections', strings: { start: 'Start tour' } } : {}),
       pins({ presentation }),
+      zoom(),
       fullscreen(),
       download(),
       // the View menu switches the rail and the scheme in the open viewer; the page's scheme follows

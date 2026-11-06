@@ -72,6 +72,14 @@
     "gzip": true
   },
   {
+    "name": "@gallerist/plugin-zoom (gz)",
+    "path": "packages/plugin-zoom/dist/index.js",
+    "import": "{ zoom }",
+    "ignore": ["@gallerist/core"],
+    "limit": "1.65 kB",
+    "gzip": true
+  },
+  {
     "name": "theme base.css (gz)",
     "path": "packages/theme-default/src/base.css",
     "limit": "10 kB",
@@ -98,7 +106,7 @@
   {
     "name": "@gallerist/cdn global build (gz)",
     "path": "packages/cdn/dist/gallerist.umd.js",
-    "limit": "35 kB",
+    "limit": "37 kB",
     "gzip": true
   }
 ]

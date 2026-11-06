@@ -11,6 +11,7 @@ import { DEFAULT_PINS_STRINGS, type Pin, pins } from '../../plugin-pins/src/inde
 import { DEFAULT_DOWNLOAD_STRINGS, download } from '../../plugin-save/src/index'
 import { DEFAULT_THUMBNAILS_STRINGS, thumbnails } from '../../plugin-thumbnails/src/index'
 import { DEFAULT_VIEW_STRINGS, view } from '../../plugin-view/src/index'
+import { DEFAULT_ZOOM_STRINGS, zoom } from '../../plugin-zoom/src/index'
 import { DEFAULT_STRINGS, type MountOptions, mount } from '../../renderer-dom/src/index'
 
 const mark = <T extends object>(defaults: T): T =>
@@ -116,6 +117,17 @@ describe('strings audit', () => {
     openWith(thumbnails(railOptions), mountOptions)
     expect(untranslated()).toEqual([])
     toggleGrid()
+    expect(untranslated()).toEqual([])
+  })
+
+  it('the zoom tool (plugin-zoom, not in this bundle)', () => {
+    const v = createViewer({
+      collection: collection(),
+      plugins: [zoom({ strings: mark(DEFAULT_ZOOM_STRINGS) })],
+    })
+    mount(v, { strings: mark(DEFAULT_STRINGS) })
+    v.open()
+    expect(document.querySelectorAll('.gallerist-zoom-tool button').length).toBe(3)
     expect(untranslated()).toEqual([])
   })
 
