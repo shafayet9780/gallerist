@@ -383,10 +383,12 @@
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  pointer-events: auto;
+  /* no pointer-events: like every region it passes them through but on its tools, so the bar's
+     free space it spans is the bar's (in immersive, the image's under it), and so is the 1px its
+     margin takes from what is before it on a phone (the bar's gap is 4px there) */
 }
-/* tools sit at the end of the bar: the strip takes the free space, its tools after this auto margin
-   (0 once they overflow; the gap after it cancelled). A shown title takes the space instead. */
+/* tools sit at the end of the bar: the strip takes the free space (a shown title shares it), its
+   tools after this auto margin (0 once they overflow; the gap after it cancelled) */
 .gallerist-region-toolbar::before {
   content: "";
   margin-inline: auto -6px;
@@ -399,6 +401,7 @@
   width: 5px;
   margin-inline-start: -6px;
 }
+/* no tools, or (where :has() works) none shown: no room either, so nothing else moves */
 .gallerist-region-toolbar:empty {
   padding: 0;
   margin: 0;
@@ -407,8 +410,13 @@
 .gallerist-region-toolbar:empty::after {
   display: none;
 }
-.gallerist-title:not([hidden]) + .gallerist-region-toolbar {
-  flex-grow: 0;
+.gallerist-region-toolbar:not(:has(> :not([hidden]))) {
+  padding: 0;
+  margin: 0;
+}
+.gallerist-region-toolbar:not(:has(> :not([hidden])))::before,
+.gallerist-region-toolbar:not(:has(> :not([hidden])))::after {
+  display: none;
 }
 .gallerist-region-toolbar::-webkit-scrollbar {
   display: none;
@@ -2143,7 +2151,8 @@
 .gallerist[data-gallerist-preset="immersive"] .gallerist-caption {
   pointer-events: none;
 }
-.gallerist[data-gallerist-preset="immersive"] .gallerist-bar > * {
+/* (the tools' strip, a region, passes them through itself: it spans the bar's free space) */
+.gallerist[data-gallerist-preset="immersive"] .gallerist-bar > :not(.gallerist-region-toolbar) {
   pointer-events: auto;
 }
 .gallerist[data-gallerist-preset="immersive"] .gallerist-caption {

@@ -8,13 +8,19 @@
   tools sit in scrolls sideways on a narrow screen, and a scroller clips on both axes, so since 0.3.0
   the ring was cut to a bracket on each side, in every skin and both schemes; Close, outside the
   strip, had it whole. The strip keeps room for the ring on every side (4px; 5px at its ends, where
-  Chromium rounds an RTL scroll range down), given back by a negative margin, so nothing in the bar
-  moves (where a title shows and the tools scroll, they may shift by a twentieth of a pixel). The
-  strip takes the bar's free space itself, its tools still at the end, so its box is wider than its
-  tools where no title shows; it uses its own `::before` and `::after`.
+  Chromium rounds an RTL scroll range down), given back by a negative margin, so the counter, title,
+  tools and Close keep their places. The exception is a shown title beside tools that scroll: the
+  title can end up to half a pixel shorter or longer, the tools moving with it, and the strip's scroll
+  range 1px longer. The strip takes the bar's free space itself (a shown title shares it), its tools
+  still at the end, so its box is wider than its tools; it uses its own `::before` and `::after`. Like
+  every region it lets pointer events through except on its tools, so that free space stays the
+  bar's, and under the `immersive` bar the image's. A drag or a wheel that starts in the 6px between
+  two tools no longer scrolls the strip; one that starts on a tool does.
 - **renderer-dom (fixed)**: where the strip scrolls, a tool reached from the keyboard is brought
   fully into view with its ring, by scrolling the strip (not the page). Browsers leave a tool 32px or
   more in view where it is, cut by the strip's edge; a pointer's focus leaves the strip as it is.
+- **plugin-view (fixed)**: opened by a pointer while the strip hides part of it, the View tool comes
+  into view with the same room for its ring (the strip's `scroll-padding`), not flush with its edge.
 
 ### A zoom tool (owner-approved, for the Apploye reviewer)
 - **plugin-zoom (new)**: `zoom()` adds a "− 100% +" group to the toolbar. − and + step through stops of
