@@ -5,7 +5,7 @@ import { grid } from '@gallerist/plugin-grid'
 import { type Pin, pins } from '@gallerist/plugin-pins'
 import { download } from '@gallerist/plugin-save'
 import { shortcuts } from '@gallerist/plugin-shortcuts'
-import { thumbnails } from '@gallerist/plugin-thumbnails'
+import { type RailMarker, type ThumbnailsOptions, thumbnails } from '@gallerist/plugin-thumbnails'
 import { view } from '@gallerist/plugin-view'
 import { zoom } from '@gallerist/plugin-zoom'
 import {
@@ -35,7 +35,8 @@ interface Setup {
   scheme: string
 }
 
-const PAIRINGS: Array<{ label: string; setup: Setup }> = [
+// a pairing can turn the host hooks on (the "Host hooks" checkbox); the others turn them off
+const PAIRINGS: Array<{ label: string; setup: Setup; hooks?: boolean }> = [
   {
     label: 'Photos',
     setup: { skin: 'gallery', preset: 'filmstrip', accent: 'periwinkle', scheme: 'skin default' },
@@ -49,7 +50,53 @@ const PAIRINGS: Array<{ label: string; setup: Setup }> = [
     setup: { skin: 'editorial', preset: 'editorial', accent: 'vermilion', scheme: 'skin default' },
   },
   { label: 'Listing', setup: { skin: 'gallery', preset: 'tour', accent: 'mint', scheme: 'light' } },
+  {
+    label: 'Time tracking',
+    setup: { skin: 'console', preset: 'reviewer', accent: 'cyan', scheme: 'skin default' },
+    hooks: true,
+  },
 ]
+
+// ── host hooks: what a time tracker's reviewer draws on the rail ─────────────
+// Each group is a stretch of tracked time with an activity level and the reviewer's notes; its
+// photos are captures of two screens, two at a time; an hour of manual time sits between groups.
+const TRACKED: Record<string, { activity: number; notes: number }> = {
+  morning: { activity: 82, notes: 2 },
+  afternoon: { activity: 47, notes: 0 },
+  evening: { activity: 18, notes: 1 },
+}
+const manual: RailMarker = {
+  id: 'manual',
+  after: 'morning',
+  caption: 'Manual',
+  label: 'Manual time, 12:00 to 13:00, 1 hour',
+  render: () => '✎ 1h',
+  tip: () => 'Manual time, 12:00 to 13:00: a client call. No screenshots.',
+}
+const hookOptions: ThumbnailsOptions = {
+  // flat: notes and activity on the label line; stacked: the activity under the card, the notes
+  // on its time label
+  renderGroupMeta: (group, _g, { display, place }) => {
+    const t = TRACKED[group.id]
+    if (!t) return null
+    const notes = t.notes ? `✉ ${t.notes}` : ''
+    if (display === 'stacked') return place === 'below' ? `${t.activity}% active` : notes
+    return [notes, `${t.activity}%`].filter(Boolean).join(' · ')
+  },
+  renderItemBadge: (_item, _g, i) => `▣ ${(i % 2) + 1}`, // the screen
+  cluster: (_item, _g, i) => Math.floor(i / 2), // one capture: two screens
+  markers: () => [manual],
+}
+const HOOKS_SNIPPET = `thumbnails({
+    // drawn by the rail: a group's notes and activity, a screen badge per item,
+    // the screens of one capture close together, manual time between groups
+    renderGroupMeta: (group, g, { place }) =>
+      place === 'below' ? \`\${group.meta.activity}% active\` : \`✉ \${group.meta.notes}\`,
+    renderItemBadge: (item) => \`▣ \${item.meta.screen}\`,
+    cluster: (item) => item.meta.capture,
+    markers: () => [{ id: 'manual', after: 'morning', caption: 'Manual',
+      label: 'Manual time, 12:00 to 13:00, 1 hour', render: () => '✎ 1h' }],
+  })`
 
 const photo = (n: number, id: string, caption: string, comments: Pin[] = []) => ({
   id,
@@ -101,6 +148,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 // ── playground ──────────────────────────────────────────────────────────────
 const state: Setup = { ...(PAIRINGS[0] as { setup: Setup }).setup }
+let hooks = false
 let viewer: ViewerApi | null = null
 let handle: RendererHandle | null = null
 
@@ -135,9 +183,10 @@ function syncControls() {
   radios('preset', PRESETS)
   radios('accent', ACCENTS[state.skin] ?? [])
   radios('scheme', SCHEMES)
+  $<HTMLInputElement>('hooks').checked = hooks
 }
 
-function snippet(s: Setup): string {
+function snippet(s: Setup, withHooks = hooks): string {
   const options = [`preset: '${s.preset}'`, `skin: '${s.skin}'`]
   if (s.accent !== ACCENTS[s.skin]?.[0]) options.push(`accent: '${s.accent}'`)
   if (s.scheme !== 'skin default') options.push(`scheme: '${s.scheme}'`)
@@ -149,7 +198,7 @@ import '@gallerist/theme-default/gallerist.css'
 ${extra}
 const viewer = createViewer({
   collection,
-  plugins: [thumbnails()], // the preset sets the rail
+  plugins: [${withHooks ? HOOKS_SNIPPET : 'thumbnails()'}], // the preset sets the rail
 })
 mount(viewer, { ${options.join(', ')} })
 viewer.open()`
@@ -167,7 +216,7 @@ function render() {
     collection: makeCollection(),
     startAt: at,
     plugins: [
-      thumbnails(),
+      thumbnails(hooks ? hookOptions : {}),
       grid(state.preset === 'tour' ? { layout: 'sections', strings: { start: 'Start tour' } } : {}),
       pins({ presentation }),
       zoom(),
@@ -219,18 +268,23 @@ function render() {
   $('snippet').textContent = snippet(state)
 }
 
-for (const { label, setup } of PAIRINGS) {
+for (const { label, setup, hooks: on } of PAIRINGS) {
   const button = document.createElement('button')
   button.type = 'button'
   button.textContent = label
   button.addEventListener('click', () => {
     Object.assign(state, setup)
+    hooks = !!on
     syncControls()
     render()
   })
   $('pairings').append(button)
 }
 $<HTMLFormElement>('controls').addEventListener('submit', (e) => e.preventDefault())
+$<HTMLInputElement>('hooks').addEventListener('change', (e) => {
+  hooks = (e.target as HTMLInputElement).checked
+  render()
+})
 $('copy').addEventListener('click', async () => {
   const button = $('copy')
   try {

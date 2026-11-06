@@ -596,8 +596,8 @@ Full option list with defaults lives in §8.1; defaults summary: `loop:true`, `i
 
 | Metric | Target |
 |---|---|
-| Core (`@gallerist/core` + `renderer-dom`, gz) | ≤ 16.5 KB (16 KB until 2026-11-03; raised for the keyboard-scrollable caption band, plan P2-R) |
-| Core + thumbnails + image, gz | ≤ 24 KB (≈ lighter than lightGallery+plugins and ~PhotoSwipe) |
+| Core (`@gallerist/core` + `renderer-dom`, gz) | ≤ 16.65 KB (16 KB until 2026-11-03, then 16.5 KB for the keyboard-scrollable caption band, plan P2-R; 16.65 KB from 0.3.4 for the toolbar focus ring) |
+| Core + thumbnails + image, gz | ≤ 25.5 KB (24 KB until 0.3.4, raised for the rail's host hooks; ≈ lighter than lightGallery+plugins and ~PhotoSwipe) |
 | Cold open → first slide painted | < 100 ms (cached) |
 | Navigation frame rate | 60 fps (no long tasks > 50 ms) |
 | Thumbnail rail, 10,000 items | smooth scroll, < 200 DOM nodes live |
