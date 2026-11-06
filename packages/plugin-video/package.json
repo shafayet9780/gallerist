@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-video",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Gallerist plugin — HTML5 <video> media adapter (play/pause on slide enter/leave, advance on ended).",
   "license": "MIT",
   "type": "module",
