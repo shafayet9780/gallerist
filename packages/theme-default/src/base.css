@@ -358,13 +358,44 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-inline-start: auto; /* tools sit at the end of the bar, after the title */
+  /* a scroller clips at its padding box, both ways: room for a focused tool's ring (2px + 2px
+     offset; +1px at the ends, where Chromium rounds an RTL scroll range down), given back by the
+     margin so nothing moves. A tool focus scrolls in stops as far in. The end's room is ::after. */
+  padding: 4px 0;
+  padding-inline-start: 5px;
+  margin: -4px -5px;
+  scroll-padding-inline: 5px;
   /* on a narrow screen the tools scroll sideways so the counter and Close always fit */
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
   pointer-events: auto;
+}
+/* tools sit at the end of the bar: the strip takes the free space, its tools after this auto margin
+   (0 once they overflow; the gap after it cancelled). A shown title takes the space instead. */
+.gallerist-region-toolbar::before {
+  content: "";
+  margin-inline: auto -6px;
+}
+/* the room after the last tool, as a box: WebKit leaves a flex scroller's end padding out of its
+   scroll range */
+.gallerist-region-toolbar::after {
+  content: "";
+  flex: none;
+  width: 5px;
+  margin-inline-start: -6px;
+}
+.gallerist-region-toolbar:empty {
+  padding: 0;
+  margin: 0;
+}
+.gallerist-region-toolbar:empty::before,
+.gallerist-region-toolbar:empty::after {
+  display: none;
+}
+.gallerist-title:not([hidden]) + .gallerist-region-toolbar {
+  flex-grow: 0;
 }
 .gallerist-region-toolbar::-webkit-scrollbar {
   display: none;

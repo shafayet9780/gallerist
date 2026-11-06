@@ -402,6 +402,22 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     footer: el('div', 'gallerist-region gallerist-region-footer'),
     caption: el('div', 'gallerist-region gallerist-region-caption'),
   }
+  // A tool given keyboard focus in the toolbar strip (it scrolls on a narrow screen) shows whole,
+  // with the room its ring takes (the strip's scroll-padding, sized for it by the theme). A browser
+  // leaves a tool 32px or more in view where it is, cut by the strip's edge. The strip itself
+  // scrolls, not the page (scrollIntoView would move an inline viewer's host page); deltas are
+  // visual, so RTL too.
+  const strip = regionHosts.toolbar
+  strip.addEventListener('focusin', (e) => {
+    const tool = e.target as HTMLElement
+    try {
+      if (!tool.matches(':focus-visible')) return // a pointer's focus: no ring, and the tool stays put
+    } catch {} // no :focus-visible: reveal it anyway
+    const t = tool.getBoundingClientRect()
+    const s = strip.getBoundingClientRect()
+    const pad = Number.parseFloat(getComputedStyle(strip).scrollPaddingLeft) || 0
+    strip.scrollLeft += Math.min(0, t.left - s.left - pad) || Math.max(0, t.right - s.right + pad)
+  })
   // The caption bar holds the item's text caption, or a plugin's caption node in its region
   // (plugin-captions), which then replaces the text. Either is the viewer's accessible description.
   const caption = el('div', 'gallerist-caption')

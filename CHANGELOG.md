@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.4
+
+### The toolbar's focus ring
+- **theme-default (fixed)**: a toolbar tool with keyboard focus (fullscreen, save, View, the rail's
+  items toggle, the grid, any plugin tool in the strip) shows its whole focus ring. The strip the
+  tools sit in scrolls sideways on a narrow screen, and a scroller clips on both axes, so since 0.3.0
+  the ring was cut to a bracket on each side, in every skin and both schemes; Close, outside the
+  strip, had it whole. The strip keeps room for the ring on every side (4px; 5px at its ends, where
+  Chromium rounds an RTL scroll range down), given back by a negative margin, so nothing in the bar
+  moves (where a title shows and the tools scroll, they may shift by a twentieth of a pixel). The
+  strip takes the bar's free space itself, its tools still at the end, so its box is wider than its
+  tools where no title shows; it uses its own `::before` and `::after`.
+- **renderer-dom (fixed)**: where the strip scrolls, a tool reached from the keyboard is brought
+  fully into view with its ring, by scrolling the strip (not the page). Browsers leave a tool 32px or
+  more in view where it is, cut by the strip's edge; a pointer's focus leaves the strip as it is.
+
 ## v0.3.3
 
 ### A View menu: the rail's layout and the scheme, in the open viewer (from the Apploye reviewer)
