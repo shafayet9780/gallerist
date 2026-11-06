@@ -349,3 +349,38 @@ test.describe('on a 390px phone', () => {
     await expect(counter(page)).toHaveText('2 / 12')
   })
 })
+
+test.describe('on a 320px phone', () => {
+  test.use({ viewport: { width: 320, height: 640 }, hasTouch: true })
+
+  for (const dir of ['ltr', 'rtl']) {
+    test(`opened while the strip hides part of it, the tool shows whole with its ring's room (${dir})`, async ({
+      page,
+    }) => {
+      await open(page, `${REVIEWER}${dir === 'rtl' ? '&dir=rtl' : ''}`)
+      const strip = page.locator('.gallerist-region-toolbar')
+      // the strip at its start, the tool (the last) partly past its end; a click that doesn't
+      // scroll it first, as a pointer's doesn't
+      const cut = await strip.evaluate((s) => {
+        s.scrollLeft = 0
+        const r = s.getBoundingClientRect()
+        const b = (s.querySelector('.gallerist-view-btn') as HTMLElement).getBoundingClientRect()
+        return b.right > r.right || b.left < r.left
+      })
+      expect(cut, 'the tool starts cut by the strip').toBe(true)
+      await tool(page).evaluate((b: HTMLElement) => b.click())
+      await expect(menu(page)).toBeVisible()
+      const { s, b, pad } = await strip.evaluate((el) => ({
+        s: el.getBoundingClientRect().toJSON(),
+        b: (el.querySelector('.gallerist-view-btn') as HTMLElement)
+          .getBoundingClientRect()
+          .toJSON(),
+        pad: Number.parseFloat(getComputedStyle(el).scrollPaddingLeft),
+      }))
+      // (within the 1px of slack the room has: the strip scrolls in whole pixels)
+      expect(pad).toBeGreaterThanOrEqual(4)
+      expect(b.left).toBeGreaterThanOrEqual(s.left + pad - 1)
+      expect(b.right).toBeLessThanOrEqual(s.right - pad + 1)
+    })
+  }
+})

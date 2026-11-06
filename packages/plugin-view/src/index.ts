@@ -381,12 +381,15 @@ export function view(opts: ViewOptions = {}): Plugin {
         watch = new MutationObserver(paint)
         watch.observe(r, { subtree: true, attributeFilter: [SCHEME, 'data-display'] })
       }
-      // a button the toolbar's strip has scrolled partly out of view (a narrow bar) is shown whole
+      // a button the toolbar's strip has scrolled partly out of view (a narrow bar) is shown whole,
+      // with the strip's scroll-padding (the theme's room for a focus ring) as a keyboard focus does
       const strip = btn.parentElement
       if (strip) {
         const s = strip.getBoundingClientRect()
         const b = btn.getBoundingClientRect()
-        strip.scrollLeft += Math.max(0, b.right - s.right) || Math.min(0, b.left - s.left)
+        const pad = Number.parseFloat(getComputedStyle(strip).scrollPaddingLeft) || 0
+        strip.scrollLeft +=
+          Math.max(0, b.right - s.right + pad) || Math.min(0, b.left - s.left - pad)
       }
       place()
       btn.setAttribute('aria-expanded', 'true')
