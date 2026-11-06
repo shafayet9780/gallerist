@@ -16,6 +16,62 @@
   fully into view with its ring, by scrolling the strip (not the page). Browsers leave a tool 32px or
   more in view where it is, cut by the strip's edge; a pointer's focus leaves the strip as it is.
 
+### A zoom tool (owner-approved, for the Apploye reviewer)
+- **plugin-zoom (new)**: `zoom()` adds a "− 100% +" group to the toolbar. − and + step through stops of
+  the zoom range (`stops`, default fit, 150%, 200%, 300%, 400%: the DOM renderer's range, 100% being
+  the image fitted to the stage), pivoting on the stage's centre (`viewer.zoomTo`). The percentage
+  shows the current zoom and fits the image again when pressed. It follows every zoom as it happens: a
+  pinch, a wheel or a double click shows its percentage while it moves (the plugin reads the transform
+  the renderer gives the current slide before it commits), and another group shows its own. − and +
+  are `aria-disabled` (still focusable) at either end of the range and while the current item can't
+  zoom: not an image (`zoomable`), still loading, failed. The percentage is unavailable at fit. While
+  the viewer has focus, `+` / `=`, `-` and `0` take the same stops in place of the renderer's own ×1.25
+  steps, except in a text field and with Ctrl, ⌘ or Alt; a key it takes stops at the viewer's root
+  (`keys: false` leaves them to the renderer). Translated labels in `strings`. Not in the
+  `@gallerist/cdn` bundle (1.53 kB gzipped; its own budget is 1.65 kB). No core or renderer change.
+- **theme-default (new)**: the tool's look in every skin and scheme (a tabular percentage of one
+  width); the renderer's zoom-reset button stays out of a bar that has the tool (unchanged without it);
+  at 600px wide or less only − and + show.
+
+### The rail (from the Apploye reviewer)
+- **plugin-thumbnails (changed)**: collapsing the rail (the handle, `t`, fullscreen) and bringing it
+  back glides its height (a side rail's width) between its size and none over `--gallerist-dur-panel`
+  (220ms, new token; the handle's chevron turns over the same time), so the stage refits a little each
+  frame instead of jumping, and a zoomed image keeps its view. A stacked rail's item column beside the
+  stage does the same when the items toggle or `e` opens or closes it. One Web Animation per panel,
+  clipped, its contents kept to the handle's side. On its way out a panel is `inert`, then
+  `display: none` as before; a collapse that takes the focus with it hands it to the viewer; reversing
+  midway turns back from where it got to. No motion under `prefers-reduced-motion` or without Web
+  Animations.
+- **plugin-thumbnails (changed)**: the rail shows no scrollbar, in every engine. A mouse or pen drags
+  it: past 5px a press is a drag, which never clicks the card it started on; short of that it is a
+  click, which selects. A grab cursor shows between cards while it can scroll; nothing in it is
+  selected or dragged out as an image. Touch keeps the browser's own scrolling. A vertical wheel
+  scrolls a sideways rail towards its end while it can; at that end, or when it can't scroll, the page
+  gets the wheel, and a sideways wheel, a trackpad swipe or a pinch is left to the browser. Each end
+  with more beyond it fades (`data-gallerist-more-start` / `-end`; `--gallerist-rail-fade`, 40px), a
+  side rail's too. On a sideways rail, ‹ › buttons at those ends (`.gallerist-rail-page`) show on hover
+  with a fine pointer and page it by 80% of its width, gliding unless reduced motion; they are out of
+  the tab order and hidden from assistive tech, as the keys already walk the rail and bring the current
+  card into view. Right to left throughout. The item column beside the stage drags too and keeps its
+  scrollbar.
+- **plugin-thumbnails (changed)**: a flat rail's group labels and a stacked timeline's labels carry
+  their whole text in a `title`.
+- **theme-default (changed)**: the rail's band (background, rule, blur) is painted by
+  `.gallerist-thumbs-region` rather than `.gallerist-thumbs`, so the strip can fade its ends without
+  fading the band. A page that styled the strip's background or border should move that to the region.
+- **theme-default (fixed)**: in a dark scheme the dividers between a flat ("Row") rail's groups all but
+  vanished (the hairline, 1.3–1.4:1). A new token, `--gallerist-divider`, defaults to the hairline; each
+  skin's dark scheme lifts it to about 2:1 (Console #464c54, 2.05:1; Gallery white at 22%, 1.93:1;
+  Editorial Night #4d4840, 1.96:1). The light schemes keep their hairline.
+- **theme-default (fixed)**: a flat rail's group label wider than its items (a time range such as
+  "10:49 – 10:50 am" over a one-item group) was cut with an ellipsis. It now widens its group, so it
+  shows whole and clear of the next group's divider, up to three card heights; past that it ends in an
+  ellipsis. Down a side rail a group stays the rail's width.
+- **size**: core + renderer-dom unchanged (16.61 kB); core + renderer-dom + thumbnails 21.99 → 23.79 kB
+  (limit 24 kB); base.css 7.60 → 8.12 kB; the `@gallerist/cdn` bundle 34.62 → 36.5 kB, so its budget
+  goes from 35 to 37 kB (owner's call).
+
 ## v0.3.3
 
 ### A View menu: the rail's layout and the scheme, in the open viewer (from the Apploye reviewer)

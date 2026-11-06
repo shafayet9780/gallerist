@@ -132,6 +132,9 @@
   - Size: plugin-pins 3,992 → 3,996 B gz (limit 4,000; I1 + I2 alone measured 3,998 B). Core + renderer-dom 16,261 B (unchanged); base.css 7,020 B.
   - Gates: lint 0, clean typecheck 0, unit 0 (734), build 0, check:dist 0, size 0, attw 0 (12 packages), e2e Chromium + WebKit 0 (1202 passed, 820 skipped by design).
   - **Open**: S4 above (a host box with `overflow: hidden`, ellipsis or line-clamp whose contents overflow keeps a wheel, so nothing scrolls or zooms there; needs ~38 B or a budget call). A closed shadow root's scroller is still not seen (`composedPath()` hides it from the card).
+- [x] **0.3.4 viewer improvements** (`feat/0.3.4-viewer`, on top of the toolbar focus-ring fix; owner-approved, from Apploye's reviewer). One commit each: dark-scheme row dividers (`--gallerist-divider`, ~2:1); the rail and item column glide open and shut (plugin-thumbnails `motion.ts`, `--gallerist-dur-panel`); the rail pulls instead of scrolling (`scroll.ts`: no scrollbar, mouse/pen drag, vertical wheel, end fades, ‹ › page buttons; the band moves to `.gallerist-thumbs-region`); flat group labels widen their group (cap 3 card heights, then ellipsis + `title`); new `@gallerist/plugin-zoom` (− 100% +, stops, live % from the content's transform, `+`/`=`/`-`/`0` taken in capture). E2e `rail-row`, `rail-motion`, `zoom`.
+  - Size: core + renderer-dom 16.61 kB (unchanged); + thumbnails 21.99 → 23.79 kB (limit 24); base.css 7.60 → 8.12 kB; cdn 34.62 → 36.5 kB, budget 35 → 37 kB (**owner's call**); plugin-zoom 1.53 kB (limit 1.65).
+  - **Open**: the site's size table (`site/index.html`) predates these numbers; the page buttons sit at the strip's middle, a little above a timeline row's cards; the item column keeps its scrollbar and has no end fades (it sits on a panel, which a mask would fade too).
 
 ## Release 0.4
 - [ ] **Size:** core + renderer-dom is at 16,497 of 16,500 B after 0.3.3. Any renderer change needs a trim first or an owner-approved raise.
