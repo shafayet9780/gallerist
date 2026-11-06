@@ -181,6 +181,11 @@ Default keyboard map (overridable, see §17):
 | `f` | fullscreen (if plugin) |
 | `Home`/`End` | first / last group |
 
+The viewer's keys are not taken from a text field inside it (`input`, `textarea`, `select`,
+contenteditable; Escape excepted, above), nor any key a handler before the viewer's already took
+(`preventDefault()`): a host popover in the caption bar closes itself on Escape, or walks its own
+list with the arrows, and the viewer does nothing with that key.
+
 Gestures (see §11 for arbitration): swipe horizontal = group nav (when not zoomed); swipe vertical-down = close; pinch/double-tap = zoom; drag = pan (when zoomed).
 
 ---
