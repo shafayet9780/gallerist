@@ -1079,9 +1079,7 @@ test.describe('reviewer: nothing over the media', () => {
 
         // A keyboard user who goes on with the pointer: a press on the stage (a click; a tap on
         // touch) moves focus off the bar's tool to the viewer itself, as on any focusable container,
-        // so the bar fades again. A drag on touch (a swipe, a pinch) presses no mouse button, so it
-        // moves no focus, as a page scroll doesn't: the tool keeps it, and the bar stays until the
-        // next tap (checked where a touch drag can be driven: Chromium's DevTools protocol).
+        // so the bar fades again.
         test('idle: a press on the stage takes focus off a bar tool, and the bar fades again', async ({
           page,
           browserName,
@@ -1095,18 +1093,6 @@ test.describe('reviewer: nothing over the media', () => {
           if (!box) throw new Error('no stage')
           const x = box.x + box.width / 2
           const y = box.y + box.height / 2
-          if (ctxName !== 'desktop' && browserName === 'chromium') {
-            const cdp = await page.context().newCDPSession(page)
-            const touch = (type: string, at?: number) =>
-              cdp.send('Input.dispatchTouchEvent', {
-                type,
-                touchPoints: at === undefined ? [] : [{ x: at, y }],
-              })
-            await touch('touchStart', x)
-            for (let k = 1; k <= 5; k++) await touch('touchMove', x - 6 * k) // short of a swipe
-            await touch('touchEnd')
-            await expect(page.locator('.gallerist-close')).toBeFocused()
-          }
           if (ctxName === 'desktop') await page.mouse.click(x, y)
           else await page.touchscreen.tap(x, y)
           await expect(page.locator('.gallerist-close')).not.toBeFocused()
@@ -1116,6 +1102,35 @@ test.describe('reviewer: nothing over the media', () => {
           expect(
             await page.locator('.gallerist-bar').evaluate((el) => getComputedStyle(el).opacity),
           ).toBe('0')
+        })
+
+        // A drag on touch (a swipe, a pinch) presses no mouse button, so it moves no focus, as a page
+        // scroll doesn't: the tool keeps it, and the bar stays until the next tap. Checked where a
+        // touch drag can be driven: Chromium's DevTools protocol.
+        test('idle: a touch drag on the stage leaves focus on a bar tool', async ({
+          page,
+          browserName,
+        }) => {
+          test.skip(ctxName === 'desktop' || browserName !== 'chromium', 'a touch drag needs CDP')
+          await page.goto('/layout.html?preset=reviewer&autohide=1&g=1&captions=1')
+          const root = page.locator('.gallerist')
+          await expect(root).toHaveAttribute('data-gallerist-phase', 'open')
+          await settle(page)
+          await keyboardFocus(page, '.gallerist-close', browserName)
+          const box = await page.locator('.gallerist-stage').boundingBox()
+          if (!box) throw new Error('no stage')
+          const x = box.x + box.width / 2
+          const y = box.y + box.height / 2
+          const cdp = await page.context().newCDPSession(page)
+          const touch = (type: string, at?: number) =>
+            cdp.send('Input.dispatchTouchEvent', {
+              type,
+              touchPoints: at === undefined ? [] : [{ x: at, y }],
+            })
+          await touch('touchStart', x)
+          for (let k = 1; k <= 5; k++) await touch('touchMove', x - 6 * k) // short of a swipe
+          await touch('touchEnd')
+          await expect(page.locator('.gallerist-close')).toBeFocused()
         })
 
         // The focus exemption adds no specificity: a page's own idle look, written for the idle rule
