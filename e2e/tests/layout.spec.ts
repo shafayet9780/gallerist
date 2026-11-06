@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { type Page, expect, test } from '@playwright/test'
 
@@ -1075,6 +1076,66 @@ test.describe('reviewer: nothing over the media', () => {
               expect(await opacity('.gallerist-bar'), 'the bar').toBe('0')
           }
         })
+
+        // A keyboard user who goes on with the pointer: a press on the stage (a click; a tap on
+        // touch) moves focus off the bar's tool to the viewer itself, as on any focusable container,
+        // so the bar fades again. A drag on touch (a swipe, a pinch) presses no mouse button, so it
+        // moves no focus, as a page scroll doesn't: the tool keeps it, and the bar stays until the
+        // next tap (checked where a touch drag can be driven: Chromium's DevTools protocol).
+        test('idle: a press on the stage takes focus off a bar tool, and the bar fades again', async ({
+          page,
+          browserName,
+        }) => {
+          await page.goto('/layout.html?preset=reviewer&autohide=1&g=1&captions=1')
+          const root = page.locator('.gallerist')
+          await expect(root).toHaveAttribute('data-gallerist-phase', 'open')
+          await settle(page)
+          await keyboardFocus(page, '.gallerist-close', browserName)
+          const box = await page.locator('.gallerist-stage').boundingBox()
+          if (!box) throw new Error('no stage')
+          const x = box.x + box.width / 2
+          const y = box.y + box.height / 2
+          if (ctxName !== 'desktop' && browserName === 'chromium') {
+            const cdp = await page.context().newCDPSession(page)
+            const touch = (type: string, at?: number) =>
+              cdp.send('Input.dispatchTouchEvent', {
+                type,
+                touchPoints: at === undefined ? [] : [{ x: at, y }],
+              })
+            await touch('touchStart', x)
+            for (let k = 1; k <= 5; k++) await touch('touchMove', x - 6 * k) // short of a swipe
+            await touch('touchEnd')
+            await expect(page.locator('.gallerist-close')).toBeFocused()
+          }
+          if (ctxName === 'desktop') await page.mouse.click(x, y)
+          else await page.touchscreen.tap(x, y)
+          await expect(page.locator('.gallerist-close')).not.toBeFocused()
+          await expect(root).toBeFocused()
+          await expect(root).toHaveAttribute('data-gallerist-idle', '', { timeout: 10_000 })
+          await settle(page)
+          expect(
+            await page.locator('.gallerist-bar').evaluate((el) => getComputedStyle(el).opacity),
+          ).toBe('0')
+        })
+
+        // The focus exemption adds no specificity: a page's own idle look, written for the idle rule
+        // as it was, still wins.
+        test('idle: a page override of the idle rule still wins', async ({ page }) => {
+          await page.goto('/layout.html?preset=reviewer&autohide=1&g=1&captions=1')
+          const root = page.locator('.gallerist')
+          await expect(root).toHaveAttribute('data-gallerist-phase', 'open')
+          await page.addStyleTag({
+            content: `.gallerist[data-gallerist-idle] .gallerist-bar,
+              .gallerist[data-gallerist-idle] .gallerist-controls > button { opacity: 0.5 }`,
+          })
+          await expect(root).toHaveAttribute('data-gallerist-idle', '', { timeout: 10_000 })
+          await settle(page)
+          const opacity = (sel: string) =>
+            page.locator(sel).evaluate((el) => getComputedStyle(el).opacity)
+          expect(await opacity('.gallerist-bar')).toBe('0.5')
+          expect(await opacity('.gallerist-prev')).toBe('0.5')
+          expect(await opacity('.gallerist-caption')).toBe('0') // not overridden: the theme's
+        })
       })
     }
   })
@@ -1082,6 +1143,46 @@ test.describe('reviewer: nothing over the media', () => {
 
 test.describe('layout behaviour', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'runs once (chromium)')
+
+  // Where :has() and :focus-visible are unsupported (iOS Safari 15.0–15.3, inside the floor) a rule
+  // that names them outside a :has()-guarded @supports is dropped whole (:not() and :has() aren't
+  // forgiving), so the chrome would never fade there. The idle rules each have a plain form outside
+  // it, with the selectors they had before the focus exemption.
+  test('the idle fade does without :has() and :focus-visible', async ({ page }) => {
+    await page.goto('/layout.html')
+    const css = readFileSync('packages/theme-default/src/base.css', 'utf8')
+    const { unguarded, plain } = await page.evaluate((text) => {
+      const sheet = new CSSStyleSheet()
+      sheet.replaceSync(text)
+      const unguarded: string[] = []
+      const plain: string[] = []
+      const walk = (rules: CSSRuleList, guarded: boolean) => {
+        for (const r of rules) {
+          if (r instanceof CSSSupportsRule)
+            walk(r.cssRules, guarded || /^selector\(:has/.test(r.conditionText))
+          else if (r instanceof CSSMediaRule) walk(r.cssRules, guarded)
+          else if (r instanceof CSSStyleRule && /data-gallerist-idle/.test(r.selectorText)) {
+            if (guarded) continue
+            if (/:has\(|:focus-visible/.test(r.selectorText)) unguarded.push(r.selectorText)
+            else plain.push(...r.selectorText.split(/,\s*/))
+          }
+        }
+      }
+      walk(sheet.cssRules, false)
+      return { unguarded, plain }
+    }, css)
+    expect(unguarded).toEqual([])
+    expect(plain).toEqual(
+      expect.arrayContaining([
+        '.gallerist[data-gallerist-idle] .gallerist-bar',
+        '.gallerist[data-gallerist-idle] .gallerist-controls > button',
+        '.gallerist[data-gallerist-idle] .gallerist-itemnav',
+        '.gallerist[data-gallerist-idle] .gallerist-navigator',
+        '.gallerist[data-gallerist-idle] .gallerist-caption',
+        '.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-thumbnails',
+      ]),
+    )
+  })
 
   test('a page override of a token wins in every skin, accent and on phones', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 }) // the compact layer is active

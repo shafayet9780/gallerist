@@ -19,7 +19,16 @@ which could cover it on a short stage, with a mouse too.
 the smaller stage and stayed clamped when it grew back: zoomed 2× at a panorama's right edge on a
 touch tablet, tabbing past a docked arrow left the view about 140px short of that edge, and a
 rotation there and back did the same. Now the part of the image at the stage's centre stays there
-through a resize, and the view comes back as it was.
+through a resize, and the view comes back as it was. That memory is the current item's, against
+the box it was clamped to: moving to another item (the zoom carries over within a group) or a load
+in between never pans to a view nobody saw, and a stage with no size (hidden) commits nothing and
+fires no `zoom` event. Known limitation, as before: a resize in the middle of a pinch, or before a
+wheel zoom settles, shows the re-clamped view for a frame, and the gesture then commits from where it
+began, in the old stage's pixels (clamped to the new stage), not from the re-clamped view.
 
 **Idle auto-hide no longer fades a control that has keyboard focus**, nor the band (or `immersive`
-rail) it is in, so a keyboard user who pauses on one still sees where focus is.
+rail) it is in, so a keyboard user who pauses on one still sees where focus is. A press on the stage
+(a click, a tap) moves focus to the viewer, so the chrome fades again; a swipe or pinch moves no
+focus, as a page scroll doesn't. Where `:has()` and `:focus-visible` are unsupported (iOS Safari
+before 15.4) all of it fades, as before, and the idle rules keep their selectors' specificity, so a
+page's own idle style still applies.

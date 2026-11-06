@@ -1745,17 +1745,33 @@
   transition: opacity var(--gallerist-dur-gentle, 280ms) var(--gallerist-ease-out, ease);
 }
 /* except what has keyboard focus, and the band holding it (WCAG 2.4.7): a keyboard user who pauses
-   on a control still sees where focus is */
-.gallerist[data-gallerist-idle]
-  :is(
-    .gallerist-bar,
-    .gallerist-controls > button,
-    .gallerist-itemnav,
-    .gallerist-navigator,
-    .gallerist-caption
-  ):not(:focus-visible, :has(:focus-visible)) {
-  opacity: 0;
-  pointer-events: none;
+   on a control still sees where focus is. Without :has() and :focus-visible (iOS Safari before
+   15.4) all of it fades, as before; an unforgiving :not() there would drop the whole rule. The
+   exemption sits in :where(), so the rule keeps the specificity host overrides were written for. */
+@supports not selector(:has(:focus-visible)) {
+  .gallerist[data-gallerist-idle] .gallerist-bar,
+  .gallerist[data-gallerist-idle] .gallerist-controls > button,
+  .gallerist[data-gallerist-idle] .gallerist-itemnav,
+  .gallerist[data-gallerist-idle] .gallerist-navigator,
+  .gallerist[data-gallerist-idle] .gallerist-caption {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+@supports selector(:has(:focus-visible)) {
+  .gallerist[data-gallerist-idle] .gallerist-bar:where(:not(:focus-visible, :has(:focus-visible))),
+  .gallerist[data-gallerist-idle]
+    .gallerist-controls
+    > button:where(:not(:focus-visible, :has(:focus-visible))),
+  .gallerist[data-gallerist-idle]
+    .gallerist-itemnav:where(:not(:focus-visible, :has(:focus-visible))),
+  .gallerist[data-gallerist-idle]
+    .gallerist-navigator:where(:not(:focus-visible, :has(:focus-visible))),
+  .gallerist[data-gallerist-idle]
+    .gallerist-caption:where(:not(:focus-visible, :has(:focus-visible))) {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 /* ── a11y live region (visually hidden) ────────────────────────────────────── */
@@ -1837,11 +1853,20 @@
   pointer-events: none; /* a fading viewer must not take clicks meant for the page */
 }
 
-/* immersive preset: chrome AND the rail fade together on idle (UX-E), unless focus is in it. */
-.gallerist[data-gallerist-preset="immersive"][data-gallerist-idle]
-  .gallerist-region-thumbnails:not(:has(:focus-visible)) {
-  opacity: 0;
-  pointer-events: none;
+/* immersive preset: chrome AND the rail fade together on idle (UX-E), unless focus is in it (as
+   above: where :has() is unsupported it fades all the same). */
+@supports not selector(:has(:focus-visible)) {
+  .gallerist[data-gallerist-preset="immersive"][data-gallerist-idle] .gallerist-region-thumbnails {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+@supports selector(:has(:focus-visible)) {
+  .gallerist[data-gallerist-preset="immersive"][data-gallerist-idle]
+    .gallerist-region-thumbnails:where(:not(:has(:focus-visible))) {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 .gallerist[data-gallerist-preset="immersive"] .gallerist-region-thumbnails {
   transition: opacity var(--gallerist-dur-gentle) var(--gallerist-ease-out);

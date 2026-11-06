@@ -1640,7 +1640,10 @@ describe('mount — resize re-clamp (C2)', () => {
   // smaller stage. A 2:1 image, zoomed 2× into its bottom inline-end corner of a 1000×800 stage.
   describe('a stage that shrinks and grows back returns to the same view', () => {
     const corner = { scale: 2, x: -1000, y: -500 }
-    const open = () => {
+    const open = (
+      items: Item[] = [{ ...item('w'), naturalSize: { w: 1000, h: 500 } }],
+      opts: Parameters<typeof mount>[1] = {},
+    ) => {
       const roCbs: (() => void)[] = []
       class FakeRO {
         constructor(cb: () => void) {
@@ -1656,9 +1659,8 @@ describe('mount — resize re-clamp (C2)', () => {
         return 0
       })
       vi.stubGlobal('cancelAnimationFrame', () => {})
-      const wide = { ...item('w'), naturalSize: { w: 1000, h: 500 } }
-      const v = createViewer({ collection: { groups: [{ id: 'g', items: [wide] }] } })
-      const h = mount(v)
+      const v = createViewer({ collection: { groups: [{ id: 'g', items }] } })
+      const h = mount(v, opts)
       v.open()
       const stage = document.querySelector('.gallerist-stage') as HTMLElement
       let size = { w: 1000, h: 800 }
@@ -1726,6 +1728,108 @@ describe('mount — resize re-clamp (C2)', () => {
       resize(600, 800)
       resize(1000, 800)
       expect(v.getState().zoom).toEqual({ scale: 1, x: 0, y: 0 })
+      h.destroy()
+    })
+
+    // What is kept for the way back belongs to the item it was worked out for, against the box it
+    // was clamped to. The gutters shrink above clamps the corner's height: it aimed for y -460.
+    // An adapter whose natural size and load the test drives.
+    const driven = () => {
+      const media = new Map<string, { size: { w: number; h: number } | null; load(): void }>()
+      const adapter = {
+        type: 'image',
+        mount: (it: Item, slot: HTMLElement) => {
+          const img = document.createElement('img')
+          slot.appendChild(img)
+          const m = { size: it.naturalSize ?? null, load: () => {} }
+          const ready = new Promise<void>((resolve) => {
+            m.load = resolve
+          })
+          media.set(it.id, m)
+          return {
+            element: img,
+            ready,
+            supportsZoom: true,
+            naturalSize: () => m.size,
+            destroy: () => img.remove(),
+          }
+        },
+      }
+      return { media, adapters: [adapter] }
+    }
+    const flush = () => new Promise((r) => setTimeout(r, 0))
+    // a portrait 3:4 image: at 600×800 it fills the stage, 1200×1600 at 2×, room for y -460
+    const pair = () => [
+      { ...item('w'), naturalSize: { w: 1000, h: 500 } },
+      { ...item('p'), naturalSize: { w: 600, h: 800 } },
+    ]
+
+    it('the next item, loading in between, opens at the view shown, not the last item’s aim', async () => {
+      const { media, adapters } = driven()
+      const { v, h, resize } = open(pair(), { adapters })
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      v.nextItem() // the zoom carries over, as it is
+      media.get('p')?.load()
+      await flush()
+      expectZoom(v, { scale: 2, x: -600, y: -400 }) // the old code panned to the last item's -460
+      resize(1000, 800) // back: the portrait is 600 wide at x 200, x clamps to its edge
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      h.destroy()
+    })
+
+    it('the next item, not loaded yet, does not take the last item’s aim on the way back', () => {
+      const { adapters } = driven()
+      const { v, h, resize } = open(pair(), { adapters })
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      v.nextItem()
+      resize(1000, 800)
+      expectZoom(v, { scale: 2, x: -600, y: -400 }) // the old code went to the last item's -460
+      h.destroy()
+    })
+
+    it('a load in between that sizes the image: the view shown stays, and is the one that returns', async () => {
+      const { media, adapters } = driven()
+      const { v, h, resize } = open(undefined, { adapters })
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      const m = media.get('w')
+      if (m) m.size = { w: 1000, h: 700 } // the hint was off: 600×420 at y 190, y in [-420, -380]
+      m?.load()
+      await flush()
+      expectZoom(v, { scale: 2, x: -600, y: -400 }) // the old code moved to -420, toward the aim
+      resize(1000, 800) // 1000×700 at y 50: the image's middle, as shown, at its end edge
+      expectZoom(v, { scale: 2, x: -1000, y: -400 })
+      h.destroy()
+    })
+
+    it('a frame inset that changes with the stage (a breakpoint) still returns', () => {
+      const { v, h, resize } = open(undefined, { frame: true })
+      const root = document.querySelector('.gallerist') as HTMLElement
+      getInternals(v).setZoom(corner) // no inset yet: the box is the same as unframed
+      root.style.setProperty('--gallerist-frame-inset', '50px')
+      resize(600, 800) // 500×250 at (50, 275): x clamps to its edge, y centres
+      expectZoom(v, { scale: 2, x: -500, y: -400 })
+      root.style.setProperty('--gallerist-frame-inset', '0px')
+      resize(1000, 800)
+      expectZoom(v, corner) // the old code mapped from the box at the new inset: x -963
+      h.destroy()
+    })
+
+    it('a stage with no size in between commits nothing, and the way back still returns', () => {
+      const { v, h, resize } = open()
+      getInternals(v).setZoom(corner)
+      resize(600, 800)
+      const zoomEnd = vi.fn()
+      v.on('zoomEnd', zoomEnd)
+      resize(0, 0) // hidden (display: none)
+      expect(zoomEnd).not.toHaveBeenCalled() // the old code committed the aim, unclamped
+      expectZoom(v, { scale: 2, x: -600, y: -400 })
+      resize(1000, 800)
+      expectZoom(v, corner)
       h.destroy()
     })
   })

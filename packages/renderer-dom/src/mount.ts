@@ -584,6 +584,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   const tagAxis = (currentSlide: HTMLElement, cur: { g: number; i: number }) => {
     if (lastCursor && (lastCursor.g !== cur.g || lastCursor.i !== cur.i)) {
       const axis = lastCursor.g !== cur.g ? 'group' : 'item'
+      kept = zoomAt = undefined // they were another item's (see reclampZoom)
       currentSlide.removeAttribute('data-gallerist-enter')
       void currentSlide.offsetWidth // reflow to restart the CSS animation
       currentSlide.setAttribute('data-gallerist-enter', axis)
@@ -679,7 +680,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
             if (groupIndex(slideKey) !== viewer.getState().cursor.g) return // no longer current
             r.overlayItem = undefined // force a repaint at the now-known natural size
             // a zoom committed before the size was known was bounded by the whole layer
-            if (attached) reclampZoom()
+            if (attached) {
+              kept = undefined
+              reclampZoom()
+            }
           })
           .catch((error) => {
             // A load we cancelled (slide torn down, item swapped out) is not a failure — adapters
@@ -1323,19 +1327,23 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     s.setProperty('--gallerist-box-w', `${box.w}px`)
     s.setProperty('--gallerist-box-h', `${box.h}px`)
   }
-  // The stage size the committed zoom was last clamped at, and what the last re-clamp kept: the
-  // view it aimed for (before the clamp), the size it aimed at, and the zoom it left.
+  // What the committed zoom was last clamped against: the stage size and the current media's
+  // painted box in it. And what the last re-clamp kept: the view it aimed for (before the clamp),
+  // what that was against, and the zoom it left. Both are the current item's: moving to another
+  // drops them (tagAxis), though the zoom carries over within a group.
   type Size = { w: number; h: number }
-  let zoomSize: Size | undefined
-  let kept: [ZoomState, Size | undefined, ZoomState] | undefined
+  type At = [Size, ReturnType<typeof paintedBox>]
+  let zoomAt: At | undefined
+  let kept: [ZoomState, At | undefined, ZoomState] | undefined
   const constrainZoom = (z: ZoomState): ZoomState => {
     const scaled = { scale: clampScale(z.scale, 1, MAX_ZOOM), x: z.x, y: z.y }
     const size = stageSize()
     // Not laid out (closed overlay, hidden container): the scale range needs no geometry, the pan
     // bounds do; the ResizeObserver re-clamps the pan once the stage has a size.
     if (!(size.w > 0 && size.h > 0)) return scaled
-    zoomSize = size
-    return clampPanToBox(scaled, size, mediaBox(size))
+    const box = mediaBox(size)
+    zoomAt = [size, box]
+    return clampPanToBox(scaled, size, box)
   }
   const offZoomBounds = internals.setZoomBounds({
     center: () => {
@@ -1347,17 +1355,21 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
 
   // Re-check the committed zoom against the current geometry; repaints either way. The pan is in
   // stage pixels, so when the stage has resized since, the media point under the stage centre is
-  // first put back under it (as a share of the media box), then the pan is clamped. While the zoom
-  // is still the one the last re-clamp left, that starts from the view it aimed for rather than the
-  // clamped one: a stage that shrinks and grows back (room for a focused docked arrow on touch, a
-  // rotation there and back) returns to the same view instead of staying clamped to the smaller one.
+  // first put back under it (as a share of the box it was clamped against), then the pan is
+  // clamped. While the zoom is still the one the last re-clamp left, that starts from the view it
+  // aimed for rather than the clamped one: a stage that shrinks and grows back (room for a focused
+  // docked arrow on touch, a rotation there and back) returns to the same view instead of staying
+  // clamped to the smaller one. Only a resize does: a load and a refresh drop the aim first, so they
+  // never pan to a view nobody saw. No size (hidden): nothing to clamp against, so nothing is
+  // committed, and the aim is kept for the resize that gives it one.
   const reclampZoom = () => {
     const cur = viewer.getState().zoom
     const size = stageSize()
-    let [z, was] = kept?.[2] === cur ? kept : [cur, zoomSize]
-    if (was && size.w > 0 && size.h > 0 && (was.w !== size.w || was.h !== size.h)) {
+    if (!(size.w > 0 && size.h > 0)) return renderWindow() // repaint overlays; nothing to clamp
+    let [z, at] = kept?.[2] === cur ? kept : [cur, zoomAt]
+    if (at && (at[0].w !== size.w || at[0].h !== size.h)) {
       // the media box's edge keeps its offset from the stage centre, scaled with the box
-      const a = mediaBox(was)
+      const [was, a] = at
       const b = mediaBox(size)
       const s = z.scale
       z = {
@@ -1372,7 +1384,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       renderWindow() // repaint overlays at the new rect
       updateNavigator()
     }
-    kept = [z, zoomSize, out]
+    kept = [z, zoomAt, out]
   }
 
   // ── re-measure on resize (spec §10.5) ──────────────────────────────────────────
@@ -1479,6 +1491,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // viewer.refresh(): an explicit re-measure, for layout changes a ResizeObserver can't see, and a
   // re-read of what the plugins ask for (readRegions)
   const offRefresh = internals.onRefresh(() => {
+    kept = undefined // see reclampZoom
     readRegions()
     if (attached) updateChrome()
     onStageResize()
