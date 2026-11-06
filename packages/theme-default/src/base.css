@@ -883,8 +883,11 @@
   padding-inline-start: 12px;
   border-inline-start: 1px solid var(--gallerist-divider);
 }
+/* a label wider than its items widens its group (a one-item group under a time range), so it shows
+   whole and clear of the next group's divider; past three card heights it ends in an ellipsis (the
+   whole label in its title) */
 .gallerist-thumb-group-cap {
-  contain: inline-size; /* a long label ends in an ellipsis instead of widening its group */
+  max-width: calc(var(--gallerist-thumb-h) * 3);
   font: 500 11px / 14px var(--gallerist-font);
   color: var(--gallerist-fg-muted);
   white-space: nowrap;
@@ -913,6 +916,10 @@
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group-row {
   flex-direction: column;
   align-items: flex-start;
+}
+/* down a side rail a group is the rail's width: a long label ends in an ellipsis there */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group-cap {
+  contain: inline-size;
 }
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group + .gallerist-thumb-group {
   padding: 12px 0 0;

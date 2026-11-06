@@ -616,6 +616,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         const text = document.createElement('span')
         text.className = 'gallerist-thumb-time-text'
         text.textContent = time ?? ''
+        if (time) label.title = time // cut to the card's width when longer
         label.appendChild(text)
         wrap.prepend(label)
         if (time) btn.setAttribute('aria-label', t.groupAt(gIndex + 1, time))
@@ -914,6 +915,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         cap.className = 'gallerist-thumb-group-cap'
         cap.setAttribute('aria-hidden', 'true') // already in the group's name
         cap.textContent = label
+        cap.title = label // the whole of one too long even for a widened group
         wrap.appendChild(cap)
       }
       const row = document.createElement('div')

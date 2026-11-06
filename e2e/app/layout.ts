@@ -69,15 +69,25 @@ const label = (g: number) => {
     ? names[Math.floor(g / 3) % names.length]
     : ['Hall', 'WC', 'Den', 'Loft'][g % 4]
 }
+// the reviewer timeline's labels: 09:12, 09:19, … every 7 minutes. time=range: "09:12 – 09:13 am"
+// (a start and an end, wider than a one-item group) · time=long: far longer than any group
+const clock = (m: number) =>
+  `${String(9 + Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const timeOf = (g: number) => {
+  const at = 12 + g * 7
+  if (p.get('time') === 'range') return `${clock(at)} – ${clock(at + 1)} am`
+  if (p.get('time') === 'long')
+    return `${clock(at)} – ${clock(at + 1)} am, Weekly review of the dashboard`
+  return clock(at)
+}
 const collection: Collection = {
   meta: { title: 'Fixture house' },
   groups: sizes.map((n, g) => ({
     id: `g${g}`,
     caption: captionMode === '1' ? `Group ${g + 1} title` : label(g),
-    // the reviewer timeline's labels: 09:12, 09:19, … every 7 minutes
     meta: {
       subtitle: captionMode === '1' ? `Floor ${(g % 3) + 1}` : undefined,
-      time: `${String(9 + Math.floor((12 + g * 7) / 60)).padStart(2, '0')}:${String((12 + g * 7) % 60).padStart(2, '0')}`,
+      time: timeOf(g),
     },
     items: Array.from({ length: n }, (_, i) =>
       img(

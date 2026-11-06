@@ -254,3 +254,86 @@ test.describe('pulling the row rail', () => {
     await expect.poll(() => scrolled(page)).toBeGreaterThan(150)
   })
 })
+
+// ── long group labels: a time range over a one-item group ─────────────────────────────────────
+// Every label shown whole (or, past the cap, cut with an ellipsis and whole in its title), inside its
+// own group, clear of the next group's divider.
+const labels = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-group')].flatMap((group) => {
+      const cap = group.querySelector<HTMLElement>('.gallerist-thumb-group-cap')
+      if (!cap || cap.hidden) return []
+      const next = group.nextElementSibling
+      const c = cap.getBoundingClientRect()
+      const g = group.getBoundingClientRect()
+      return [
+        {
+          text: cap.textContent ?? '',
+          title: cap.title,
+          cut: cap.scrollWidth > cap.clientWidth + 1,
+          inGroup: c.left >= g.left - 0.5 && c.right <= g.right + 0.5,
+          // the next group's divider is its inline-start border
+          clear: !next || c.right <= next.getBoundingClientRect().left + 0.5,
+          ltr: getComputedStyle(group).direction === 'ltr',
+        },
+      ]
+    }),
+  )
+
+for (const [name, viewport] of [
+  ['desktop', { width: 1440, height: 900 }],
+  ['phone', { width: 390, height: 844 }],
+] as const) {
+  test(`${name}: a time range over a one-item group shows whole, clear of the next divider`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport)
+    await open(page, 'skin=console&one=1&time=range&g=0')
+    const seen = await labels(page)
+    expect(seen.length).toBeGreaterThan(1)
+    for (const l of seen) {
+      expect(l.text).toMatch(/^\d\d:\d\d – \d\d:\d\d am$/)
+      expect(l, l.text).toMatchObject({ cut: false, inGroup: true, clear: true })
+      expect(l.title).toBe(l.text)
+    }
+  })
+}
+
+test('right to left: the same, mirrored', async ({ page }) => {
+  await open(page, 'skin=console&one=1&time=range&g=0&dir=rtl')
+  const seen = await labels(page)
+  for (const l of seen) {
+    expect(l.ltr).toBe(false)
+    // in RTL the next group sits to the left: check against its right edge instead
+    expect(l, l.text).toMatchObject({ cut: false, inGroup: true })
+  }
+  const clear = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('.gallerist-thumb-group')].every((group) => {
+      const cap = group.querySelector<HTMLElement>('.gallerist-thumb-group-cap')
+      const next = group.nextElementSibling
+      if (!cap || cap.hidden || !next) return true
+      return cap.getBoundingClientRect().left >= next.getBoundingClientRect().right - 0.5
+    }),
+  )
+  expect(clear).toBe(true)
+})
+
+test('a label longer than the cap ends in an ellipsis, whole in its title', async ({ page }) => {
+  await open(page, 'skin=console&time=long&g=0')
+  const seen = await labels(page)
+  expect(seen.length).toBeGreaterThan(1)
+  for (const l of seen) {
+    expect(l, l.text).toMatchObject({ cut: true, inGroup: true, clear: true })
+    expect(l.title).toContain('Weekly review of the dashboard')
+  }
+})
+
+test('down a side rail, a long label stays within the rail', async ({ page }) => {
+  await open(page, 'skin=console&one=1&time=range&g=0&rail=left')
+  const fits = await page.evaluate(() => {
+    const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+    return rail.scrollWidth <= rail.clientWidth + 1
+  })
+  expect(fits).toBe(true)
+  for (const l of await labels(page)) expect(l.inGroup).toBe(true)
+})

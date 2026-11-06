@@ -2339,3 +2339,27 @@ describe('plugin-thumbnails — live display switch (setDisplay)', () => {
     expect(bar.hidden).toBe(false)
   })
 })
+
+describe('plugin-thumbnails — long labels', () => {
+  it('a flat group label and a timeline label carry their whole text in a title', () => {
+    const label = '10:49 – 10:50 am'
+    const flat = createViewer({
+      collection: collection(),
+      plugins: [thumbnails({ groupDisplay: 'flat', timeline: () => label })],
+    })
+    mount(flat)
+    flat.open()
+    const cap = document.querySelector('.gallerist-thumb-group-cap') as HTMLElement
+    expect(cap.textContent).toBe(label)
+    expect(cap.title).toBe(label)
+    flat.destroy()
+    document.body.innerHTML = ''
+    const stacked = createViewer({
+      collection: collection(),
+      plugins: [thumbnails({ timeline: () => label })],
+    })
+    mount(stacked)
+    stacked.open()
+    expect((document.querySelector('.gallerist-thumb-time') as HTMLElement).title).toBe(label)
+  })
+})
