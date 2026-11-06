@@ -84,6 +84,9 @@
        hairline that reads on a light band all but disappears on a dark one) */
     --gallerist-divider: var(--gallerist-hairline);
     --gallerist-rail-fade: 40px; /* how far a rail's end fades where it has more beyond it */
+    /* item clusters (thumbnails `cluster`): the gap inside one, and between two */
+    --gallerist-cluster-inner: 2px;
+    --gallerist-cluster-gap: 8px;
 
     /* hover: unchanged unless a skin sets one */
     --gallerist-arrow-hover-bg: var(--gallerist-arrow-bg);
@@ -720,10 +723,6 @@
 .gallerist-thumbs[data-timeline] {
   align-items: flex-start;
 }
-.gallerist-thumbs[data-timeline] .gallerist-thumb-wrap {
-  flex-direction: column;
-  gap: 6px;
-}
 .gallerist-thumb-time {
   position: relative;
   display: flex;
@@ -840,6 +839,8 @@
   position: relative;
   flex: 0 0 auto;
   display: flex;
+  flex-direction: column; /* a label over the card, a host's meta under it (the caret floats) */
+  gap: 6px;
 }
 .gallerist-thumb-expand {
   position: absolute;
@@ -878,8 +879,11 @@
   justify-content: flex-end; /* the item rows line up, labelled or not */
   gap: 6px;
 }
-/* the divider: the same room on both sides of it (the rail's gap, then this padding) */
-.gallerist-thumb-group + .gallerist-thumb-group {
+/* the divider: the same room on both sides of it (the rail's gap, then this padding); a marker
+   between two groups has one on each side */
+.gallerist-thumbs[data-display="flat"]
+  > :is(.gallerist-thumb-group, .gallerist-rail-marker)
+  + :is(.gallerist-thumb-group, .gallerist-rail-marker) {
   padding-inline-start: 12px;
   border-inline-start: 1px solid var(--gallerist-divider);
 }
@@ -897,7 +901,7 @@
 .gallerist-thumbs[data-timeline] .gallerist-thumb-group-cap {
   font-family: var(--gallerist-mono);
 }
-.gallerist-thumb-group[data-active] > .gallerist-thumb-group-cap {
+.gallerist-thumb-group[data-active] .gallerist-thumb-group-cap {
   color: var(--gallerist-accent);
 }
 .gallerist-thumb-group-row {
@@ -918,13 +922,149 @@
   align-items: flex-start;
 }
 /* down a side rail a group is the rail's width: a long label ends in an ellipsis there */
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group-cap {
+.gallerist[data-gallerist-orientation="vertical"]
+  :is(.gallerist-thumb-group-cap, .gallerist-thumb-group-head) {
   contain: inline-size;
 }
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group + .gallerist-thumb-group {
+.gallerist[data-gallerist-orientation="vertical"]
+  .gallerist-thumbs[data-display="flat"]
+  > :is(.gallerist-thumb-group, .gallerist-rail-marker)
+  + :is(.gallerist-thumb-group, .gallerist-rail-marker) {
   padding: 12px 0 0;
   border-inline-start: 0;
   border-block-start: 1px solid var(--gallerist-divider);
+}
+
+/* ── host decorations (thumbnails `renderGroupMeta`, `renderItemBadge`, `cluster`, `markers`) ──── */
+/* a group's meta: at the end of its label line (flat: the group widens for it, the label still
+   capped at three card heights), under a stacked card at its width, or at the end of its time label */
+.gallerist-thumb-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font: 500 11px / 14px var(--gallerist-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--gallerist-fg-muted);
+  white-space: nowrap;
+}
+.gallerist-thumb-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 14px;
+}
+.gallerist-thumb-group-head[hidden] {
+  display: none;
+}
+:is(.gallerist-thumb-group-head, .gallerist-thumb-time) > .gallerist-thumb-meta {
+  flex: none;
+  margin-inline-start: auto;
+}
+.gallerist-thumb-wrap > .gallerist-thumb-meta {
+  box-sizing: border-box;
+  width: calc(var(--gallerist-thumb-h) * 1.4);
+  min-height: 14px;
+}
+/* an item's badge: the top end corner (a number from `numberItems` has the start) */
+.gallerist-thumb-badge {
+  position: absolute;
+  top: 3px;
+  inset-inline-end: 3px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: 2px;
+  background: var(--gallerist-badge-bg);
+  color: var(--gallerist-fg);
+  font: 600 9px / 14px var(--gallerist-mono);
+  pointer-events: none;
+}
+.gallerist-thumb-badge svg {
+  width: 10px;
+  height: 10px;
+}
+/* clusters: close inside one, a wider gap where a new one starts (the rows' gap is 6px) */
+.gallerist-thumb-item[data-cluster="in"] {
+  --_cluster: calc(var(--gallerist-cluster-inner) - 6px);
+}
+.gallerist-thumb-item[data-cluster="start"] {
+  --_cluster: calc(var(--gallerist-cluster-gap) - 6px);
+}
+.gallerist-thumb-item[data-cluster]:not(:first-child) {
+  margin-inline-start: var(--_cluster);
+}
+:is(
+    .gallerist-thumb-items[data-axis="vertical"],
+    .gallerist-thumb-peek:not([data-axis="horizontal"]),
+    .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-group-row,
+    .gallerist[data-gallerist-orientation="vertical"] .gallerist-thumb-items
+  )
+  > .gallerist-thumb-item[data-cluster]:not(:first-child) {
+  margin-inline-start: 0;
+  margin-block-start: var(--_cluster);
+}
+/* a marker between groups (not an item): a dashed box the height of the rail's cards, under a
+   label line like a group's */
+.gallerist-rail-marker {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* flat: in line with the item rows */
+  gap: 6px;
+  -webkit-touch-callout: none; /* a long press shows its tip, not the system menu */
+}
+.gallerist-rail-marker-cap {
+  height: 14px;
+  font: 500 11px / 14px var(--gallerist-font);
+  color: var(--gallerist-fg-muted);
+  white-space: nowrap;
+}
+.gallerist-rail-marker-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  min-width: calc(var(--gallerist-thumb-h) * 0.8);
+  height: calc(var(--gallerist-thumb-h) * 0.7 + 4px);
+  padding: 0 10px;
+  border: 1px dashed var(--gallerist-fg-muted);
+  border-radius: var(--gallerist-thumb-radius);
+  color: var(--gallerist-fg-muted);
+  font: 500 11px / 1.2 var(--gallerist-mono);
+  white-space: nowrap;
+}
+/* stacked: the cards' height, under the time labels' line */
+.gallerist-thumbs:not([data-display]) > .gallerist-rail-marker {
+  justify-content: flex-start;
+}
+.gallerist-thumbs:not([data-display]) .gallerist-rail-marker-body {
+  height: calc(var(--gallerist-thumb-h) + 4px);
+}
+/* down a side rail: a short box across the rail */
+.gallerist[data-gallerist-orientation="vertical"] .gallerist-rail-marker-body {
+  height: 32px;
+}
+/* a marker's tip (hover, long press): in the rail's region, which doesn't clip */
+.gallerist-rail-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 8;
+  box-sizing: border-box;
+  max-width: min(280px, 80vw);
+  padding: 8px 10px;
+  border-radius: var(--gallerist-radius);
+  background: var(--gallerist-flyout-bg);
+  color: var(--gallerist-fg);
+  box-shadow: var(--gallerist-shadow);
+  backdrop-filter: var(--gallerist-blur);
+  font: 12px / 1.4 var(--gallerist-font);
+  pointer-events: none;
 }
 
 /* ── chrome buttons (one look for bar tools, arrows, item navigator, plugin buttons) ───────── */
@@ -1022,10 +1162,21 @@
 .gallerist-bar:has(.gallerist-zoom-tool) > .gallerist-zoom-reset {
   display: none;
 }
-/* a narrow screen keeps − and + (a pinch zooms there, a double tap fits) */
+/* a narrow screen keeps − and + (a pinch zooms there, a double tap fits), where it keeps the tool */
 @media (max-width: 600px) {
   .gallerist-bar .gallerist-zoom-level {
     display: none;
+  }
+}
+/* A phone (600px wide or less) leaves the zoom tool and fullscreen out of the bar: a pinch or a
+   double tap zooms, and the viewer fills the screen already. A page keeps them by setting
+   --gallerist-phone-zoom: flex and --gallerist-phone-fullscreen: grid (their own display). */
+@media (max-width: 600px) {
+  .gallerist-bar .gallerist-zoom-tool {
+    display: var(--gallerist-phone-zoom, none);
+  }
+  .gallerist-bar .gallerist-fullscreen-btn:not([hidden]) {
+    display: var(--gallerist-phone-fullscreen, none);
   }
 }
 
