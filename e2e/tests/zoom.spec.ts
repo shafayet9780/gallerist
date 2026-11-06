@@ -147,8 +147,16 @@ for (const scheme of ['dark', 'light']) {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
 
-  test('− and + stay (the percentage goes), and every tool can be reached', async ({ page }) => {
+  test('the tool leaves the bar (a pinch zooms), and the page can keep it', async ({ page }) => {
     await open(page, `${REVIEWER}&view=1`)
+    await expect(page.locator('.gallerist-zoom-tool')).toBeHidden()
+  })
+
+  test('kept: − and + stay (the percentage goes), and every tool can be reached', async ({
+    page,
+  }) => {
+    await open(page, `${REVIEWER}&view=1`)
+    await page.addStyleTag({ content: '.gallerist { --gallerist-phone-zoom: flex }' })
     await expect(level(page)).toBeHidden()
     await expect(out(page)).toBeVisible()
     await expect(into(page)).toBeVisible()

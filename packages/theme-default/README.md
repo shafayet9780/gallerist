@@ -33,6 +33,13 @@ skin (`gallery.css`) and the plugin add-ons (`grid.css` for plugin-grid, `pins.c
 plugin-pins). To build a skin from scratch, import `base.css` plus the add-ons for the plugins you
 use, then your own tokens.
 
+On a phone (600px wide or less) the bar leaves out the zoom tool (`@gallerist/plugin-zoom`) and
+fullscreen (`@gallerist/plugin-fullscreen`): a pinch or a double tap zooms, and the viewer already
+fills the screen. Keep them with `--gallerist-phone-zoom: flex` and `--gallerist-phone-fullscreen:
+grid` on `.gallerist` (each tool's own display; there the zoom tool shows − and + only). The rail's
+item clusters (`thumbnails({ cluster })`) use `--gallerist-cluster-inner` (2px) inside a cluster and
+`--gallerist-cluster-gap` (8px) between two.
+
 Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 
 ## License

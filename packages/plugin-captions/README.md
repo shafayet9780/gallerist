@@ -79,6 +79,29 @@ inside it. Style your node with your own classes; the theme's caption tokens
   know about the item in `alt`.
 - Controls inside your node are reachable with Tab like any other viewer control.
 
+## A popover from the caption
+
+A control in your caption that opens a popover (notes for the current item, say) should put the
+popover in the **viewer root** (`button.closest('.gallerist')`, which is positioned), not inside the
+caption: the caption band scrolls when its content is taller than its room, and a scroller clips
+whatever is inside it, so a popover kept there is cut off where it rises over the stage. In the
+root, with `position: absolute` and a `z-index` of 10 or more, it shows over the stage, the rail and
+the bar; set its `bottom` / `inset-inline-end` from the button's `getBoundingClientRect()` against
+the root's (on a phone, `inset: auto 0 0` makes it a bottom sheet). It is still inside the viewer, so
+Tab reaches it and the dialog's focus trap keeps it.
+
+- **Escape**: handle it on the popover, close the popover, return focus to its button and call
+  `preventDefault()`. The viewer leaves a key that was already taken, so it stays open; the next
+  Escape closes it.
+- **Typing**: the viewer's keys do nothing in a text field inside it (`input`, `textarea`, `select`,
+  contenteditable), so a note box takes ←, →, Home, End, digits and letters as text.
+- **A key that opens it** (a plugin `keymap`, `n`): call `preventDefault()` in the handler when it
+  moves focus into a field, or the field gets the letter.
+- Close it when the viewer closes (`viewer.subscribe`, `phase === 'closed'`) and before the caption
+  renders again (`refresh()`, a new item), which replaces your button.
+
+The e2e fixture `e2e/app/hooks.ts` builds one.
+
 ## React
 
 In React, use `<Gallerist.Caption>` from `@gallerist/react`; it renders JSX into the same region.

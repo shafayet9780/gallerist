@@ -7,7 +7,9 @@ import { viewerSettled } from './settled'
 // (a browser leaves one 32px or more in view where it is) stops that far short of the strip's edge.
 // Each tool is reached from the keyboard, on and then back (on a phone the strip scrolls under it
 // both ways), in every skin, both schemes, on a desktop and 390px and 320px phones, with the most
-// tools the fixture has (grid, rail toggle, fullscreen, save, View), and in RTL.
+// tools the fixture has (grid, rail toggle, fullscreen, save, View), and in RTL. A phone leaves
+// fullscreen out of the bar by default; these runs keep it (--gallerist-phone-fullscreen), so the
+// strip still has the most tools to scroll through.
 
 const VIEWPORTS = {
   desktop: { viewport: { width: 1280, height: 800 } },
@@ -98,6 +100,7 @@ for (const [size, ctx] of Object.entries(VIEWPORTS)) {
           let scrolled = false
           for (const [look, query] of Object.entries(LOOKS)) {
             await page.goto(`/layout.html?skin=${skin}&scheme=${scheme}&${query}`)
+            await page.addStyleTag({ content: '.gallerist { --gallerist-phone-fullscreen: grid }' })
             await viewerSettled(page)
             const labels = await tools(page)
             expect(labels.length, `${look}: tools in the strip`).toBeGreaterThanOrEqual(4)
