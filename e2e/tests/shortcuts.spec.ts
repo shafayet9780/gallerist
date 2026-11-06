@@ -99,10 +99,15 @@ test('Tab stays in the dialog', async ({ page }) => {
   await open(page)
   await help(page)
   const close = page.getByRole('button', { name: 'Esc to close' })
+  const body = page.getByRole('region', { name: 'Keyboard shortcuts' })
   await page.keyboard.press('Tab')
   await expect(close).toBeFocused()
   await page.keyboard.press('Tab')
+  await expect(body).toBeFocused() // the list, so the keys can scroll it
+  await page.keyboard.press('Tab')
   await expect(close).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(body).toBeFocused()
   await page.keyboard.press('Shift+Tab')
   await expect(close).toBeFocused()
   await page.keyboard.press('Enter')
@@ -226,4 +231,45 @@ test.describe('on a 390px phone', () => {
     await expect(sheet).toBeHidden()
     await expect(root(page)).toHaveAttribute('data-gallerist-phase', 'open')
   })
+})
+
+// A viewer too short for the list: the dialog keeps inside it and its list scrolls (by the wheel,
+// and by the keys once Tab has focused it), the last row reachable.
+const scrollsToTheEnd = async (page: Page, overflows = true) => {
+  const dialog = page.locator('.gallerist-shortcuts')
+  const viewer = await root(page).boundingBox()
+  const box = await dialog.boundingBox()
+  if (!viewer || !box) throw new Error('no box')
+  expect(box.y).toBeGreaterThanOrEqual(viewer.y - 1)
+  expect(box.y + box.height).toBeLessThanOrEqual(viewer.y + viewer.height + 1)
+  const body = page.locator('.gallerist-shortcuts-body')
+  expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight + 10)).toBe(overflows)
+  await body.focus()
+  await page.keyboard.press('End')
+  await expect
+    .poll(() => body.evaluate((el) => Math.ceil(el.scrollTop + el.clientHeight) >= el.scrollHeight))
+    .toBe(true)
+  await expect(page.locator('.gallerist-shortcuts-row').last()).toBeInViewport()
+}
+
+test('a 360px inline viewer: the list stays inside it and scrolls to its end', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await open(page, `${REVIEWER}&inline=360`)
+  await expect(root(page)).toHaveAttribute('data-gallerist-mode', 'inline')
+  await help(page)
+  await scrollsToTheEnd(page)
+})
+
+test('a 390×667 phone opened from the host: the sheet fits inside the viewer, its end in view', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 667 })
+  await open(page)
+  const opened = await page.evaluate(() =>
+    (
+      window as unknown as { shortcutsPlugin: { open(keys?: boolean): boolean } }
+    ).shortcutsPlugin.open(true),
+  )
+  expect(opened).toBe(true)
+  await scrollsToTheEnd(page, false)
 })

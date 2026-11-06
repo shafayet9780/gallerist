@@ -126,6 +126,13 @@ const customCaption: Plugin[] = customMode
     ]
   : []
 
+// shortcuts=1: the shortcut list on ?, with one host entry (and its gesture); `open()` for a spec
+const shortcutsPlugin = shortcuts({
+  shortcuts: [{ keys: ['N'], label: 'Add a note', gesture: 'Long press' }],
+})
+;(window as unknown as { shortcutsPlugin: typeof shortcutsPlugin }).shortcutsPlugin =
+  shortcutsPlugin
+
 if (p.get('dir') === 'rtl') document.documentElement.dir = 'rtl'
 const rail = (p.get('rail') ?? undefined) as RailPlacement | undefined
 const viewer = createViewer({
@@ -160,18 +167,21 @@ const viewer = createViewer({
                 }),
               ]
             : []),
-          // shortcuts=1: the shortcut list on ?, with one host entry (and its gesture)
-          ...(p.get('shortcuts') === '1'
-            ? [
-                shortcuts({
-                  shortcuts: [{ keys: ['N'], label: 'Add a note', gesture: 'Long press' }],
-                }),
-              ]
-            : []),
+          ...(p.get('shortcuts') === '1' ? [shortcutsPlugin] : []),
         ],
 })
 ;(window as unknown as { viewChanges: ViewChange[] }).viewChanges = []
+// inline=N: an inline viewer N px tall, in the page (a host's section), instead of the overlay
+const inline = Number(p.get('inline')) || 0
+let container: HTMLElement | undefined
+if (inline) {
+  container = document.createElement('section')
+  container.className = 'fixture-host'
+  container.style.cssText = `position: relative; height: ${inline}px; margin: 40px 0`
+  document.body.append(container)
+}
 mount(viewer, {
+  container,
   preset: (p.get('preset') ?? undefined) as PresetName | undefined,
   arrows: (p.get('arrows') ?? undefined) as ArrowLayout | undefined,
   rail,

@@ -35,7 +35,7 @@ export interface ShortcutsStrings {
   title: string
   /** the dialog's title with the gestures (and the View menu's row on a touch screen) */
   gestures: string
-  /** the close button's text after the Esc key cap ("Esc to close"), and its name with gestures */
+  /** the close button's text, `{key}` where the Esc key cap goes ("{key} to close") */
   toClose: string
   close: string
   /** section titles */
@@ -82,7 +82,7 @@ export interface ShortcutsStrings {
 export const DEFAULT_SHORTCUTS_STRINGS: ShortcutsStrings = {
   title: 'Keyboard shortcuts',
   gestures: 'Gestures',
-  toClose: 'to close',
+  toClose: '{key} to close',
   close: 'Close',
   move: 'Move',
   zoom: 'Zoom',
@@ -164,6 +164,9 @@ const el = <K extends keyof HTMLElementTagNameMap>(
   return node
 }
 const cap = (k: string) => (k.length === 1 ? k.toUpperCase() : k)
+// `?` typed with AltGr (Ctrl + Alt on Windows) is still `?`; another chord is the browser's
+const chord = (e: KeyboardEvent) =>
+  (e.ctrlKey || e.metaKey || e.altKey) && !e.getModifierState?.('AltGraph')
 
 export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
   const t: ShortcutsStrings = { ...DEFAULT_SHORTCUTS_STRINGS, ...opts.strings }
@@ -201,6 +204,10 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
         plugins.find((p) => p.name === 'thumbnails') as { display?: string } | undefined
       )?.display
 
+      // zooming, while an item can zoom (an image)
+      const zoom = viewer
+        .getCollection()
+        .groups.some((g) => g.items.some((i) => i.type === 'image'))
       let sections: Array<[string, Row[]]>
       if (keys) {
         const move: Row[] = grouped
@@ -230,11 +237,13 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
           [t.move, move],
           [
             t.zoom,
-            [
-              [t.zoomIn, ['+']],
-              [t.zoomOut, ['−']],
-              [t.fit, ['0']],
-            ],
+            zoom
+              ? [
+                  [t.zoomIn, ['+']],
+                  [t.zoomOut, ['−']],
+                  [t.fit, ['0']],
+                ]
+              : [],
           ],
           [t.viewer, tools.flatMap(([label, k]) => (k ? [[label, [cap(k)]] as Row] : []))],
         ]
@@ -245,8 +254,7 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
             [
               [grouped ? t.prevNextGroup : t.prevNext, t.swipe],
               ...(grouped ? [[t.nextItem, t.swipeUp] as Row] : []),
-              [t.zoom, t.pinch],
-              [t.pan, t.drag],
+              ...(zoom ? [[t.zoom, t.pinch] as Row, [t.pan, t.drag] as Row] : []),
               ...(overlay ? [[t.exit, t.swipeDown] as Row] : []),
             ],
           ],
@@ -282,9 +290,10 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
     // tool's and the page's never see it. Escape and ? close; Tab stays in the dialog.
     const onKey = (e: KeyboardEvent) => {
       const r = root()
-      if (!scrim || !r || !e.composedPath().includes(r)) return
+      if (!scrim?.isConnected) return close() // the viewer went away with it open
+      if (!r || !e.composedPath().includes(r)) return
       e.stopPropagation()
-      if (e.key === 'Escape' || (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey)) {
+      if (e.key === 'Escape' || (e.key === '?' && !chord(e))) {
         e.preventDefault()
         close(true)
       } else if (e.key === 'Tab') {
@@ -308,6 +317,7 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
     }
     // A press on the page outside the viewer closes it, leaving focus where the press puts it (a
     // press on the scrim closes it too, with focus back where it was: see open()).
+    // (A viewer gone with it open is outside too: its listeners go with the next press or key.)
     const onPress = (e: Event) => {
       if (!e.composedPath().includes(root() as EventTarget)) close()
     }
@@ -330,13 +340,19 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
       title.id = id
       const x = head.appendChild(el('button', 'gallerist-shortcuts-close'))
       x.type = 'button'
-      if (keys) x.append(el('kbd', '', t.esc), ` ${t.toClose}`)
-      else {
+      if (keys) {
+        const [before, after] = t.toClose.split('{key}')
+        x.append(before as string, el('kbd', '', t.esc), after ?? '')
+      } else {
         x.innerHTML = X
         x.setAttribute('aria-label', t.close)
       }
       x.addEventListener('click', () => close(true))
+      // the list scrolls when the viewer is short: a stop for the keys, so they can scroll it
       const body = el('div', 'gallerist-shortcuts-body')
+      body.tabIndex = 0
+      body.setAttribute('role', 'region')
+      body.setAttribute('aria-labelledby', id)
       for (const [name, list] of rows(keys)) {
         const section = body.appendChild(el('section'))
         if (name) section.appendChild(el('h3', '', name))

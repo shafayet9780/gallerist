@@ -96,14 +96,73 @@ describe('plugin-zoom', () => {
     expect(disabled(out)).toBe(true)
   })
 
-  it('a video can’t zoom: − and + stay unavailable, and its keys do nothing', async () => {
+  it('a video can’t zoom: − and + stay unavailable, and its keys do nothing but go on to the page', async () => {
     const { v, root, into } = await open()
     v.nextItem()
     loaded(v, 'v')
     expect(disabled(into)).toBe(true)
     into.click()
+    const above: string[] = []
+    document.addEventListener('keydown', (e) => above.push(e.key))
     key(root, '+')
+    expect(v.getState().zoom.scale).toBe(1) // nor the renderer's step
+    expect(above).toEqual(['+'])
+  })
+
+  it('leaves the keys to a dialog or menu in the viewer, a slider-like widget, a shadow root’s field', async () => {
+    const { v, root } = await open()
+    loaded(v, 'a')
+    const host = (role: string) => {
+      const box = root.appendChild(document.createElement('div'))
+      box.setAttribute('role', role)
+      const inner = box.appendChild(document.createElement('button'))
+      return inner
+    }
+    for (const role of ['dialog', 'menu', 'spinbutton', 'slider', 'tree', 'grid']) {
+      const el = host(role)
+      let reached = false
+      el.addEventListener('keydown', (e) => {
+        reached = true
+        e.preventDefault() // the widget's own step
+      })
+      key(el, '-')
+      key(el, '+')
+      expect(reached, role).toBe(true)
+      expect(v.getState().zoom.scale, role).toBe(1)
+    }
+    const shadowHost = root.appendChild(document.createElement('div'))
+    const field = shadowHost
+      .attachShadow({ mode: 'open' })
+      .appendChild(document.createElement('input'))
+    field.dispatchEvent(
+      new KeyboardEvent('keydown', { key: '+', bubbles: true, composed: true, cancelable: true }),
+    )
     expect(v.getState().zoom.scale).toBe(1)
+    // the viewer's own root is a dialog (an overlay): its keys are still the tool's
+    key(root, '+')
+    expect(v.getState().zoom.scale).toBe(1.5)
+  })
+
+  it('brings stops outside the renderer’s range into it, so + and − never do nothing', async () => {
+    const { v, into, out } = await open({ stops: [0.5, 1, 2, 8] })
+    loaded(v, 'a')
+    expect(disabled(out)).toBe(true) // at fit, the range's start
+    into.click()
+    into.click()
+    expect(v.getState().zoom.scale).toBe(4) // 8 → 400%
+    expect(disabled(into)).toBe(true)
+  })
+
+  it('says the zoom it takes in the viewer’s live region', async () => {
+    const { v, root, into, level } = await open()
+    loaded(v, 'a')
+    const live = root.querySelector('.gallerist-live') as HTMLElement
+    into.click()
+    expect(live.textContent).toBe('150%')
+    key(root, '+')
+    expect(live.textContent).toBe('200%')
+    level.click()
+    expect(live.textContent).toBe('100%')
   })
 
   it('a failed load is unavailable too', async () => {

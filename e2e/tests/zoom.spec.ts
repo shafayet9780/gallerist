@@ -195,3 +195,63 @@ test('right to left: the group mirrors with the bar', async ({ page }) => {
   await into(page).click()
   await expect(level(page)).toHaveText('150%')
 })
+
+test('the keys are the View popover’s while it is open: - and 0 don’t zoom behind it', async ({
+  page,
+}) => {
+  await open(page, `${REVIEWER}&view=1`)
+  await page.locator('.gallerist').focus()
+  await page.keyboard.press('+')
+  expect(await scale(page)).toBe(1.5)
+  await page.locator('.gallerist-view-btn').click()
+  const menu = page.getByRole('dialog', { name: 'View', exact: true })
+  await expect(menu).toBeVisible()
+  await page.getByRole('radio', { checked: true }).first().focus()
+  for (const key of ['-', '0', '+']) await page.keyboard.press(key)
+  expect(await scale(page)).toBe(1.5)
+  await expect(menu).toBeVisible()
+})
+
+test('a host slider in the viewer keeps its own + and -', async ({ page }) => {
+  await open(page)
+  await page.evaluate(() => {
+    const slider = document.createElement('div')
+    slider.setAttribute('role', 'slider')
+    slider.tabIndex = 0
+    slider.className = 'host-slider'
+    slider.dataset.value = '5'
+    slider.addEventListener('keydown', (e) => {
+      if (e.key !== '+' && e.key !== '-') return
+      slider.dataset.value = String(Number(slider.dataset.value) + (e.key === '+' ? 1 : -1))
+      e.preventDefault()
+    })
+    document.querySelector('.gallerist')?.append(slider)
+  })
+  await page.locator('.host-slider').focus()
+  await page.keyboard.press('+')
+  await page.keyboard.press('+')
+  await expect(page.locator('.host-slider')).toHaveAttribute('data-value', '7')
+  expect(await scale(page)).toBe(1)
+})
+
+test('with the tool hidden, the renderer’s reset shows while zoomed', async ({ page }) => {
+  await open(page)
+  await page.locator('.gallerist-zoom-tool').evaluate((el) => {
+    ;(el as HTMLElement).hidden = true
+  })
+  await page.locator('.gallerist').focus()
+  await page.keyboard.press('+')
+  await expect(page.locator('.gallerist-zoom-reset')).toBeVisible()
+})
+
+test.describe('on a phone, zoomed', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
+
+  test('the renderer’s reset shows (the tool and its percentage are out of the bar)', async ({
+    page,
+  }) => {
+    await open(page, `${REVIEWER}&zoom=2`)
+    await expect(page.locator('.gallerist-zoom-tool')).toBeHidden()
+    await expect(page.locator('.gallerist-zoom-reset')).toBeVisible()
+  })
+})

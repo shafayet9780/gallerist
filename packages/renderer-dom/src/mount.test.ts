@@ -1934,6 +1934,37 @@ describe('mount — modal accessibility (WS-3)', () => {
     expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
   })
 
+  it('a field inside a shadow root keeps its keys too (the event’s first target, not its host)', () => {
+    const v = createViewer({ collection: collection() })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const host = root.appendChild(document.createElement('div'))
+    const input = host.attachShadow({ mode: 'open' }).appendChild(document.createElement('input'))
+    const before = { ...v.getState().cursor }
+    for (const k of ['ArrowRight', 'End', 't', '2'])
+      input.dispatchEvent(key({ key: k, cancelable: true, composed: true }))
+    expect(v.getState().cursor).toEqual(before)
+    expect(root.getAttribute('data-gallerist-rail')).toBe('expanded')
+  })
+
+  it('a plugin key typed with AltGr (Ctrl + Alt on Windows) is still that key; another chord is not', () => {
+    const hit = vi.fn()
+    const v = createViewer({
+      collection: collection(),
+      plugins: [() => ({ name: 'help', keymap: { '?': hit } })],
+    })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    root.dispatchEvent(key({ key: '?', ctrlKey: true, cancelable: true }))
+    expect(hit).not.toHaveBeenCalled()
+    const altGr = key({ key: '?', ctrlKey: true, altKey: true, cancelable: true })
+    Object.defineProperty(altGr, 'getModifierState', { value: (m: string) => m === 'AltGraph' })
+    root.dispatchEvent(altGr)
+    expect(hit).toHaveBeenCalledTimes(1)
+  })
+
   it('describes the viewer with the caption (aria-describedby)', () => {
     const v = createViewer({
       collection: {

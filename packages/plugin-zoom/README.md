@@ -45,13 +45,15 @@ unavailable at fit, where there's nothing to reset. Unavailable buttons are `ari
 a press reaches the end of the range.
 
 The renderer's own zoom-reset button (shown in the bar while the image is zoomed) is left out while
-this tool is in the bar: the percentage does the same. Without the plugin it works as before.
+this tool shows in the bar: the percentage does the same. A tool given `hidden`, or left out on a
+phone, leaves the reset where it was; without the plugin it works as before. A zoom from the tool or
+its keys is announced in the viewer's live region (`150%`); a pinch or a wheel only shows it.
 
 ## Options
 
 | Option | Default | |
 |---|---|---|
-| `stops` | `[1, 1.5, 2, 3, 4]` | the zoom levels − and + step through, as scales (1 = fit); the first and last are the ends of the range |
+| `stops` | `[1, 1.5, 2, 3, 4]` | the zoom levels − and + step through, as scales (1 = fit); the first and last are the ends of the range. The DOM renderer zooms from fit to 400%: a stop outside that range is brought into it |
 | `zoomable(item)` | `item.type === 'image'` | whether an item can zoom once it has loaded (a custom adapter's media that zooms) |
 | `keys` | `true` | `+` / `=`, `-` and `0` step through the stops; `false` leaves them to the renderer |
 | `strings` | English | the labels, for translation; defaults in `DEFAULT_ZOOM_STRINGS`: `zoom` (the group), `zoomIn`, `zoomOut`, `reset(percent)` (the percentage button's name, which includes the percentage it shows), `percent(scale)` (how a zoom reads, `125%`) |
@@ -74,7 +76,12 @@ committed until it ends, so while one moves the plugin reads the transform the r
 current slide (`.gallerist-content[data-gallerist-current]`), through a `MutationObserver` on the
 viewer's root that only looks at `style` changes. The keys are a capture-phase `keydown` listener on
 the viewer's root; it stops the keys it takes (`+`, `=`, `-`, `0`) from reaching the renderer and
-anything above the viewer.
+anything above the viewer. It leaves them alone where they are someone else's: typed in a field
+(`input`, `textarea`, `select`, contenteditable, one in an open shadow root included), inside a
+dialog or menu in the viewer (the View popover, a host's popover), inside a `slider`, `spinbutton`,
+`tree` or `grid`, or with Ctrl, ⌘ or Alt. While the current item can't zoom they do nothing (as the
+tool shows) and go on to the page, marked taken (`preventDefault()`), so the renderer doesn't zoom it
+either.
 
 ## Not in the CDN bundle
 

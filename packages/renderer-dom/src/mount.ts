@@ -181,9 +181,9 @@ function focusableWithin(root: HTMLElement): HTMLElement[] {
   )
 }
 /** True when the key event originates from a control where typing must not be hijacked. */
-function isEditableTarget(target: EventTarget | null): boolean {
+function isEditableTarget(target?: EventTarget | null): boolean {
   const node = target as HTMLElement | null
-  return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName ?? ''))
+  return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName))
 }
 
 /** Longest animation (delay + duration × iterations) in ms from a computed style's comma lists.
@@ -1139,7 +1139,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // A key a handler before ours took (preventDefault: a host popover closing on Escape, a host
     // list walking its own ↑/↓) is not ours. Don't hijack typing inside an embedded control (overlay
     // input/textarea/select/contenteditable); Escape still closes from anywhere (I-UX2).
-    if (e.defaultPrevented || (isEditableTarget(e.target) && e.key !== 'Escape')) return
+    // (A field in an open shadow root counts by itself: the event's first target, not its host.)
+    if (e.defaultPrevented || (isEditableTarget(e.composedPath()[0]) && e.key !== 'Escape')) return
     // A focused caption band scrolls with ↑/↓/Home/End rather than navigating. Scrolled here, not
     // left to the browser: WebKit on Linux (GTK/WPE) leaves the placard's band unscrolled.
     const by =
@@ -1214,8 +1215,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         } else viewer.goTo(viewer.getCollection().groups.length - 1)
         break
       default:
-        // Modified chords (Ctrl/Cmd/Alt) belong to the browser/OS, not our single-letter map.
-        if (e.ctrlKey || e.metaKey || e.altKey) return
+        // Modified chords (Ctrl/Cmd/Alt) belong to the browser/OS, not our single-letter map; a key
+        // typed with AltGr (Ctrl + Alt on Windows: `?` on some layouts) is still that key.
+        if ((e.ctrlKey || e.metaKey || e.altKey) && !e.getModifierState?.('AltGraph')) return
         // Within-group digit jumps are meaningless in linear mode (the pills retire), so skip them.
         if (!linear && /^[1-9]$/.test(e.key)) {
           viewer.goTo(viewer.getState().cursor.g, Number(e.key) - 1)

@@ -33,10 +33,16 @@ skin (`gallery.css`) and the plugin add-ons (`grid.css` for plugin-grid, `pins.c
 plugin-pins). To build a skin from scratch, import `base.css` plus the add-ons for the plugins you
 use, then your own tokens.
 
-On a phone (600px wide or less) the bar leaves out the zoom tool (`@gallerist/plugin-zoom`) and
-fullscreen (`@gallerist/plugin-fullscreen`): a pinch or a double tap zooms, and the viewer already
-fills the screen. Keep them with `--gallerist-phone-zoom: flex` and `--gallerist-phone-fullscreen:
-grid` on `.gallerist` (each tool's own display; there the zoom tool shows − and + only). The rail's
+On a phone (600px wide or less) the bar leaves out the zoom tool (`@gallerist/plugin-zoom`): a
+pinch or a double tap zooms, and the renderer's reset button shows while zoomed. An overlay viewer's
+bar leaves out fullscreen (`@gallerist/plugin-fullscreen`) too, as the overlay already fills the
+screen; an inline viewer keeps it. Keep them with `--gallerist-phone-zoom: flex` and
+`--gallerist-phone-fullscreen: grid` on `.gallerist` (each tool's own display; there the zoom tool
+shows − and + only). A bar whose only tools are these two (and `controls: false`) still shows on a
+phone, empty: leave the plugins out there, or keep the tools with the tokens.
+
+The theme follows `forced-colors: active` (Windows High Contrast): the View popover's chosen segment
+takes the system's selection colours and the focus rings the text colour. The rail's
 item clusters (`thumbnails({ cluster })`) use `--gallerist-cluster-inner` (2px) inside a cluster and
 `--gallerist-cluster-gap` (8px) between two.
 

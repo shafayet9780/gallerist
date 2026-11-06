@@ -152,7 +152,10 @@ describe('strings audit', () => {
   })
 
   it('the shortcut list, keys and gestures, and its View row (plugin-shortcuts, not in this bundle)', () => {
-    const list = shortcuts({ strings: mark(DEFAULT_SHORTCUTS_STRINGS) })
+    // the close text is split at its key cap (`{key}`): each side is marked on its own
+    const list = shortcuts({
+      strings: { ...mark(DEFAULT_SHORTCUTS_STRINGS), toClose: '⟦close with⟧ {key} ⟦to close⟧' },
+    })
     const v = createViewer({
       collection: collection(),
       plugins: [

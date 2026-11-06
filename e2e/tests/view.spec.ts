@@ -384,3 +384,21 @@ test.describe('on a 320px phone', () => {
     })
   }
 })
+
+test('forced colours: the checked segment takes the system selection colours', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'forced colours are emulated in Chromium only')
+  await page.emulateMedia({ forcedColors: 'active' })
+  await open(page)
+  await tool(page).click()
+  await expect(menu(page)).toBeVisible()
+  const look = await page.evaluate(() => {
+    const on = document.querySelector('.gallerist-view-item[aria-checked="true"]') as HTMLElement
+    const off = document.querySelector('.gallerist-view-item[aria-checked="false"]') as HTMLElement
+    return [getComputedStyle(on).backgroundColor, getComputedStyle(off).backgroundColor]
+  })
+  expect(look[0]).not.toBe(look[1])
+  expect(look[0]).not.toBe('rgba(0, 0, 0, 0)')
+})

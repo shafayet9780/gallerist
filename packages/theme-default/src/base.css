@@ -371,9 +371,10 @@
   pointer-events: auto;
 }
 .gallerist-region-toolbar {
+  --_gap: 6px; /* between tools: ::before and ::after cancel it */
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--_gap);
   /* a scroller clips at its padding box, both ways: room for a focused tool's ring (2px + 2px
      offset; +1px at the ends, where Chromium rounds an RTL scroll range down), given back by the
      margin so nothing moves. A tool focus scrolls in stops as far in. The end's room is ::after. */
@@ -394,7 +395,7 @@
    tools after this auto margin (0 once they overflow; the gap after it cancelled) */
 .gallerist-region-toolbar::before {
   content: "";
-  margin-inline: auto -6px;
+  margin-inline: auto calc(-1 * var(--_gap));
 }
 /* the room after the last tool, as a box: WebKit leaves a flex scroller's end padding out of its
    scroll range */
@@ -402,7 +403,7 @@
   content: "";
   flex: none;
   width: 5px;
-  margin-inline-start: -6px;
+  margin-inline-start: calc(-1 * var(--_gap));
 }
 /* no tools, or (where :has() works) none shown: no room either, so nothing else moves */
 .gallerist-region-toolbar:empty {
@@ -908,8 +909,10 @@
 }
 /* the divider: the same room on both sides of it (the rail's gap, then this padding); a marker
    between two groups has one on each side */
-.gallerist-thumbs[data-display="flat"]
-  > :is(.gallerist-thumb-group, .gallerist-rail-marker)
+/* (as specific as 0.3's `.gallerist-thumb-group + .gallerist-thumb-group`, so a page's rule for it
+   still wins) */
+.gallerist-thumbs:where([data-display="flat"])
+  > :where(.gallerist-thumb-group, .gallerist-rail-marker)
   + :is(.gallerist-thumb-group, .gallerist-rail-marker) {
   padding-inline-start: 12px;
   border-inline-start: 1px solid var(--gallerist-divider);
@@ -954,8 +957,8 @@
   contain: inline-size;
 }
 .gallerist[data-gallerist-orientation="vertical"]
-  .gallerist-thumbs[data-display="flat"]
-  > :is(.gallerist-thumb-group, .gallerist-rail-marker)
+  .gallerist-thumbs:where([data-display="flat"])
+  > :where(.gallerist-thumb-group, .gallerist-rail-marker)
   + :is(.gallerist-thumb-group, .gallerist-rail-marker) {
   padding: 12px 0 0;
   border-inline-start: 0;
@@ -1023,6 +1026,10 @@
 }
 .gallerist-thumb-item[data-cluster]:not(:first-child) {
   margin-inline-start: var(--_cluster);
+}
+/* 2px apart, a neighbour would paint over part of a focused thumb's ring */
+.gallerist-thumb-item:focus-visible {
+  z-index: 1;
 }
 :is(
     .gallerist-thumb-items[data-axis="vertical"],
@@ -1188,8 +1195,9 @@
 .gallerist-bar .gallerist-zoom-level[aria-disabled="true"]:hover {
   background: var(--gallerist-tool-bg);
 }
-/* the percentage resets the zoom: the renderer's own reset button would say it twice */
-.gallerist-bar:has(.gallerist-zoom-tool) > .gallerist-zoom-reset {
+/* the percentage resets the zoom: the renderer's own reset button would say it twice (while the
+   tool shows: a hidden one, or one a phone leaves out, leaves the reset where it was) */
+.gallerist-bar:has(.gallerist-zoom-tool:not([hidden])) > .gallerist-zoom-reset {
   display: none;
 }
 /* a narrow screen keeps − and + (a pinch zooms there, a double tap fits), where it keeps the tool */
@@ -1198,14 +1206,19 @@
     display: none;
   }
 }
-/* A phone (600px wide or less) leaves the zoom tool and fullscreen out of the bar: a pinch or a
-   double tap zooms, and the viewer fills the screen already. A page keeps them by setting
-   --gallerist-phone-zoom: flex and --gallerist-phone-fullscreen: grid (their own display). */
+/* A phone (600px wide or less) leaves the zoom tool out of the bar (a pinch or a double tap zooms),
+   and an overlay viewer's fullscreen (it fills the screen already; an inline one keeps it). A page
+   keeps them by setting --gallerist-phone-zoom: flex and --gallerist-phone-fullscreen: grid (their
+   own display). The renderer's reset shows there while zoomed, as without the tool: the percentage,
+   which resets, is the part of the tool a phone never shows. */
 @media (max-width: 600px) {
   .gallerist-bar .gallerist-zoom-tool:not([hidden]) {
     display: var(--gallerist-phone-zoom, none);
   }
-  .gallerist-bar .gallerist-fullscreen-btn:not([hidden]) {
+  .gallerist-bar:has(.gallerist-zoom-tool:not([hidden])) > .gallerist-zoom-reset:not([hidden]) {
+    display: grid;
+  }
+  .gallerist[data-gallerist-mode="overlay"] .gallerist-bar .gallerist-fullscreen-btn:not([hidden]) {
     display: var(--gallerist-phone-fullscreen, none);
   }
 }
@@ -1227,7 +1240,8 @@
   width: max-content;
   max-width: calc(100% - 16px);
   overflow-y: auto;
-  padding: 12px 12px 6px 16px;
+  padding: 12px 12px 6px;
+  padding-inline-start: 16px;
   border: 1px solid var(--gallerist-hairline);
   border-radius: calc(var(--gallerist-radius) + 3px);
   background: var(--gallerist-popover-bg);
@@ -1307,8 +1321,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 0 -6px 0 -10px;
-  padding: 9px 6px 3px 10px;
+  margin: 0;
+  margin-inline: -10px -6px;
+  padding: 9px 6px 3px;
+  padding-inline: 10px 6px;
   border: 0;
   border-block-start: 1px solid var(--gallerist-hairline);
   border-radius: 0 0 5px 5px;
@@ -1350,6 +1366,26 @@
     display: none;
   }
 }
+/* forced colours drop the checked segment's raised surface and shadow: it takes the system's
+   selection colours, and a focus ring the text colour, so focus and the choice still differ */
+@media (forced-colors: active) {
+  .gallerist-view-item[aria-checked="true"] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .gallerist-view-item[aria-checked="true"] .gallerist-view-icon {
+    color: inherit;
+  }
+  :is(
+      .gallerist-view-item,
+      .gallerist-view-foot,
+      .gallerist-shortcuts-close,
+      .gallerist-shortcuts-body
+    ):focus-visible {
+    outline-color: CanvasText;
+  }
+}
 
 /* ── the shortcut list (plugin-shortcuts): a modal dialog over the viewer ────────── */
 /* The plugin puts a scrim over the whole viewer (the rest of it inert) and the dialog in its middle:
@@ -1359,7 +1395,9 @@
   position: absolute;
   inset: 0;
   z-index: 20;
+  /* one cell the scrim's size, so the dialog's max-height holds and its list scrolls */
   display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   padding: 16px;
   background: var(--gallerist-scrim);
@@ -1386,7 +1424,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 12px 12px 20px;
+  padding: 12px;
+  padding-inline-start: 20px;
   border-block-end: 1px solid var(--gallerist-hairline);
 }
 .gallerist-shortcuts-head .gallerist-icon {
@@ -1427,10 +1466,19 @@
 }
 .gallerist-shortcuts-body {
   display: flex;
+  min-height: 0;
   flex-wrap: wrap;
   gap: 4px 28px;
   overflow-y: auto;
   padding: 16px 20px 18px;
+}
+/* the list takes focus (Tab) so the keys can scroll it when the viewer is short */
+.gallerist-shortcuts-body:focus {
+  outline: none;
+}
+.gallerist-shortcuts-body:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: -2px;
 }
 .gallerist-shortcuts-body section {
   flex: 1 1 150px;

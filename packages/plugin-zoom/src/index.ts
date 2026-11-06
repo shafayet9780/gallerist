@@ -36,7 +36,8 @@ export const DEFAULT_ZOOM_STRINGS: ZoomStrings = {
 
 export interface ZoomOptions {
   /** The zoom levels − and + step through, as scales (1 = fit). Default `[1, 1.5, 2, 3, 4]`, the DOM
-   *  renderer's range (fit to 400%); the first and last are the ends of the range. */
+   *  renderer's range (fit to 400%); the first and last are the ends of the range. A stop outside
+   *  that range is brought into it (the renderer can't zoom past it). */
   stops?: readonly number[]
   /** Whether an item can zoom (when it has loaded). Default: images (`type: 'image'`). */
   zoomable?: (item: Item) => boolean
@@ -66,14 +67,23 @@ export function nextStop(stops: readonly number[], scale: number, dir: 1 | -1): 
 }
 
 const SCALE = /scale\(\s*([\d.]+)/
-const editable = (target: EventTarget | null) => {
-  const node = target as HTMLElement | null
-  return !!node && (node.isContentEditable || /^(input|textarea|select)$/i.test(node.tagName ?? ''))
+/** The DOM renderer's zoom range: fit to 400%. */
+const RANGE = [1, 4] as const
+// Where the keys are someone else's: a field, a dialog or menu in the viewer (the View popover), or a
+// widget whose own keys these are. A node inside a shadow root counts by itself (the event's first
+// target). The viewer's root (an overlay is a dialog) and what holds it don't count.
+const OWNED =
+  'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role=dialog],[role=menu],[role=spinbutton],[role=slider],[role=tree],[role=grid]'
+const theirs = (e: KeyboardEvent, root: HTMLElement) => {
+  const at = (e.composedPath()[0] as Element).closest?.(OWNED)
+  return !!at && !at.contains(root)
 }
 
 export function zoom(opts: ZoomOptions = {}): Plugin {
   const t: ZoomStrings = { ...DEFAULT_ZOOM_STRINGS, ...opts.strings }
-  const stops = (opts.stops?.length ? [...opts.stops] : [...DEFAULT_STOPS]).sort((a, b) => a - b)
+  const stops = (opts.stops?.length ? opts.stops : DEFAULT_STOPS)
+    .map((s) => Math.min(RANGE[1], Math.max(RANGE[0], s)))
+    .sort((a, b) => a - b)
   const min = stops[0] ?? 1
   const max = stops[stops.length - 1] ?? 1
   const zoomable = opts.zoomable ?? ((item: Item) => item.type === 'image')
@@ -113,23 +123,35 @@ export function zoom(opts: ZoomOptions = {}): Plugin {
       off(level, s <= 1 + EPS)
     }
 
+    // a zoom from the tool or its keys says its percentage (a pinch or a wheel shows it only)
+    const say = () => {
+      const live = root?.querySelector('.gallerist-live')
+      if (live) live.textContent = t.percent(viewer.getState().zoom.scale)
+    }
     const step = (dir: 1 | -1) => {
       if (!canZoom()) return
       const s = scale()
       const to = nextStop(stops, s, dir)
-      if (to !== s) viewer.zoomTo(to)
+      if (to === s) return
+      viewer.zoomTo(to)
+      say()
     }
     const fit = () => {
-      if (viewer.getState().zoom.scale > 1 + EPS) viewer.resetZoom()
+      if (viewer.getState().zoom.scale <= 1 + EPS) return
+      viewer.resetZoom()
+      say()
     }
 
     // the renderer's zoom keys step by its own factor: take them first (capture on the viewer's
-    // root), unless typing (a field in the viewer keeps them) or a chord (the browser's zoom)
+    // root), unless they're someone else's (typing, a dialog, a slider: OWNED) or a chord (the
+    // browser's zoom). While the item can't zoom they do nothing here, as the tool shows, and go on
+    // to the page (marked taken, so the renderer doesn't zoom it either).
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || editable(e.target)) return
       const dir = e.key === '+' || e.key === '=' ? 1 : e.key === '-' ? -1 : e.key === '0' ? 0 : null
-      if (dir === null) return
+      if (dir === null || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
+      if (theirs(e, e.currentTarget as HTMLElement)) return
       e.preventDefault()
+      if (!canZoom()) return
       e.stopImmediatePropagation()
       if (dir === 0) fit()
       else step(dir)

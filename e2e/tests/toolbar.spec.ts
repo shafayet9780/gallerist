@@ -303,3 +303,19 @@ for (const [size, configs] of Object.entries(GEOMETRY)) {
     })
   })
 }
+
+// A phone leaves fullscreen out of an overlay viewer's bar (it fills the screen already); an inline
+// viewer on a narrow screen keeps it.
+test.describe('fullscreen on a 390px screen', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
+
+  test('an overlay viewer leaves it out; an inline one keeps it', async ({ page }) => {
+    await page.goto('/layout.html?preset=reviewer&skin=console')
+    await expect(page.locator('.gallerist[data-gallerist-phase="open"]')).toBeVisible()
+    await expect(page.locator('.gallerist-fullscreen-btn')).toHaveCount(1)
+    await expect(page.locator('.gallerist-fullscreen-btn')).toBeHidden()
+    await page.goto('/layout.html?preset=reviewer&skin=console&inline=600')
+    await expect(page.locator('.gallerist[data-gallerist-mode="inline"]')).toBeVisible()
+    await expect(page.locator('.gallerist-fullscreen-btn')).toBeVisible()
+  })
+})

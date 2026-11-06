@@ -55,12 +55,16 @@ does nothing:
   collection where every group holds one item. A side rail (`groupAxis: 'vertical'`) turns the axes
   (↑/↓ between groups). Right to left, ← moves forward, and the list shows → ← for previous / next.
 - **Zoom.** `+`, `−`, `0`: the renderer's keys, or [plugin-zoom](../plugin-zoom/README.md)'s stops
-  when it is registered.
+  when it is registered. Only while the collection has an image (an item that can zoom); the gestures
+  leave out pinch and drag the same way.
 - **Viewer.** F for fullscreen ([plugin-fullscreen](../plugin-fullscreen/README.md), where the
   browser can fullscreen an element), T to show or hide the thumbnails (with a rail), E for the
   group's items (a stacked rail), G for the grid, P and C for pins (C with `onPlace`), D (or its
   `key`) to download, `?` for this list, Esc to close (an overlay viewer). A plugin's key shows only
-  while that plugin holds it: a later plugin that took the key hides it.
+  while that plugin holds it: a later plugin that took the key hides it. The renderer reads its own
+  keys first (the arrows, Home/End, `+` `=` `-` `0`, `t`, and 1–9 while items are grouped), so a
+  plugin given one of them (`grid({ key: 't' })`) never gets it and shouldn't be: the list would
+  show it. `?` typed with AltGr (Ctrl + Alt on Windows) counts as `?`.
 - **Your own**, from `shortcuts`: `{ label, keys?, gesture?, section? }`. `keys` are drawn as key
   caps; `section` names a built-in section (its title: `strings.move`, `zoom`, `viewer`) or a new one
   after them; without it the entry joins Viewer. An entry with a `gesture` is listed with the
@@ -75,14 +79,17 @@ close (an overlay viewer); then yours. A note under them says `?` lists the keys
 | Option | Default | |
 |---|---|---|
 | `shortcuts` | — | your own entries, as above |
-| `strings` | English | every label, for translation; defaults in `DEFAULT_SHORTCUTS_STRINGS`, key names (`home`, `end`, `esc`) included |
+| `strings` | English | every label, for translation; defaults in `DEFAULT_SHORTCUTS_STRINGS`, key names (`home`, `end`, `esc`) included. `toClose` is the close button's text, with `{key}` where the Esc key cap goes (`'{key} to close'`; `'Fermer avec {key}'`) |
 
 ## Keyboard, pointer and screen readers
 
 The dialog is `role="dialog"` with `aria-modal="true"`, named by its title ("Keyboard shortcuts", or
 "Gestures"). It sits in the viewer's root over a scrim that covers the viewer, and the rest of the
 viewer is `inert` while it shows (what was inert already stays so). Focus moves to the dialog, so a
-screen reader reads it, and **Tab** stays inside it (its close button). Each section is a heading
+screen reader reads it, and **Tab** stays inside it: its close button, then the list, a region
+named by the title that takes focus so the arrow keys, Page Up/Down and Home/End scroll it when the
+viewer is too short to show it whole (the dialog keeps inside the viewer, an inline one included).
+Each section is a heading
 over a description list: what it does, then its keys.
 
 - **Escape** closes the list, and only the list: the viewer stays open. **`?`** closes it too.
@@ -92,7 +99,8 @@ over a description list: what it does, then its keys.
 - No other key acts while it is open: a `window` listener in the capture phase takes every key
   pressed in the viewer first, so the viewer doesn't move, zoom or close under it, and plugin-zoom's
   keys don't reach the image.
-- It closes when the viewer closes, and when the plugin is disposed.
+- It closes when the viewer closes, and when the plugin is disposed; if the renderer goes away with
+  it open, its listeners go at the next key or press.
 
 ## Look
 

@@ -140,15 +140,61 @@ describe('plugin-shortcuts — opening and closing', () => {
     expect(dialog()).not.toBeNull()
   })
 
-  it('Tab stays in the dialog', () => {
+  it('Tab stays in the dialog: the close button, then the list (which scrolls with the keys)', () => {
     setup()
     root().focus()
     press('?')
     const close = q('.gallerist-shortcuts-close') as HTMLElement
+    const body = q('.gallerist-shortcuts-body') as HTMLElement
+    expect(body.tabIndex).toBe(0)
+    expect(body.getAttribute('role')).toBe('region')
+    expect(body.getAttribute('aria-labelledby')).toBe(q('.gallerist-shortcuts h2')?.id)
     expect(press('Tab', { shiftKey: true }).defaultPrevented).toBe(true) // from the dialog: to the end
+    expect(focused()).toBe(body)
+    expect(press('Tab').defaultPrevented).toBe(true) // past the end: back to the start
     expect(focused()).toBe(close)
-    expect(press('Tab').defaultPrevented).toBe(true) // one stop: it wraps to itself
-    expect(focused()).toBe(close)
+    close.focus()
+    expect(press('Tab', { shiftKey: true }).defaultPrevented).toBe(true) // before the start: the end
+    expect(focused()).toBe(body)
+  })
+
+  it('? typed with AltGr closes it; another chord does not', () => {
+    setup()
+    root().focus()
+    press('?')
+    const altGr = new KeyboardEvent('keydown', {
+      key: '?',
+      ctrlKey: true,
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(altGr, 'getModifierState', { value: (k: string) => k === 'AltGraph' })
+    press('?', { ctrlKey: true })
+    expect(dialog()).not.toBeNull()
+    focused().dispatchEvent(altGr)
+    expect(dialog()).toBeNull()
+  })
+
+  it('lets go of its listeners when the viewer goes away with it open', () => {
+    setup()
+    root().focus()
+    press('?')
+    const remove = vi.spyOn(window, 'removeEventListener')
+    root().remove()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x' }))
+    expect(remove).toHaveBeenCalledWith('keydown', expect.any(Function), true)
+    remove.mockRestore()
+  })
+
+  it('the close text puts the Esc key cap where `{key}` is', () => {
+    setup({ strings: { toClose: 'Fermer avec {key}' } })
+    root().focus()
+    press('?')
+    const close = q('.gallerist-shortcuts-close') as HTMLElement
+    expect(close.textContent).toBe('Fermer avec Esc')
+    expect(close.lastChild?.textContent).toBe('')
+    expect(close.querySelector('kbd')?.previousSibling?.textContent).toBe('Fermer avec ')
   })
 
   it('the close button and a press on the scrim close it, focus back; a press on the page too, focus left', () => {
@@ -203,6 +249,24 @@ describe('plugin-shortcuts — opening and closing', () => {
 })
 
 describe('plugin-shortcuts — what it lists', () => {
+  it('no zoom keys or gestures when no item can zoom (no image)', () => {
+    const v = createViewer({
+      collection: { groups: [{ id: 'g', items: [{ id: 'v', type: 'video', source: 'v.mp4' }] }] },
+      plugins: [shortcuts()],
+    })
+    mount(v)
+    v.open()
+    root().focus()
+    press('?')
+    expect(Object.keys(listed())).toEqual(['Move', 'Viewer'])
+    press('Escape')
+    const live = getInternals(v)
+      .getPlugins()
+      .find((p) => p.name === 'shortcuts') as ShortcutsInstance
+    live.open(false)
+    expect(JSON.stringify(listed())).not.toMatch(/Pinch|Drag/)
+  })
+
   it('a stacked rail: groups on ←/→, items on ↑/↓, Home/End, 1–9; zoom; the rail keys', () => {
     setup(undefined, { plugins: [thumbnails()] })
     root().focus()
