@@ -6,11 +6,13 @@
 //  • manual time as a marker between timeframes, with a tooltip (markers)
 //  • a notes popover from the caption bar: the host portals it into the viewer root, so it rises
 //    over the stage; Escape in it closes it, not the viewer; N opens it (a plugin keymap)
+//  • the zoom tool, the View popover and the shortcut list (?) with the host's N and long press
 // Query: display=flat|stacked (default flat) · skin · scheme · dir=rtl · preset (default reviewer)
 import { type Group, type Item, type Plugin, createViewer } from '@gallerist/core'
 import { captions } from '@gallerist/plugin-captions'
 import { fullscreen } from '@gallerist/plugin-fullscreen'
 import { download } from '@gallerist/plugin-save'
+import { shortcuts } from '@gallerist/plugin-shortcuts'
 import { type RailMarker, refreshRail, thumbnails } from '@gallerist/plugin-thumbnails'
 import { view } from '@gallerist/plugin-view'
 import { zoom } from '@gallerist/plugin-zoom'
@@ -244,7 +246,22 @@ const notesKey: Plugin = () => ({ name: 'notes', keymap: { n: onN, N: onN } })
 const viewer = createViewer({
   collection: { groups },
   startAt: { g: 1, i: 1 },
-  plugins: [rail, zoom(), fullscreen(), download(), view(), caption, notesKey],
+  plugins: [
+    rail,
+    zoom(),
+    fullscreen(),
+    download(),
+    view(),
+    caption,
+    notesKey,
+    // the host's own entries join the list: N (keys), a long press on the marker (gestures)
+    shortcuts({
+      shortcuts: [
+        { label: 'Notes', keys: ['N'] },
+        { label: 'Manual time details', gesture: 'Long press the marker' },
+      ],
+    }),
+  ],
 })
 // the popover belongs to its timeframe and its button: it goes when the viewer closes or moves
 let at = ''

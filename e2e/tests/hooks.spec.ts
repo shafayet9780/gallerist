@@ -387,6 +387,53 @@ test('the notes popover: Escape closes it before the viewer, keys typed in it st
   await expect.poll(() => phase(page)).toBe('closed')
 })
 
+// With zoom, View and the shortcut list on the same viewer: ? lists the host's N with the viewer's
+// keys, a ? typed in the notes stays there, a ? on the notes button (taken by no one) still opens the
+// list, and the View popover's last row opens it.
+test('the shortcut list: the host entries, around the notes popover and from View', async ({
+  page,
+}) => {
+  await open(page)
+  const list = page.getByRole('dialog', { name: 'Keyboard shortcuts', exact: true })
+  const rows = () =>
+    list
+      .locator('.gallerist-shortcuts-row')
+      .evaluateAll((els) =>
+        els.map(
+          (r) =>
+            `${r.querySelector('dt')?.textContent}: ${[...r.querySelectorAll('kbd')].map((k) => k.textContent).join(' ')}`,
+        ),
+      )
+  await page.locator('.gallerist').press('Shift+Slash')
+  await expect(list).toBeVisible()
+  expect(await rows()).toEqual(
+    expect.arrayContaining(['Zoom in: +', 'Fit to screen: 0', 'Notes: N', 'This list: ?']),
+  )
+  await page.keyboard.press('Escape')
+  await expect(list).toBeHidden()
+  expect(await phase(page)).toBe('open')
+  // a ? typed in the note box is the note's
+  await page.locator('.gallerist').press('n')
+  await expect(page.locator('.hk-note-box')).toBeFocused()
+  await page.keyboard.press('Shift+Slash')
+  await expect(page.locator('.hk-note-box')).toHaveValue('?')
+  await expect(list).toBeHidden()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.hk-note-btn')).toBeFocused()
+  // on the notes button nobody takes ?: the list opens, and Escape closes it, not the viewer
+  await page.keyboard.press('Shift+Slash')
+  await expect(list).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(list).toBeHidden()
+  expect(await phase(page)).toBe('open')
+  // the View popover's last row
+  await page.locator('.gallerist-view-btn').click()
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click()
+  await expect(list).toBeVisible()
+  await page.keyboard.press('Escape')
+  expect(await phase(page)).toBe('open')
+})
+
 test('the notes popover rises over the stage from the caption bar, unclipped and on top', async ({
   page,
 }) => {
@@ -440,6 +487,17 @@ test.describe('on a phone', () => {
     await expect(page.locator('.gallerist-zoom-out')).toBeVisible()
     await expect(page.locator('.gallerist-fullscreen-btn')).toBeVisible()
     await expect(page.locator('.gallerist-zoom-level')).toBeHidden() // as before: − and + only
+  })
+
+  test("the gesture list has the host's long press", async ({ page }) => {
+    await page.goto('/hooks.html')
+    await viewerSettled(page)
+    await page.locator('.gallerist-view-btn').tap()
+    await page.getByRole('button', { name: 'Gestures' }).tap()
+    const list = page.getByRole('dialog', { name: 'Gestures', exact: true })
+    await expect(list).toBeVisible()
+    await expect(list.getByText('Long press the marker')).toBeVisible()
+    await expect(list.getByText('Notes', { exact: true })).toHaveCount(0) // keys only
   })
 
   test('a long press on the marker shows its tip until the next press', async ({ page }) => {
