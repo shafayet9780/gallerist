@@ -12,7 +12,7 @@
 // in it never reach the viewer (a window listener in the capture phase takes them first): Escape and
 // `?` close it, and nothing else acts. The root is found from a hidden node in the toolbar region.
 
-import type { Plugin, PluginInstance, ViewerApi } from '@gallerist/core'
+import type { Item, Plugin, PluginInstance, ViewerApi } from '@gallerist/core'
 import { getInternals } from '@gallerist/core/internal'
 
 /** A host's own shortcut, listed with the built-in ones. */
@@ -188,9 +188,10 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
       const plugins = getInternals(viewer).getPlugins()
       const map: Record<string, unknown> = {}
       for (const p of plugins) Object.assign(map, p.keymap)
+      const named = (name: string) => plugins.find((p) => p.name === name)
       // the key `k` of the plugin `name`, while it holds it (none: its first key)
       const held = (name: string, k?: string) => {
-        const own = plugins.find((p) => p.name === name)?.keymap ?? {}
+        const own = named(name)?.keymap ?? {}
         const key = k ?? Object.keys(own)[0]
         return key && own[key] && map[key] === own[key] ? key : undefined
       }
@@ -200,14 +201,13 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
       const along = ['↑', '↓']
       const grouped = !linear && viewer.getCollection().groups.some((g) => g.items.length > 1)
       const overlay = r.getAttribute('data-gallerist-mode') === 'overlay'
-      const rail = (
-        plugins.find((p) => p.name === 'thumbnails') as { display?: string } | undefined
-      )?.display
+      const rail = (named('thumbnails') as { display?: string } | undefined)?.display
 
-      // zooming, while an item can zoom (an image)
-      const zoom = viewer
-        .getCollection()
-        .groups.some((g) => g.items.some((i) => i.type === 'image'))
+      // zooming, while an item can zoom: plugin-zoom's `zoomable`, else an image
+      const can =
+        (named('zoom') as { zoomable?: (item: Item) => boolean } | undefined)?.zoomable ??
+        ((i: Item) => i.type === 'image')
+      const zoom = viewer.getCollection().groups.some((g) => g.items.some((i) => can(i)))
       let sections: Array<[string, Row[]]>
       if (keys) {
         const move: Row[] = grouped
@@ -348,11 +348,10 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
         x.setAttribute('aria-label', t.close)
       }
       x.addEventListener('click', () => close(true))
-      // the list scrolls when the viewer is short: a stop for the keys, so they can scroll it
+      // the list scrolls when the viewer is short: a stop for the keys, so they can scroll it (no
+      // role or name of its own: the dialog's title names it already, once)
       const body = el('div', 'gallerist-shortcuts-body')
       body.tabIndex = 0
-      body.setAttribute('role', 'region')
-      body.setAttribute('aria-labelledby', id)
       for (const [name, list] of rows(keys)) {
         const section = body.appendChild(el('section'))
         if (name) section.appendChild(el('h3', '', name))

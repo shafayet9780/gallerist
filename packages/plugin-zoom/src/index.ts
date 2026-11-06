@@ -13,7 +13,7 @@
 // range and while the current item can't zoom: a video or another non-image, one still loading, one
 // that failed. The percentage is unavailable at fit, where there's nothing to reset.
 
-import type { Item, Plugin, ViewerApi } from '@gallerist/core'
+import type { Item, Plugin, PluginInstance, ViewerApi } from '@gallerist/core'
 
 export interface ZoomStrings {
   /** the tool's group name */
@@ -42,10 +42,18 @@ export interface ZoomOptions {
   /** Whether an item can zoom (when it has loaded). Default: images (`type: 'image'`). */
   zoomable?: (item: Item) => boolean
   /** `+` / `=`, `-` and `0` step through the stops while the viewer has focus. Default true; `false`
-   *  leaves those keys to the renderer (which steps by its own factor). */
+   *  leaves those keys to the renderer (which steps by its own factor). While it's on, no plugin's
+   *  keymap gets them: the tool takes them while the item can zoom, and marks them taken
+   *  (`preventDefault()`) while it can't, so the renderer runs nothing for them. */
   keys?: boolean
   /** UI text overrides, for translation; merged over English. */
   strings?: Partial<ZoomStrings>
+}
+
+/** The plugin's instance: `zoomable` is the option's predicate (or the default), which
+ *  plugin-shortcuts reads to list the zoom keys only while the collection has an item that zooms. */
+export interface ZoomInstance extends PluginInstance {
+  zoomable: (item: Item) => boolean
 }
 
 export const DEFAULT_STOPS: readonly number[] = [1, 1.5, 2, 3, 4]
@@ -88,7 +96,7 @@ export function zoom(opts: ZoomOptions = {}): Plugin {
   const max = stops[stops.length - 1] ?? 1
   const zoomable = opts.zoomable ?? ((item: Item) => item.type === 'image')
 
-  return (viewer: ViewerApi) => {
+  return (viewer: ViewerApi): ZoomInstance => {
     let group: HTMLElement | null = null
     let out: HTMLButtonElement | null = null
     let level: HTMLButtonElement | null = null
@@ -221,6 +229,7 @@ export function zoom(opts: ZoomOptions = {}): Plugin {
 
     return {
       name: 'zoom',
+      zoomable, // plugin-shortcuts lists the zoom keys while an item can zoom
       init() {
         unsub = viewer.subscribe(() => {
           live = null // a commit (or a new item) settles the live transform

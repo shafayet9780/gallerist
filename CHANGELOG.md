@@ -38,7 +38,8 @@ version.
 - **plugin-zoom** (new): with it registered, `+` / `=`, `-` and `0` pressed in the viewer stop at the
   viewer's root (`keys: false` leaves them to the renderer, which lets them bubble), except in a field,
   a dialog or menu in the viewer, a slider, spinbutton, tree or grid. While the item can't zoom (a
-  video) they go on to the page, marked taken (`preventDefault()`).
+  video) they go on to the page, marked taken (`preventDefault()`), so no plugin's `keymap` runs on
+  them either.
 - **renderer-dom**: a key from a text field inside an open shadow root in the viewer stays in the field
   (the viewer reads the event's first target), and a plugin's key typed with AltGr (Ctrl + Alt on
   Windows) reaches the plugin instead of counting as a browser chord.
@@ -185,12 +186,13 @@ version.
   overlay viewer), the host's, and a note that `?` lists the keys with a keyboard.
 - **plugin-shortcuts (a11y)**: `role="dialog"`, `aria-modal="true"`, named by its title; it sits in
   the viewer's root over a scrim, the rest of the viewer `inert` while it shows; focus moves to it and
-  Tab stays inside (the close button, then the list, a region named by the title that the keys
-  scroll when the viewer is short); Escape (or `?`, AltGr's too, the close button, a click on the
+  Tab stays inside (the close button, then the list, a focus stop the keys scroll when the viewer is
+  short; no role or name of its own, so the title is announced once); Escape (or `?`, AltGr's too, the close button, a click on the
   scrim) closes it, and only it, with focus back where it was. A `window` capture-phase listener takes
   every key pressed in the viewer while it shows, so nothing moves, zooms or closes under it; it goes
   with the next key or press if the renderer goes away with the list open. Zoom keys (and pinch and
-  drag) are listed only while the collection has an image. Translated text in `strings` (key names
+  drag) are listed only while the collection has an item that can zoom: an image, or what
+  plugin-zoom's `zoomable` accepts when it is registered (its instance exposes `zoomable`). Translated text in `strings` (key names
   included; `toClose` puts the Esc key cap at its `{key}`).
 - **theme-default (new)**: the dialog in every skin and scheme: centred, up to 720px, the sections side
   by side (Move widest); key caps in the surface colour and monospace face; a sheet from the bottom
@@ -244,14 +246,14 @@ version.
 - core + renderer-dom 16,497 → 16,650 B; its budget goes from 16.5 to 16.65 kB (owner-approved, for the
   toolbar focus ring; the key a host took is 1 B more, a field in a shadow root and AltGr 34 B), and
   it is now at the limit.
-- core + renderer-dom + thumbnails 21.99 → 25.49 kB (25,488 B); its budget goes from 24 to 25.5 kB
+- core + renderer-dom + thumbnails 21.99 → 25.49 kB (25,493 B); its budget goes from 24 to 25.5 kB
   (owner-approved, for the rail's motion, drag and the host hooks; the pre-release review's fixes fit
   in it after a trim).
 - plugin-view 2,392 → 2,959 B; its budget goes from 2.4 to 3 kB (owner-approved: the segment glyphs,
   the radio-group keys, the live repaint and the shortcut row).
-- `@gallerist/cdn` 34.62 → 38.27 kB (38,267 B); its budget goes from 35 to 40 kB (owner-approved). It
+- `@gallerist/cdn` 34.62 → 38.30 kB (38,295 B); its budget goes from 35 to 40 kB (owner-approved). It
   bundles neither plugin-zoom nor plugin-shortcuts.
-- New: plugin-zoom 1,641 B (budget 1.65 kB); plugin-shortcuts 2,826 B (budget 2.85 kB).
+- New: plugin-zoom 1,645 B (budget 1.65 kB); plugin-shortcuts 2,834 B (budget 2.85 kB).
 - theme-default base.css 7.60 → 9.39 kB (limit 10 kB); console.css 1.21 → 1.30 kB. Core unchanged
   (3.10 kB).
 

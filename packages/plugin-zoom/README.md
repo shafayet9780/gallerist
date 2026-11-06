@@ -38,6 +38,12 @@ say), and nothing with Ctrl, ⌘ or Alt held (the browser's own page zoom). With
 renderer zooms by a fixed factor on those keys; with it, the keys and the buttons take the same
 steps (`keys: false` leaves the keys to the renderer).
 
+These keys are the tool's while `keys` is on, whatever the item: while it can't zoom they are
+marked taken (`preventDefault()`) and the renderer runs nothing for them, so another plugin's own
+`+`, `=`, `-` or `0` in its `keymap` never runs either. A plugin (or host) that wants one of those keys
+sets `keys: false`, or handles it first in a capture-phase listener above the viewer's root (on
+`document`, say) and calls `preventDefault()`, which this plugin leaves alone.
+
 **−** and **+** are unavailable at either end of the range, and while the current item can't zoom: a
 video or another non-image, an image still loading, one that failed to load. The percentage is
 unavailable at fit, where there's nothing to reset. Unavailable buttons are `aria-disabled` and dimmed
@@ -54,7 +60,7 @@ its keys is announced in the viewer's live region (`150%`); a pinch or a wheel o
 | Option | Default | |
 |---|---|---|
 | `stops` | `[1, 1.5, 2, 3, 4]` | the zoom levels − and + step through, as scales (1 = fit); the first and last are the ends of the range. The DOM renderer zooms from fit to 400%: a stop outside that range is brought into it |
-| `zoomable(item)` | `item.type === 'image'` | whether an item can zoom once it has loaded (a custom adapter's media that zooms) |
+| `zoomable(item)` | `item.type === 'image'` | whether an item can zoom once it has loaded (a custom adapter's media that zooms); [plugin-shortcuts](../plugin-shortcuts/README.md) lists the zoom keys while an item in the collection can |
 | `keys` | `true` | `+` / `=`, `-` and `0` step through the stops; `false` leaves them to the renderer |
 | `strings` | English | the labels, for translation; defaults in `DEFAULT_ZOOM_STRINGS`: `zoom` (the group), `zoomIn`, `zoomOut`, `reset(percent)` (the percentage button's name, which includes the percentage it shows), `percent(scale)` (how a zoom reads, `125%`) |
 

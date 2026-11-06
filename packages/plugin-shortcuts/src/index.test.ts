@@ -147,8 +147,8 @@ describe('plugin-shortcuts — opening and closing', () => {
     const close = q('.gallerist-shortcuts-close') as HTMLElement
     const body = q('.gallerist-shortcuts-body') as HTMLElement
     expect(body.tabIndex).toBe(0)
-    expect(body.getAttribute('role')).toBe('region')
-    expect(body.getAttribute('aria-labelledby')).toBe(q('.gallerist-shortcuts h2')?.id)
+    expect(body.hasAttribute('role')).toBe(false) // the dialog's name isn't announced twice
+    expect(body.hasAttribute('aria-labelledby')).toBe(false)
     expect(press('Tab', { shiftKey: true }).defaultPrevented).toBe(true) // from the dialog: to the end
     expect(focused()).toBe(body)
     expect(press('Tab').defaultPrevented).toBe(true) // past the end: back to the start
@@ -265,6 +265,26 @@ describe('plugin-shortcuts — what it lists', () => {
       .find((p) => p.name === 'shortcuts') as ShortcutsInstance
     live.open(false)
     expect(JSON.stringify(listed())).not.toMatch(/Pinch|Drag/)
+  })
+
+  it("with plugin-zoom, its `zoomable` decides: a video that zooms lists the keys, images that don't, none", () => {
+    const open = (items: Item[], zoomable: (item: Item) => boolean) => {
+      document.body.innerHTML = ''
+      const v = createViewer({
+        collection: { groups: [{ id: 'g', items }] },
+        plugins: [zoom({ zoomable }), shortcuts()],
+      })
+      mount(v)
+      v.open()
+      root().focus()
+      press('?')
+      const sections = Object.keys(listed())
+      v.destroy()
+      return sections
+    }
+    const video: Item = { id: 'v', type: 'video', source: 'v.mp4' }
+    expect(open([video], (i) => i.type === 'video')).toContain('Zoom')
+    expect(open([item('a')], () => false)).not.toContain('Zoom')
   })
 
   it('a stacked rail: groups on ←/→, items on ↑/↓, Home/End, 1–9; zoom; the rail keys', () => {

@@ -55,8 +55,9 @@ does nothing:
   collection where every group holds one item. A side rail (`groupAxis: 'vertical'`) turns the axes
   (↑/↓ between groups). Right to left, ← moves forward, and the list shows → ← for previous / next.
 - **Zoom.** `+`, `−`, `0`: the renderer's keys, or [plugin-zoom](../plugin-zoom/README.md)'s stops
-  when it is registered. Only while the collection has an image (an item that can zoom); the gestures
-  leave out pinch and drag the same way.
+  when it is registered. Only while the collection has an item that can zoom: an image, or with
+  plugin-zoom what its `zoomable` option accepts; the gestures leave out pinch and drag the same
+  way.
 - **Viewer.** F for fullscreen ([plugin-fullscreen](../plugin-fullscreen/README.md), where the
   browser can fullscreen an element), T to show or hide the thumbnails (with a rail), E for the
   group's items (a stacked rail), G for the grid, P and C for pins (C with `onPlace`), D (or its
@@ -86,9 +87,9 @@ close (an overlay viewer); then yours. A note under them says `?` lists the keys
 The dialog is `role="dialog"` with `aria-modal="true"`, named by its title ("Keyboard shortcuts", or
 "Gestures"). It sits in the viewer's root over a scrim that covers the viewer, and the rest of the
 viewer is `inert` while it shows (what was inert already stays so). Focus moves to the dialog, so a
-screen reader reads it, and **Tab** stays inside it: its close button, then the list, a region
-named by the title that takes focus so the arrow keys, Page Up/Down and Home/End scroll it when the
-viewer is too short to show it whole (the dialog keeps inside the viewer, an inline one included).
+screen reader reads it, and **Tab** stays inside it: its close button, then the list, which takes
+focus so the arrow keys, Page Up/Down and Home/End scroll it when the viewer is too short to show it
+whole (it has no role or name of its own: the dialog's title is announced once) (the dialog keeps inside the viewer, an inline one included).
 Each section is a heading
 over a description list: what it does, then its keys.
 

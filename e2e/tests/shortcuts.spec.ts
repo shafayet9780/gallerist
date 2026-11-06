@@ -99,7 +99,7 @@ test('Tab stays in the dialog', async ({ page }) => {
   await open(page)
   await help(page)
   const close = page.getByRole('button', { name: 'Esc to close' })
-  const body = page.getByRole('region', { name: 'Keyboard shortcuts' })
+  const body = page.locator('.gallerist-shortcuts-body')
   await page.keyboard.press('Tab')
   await expect(close).toBeFocused()
   await page.keyboard.press('Tab')
