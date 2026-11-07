@@ -65,6 +65,12 @@ with no size to go by takes `--gallerist-media-ratio` (`3 / 2`). A load still ru
 text tokens; no warning colours). With no placeholder the box is a skeleton after 300ms:
 `--gallerist-placeholder` with a `--gallerist-shimmer` sweep. See the renderer's README.
 
+The rail's current label (a flat rail's group label, a timeline's time label) is
+`--gallerist-label-current` (the accent) at `--gallerist-label-current-weight` (500). A focused thumb's
+ring is 2px `--gallerist-focus` in `--gallerist-thumb-focus-style` (`solid`; `dashed` tells it apart
+from a solid selection ring), 2px out, or `--gallerist-thumb-focus-offset-current` (2px) out on the
+current thumb, whose ring (`--gallerist-thumb-ring`, `--gallerist-item-ring`) may sit outside it.
+
 The theme follows `forced-colors: active` (Windows High Contrast): the View popover's chosen segment
 takes the system's selection colours and the focus rings the text colour. The rail's
 item clusters (`thumbnails({ cluster })`) use `--gallerist-cluster-inner` (2px) inside a cluster and

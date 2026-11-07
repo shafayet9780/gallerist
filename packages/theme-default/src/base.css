@@ -107,6 +107,12 @@
     /* an item thumb's badge (thumbnails `renderItemBadge`), its `inset-block` from the image's edges:
        the top end corner; `auto 3px` takes it to the bottom end */
     --gallerist-thumb-badge-inset-block: 3px auto;
+    /* the rail's current group label (flat) or time label (timeline), and a focused thumb's ring:
+       its outline-style, and its offset on the current thumb (whose ring is outside it) */
+    --gallerist-label-current: var(--gallerist-accent);
+    --gallerist-label-current-weight: 500;
+    --gallerist-thumb-focus-style: solid;
+    --gallerist-thumb-focus-offset-current: 2px;
 
     /* popovers (the View menu, the shortcut list) sit a step above the bands; a segmented control
        is a recessed track with its checked segment raised */
@@ -760,8 +766,12 @@
 .gallerist-thumb:focus-visible,
 .gallerist-thumb-item:focus-visible,
 .gallerist-grid-cell:focus-visible {
-  outline: 2px solid var(--gallerist-focus);
+  outline: 2px var(--gallerist-thumb-focus-style) var(--gallerist-focus);
   outline-offset: 2px;
+}
+/* the current thumb's ring is outside it: focus there may sit further out */
+:is(.gallerist-thumb, .gallerist-thumb-item)[data-active]:focus-visible {
+  outline-offset: var(--gallerist-thumb-focus-offset-current);
 }
 .gallerist-thumb-img {
   width: 100%;
@@ -955,10 +965,11 @@
   isolation: isolate; /* keeps the track line behind its own label */
 }
 .gallerist-thumb-wrap[data-active] .gallerist-thumb-time {
-  color: var(--gallerist-accent);
+  color: var(--gallerist-label-current);
+  font-weight: var(--gallerist-label-current-weight);
 }
 .gallerist-thumb-wrap[data-active] .gallerist-thumb-time::before {
-  background: var(--gallerist-accent);
+  background: var(--gallerist-label-current);
 }
 /* numbered items (thumbnails `numberItems`) */
 .gallerist-thumb-num {
@@ -1077,7 +1088,8 @@
   font-family: var(--gallerist-mono);
 }
 .gallerist-thumb-group[data-active] .gallerist-thumb-group-cap {
-  color: var(--gallerist-accent);
+  color: var(--gallerist-label-current);
+  font-weight: var(--gallerist-label-current-weight);
 }
 .gallerist-thumb-group-row {
   display: flex;
