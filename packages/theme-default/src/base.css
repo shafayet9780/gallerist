@@ -340,8 +340,8 @@
   visibility: hidden;
 }
 /* `item.placeholder` in the image's box (ratio: naturalSize, the placeholder's, or the token). An
-   image one is blurred, overscanned 2× the blur and clipped (no fringe); the blur clears as the image
-   fades in, then it hides; a failure keeps it, sharp. None: a skeleton after 300ms. */
+   image one is blurred, overscanned 2× the blur and clipped (no fringe), sharp as the image fades in,
+   then hidden; a failure keeps it, sharp. None: a skeleton after 300ms, gone when the image is in. */
 .gallerist-content {
   container-type: size;
 }
@@ -376,12 +376,11 @@
   visibility: hidden;
   transition: visibility 0s var(--gallerist-dur-reveal);
 }
-.gallerist-media-placeholder[data-gallerist-skeleton] {
+[data-gallerist-skeleton]:not([data-gallerist-loaded]) {
   background: var(--gallerist-placeholder);
   animation: gallerist-fade var(--gallerist-dur-exit) 0.3s backwards;
 }
-/* (not once hidden: it would run on) */
-.gallerist-media-placeholder[data-gallerist-skeleton]:not([data-gallerist-loaded])::after {
+[data-gallerist-skeleton]:not([data-gallerist-loaded])::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -399,8 +398,7 @@
     background-position: -50% 0;
   }
 }
-/* a slow load's pill, bottom end: after the delay, or at once on a failure (Retry). Neutral: warning
-   colours are a host's data colours */
+/* a slow load's pill, bottom end: after the delay, or at once on a failure (Retry). Neutral */
 .gallerist-media-pill {
   position: absolute;
   bottom: 12px;
@@ -500,7 +498,7 @@
     filter: none;
     transition: none;
   }
-  .gallerist-media-placeholder[data-gallerist-skeleton]:not([data-gallerist-loaded])::after,
+  [data-gallerist-skeleton]:not([data-gallerist-loaded])::after,
   .gallerist-media-pill::before {
     animation: none;
   }

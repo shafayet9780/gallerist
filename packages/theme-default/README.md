@@ -63,7 +63,8 @@ clipped to the image's box; the image fades in over it in `--gallerist-dur-revea
 with no size to go by takes `--gallerist-media-ratio` (`3 / 2`). A load still running after
 `--gallerist-loading-delay` (400ms) shows a "Loading full size" pill (the panel, hairline and muted
 text tokens; no warning colours). With no placeholder the box is a skeleton after 300ms:
-`--gallerist-placeholder` with a `--gallerist-shimmer` sweep. See the renderer's README.
+`--gallerist-placeholder` with a `--gallerist-shimmer` sweep, gone at once when the image is in. No
+loading animation outlives the load. See the renderer's README.
 
 The rail's current label (a flat rail's group label, a timeline's time label) is
 `--gallerist-label-current` (the accent) at `--gallerist-label-current-weight` (500). A focused thumb's

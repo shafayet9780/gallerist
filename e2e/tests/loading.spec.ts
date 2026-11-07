@@ -149,6 +149,49 @@ test.describe('loading: an image placeholder', () => {
     await expect(pill(page)).toHaveCount(0)
   })
 
+  // An animation left running on a hidden box keeps the page animating (a 0ms panel token then
+  // still finds one running): every loading animation ends with the load.
+  for (const [ph, media] of [
+    ['url', 'fast'],
+    ['none', 'fast'],
+    ['none', 'hold'],
+    ['url', 'hold'],
+  ] as const) {
+    test(`no loading animation outlives the load (${ph === 'url' ? 'placeholder' : 'skeleton'}, ${media})`, async ({
+      page,
+    }) => {
+      const served = await serve(page, media)
+      await open(page, `/loading.html?ph=${ph}`)
+      await expect(page.locator('.gallerist[data-gallerist-phase="open"]')).toBeVisible()
+      if (media === 'hold') {
+        await page.waitForTimeout(500) // past the skeleton's and the pill's delays
+        served.release()
+      }
+      await expect(full(page)).toHaveAttribute('data-gallerist-loaded', '')
+      await expect(box(page)).toBeHidden() // the reveal is over
+      // none left on the box (whenever this runs: a fast load's skeleton fade would run on 480ms)…
+      expect(
+        await box(page).evaluate((b) => [
+          getComputedStyle(b).animationName,
+          getComputedStyle(b, '::after').animationName,
+        ]),
+      ).toEqual(['none', 'none'])
+      // …nor anywhere in it, once the reveal's transitions are done
+      const running = await page.evaluate(async () => {
+        for (let k = 0; k < 2; k++) await new Promise((r) => requestAnimationFrame(r))
+        return document
+          .getAnimations()
+          .filter((a) =>
+            (a.effect as KeyframeEffect | null)?.target?.closest(
+              '.gallerist-media-placeholder, .gallerist-media-pill',
+            ),
+          )
+          .map((a) => (a as CSSAnimation).animationName ?? (a as CSSTransition).transitionProperty)
+      })
+      expect(running).toEqual([])
+    })
+  }
+
   test('moving to an item whose thumb is cached paints its placeholder at once', async ({
     page,
   }) => {
