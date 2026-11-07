@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-shortcuts",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Gallerist plugin — a keyboard shortcut list on ?: the keys that work in the viewer as it is laid out (and the gestures on a touch screen), with the host's own, in a modal dialog.",
   "license": "MIT",
   "type": "module",

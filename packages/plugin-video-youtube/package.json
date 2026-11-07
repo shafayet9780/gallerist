@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-video-youtube",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Gallerist plugin — YouTube IFrame API media adapter (split provider sub-plugin).",
   "license": "MIT",
   "type": "module",
