@@ -7,7 +7,9 @@
 //  • a notes popover from the caption bar: the host portals it into the viewer root, so it rises
 //    over the stage; Escape in it closes it, not the viewer; N opens it (a plugin keymap)
 //  • the zoom tool, the View popover and the shortcut list (?) with the host's N and long press
-// Query: display=flat|stacked (default flat) · skin · scheme · dir=rtl · preset (default reviewer)
+// Query: display=flat|stacked (default flat) · skin · scheme · dir=rtl · preset (default reviewer) ·
+// wide=1: the marker's box and the 12:00 timeframe's label line take a fixed room (whatever the
+// fonts), so on a 390px phone the cards either side of them and the current one can't all show
 import { type Group, type Item, type Plugin, createViewer } from '@gallerist/core'
 import { captions } from '@gallerist/plugin-captions'
 import { fullscreen } from '@gallerist/plugin-fullscreen'
@@ -111,12 +113,13 @@ const noteCount = (id: string) => {
   return c
 }
 
+const wide = p.has('wide')
 const manual: RailMarker = {
   id: 'manual-1',
   after: 'tf70',
   caption: 'Manual',
   label: 'Manual time, 11:20 – 11:45, 25 minutes',
-  render: () => '✎ 25m',
+  render: () => (wide ? el('span', 'hk-room hk-room-marker', '✎ 25m') : '✎ 25m'),
   tip: () => {
     const t = el('div', 'hk-tip')
     t.append(
@@ -138,7 +141,7 @@ const rail = thumbnails({
     const count = noteCount(g.id)
     if (display === 'stacked' && place === 'below') return readout(f, true)
     if (display === 'stacked') return count
-    const line = el('span', 'hk-line')
+    const line = el('span', wide && g.id === 'tf120' ? 'hk-line hk-room' : 'hk-line')
     if (count) line.append(count)
     line.append(readout(f, false))
     line.setAttribute(

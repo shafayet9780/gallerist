@@ -1,7 +1,7 @@
 // Windowing helpers for the rail: which run of cards to draw, and how to change it without the
 // visible cards jumping. Pure or DOM-reading only; the plugin owns the DOM writes.
 
-const INF = Number.POSITIVE_INFINITY
+const INF = 1 / 0 // Infinity, in fewer bytes
 
 export type Axis = 'x' | 'y'
 
@@ -106,7 +106,9 @@ export function keepPlace(
   const before = ref && axis ? edge(ref.getBoundingClientRect(), axis) : null
   mutate()
   if (before === null || !ref?.isConnected || !axis) return
-  const shift = edge(ref.getBoundingClientRect(), axis) - before
+  // whole px: WebKit drops a scroll's fraction, and two such drops (the reveal, then this) can cut
+  // 2px off a card meant to show whole
+  const shift = Math.round(edge(ref.getBoundingClientRect(), axis) - before)
   if (!shift) return
   if (axis === 'x') scroller.scrollLeft += shift
   else scroller.scrollTop += shift

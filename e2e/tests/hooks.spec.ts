@@ -525,6 +525,96 @@ test.describe('on a phone', () => {
     await expect(tip).toHaveCount(0)
   })
 
+  // 0.4.1 (Apploye): where the current card and the cards either side of it couldn't all show, the
+  // rail centred the current one, so the next card past a marker or a label line wider than its
+  // group's cards was cut off, though it would have shown whole with the current one. Now, where
+  // more lies between the current card and the one ahead (the way the cursor went) than behind it,
+  // the two show whole wherever they fit. wide=1 gives the marker and the 12:00 label line a fixed
+  // room, so the three don't fit whatever the fonts. A row rail (items) and a stacked one (groups).
+  type Span = { id: string; a: number; z: number }
+  const railNow = (page: Page, sel: string) =>
+    page.evaluate(async (sel) => {
+      for (let k = 0; k < 2; k++) await new Promise((r) => requestAnimationFrame(r)) // re-window
+      const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+      const r = rail.getBoundingClientRect()
+      const cards = [...rail.querySelectorAll<HTMLElement>(sel)]
+        .map((c) => ({ c, b: c.getBoundingClientRect() }))
+        .filter(({ b }) => b.width > 0)
+      const id = (c: HTMLElement) => c.dataset.item ?? c.dataset.group ?? ''
+      return {
+        id: id(cards.find(({ c }) => c.hasAttribute('data-active'))?.c ?? rail),
+        cards: cards.map(({ c, b }) => ({ id: id(c), a: b.left, z: b.right })),
+        lo: r.left,
+        hi: r.right,
+      }
+    }, sel)
+  const span = (...cs: Span[]) => Math.max(...cs.map((c) => c.z)) - Math.min(...cs.map((c) => c.a))
+
+  for (const [display, sel, total, tightAt] of [
+    [
+      'flat',
+      'button[data-item]',
+      19, // items (the rail draws a run of them)
+      // past the marker (after 11:10) and past the 12:00 label line, both ways
+      ['s77-1>s107-1', 's122-1>s132-1', 's107-1>s77-1', 's132-1>s122-1'],
+    ],
+    [
+      'stacked',
+      'button[data-group]:not([data-item]):not(.gallerist-thumb-expand)',
+      7, // timeframes
+      ['tf70>tf105', 'tf105>tf70'], // past the marker, both ways
+    ],
+  ] as const)
+    for (const dir of ['ltr', 'rtl'] as const) {
+      test(`a ${display} rail shows the card ahead whole past a marker or a wide label, ${dir}`, async ({
+        page,
+      }) => {
+        test.setTimeout(60_000)
+        await page.goto(`/hooks.html?wide=1&display=${display}&dir=${dir}`)
+        await viewerSettled(page)
+        await page.evaluate(() =>
+          (window as unknown as { viewer: { goTo(g: number, i: number): void } }).viewer.goTo(0, 0),
+        )
+        await page.locator('.gallerist').focus()
+        // the steps where the three can't show but the current card and the one ahead can
+        const tight: string[] = []
+        const [fwd, back] =
+          dir === 'rtl' ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
+        for (const [key, step] of [
+          [fwd, 1],
+          [back, -1],
+        ] as const)
+          for (let s = 0; s < total - 1; s++) {
+            await page.keyboard.press(key)
+            const n = await railNow(page, sel)
+            const cards = n.cards // in the rail's order (right to left too)
+            const k = cards.findIndex((c) => c.id === n.id)
+            const cur = cards[k] as Span
+            const ahead = cards[k + step]
+            const behind = cards[k - step]
+            const room = n.hi - n.lo
+            const whole = (c: Span) => c.a >= n.lo - 1 && c.z <= n.hi + 1
+            const gap = (c?: Span) => (c ? Math.max(c.a - cur.z, cur.a - c.z) : 0)
+            const at = `${key} to ${cur.id}`
+            // (soft: every step that fails is reported, not just the first)
+            expect.soft(whole(cur), `${at}: it shows whole`).toBe(true)
+            if (!ahead) continue
+            if (!behind || span(behind, cur, ahead) <= room - 1) {
+              for (const c of [behind, ahead])
+                if (c) expect.soft(whole(c), `${at}: ${c.id} shows`).toBe(true)
+              continue
+            }
+            if (gap(ahead) > gap(behind) + 1 && span(cur, ahead) <= room - 1) {
+              expect.soft(whole(ahead), `${at}: ${ahead.id} ahead shows whole`).toBe(true)
+              // well clear of the edge cases, whatever the fonts
+              if (span(behind, cur, ahead) > room + 15 && span(cur, ahead) < room - 15)
+                tight.push(`${cur.id}>${ahead.id}`)
+            }
+          }
+        expect(tight).toEqual(expect.arrayContaining([...tightAt]))
+      })
+    }
+
   test('the rail and the notes sheet at 390px', async ({ page }) => {
     await open(page)
     await expect(page.locator('.gallerist-rail-marker')).toHaveCount(1)

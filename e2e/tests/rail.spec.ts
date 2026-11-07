@@ -133,12 +133,15 @@ const around = (n: RailNow, id: string) => {
 }
 const spanOf = (n: RailNow, id: string) => n.cards.find((c) => c.id === id)
 
-// Step `steps` times with `key`. After each step the current card and its neighbours show whole (or,
-// where the rail is too short for three cards, the current one shows whole, centred); the rail moved
-// only if one of them didn't show whole before the step; and a move centres the current card unless
-// the rail stopped at an end, or, where the three fit but centring would cut a wider neighbour (index
-// chips follow their labels), goes on from the centre only as far as shows them all.
-const walk = async (page: Page, flat: boolean, key: string, steps: number) => {
+// Step `steps` times with `key`, `step` cards along the rail's order (1: toward its end). After each
+// step the current card and its neighbours show whole (or, where the three can't fit for more lying
+// between the current one and the one ahead, the way the walk goes, than behind it: those two;
+// otherwise the current one shows whole, centred); the rail moved only if one of them didn't show
+// whole before the step; and a move centres the current card unless the rail stopped at an end, or,
+// where the three fit but centring would cut one of them (index chips follow their labels), goes on
+// from the centre only as far as shows them all, or, where only the current card and the one ahead
+// show, centres the two together.
+const walk = async (page: Page, flat: boolean, key: string, steps: number, step: 1 | -1 = 1) => {
   let before = await railNow(page, flat)
   for (let s = 0; s < steps; s++) {
     await page.keyboard.press(key)
@@ -146,26 +149,37 @@ const walk = async (page: Page, flat: boolean, key: string, steps: number) => {
     expect(now.id, `step ${s + 1}`).not.toBe(before.id)
     const [prev, cur, next] = around(now, now.id) as [Span | undefined, Span, Span | undefined]
     expect(cur, `${now.id} drawn`).toBeDefined()
-    const ends = (prev ?? cur).a < (next ?? cur).a ? [prev, next] : [next, prev]
-    const room = (ends[1] ?? cur).z - (ends[0] ?? cur).a <= now.hi - now.lo + 0.5
-    for (const c of room ? [prev, cur, next] : [cur])
-      expect(whole(now, c), `${now.id}: ${c?.id} shows`).toBe(true)
-    // how far the current card's middle is from the rail's, less what showing the three whole
-    // takes back (scrolling by d moves every card by -d; the three show for d in [from, to])
+    // the cards that should show: the three, else the current one and the one ahead, else itself
+    const fits = (cs: Array<Span | undefined>) => {
+      const set = cs.filter((c): c is Span => !!c)
+      const z = Math.max(...set.map((c) => c.z))
+      return z - Math.min(...set.map((c) => c.a)) <= now.hi - now.lo + 0.5 ? set : null
+    }
+    const [behind, ahead] = step > 0 ? [prev, next] : [next, prev]
+    const three = fits([prev, cur, next])
+    // the room between the current card and another (none: 0)
+    const room = (c?: Span) => (c ? Math.max(c.a - cur.z, cur.a - c.z) : 0)
+    // the current one and the one ahead, where more lies between them than behind (a marker)
+    const two = three || room(ahead) <= room(behind) + 1 ? null : fits([cur, ahead])
+    const set = three ?? two ?? [cur]
+    for (const c of set) expect(whole(now, c), `${now.id}: ${c.id} shows`).toBe(true)
+    // how far the current card's middle is from the rail's, less what showing them whole takes
+    // back (scrolling by d moves every card by -d; they show for d in [from, to])
     const off = (cur.a + cur.z) / 2 - (now.lo + now.hi) / 2
-    const three = [prev, cur, next].filter((c): c is Span => !!c)
-    const from = Math.max(...three.map((c) => c.z)) - now.hi
-    const to = Math.min(...three.map((c) => c.a)) - now.lo
-    const centred = Math.abs(room ? Math.min(Math.max(off, from), to) : off) < 2
+    const from = Math.max(...set.map((c) => c.z)) - now.hi
+    const to = Math.min(...set.map((c) => c.a)) - now.lo
+    const centred = Math.abs(two ? (from + to) / 2 : Math.min(Math.max(off, from), to)) < 2
     const atEnd = now.at <= 1 || now.at >= now.max - 1
     // did the rail move? (the cards that stay keep their place through a re-window otherwise)
     const ref = spanOf(before, before.id) as Span
     const moved = Math.abs((spanOf(now, ref.id)?.a ?? Number.NaN) - ref.a) > 1
-    const needed = around(before, now.id).some((c) => !whole(before, c))
+    const needed = (two ?? around(before, now.id)).some(
+      (c) => !whole(before, spanOf(before, c?.id ?? '')),
+    )
     if (!needed) expect(moved, `${now.id}: the rail stayed put`).toBe(false)
     else if (!moved) expect(centred || atEnd, `${now.id}: already in place`).toBe(true)
     if (moved && !atEnd)
-      expect(centred, `${now.id} centred (or as near as shows all three)`).toBe(true)
+      expect(centred, `${now.id} centred (or as near as shows them all)`).toBe(true)
     before = now
   }
   return before
@@ -288,7 +302,7 @@ for (const { name, size, query, flat, fwd, back, total } of [
     expect(end.id).toBe(end.cards.at(-1)?.id)
     expect(end.at).toBeGreaterThanOrEqual(end.max - 1)
     // and back to the start (a move there that isn't a centring stopped at the rail's start)
-    const home = await walk(page, flat, back, total - 1)
+    const home = await walk(page, flat, back, total - 1, -1)
     expect(home.id).toBe(home.cards[0]?.id)
     expect(whole(home, home.cards[0])).toBe(true)
   })

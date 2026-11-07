@@ -28,7 +28,10 @@ mount(viewer)
 - **Context around the current card.** While the current card and the cards on either side of it
   show whole, the rail doesn't move, so clicking a card in view doesn't shift it. Once one of them
   would be cut off by an edge, the rail scrolls to centre the current card, so a step always shows
-  what comes next. At either end of the rail the scroll stops at the first or last card. This applies
+  what comes next. Where the three can't show together because more lies between the current card
+  and the next one the way you're going (a marker, a group label wider than its cards) than behind
+  it, the rail shows the current card and that next one whole, centred together, wherever the two
+  fit (0.4.1). At either end of the rail the scroll stops at the first or last card. This applies
   to every rail that scrolls (`flat`, `stacked`, `index` rows and chips, side rails, right to left) and
   to the item column. These scrolls are instant, with no animation, so there is nothing to turn off
   for `prefers-reduced-motion`.

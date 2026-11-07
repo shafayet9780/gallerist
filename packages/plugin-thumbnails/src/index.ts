@@ -366,48 +366,70 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
 // Brings the current card into view with context around it, scrolling only the viewer's own panels
 // (scrollIntoView would also scroll the page, moving an inline viewer's host page every time the
 // cursor changes). `around` are the cards next to it in its run (the rail's sequence, or the
-// group's items), where drawn. While the card and those neighbours all show whole, nothing moves,
-// so a click on a card in view doesn't shift the rail. Once one of them is cut by an edge or past
-// it, the panel centres the card, which leaves about half a panel of what comes next in view,
-// whichever way the cursor went. Cards of different widths (index chips) can leave a wider
-// neighbour cut once centred: where the three fit, the scroll goes on from the centre just as far
-// as shows them all. The browser clamps that at either end of the rail, so the first and last
-// cards stop at their edges. Instant, as every scroll of the rail is (there is no motion
-// to take out under prefers-reduced-motion).
-function reveal(btn: HTMLElement | undefined, ...around: Array<HTMLElement | undefined>): void {
+// group's items), where drawn: the one behind it, then the one ahead. While the card and those
+// neighbours all show whole, nothing moves, so a click on a card in view doesn't shift the rail.
+// Once one of them is cut by an edge or past it, the panel centres the card, which leaves about
+// half a panel of what comes next in view, whichever way the cursor went. Cards of different
+// widths (index chips) can leave a wider neighbour cut once centred: where the three fit, the
+// scroll goes on from the centre just as far as shows them all; where they don't (a marker or a
+// wide label line between them), it centres the card and the one ahead together (centreBy). The
+// browser clamps that at either end of the rail, so the first and last cards stop at their edges.
+// Instant, as every scroll of the rail is (there is no motion to take out under
+// prefers-reduced-motion).
+function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefined>): void {
   if (!btn) return
   const target = btn.getBoundingClientRect()
   if (!target.width && !target.height) return // hidden (an index chip's items): nothing to reveal
   for (let box = btn.parentElement; box; box = box.parentElement) {
     if (box.classList.contains('gallerist')) return
     const { overflowX, overflowY } = getComputedStyle(box)
-    if (/auto|scroll/.test(overflowX)) box.scrollLeft += centreBy(box, btn, around, 'left', 'right')
-    if (/auto|scroll/.test(overflowY)) box.scrollTop += centreBy(box, btn, around, 'top', 'bottom')
+    if (/auto|scroll/.test(overflowX)) box.scrollLeft += centreBy(box, btn, around, 'x')
+    if (/auto|scroll/.test(overflowY)) box.scrollTop += centreBy(box, btn, around, 'y')
   }
 }
 
-/** How far to scroll `box` along one axis: 0 while `btn` and its neighbours show whole, else what
- *  centres `btn` in it, moved on as little as shows them all where they fit. A neighbour with no
- *  box (not laid out, hidden) doesn't count. */
+/** How far to scroll `box` along one axis: 0 while `btn` and its neighbours (`around`: the one
+ *  behind it, then the one ahead, the way the cursor went) show whole, else what centres `btn` in
+ *  it, moved on as little as shows them all where they fit. Where the three don't because more lies
+ *  between `btn` and the one ahead than between it and the one behind (a marker, a label line wider
+ *  than its cards), 0 while `btn` and the one ahead show whole, else what centres the two, so what
+ *  comes next shows whole wherever it can (0.4.1). Otherwise (evenly spaced cards in a short panel,
+ *  or the two don't fit either) `btn` centred, as before. A neighbour with no box (not laid out,
+ *  hidden) doesn't count. */
 function centreBy(
   box: HTMLElement,
   btn: HTMLElement,
   around: Array<HTMLElement | undefined>,
-  lo: 'left' | 'top',
-  hi: 'right' | 'bottom',
+  axis: Axis,
 ): number {
+  const [lo, hi] = axis === 'x' ? (['left', 'right'] as const) : (['top', 'bottom'] as const)
   const edge = box.getBoundingClientRect()
-  const rs = [btn, ...around].flatMap((el) => {
-    const r = el?.getBoundingClientRect()
-    return r && (r.width || r.height) ? [r] : []
-  })
-  if (rs.every((r) => r[lo] >= edge[lo] - 1 && r[hi] <= edge[hi] + 1)) return 0
   const r = btn.getBoundingClientRect()
   const by = (r[lo] + r[hi] - edge[lo] - edge[hi]) / 2
-  // the scrolls that show every card whole run from `from` to `to` (none: they don't fit)
-  const from = Math.max(...rs.map((q) => q[hi])) - edge[hi]
-  const to = Math.min(...rs.map((q) => q[lo])) - edge[lo]
-  return from > to + 1 ? by : Math.min(Math.max(by, from), to)
+  // a neighbour's box (none, or not laid out: btn's own, which changes nothing below)
+  const [b, a] = around.map((el) => {
+    const q = el?.getBoundingClientRect()
+    return q?.width || q?.height ? (q as DOMRect) : r
+  }) as [DOMRect, DOMRect]
+  // the room between `btn` and a neighbour, either side of it (btn itself: less than none)
+  const gap = (q: DOMRect) => Math.max(q[lo] - r[hi], r[lo] - q[hi])
+  // the three; then, where more lies between btn and the one ahead than behind it, btn and that
+  // one (else the two either side, which can't fit where the three don't: btn is between them)
+  for (const rs of [
+    [r, b, a],
+    [gap(a) > gap(b) + 1 ? r : b, a],
+  ]) {
+    // the scrolls that show them whole run from `from` to `to` (none: they don't fit); 0 among
+    // them: they show already, nothing moves. In whole px: WebKit drops a scroll's fraction, and
+    // with keepPlace's after it a card at the edge could lose up to 2px.
+    const from = Math.max(...rs.map((q) => q[hi])) - edge[hi]
+    const to = Math.min(...rs.map((q) => q[lo])) - edge[lo]
+    if (from <= to + 1)
+      return from <= 1 && to >= -1
+        ? 0
+        : Math.round(rs[2] ? Math.min(Math.max(by, from), to) : (from + to) / 2)
+  }
+  return by
 }
 
 /** Whether the primary pointer can hover (desktop). Defaults true when undetectable (SSR/test). */
@@ -515,6 +537,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let winEnd = -1
     let axis: Axis | null = null // which way the rail scrolls, once measured
     let perView = 0 // cards that fit in the rail, once measured
+    let lastAt = 0 // the current card's place in the rail when last revealed
     let resizeObs: ResizeObserver | null = null
     let frame = 0 // pending rAF for a scroll/resize re-window
     const groupBtns = new Map<string, HTMLButtonElement>()
@@ -1019,6 +1042,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // neighbours in the group's item panel (the item column, an index section's items)
     const revealActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
       const at = isFlat ? (flatPos.get(`${g}:${i}`) ?? 0) : g
+      // the way the cursor went (a step back: the card before it is the one ahead)
+      const d = at < lastAt ? -1 : 1
+      lastAt = at
       const card = (k: number) =>
         isFlat ? itemBtns.get(flat[k]?.itemId ?? '') : groupBtns.get(col.groups[k]?.id ?? '')
       // Centring scrolls up to half the rail past what shows, and the drawn run reaches only a few
@@ -1026,9 +1052,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // need first (keepPlace holds the screen still), or the scroll would stop at the run's end.
       // The scroll that follows trims the run back (rewindow).
       const btn = card(at)
+      const near = [card(at - d), card(at + d)] // behind it, ahead of it
       if (root && btn && axis && perView) {
-        const [lo, hi] = axis === 'x' ? (['left', 'right'] as const) : (['top', 'bottom'] as const)
-        if (centreBy(root, btn, [card(at - 1), card(at + 1)], lo, hi)) {
+        if (centreBy(root, btn, near, axis)) {
           const reach = Math.ceil(perView / 2) + 1
           setWindow(
             col,
@@ -1037,10 +1063,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           )
         }
       }
-      reveal(btn, card(at - 1), card(at + 1))
+      reveal(btn, near)
       const items = col.groups[g]?.items ?? []
       const item = (k: number) => itemBtns.get(items[k]?.id ?? '')
-      if (!isFlat) reveal(item(i), item(i - 1), item(i + 1))
+      if (!isFlat) reveal(item(i), [item(i - 1), item(i + 1)])
     }
 
     const applyActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
