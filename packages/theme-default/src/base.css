@@ -507,6 +507,9 @@
   align-items: center;
   padding: 8px 12px;
   overflow-x: auto;
+  /* a card brought into view (the current one, a focused one) lands clear of the end fades, and of
+     the ‹ › page buttons in them (plugin-thumbnails reads it) */
+  scroll-padding-inline: var(--gallerist-rail-fade);
   scrollbar-width: none;
   -webkit-user-select: none;
   user-select: none;
@@ -519,6 +522,7 @@
 }
 .gallerist-thumbs[data-gallerist-scroll="y"] {
   --_fade-to: to bottom;
+  scroll-padding: var(--gallerist-rail-fade) 0;
 }
 .gallerist[data-gallerist-dir="rtl"] .gallerist-thumbs[data-gallerist-scroll="x"] {
   --_fade-to: to left;

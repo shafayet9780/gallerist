@@ -1886,10 +1886,18 @@ describe('plugin-thumbnails — context around the current card, cards of differ
   // marker or a label line wider than its group's cards takes, 0.4.1). Where it starts at scroll 0
   // along the rail's reading direction (`start`), and its box at a scroll (mirrored in a right-to-left
   // rail)
+  // (`gapAt`: the card the gap comes before, 10 unless set)
   const len = (wide: number) => (k: number) => (k === 10 ? wide : 90)
-  const start = (wide: number, gap: number) => (k: number) =>
-    k * 100 + (k > 10 ? wide - 90 : 0) + (k >= 10 ? gap : 0)
-  const layOut = (axis: 'x' | 'y', sel: string, wide: number, { rtl = false, gap = 0 } = {}) => {
+  const start =
+    (wide: number, gap: number, gapAt = 10) =>
+    (k: number) =>
+      k * 100 + (k > 10 ? wide - 90 : 0) + (k >= gapAt ? gap : 0)
+  const layOut = (
+    axis: 'x' | 'y',
+    sel: string,
+    wide: number,
+    { rtl = false, gap = 0, gapAt = 10 } = {},
+  ) => {
     rail = document.querySelector('.gallerist-thumbs') as HTMLElement
     scroll = 0
     if (axis === 'x') rail.style.overflowX = 'auto'
@@ -1899,12 +1907,14 @@ describe('plugin-thumbnails — context around the current card, cards of differ
     const groupOf = (el: HTMLElement) =>
       el.matches(sel) && el.dataset.group ? Number(el.dataset.group.slice(1)) : -1
     const at = (k: number) => {
-      const a = start(wide, gap)(k)
+      const a = start(wide, gap, gapAt)(k)
       return rtl ? EXTENT - a - len(wide)(k) : a
     }
+    // as far as the last drawn card reaches
     const max = () => {
-      const n = cards().length
-      return n ? Math.max(0, start(wide, gap)(n - 1) + len(wide)(n - 1) - EXTENT) : 0
+      const last = cards().at(-1)
+      const n = last ? groupOf(last) : -1
+      return n < 0 ? 0 : Math.max(0, start(wide, gap, gapAt)(n) + len(wide)(n) - EXTENT)
     }
     Object.defineProperty(rail, prop, {
       configurable: true,
@@ -2112,6 +2122,140 @@ describe('plugin-thumbnails — context around the current card, cards of differ
     for (const k of [9, 10]) expect(whole(card('.gallerist-thumb', k), 'y'), `g${k}`).toBe(true)
   })
 
+  // 0.4.1 review: the pair centred together left the current card in the rail's end fade (40px; on a
+  // 390px phone 17px of room each end), under the ‹ › page button on a hover device. The theme's
+  // scroll-padding is the fade: the current card shows clear of it, the card ahead may run into the
+  // far one.
+  const fade = (px: number, side: 'Left' | 'Top' = 'Left') => {
+    rail.style[`scrollPadding${side}`] = `${px}px`
+    rail.style[`scrollPadding${side === 'Left' ? 'Right' : 'Bottom'}`] = `${px}px`
+  }
+  const clear = (el: Element | null, f: number, axis: 'x' | 'y' = 'x') => {
+    const r = el?.getBoundingClientRect() as DOMRect
+    const [a, z] = axis === 'x' ? [r.left, r.right] : [r.top, r.bottom]
+    return a >= f && z <= EXTENT - f
+  }
+  it('the current card shows clear of the scroll-padding (the end fade) with the one ahead', () => {
+    const v = chips(30)
+    layOut('x', ROW, 90, { gap: 760 })
+    fade(40)
+    v.goTo(8)
+    expect(scroll).toBe(0)
+    v.next() // the two centred (875) would leave g9 at 25..115: as near as clears it, 40..130
+    expect(scroll).toBe(860)
+    expect(clear(card(ROW, 9), 40), 'g9 clear').toBe(true)
+    expect(whole(card(ROW, 10)), 'g10 whole').toBe(true) // into the far fade: 900..990
+    // shown whole with the one ahead but in the fade: not left there
+    v.prev()
+    rail.scrollLeft = 880 // by hand: g9 at 20..110, g10 at 880..970
+    v.next()
+    expect(scroll).toBe(860)
+    // clear of it and whole with the one ahead: nothing moves
+    v.prev()
+    rail.scrollLeft = 850 // g9 at 50..140, g10 at 910..1000
+    v.next()
+    expect(scroll).toBe(850)
+  })
+
+  it('right to left and down a side rail: the current card clear of the end fade', () => {
+    document.documentElement.setAttribute('dir', 'rtl')
+    const v = chips(30)
+    layOut('x', ROW, 90, { rtl: true, gap: 760 })
+    fade(40)
+    v.goTo(8)
+    v.next()
+    expect(scroll).toBe(-860)
+    expect(clear(card(ROW, 9), 40), 'g9 clear').toBe(true)
+    expect(whole(card(ROW, 10)), 'g10 whole').toBe(true)
+    v.destroy()
+    document.body.innerHTML = ''
+    document.documentElement.removeAttribute('dir')
+    vi.restoreAllMocks()
+    const w = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 50 })] })
+    mount(w, { rail: 'left' })
+    w.open()
+    layOut('y', '.gallerist-thumb', 90, { gap: 760 })
+    fade(40, 'Top')
+    w.goTo(8)
+    w.next()
+    expect(scroll).toBe(860)
+    expect(clear(card('.gallerist-thumb', 9), 40, 'y'), 'g9 clear').toBe(true)
+  })
+
+  // 0.4.1 review: a reveal that doesn't move the current card (an item step in its group, the item
+  // panel's toggle, a reopen) took the way the cursor went to be forward, so the card ahead flipped
+  // to the other side and the rail jumped
+  it('a reveal that leaves the current card where it is keeps the way the cursor went', () => {
+    const v = chips(30)
+    layOut('x', ROW, 90, { gap: 760 })
+    v.goTo(11)
+    v.goTo(10) // back: g9 ahead, past the gap: the two centred
+    expect(scroll).toBe(875)
+    v.prev() // g9: g8 ahead, the gap behind: g9 centred
+    expect(scroll).toBe(445)
+    v.nextItem() // an item step in g9: still going back, nothing moves
+    expect(v.getState().cursor).toEqual({ g: 9, i: 1 })
+    expect(scroll).toBe(445)
+    v.nextItem()
+    expect(scroll).toBe(445)
+  })
+
+  // 0.4.1 review: the cursor stepping onto the last card drawn: centring draws the cards past it, but
+  // the reveal read its neighbours before that, so the card ahead counted as missing
+  it('a step onto the last card drawn reads the card ahead once the run has drawn it', async () => {
+    const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 2 })] })
+    mount(v)
+    v.open()
+    v.goTo(7) // drawn: g5..g9 (no layout yet)
+    layOut('x', '.gallerist-thumb', 90, { gap: 760, gapAt: 11 }) // g10 1000..1090, g11 1860..1950
+    Object.defineProperty(rail, 'clientWidth', { configurable: true, value: 800 })
+    rail.dispatchEvent(new Event('scroll'))
+    await new Promise<void>((r) => requestAnimationFrame(() => r()))
+    // measured: 9 cards a rail, the run g0..g10 around g5 in the middle
+    expect(card('.gallerist-thumb', 10)).not.toBeNull()
+    expect(card('.gallerist-thumb', 11)).toBeNull()
+    v.goTo(10) // g10, cut: the rail draws g11 on, then shows g10 and g11 centred together
+    expect(scroll).toBe(975)
+    for (const k of [10, 11]) expect(whole(card('.gallerist-thumb', k)), `g${k}`).toBe(true)
+  })
+
+  it('a step onto the last card drawn, whole, draws the card ahead to see whether it shows', async () => {
+    const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 2 })] })
+    mount(v)
+    v.open()
+    v.goTo(6) // drawn: g4..g8 (no layout yet)
+    layOut('x', '.gallerist-thumb', 90, { gap: 760 }) // g9 900..990, g10 1760..1850
+    Object.defineProperty(rail, 'clientWidth', { configurable: true, value: 600 })
+    rail.dispatchEvent(new Event('scroll'))
+    await new Promise<void>((r) => requestAnimationFrame(() => r()))
+    // measured: 7 cards a rail, the run g1..g9 around g5 in the middle
+    expect(card('.gallerist-thumb', 9)).not.toBeNull()
+    expect(card('.gallerist-thumb', 10)).toBeNull()
+    v.goTo(9) // g9 shows whole; g10 past the gap, not drawn: drawn, then the two centred
+    expect(scroll).toBe(875)
+    for (const k of [9, 10]) expect(whole(card('.gallerist-thumb', k)), `g${k}`).toBe(true)
+  })
+
+  // 0.4.1 review: the last place the cursor was revealed counted a flat rail's items, and a stacked
+  // rail's groups: after a switch, the way it went came out of the two
+  it('a display switch keeps the way the cursor went', () => {
+    const v = createViewer({
+      collection: many(30, 3),
+      plugins: [thumbnails({ groupDisplay: 'flat', overscan: 50 })],
+    })
+    mount(v)
+    v.open()
+    v.goTo(10) // forward: item 30 of the flat rail
+    const rail0 = getInternals(v)
+      .getPlugins()
+      .find((p) => p.name === 'thumbnails') as ThumbnailsInstance
+    layOut('x', '.gallerist-thumb', 90, { gap: 760 }) // g9 900..990, g10 1760..1850, g11 1860..
+    rail0.setDisplay('stacked')
+    // still going forward: g11 ahead, next to it; the gap behind: g10 centred, as a step forward
+    // there centres it (not g9 ahead, which a step back would bring in: 875)
+    expect(scroll).toBe(1305)
+  })
+
   it('a side rail: down the column, by scrollTop', () => {
     const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 50 })] })
     mount(v, { rail: 'left' })
@@ -2209,6 +2353,36 @@ describe('strip helpers', () => {
     expect(scroller.scrollLeft).toBe(240)
     keepPlace(scroller, ref, null, () => {}) // no axis measured yet: nothing to correct
     expect(scroller.scrollLeft).toBe(240)
+  })
+
+  // 0.4.1: cards 84 × 16/9 (149.33px) wide: each re-window moves the reference by a fraction. A whole
+  // px scroll each time, rounded alone, errs the same way every time (0.33px, 30 re-windows: 10px off);
+  // the fraction carried keeps what shows within half a px of where it was.
+  it('keepPlace carries the fraction its whole-px scrolls leave out', () => {
+    const scroller = document.createElement('div')
+    let scroll = 0
+    Object.defineProperty(scroller, 'scrollLeft', {
+      configurable: true,
+      get: () => scroll,
+      set: (v: number) => {
+        scroll = Math.trunc(v) // whole px, as WebKit keeps them
+      },
+    })
+    let drawn = 0 // what the re-windows put before the reference
+    const ref = document.createElement('span')
+    scroller.appendChild(ref)
+    document.body.appendChild(scroller)
+    ref.getBoundingClientRect = () => ({ left: 500 + drawn - scroll, top: 0 }) as DOMRect
+    for (let k = 1; k <= 30; k++) {
+      keepPlace(scroller, ref, 'x', () => {
+        drawn += (84 * 16) / 9
+      })
+      // the reference stays within half a px of 500
+      expect(
+        Math.abs(ref.getBoundingClientRect().left - 500),
+        `re-window ${k}`,
+      ).toBeLessThanOrEqual(0.5 + 1e-9)
+    }
   })
 })
 

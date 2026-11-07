@@ -541,11 +541,18 @@ test.describe('on a phone', () => {
         .map((c) => ({ c, b: c.getBoundingClientRect() }))
         .filter(({ b }) => b.width > 0)
       const id = (c: HTMLElement) => c.dataset.item ?? c.dataset.group ?? ''
+      // the fade at the rail's left and right ends, where it has more beyond (0: none)
+      const cs = getComputedStyle(rail)
+      const fade = Number.parseFloat(cs.getPropertyValue('--gallerist-rail-fade')) || 0
+      const more = ['start', 'end'].map((e) => rail.hasAttribute(`data-gallerist-more-${e}`))
+      const [fLo, fHi] = cs.direction === 'rtl' ? more.reverse() : more
       return {
         id: id(cards.find(({ c }) => c.hasAttribute('data-active'))?.c ?? rail),
         cards: cards.map(({ c, b }) => ({ id: id(c), a: b.left, z: b.right })),
         lo: r.left,
         hi: r.right,
+        fLo: fLo ? fade : 0,
+        fHi: fHi ? fade : 0,
       }
     }, sel)
   const span = (...cs: Span[]) => Math.max(...cs.map((c) => c.z)) - Math.min(...cs.map((c) => c.a))
@@ -598,6 +605,11 @@ test.describe('on a phone', () => {
             const at = `${key} to ${cur.id}`
             // (soft: every step that fails is reported, not just the first)
             expect.soft(whole(cur), `${at}: it shows whole`).toBe(true)
+            // …and clear of the fades (0.4.1 review: it sat in one, dimmed)
+            expect
+              .soft(cur.a, `${at}: clear of the start fade`)
+              .toBeGreaterThanOrEqual(n.lo + n.fLo - 1)
+            expect.soft(cur.z, `${at}: clear of the end fade`).toBeLessThanOrEqual(n.hi - n.fHi + 1)
             if (!ahead) continue
             if (!behind || span(behind, cur, ahead) <= room - 1) {
               for (const c of [behind, ahead])
@@ -605,7 +617,13 @@ test.describe('on a phone', () => {
               continue
             }
             if (gap(ahead) > gap(behind) + 1 && span(cur, ahead) <= room - 1) {
-              expect.soft(whole(ahead), `${at}: ${ahead.id} ahead shows whole`).toBe(true)
+              // whole, but for what the current card clear of the near fade leaves too little room
+              // for: then it runs past the rail's far edge by that, in the far fade
+              const short = span(cur, ahead) - (room - (ahead.a > cur.a ? n.fLo : n.fHi))
+              const over = Math.max(0, n.lo - ahead.a, ahead.z - n.hi)
+              expect
+                .soft(over, `${at}: ${ahead.id} ahead shows whole`)
+                .toBeLessThanOrEqual(Math.max(0, short) + 1)
               // well clear of the edge cases, whatever the fonts
               if (span(behind, cur, ahead) > room + 15 && span(cur, ahead) < room - 15)
                 tight.push(`${cur.id}>${ahead.id}`)

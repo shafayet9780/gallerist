@@ -92,10 +92,21 @@ for (const [name, query] of [
 // it centres the current card, which the browser clamps at either end of the rail. The layout
 // fixture: 37 items in 12 groups of mixed sizes.
 type Span = { id: string; a: number; z: number }
-type RailNow = { id: string; cards: Span[]; lo: number; hi: number; at: number; max: number }
+type RailNow = {
+  id: string
+  cards: Span[]
+  lo: number
+  hi: number
+  at: number
+  max: number
+  fLo: number
+  fHi: number
+  pad: number
+}
 // the rail's cards in rail order (a flat rail's items, else its group cards or chips; DOM order, so
 // a right-to-left rail's first card is its rightmost), the current one, the rail's extent and how far
-// it is scrolled toward its end (0 at the start)
+// it is scrolled toward its end (0 at the start); the fade at its low (left, top) and high ends, where
+// there is more beyond (0: none), and its scroll-padding (the theme's: the fade's width)
 const railNow = (page: Page, flat: boolean) =>
   page.evaluate(async (flat) => {
     for (let k = 0; k < 2; k++) await new Promise((r) => requestAnimationFrame(r)) // the re-window
@@ -114,6 +125,10 @@ const railNow = (page: Page, flat: boolean) =>
         z: down ? b.bottom : b.right,
         on: c.hasAttribute('data-active'),
       }))
+    const cs = getComputedStyle(rail)
+    const fade = Number.parseFloat(cs.getPropertyValue('--gallerist-rail-fade')) || 0
+    const more = ['start', 'end'].map((e) => rail.hasAttribute(`data-gallerist-more-${e}`))
+    const [fLo, fHi] = !down && cs.direction === 'rtl' ? more.reverse() : more
     return {
       id: cards.find((c) => c.on)?.id ?? '',
       cards: cards.map(({ id, a, z }) => ({ id, a, z })),
@@ -121,11 +136,19 @@ const railNow = (page: Page, flat: boolean) =>
       hi: down ? r.bottom : r.right,
       at: Math.abs(down ? rail.scrollTop : rail.scrollLeft),
       max: down ? rail.scrollHeight - rail.clientHeight : rail.scrollWidth - rail.clientWidth,
+      fLo: fLo ? fade : 0,
+      fHi: fHi ? fade : 0,
+      pad: Number.parseFloat(down ? cs.scrollPaddingTop : cs.scrollPaddingLeft) || 0,
     }
   }, flat) as Promise<RailNow>
 
 // shows whole along the rail (no card: the run's end, nothing to show)
 const whole = (n: RailNow, c: Span | undefined) => !c || (c.a >= n.lo - 1 && c.z <= n.hi + 1)
+// shows clear of the rail's end fades (0.4.1 review: the current card sat in one, dimmed, and under
+// the ‹ › page button on a hover device)
+const clear = (n: RailNow, c: Span | undefined) =>
+  !c || (c.a >= n.lo + n.fLo - 1 && c.z <= n.hi - n.fHi + 1)
+const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(x, hi))
 // the card `id` and the ones either side of it, in rail order
 const around = (n: RailNow, id: string) => {
   const k = n.cards.findIndex((c) => c.id === id)
@@ -162,20 +185,40 @@ const walk = async (page: Page, flat: boolean, key: string, steps: number, step:
     // the current one and the one ahead, where more lies between them than behind (a marker)
     const two = three || room(ahead) <= room(behind) + 1 ? null : fits([cur, ahead])
     const set = three ?? two ?? [cur]
-    for (const c of set) expect(whole(now, c), `${now.id}: ${c.id} shows`).toBe(true)
+    // the current card clear of the fades; the one ahead of two may run into the far one, and past
+    // the rail's edge as far as the near one leaves too little room for both (0.4.1 review)
+    expect(clear(now, cur), `${now.id} shows clear of the fades`).toBe(true)
+    for (const c of set) {
+      if (two && c === ahead) {
+        const near = c.a > cur.a ? now.fLo : now.fHi
+        const over = Math.max(0, now.lo - c.a, c.z - now.hi)
+        const short = Math.max(c.z, cur.z) - Math.min(c.a, cur.a) - (now.hi - now.lo - near)
+        expect(over, `${now.id}: ${c.id} ahead shows`).toBeLessThanOrEqual(Math.max(0, short) + 1)
+      } else expect(whole(now, c), `${now.id}: ${c.id} shows`).toBe(true)
+    }
     // how far the current card's middle is from the rail's, less what showing them whole takes
-    // back (scrolling by d moves every card by -d; they show for d in [from, to])
+    // back (scrolling by d moves every card by -d; they show for d in [from, to]), then what showing
+    // the current card clear of the scroll-padding takes (for d in [c0, c1])
     const off = (cur.a + cur.z) / 2 - (now.lo + now.hi) / 2
     const from = Math.max(...set.map((c) => c.z)) - now.hi
     const to = Math.min(...set.map((c) => c.a)) - now.lo
-    const centred = Math.abs(two ? (from + to) / 2 : Math.min(Math.max(off, from), to)) < 2
+    const c0 = cur.z - now.hi + now.pad
+    const c1 = cur.a - now.lo - now.pad
+    const rest = set.length > 1 ? clamp(clamp(two ? (from + to) / 2 : off, from, to), c0, c1) : off
+    const centred = Math.abs(rest) < 2
     const atEnd = now.at <= 1 || now.at >= now.max - 1
     // did the rail move? (the cards that stay keep their place through a re-window otherwise)
     const ref = spanOf(before, before.id) as Span
     const moved = Math.abs((spanOf(now, ref.id)?.a ?? Number.NaN) - ref.a) > 1
-    const needed = (two ?? around(before, now.id)).some(
-      (c) => !whole(before, spanOf(before, c?.id ?? '')),
-    )
+    // it had to if one of them didn't show whole before the step (a card not drawn then didn't
+    // show), or the current card sat in a fade
+    const showed = (c: Span) => {
+      const was = spanOf(before, c.id)
+      return !!was && whole(before, was)
+    }
+    const needed =
+      (two ?? [prev, cur, next]).some((c) => !!c && !showed(c)) ||
+      !clear(before, spanOf(before, cur.id))
     if (!needed) expect(moved, `${now.id}: the rail stayed put`).toBe(false)
     else if (!moved) expect(centred || atEnd, `${now.id}: already in place`).toBe(true)
     if (moved && !atEnd)
@@ -295,7 +338,9 @@ for (const { name, size, query, flat, fwd, back, total } of [
     await page.goto(`/layout.html?g=0&${query}`)
     await expect(page.locator('.gallerist')).toHaveAttribute('data-gallerist-phase', 'open')
     const start = await railNow(page, flat)
-    expect(start.at).toBe(0)
+    // at the start (a right-to-left rail of chips can overflow its start by a px in Chromium: the
+    // first chip, kept clear of where a fade would be, takes the rail there, 1 from 0)
+    expect(start.at).toBeLessThanOrEqual(1)
     expect(start.max, 'the rail scrolls').toBeGreaterThan(0)
     // to the end: centring the cards before the last stops at the rail's end (clamped)
     const end = await walk(page, flat, fwd, total - 1)

@@ -372,8 +372,10 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
 // half a panel of what comes next in view, whichever way the cursor went. Cards of different
 // widths (index chips) can leave a wider neighbour cut once centred: where the three fit, the
 // scroll goes on from the centre just as far as shows them all; where they don't (a marker or a
-// wide label line between them), it centres the card and the one ahead together (centreBy). The
-// browser clamps that at either end of the rail, so the first and last cards stop at their edges.
+// wide label line between them), it centres the card and the one ahead together (centreBy). The card
+// itself stays clear of the panel's scroll-padding (the theme's: the rail's end fades, where the ‹ ›
+// page buttons sit too). The browser clamps that at either end of the rail, so the first and last
+// cards stop at their edges.
 // Instant, as every scroll of the rail is (there is no motion to take out under
 // prefers-reduced-motion).
 function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefined>): void {
@@ -395,7 +397,8 @@ function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefi
  *  than its cards), 0 while `btn` and the one ahead show whole, else what centres the two, so what
  *  comes next shows whole wherever it can (0.4.1). Otherwise (evenly spaced cards in a short panel,
  *  or the two don't fit either) `btn` centred, as before. A neighbour with no box (not laid out,
- *  hidden) doesn't count. */
+ *  hidden) doesn't count. `btn` itself shows clear of `box`'s scroll-padding (0.4.1: the rail's end
+ *  fades): the scroll moves on as little as clears it, and 0 needs it clear too. */
 function centreBy(
   box: HTMLElement,
   btn: HTMLElement,
@@ -406,6 +409,14 @@ function centreBy(
   const edge = box.getBoundingClientRect()
   const r = btn.getBoundingClientRect()
   const by = (r[lo] + r[hi] - edge[lo] - edge[hi]) / 2
+  // the scrolls that show `btn` clear of the scroll-padding (the theme's is the rail's end fade,
+  // symmetric: one side read): c0 to c1
+  const f =
+    Number.parseFloat(
+      getComputedStyle(box)[axis === 'x' ? 'scrollPaddingLeft' : 'scrollPaddingTop'],
+    ) || 0
+  const c0 = r[hi] - edge[hi] + f
+  const c1 = r[lo] - edge[lo] - f
   // a neighbour's box (none, or not laid out: btn's own, which changes nothing below)
   const [b, a] = around.map((el) => {
     const q = el?.getBoundingClientRect()
@@ -425,12 +436,16 @@ function centreBy(
     const from = Math.max(...rs.map((q) => q[hi])) - edge[hi]
     const to = Math.min(...rs.map((q) => q[lo])) - edge[lo]
     if (from <= to + 1)
-      return from <= 1 && to >= -1
+      return from <= 1 && to >= -1 && c0 <= 1 && c1 >= -1
         ? 0
-        : Math.round(rs[2] ? Math.min(Math.max(by, from), to) : (from + to) / 2)
+        : // then as near as that keeps btn clear (where it can: not past its start)
+          Math.round(clamp(clamp(rs[2] ? by : (from + to) / 2, from, to), c0, c1))
   }
-  return by
+  return Math.round(by)
 }
+
+/** `x` within `lo`..`hi`; `lo` where they cross. */
+const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(x, hi))
 
 /** Whether the primary pointer can hover (desktop). Defaults true when undetectable (SSR/test). */
 function canHover(): boolean {
@@ -538,6 +553,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     let axis: Axis | null = null // which way the rail scrolls, once measured
     let perView = 0 // cards that fit in the rail, once measured
     let lastAt = 0 // the current card's place in the rail when last revealed
+    let dir = 1 // the way the cursor last went along the rail (1: toward its end)
     let resizeObs: ResizeObserver | null = null
     let frame = 0 // pending rAF for a scroll/resize re-window
     const groupBtns = new Map<string, HTMLButtonElement>()
@@ -839,15 +855,14 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const v = box.getBoundingClientRect()
       const w = tipEl.offsetWidth
       const h = tipEl.offsetHeight
-      const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(x, hi - 8))
       let x = r.left + r.width / 2 - w / 2
       let y = r.top + r.height / 2 > v.top + v.height / 2 ? r.top - h - 8 : r.bottom + 8
       if (axis === 'y') {
         x = r.left + r.width / 2 > v.left + v.width / 2 ? r.left - w - 8 : r.right + 8
         y = r.top + r.height / 2 - h / 2
       }
-      tipEl.style.left = `${clamp(x, v.left + 8, v.right - w) - b.left}px`
-      tipEl.style.top = `${clamp(y, v.top + 8, v.bottom - h) - b.top}px`
+      tipEl.style.left = `${clamp(x, v.left + 8, v.right - w - 8) - b.left}px`
+      tipEl.style.top = `${clamp(y, v.top + 8, v.bottom - h - 8) - b.top}px`
     }
     const readMarkers = (col: Collection) => {
       const ids = new Set(col.groups.map((g) => g.id))
@@ -1042,19 +1057,22 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     // neighbours in the group's item panel (the item column, an index section's items)
     const revealActive = (col: ReturnType<ViewerApi['getCollection']>, g: number, i: number) => {
       const at = isFlat ? (flatPos.get(`${g}:${i}`) ?? 0) : g
-      // the way the cursor went (a step back: the card before it is the one ahead)
-      const d = at < lastAt ? -1 : 1
+      // the way the cursor went (a step back: the card before it is the one ahead); a reveal that
+      // doesn't move it (an item step in its group, the item panel's toggle, a reopen) keeps it
+      dir = Math.sign(at - lastAt) || dir
       lastAt = at
       const card = (k: number) =>
         isFlat ? itemBtns.get(flat[k]?.itemId ?? '') : groupBtns.get(col.groups[k]?.id ?? '')
       // Centring scrolls up to half the rail past what shows, and the drawn run reaches only a few
-      // cards past it: when the rail is about to centre, draw what the centred card's half-rails
-      // need first (keepPlace holds the screen still), or the scroll would stop at the run's end.
+      // cards past it: when the rail is about to centre, or the card ahead isn't drawn (the cursor
+      // at the run's end, or the rail's), draw what the centred card's half-rails need first (keepPlace holds the
+      // screen still), or the scroll would stop at the run's end, or miss a neighbour past a marker.
       // The scroll that follows trims the run back (rewindow).
       const btn = card(at)
-      const near = [card(at - d), card(at + d)] // behind it, ahead of it
+      // behind it, ahead of it: read again after setWindow, which can draw them
+      const near = () => [card(at - dir), card(at + dir)]
       if (root && btn && axis && perView) {
-        if (centreBy(root, btn, near, axis)) {
+        if (centreBy(root, btn, near(), axis) || !card(at + dir)) {
           const reach = Math.ceil(perView / 2) + 1
           setWindow(
             col,
@@ -1063,7 +1081,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
           )
         }
       }
-      reveal(btn, near)
+      reveal(btn, near())
       const items = col.groups[g]?.items ?? []
       const item = (k: number) => itemBtns.get(items[k]?.id ?? '')
       if (!isFlat) reveal(item(i), [item(i - 1), item(i + 1)])
@@ -1443,6 +1461,8 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         }
         if (peekGroupId && peekGroupId === activeGroupId) closePeek() // navigated into the peeked group
       }
+      // new data or a new display (forget): `lastAt` counted another rail's places
+      if (colChanged) lastAt = at
       applyActive(col, cur.g, cur.i)
       strip?.update()
 
