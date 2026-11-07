@@ -13,8 +13,13 @@ import type {
   ViewerApi,
   ZoomState,
 } from '@gallerist/core'
-import { clampPanToBox, clampScale, getInternals } from '@gallerist/core/internal'
-import { imageAdapter, mountImage } from './adapters/image'
+import {
+  clampPanToBox,
+  clampScale,
+  getInternals,
+  reportHandlerError,
+} from '@gallerist/core/internal'
+import { type DomAdapterCtx, cssMs, imageAdapter, mountImage } from './adapters/image'
 import { type Accent, type ColorScheme, type Skin, applyAppearance } from './appearance'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
@@ -169,6 +174,13 @@ function el(tag: string, className?: string, attrs?: Record<string, string>): HT
   if (attrs) for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v)
   return node
 }
+/** A button with an icon, named, that runs `click`. */
+function button(cls: string, label: string, icon: string, click: () => void): HTMLElement {
+  const b = el('button', cls, { type: 'button', 'aria-label': label })
+  b.innerHTML = icon
+  b.addEventListener('click', click)
+  return b
+}
 
 const FOCUSABLE_SELECTOR =
   'a[href],area[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),iframe,[tabindex],[contenteditable="true"]'
@@ -180,6 +192,11 @@ function focusableWithin(root: HTMLElement): HTMLElement[] {
       node.tabIndex !== -1 && !node.hasAttribute('disabled') && node.checkVisibility?.() !== false,
   )
 }
+// Widgets with arrow keys of their own: a plugin's arrow keys aren't asked from inside one.
+// Not the viewer's own listboxes (a rail's, a grid's; their class starts `gallerist-`): their arrows
+// are the viewer's. A host class that only contains `gallerist-` is still the host's.
+const WIDGETS =
+  '[role=dialog],[role^=menu],[role=slider],[aria-haspopup]:not([aria-haspopup=false]),:is([role=listbox],[role=tablist],[role=radiogroup],[role^=tree],[role=grid]):not([class^=gallerist-])'
 /** True when the key event originates from a control where typing must not be hijacked. */
 function isEditableTarget(target?: EventTarget | null): boolean {
   const node = target as HTMLElement | null
@@ -189,11 +206,6 @@ function isEditableTarget(target?: EventTarget | null): boolean {
 /** Longest animation (delay + duration × iterations) in ms from a computed style's comma lists.
  *  An infinite animation counts one iteration: it never ends, so the timer settles after one. */
 function animationMs(style: CSSStyleDeclaration): number {
-  const ms = (v: string) => {
-    const n = Number.parseFloat(v)
-    if (!Number.isFinite(n)) return 0
-    return v.trim().endsWith('ms') ? n : n * 1000
-  }
   const count = (v: string | undefined) => {
     const n = Number.parseFloat(v ?? '1')
     return Number.isFinite(n) && n > 0 ? n : 1
@@ -204,7 +216,7 @@ function animationMs(style: CSSStyleDeclaration): number {
   const iterations = (style.animationIterationCount || '1').split(',')
   return Math.max(
     0,
-    ...durations.map((d, i) => ms(at(delays, i) ?? '0s') + ms(d) * count(at(iterations, i))),
+    ...durations.map((d, i) => cssMs(at(delays, i) ?? '0s') + cssMs(d) * count(at(iterations, i))),
   )
 }
 
@@ -480,12 +492,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   let railCollapsed = railHidden
   let preFsCollapsed: boolean | null = null
   const railHandle = el('div', 'gallerist-rail-handle')
-  const railToggle = el('button', 'gallerist-rail-toggle', {
-    type: 'button',
-    'aria-label': railHidden ? ui.showThumbnails : ui.hideThumbnails,
-    'aria-pressed': String(railHidden),
-  })
-  railToggle.innerHTML = ICONS.collapse
+  const railToggle = button(
+    'gallerist-rail-toggle',
+    railHidden ? ui.showThumbnails : ui.hideThumbnails,
+    ICONS.collapse,
+    () => setRailCollapsed(!railCollapsed, true),
+  )
+  railToggle.setAttribute('aria-pressed', String(railHidden))
   railHandle.appendChild(railToggle)
   const setRailCollapsed = (v: boolean, manual = false) => {
     railCollapsed = v
@@ -495,7 +508,6 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // a manual toggle while fullscreen wins over the on-exit restore
     if (manual) preFsCollapsed = null
   }
-  railToggle.addEventListener('click', () => setRailCollapsed(!railCollapsed, true))
 
   let counter: HTMLElement | undefined
   let title: HTMLElement | undefined
@@ -515,38 +527,34 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     counter = el('div', 'gallerist-counter')
     title = el('div', 'gallerist-title')
     title.hidden = true
-    reset = el('button', 'gallerist-zoom-reset', { type: 'button', 'aria-label': ui.resetZoom })
-    reset.innerHTML = ICONS.zoomReset
+    reset = button('gallerist-zoom-reset', ui.resetZoom, ICONS.zoomReset, () => viewer.resetZoom())
     reset.hidden = true // only while zoomed in
-    reset.addEventListener('click', () => viewer.resetZoom())
-    const close = el('button', 'gallerist-close', { type: 'button', 'aria-label': ui.close })
-    close.innerHTML = ICONS.close
-    close.addEventListener('click', () => viewer.close())
+    const close = button('gallerist-close', ui.close, ICONS.close, () => viewer.close())
     bar.append(counter, title, regionHosts.toolbar, reset, close)
 
     // over the stage: group arrows and the item navigator (↑ · position · ↓) as one cluster, so
     // each arrow layout places it as a unit. Icons follow the group axis: horizontal → group ←/→,
     // item ↑/↓; vertical (side rail) → group ↑/↓, item ←/→.
-    const prev = el('button', 'gallerist-prev', { type: 'button', 'aria-label': ui.previous })
-    prev.innerHTML = vertical ? ICONS.itemPrev : ICONS.prev
-    prev.addEventListener('click', () => nav.prev())
-    const next = el('button', 'gallerist-next', { type: 'button', 'aria-label': ui.next })
-    next.innerHTML = vertical ? ICONS.itemNext : ICONS.next
-    next.addEventListener('click', () => nav.next())
+    const prev = button('gallerist-prev', ui.previous, vertical ? ICONS.itemPrev : ICONS.prev, () =>
+      nav.prev(),
+    )
+    const next = button('gallerist-next', ui.next, vertical ? ICONS.itemNext : ICONS.next, () =>
+      nav.next(),
+    )
     prevArrow = prev
     nextArrow = next
-    const prevItem = el('button', 'gallerist-item-prev', {
-      type: 'button',
-      'aria-label': ui.previousItem,
-    })
-    prevItem.innerHTML = vertical ? ICONS.prev : ICONS.itemPrev
-    prevItem.addEventListener('click', () => nav.prevItem())
-    const nextItem = el('button', 'gallerist-item-next', {
-      type: 'button',
-      'aria-label': ui.nextItem,
-    })
-    nextItem.innerHTML = vertical ? ICONS.next : ICONS.itemNext
-    nextItem.addEventListener('click', () => nav.nextItem())
+    const prevItem = button(
+      'gallerist-item-prev',
+      ui.previousItem,
+      vertical ? ICONS.prev : ICONS.itemPrev,
+      () => nav.prevItem(),
+    )
+    const nextItem = button(
+      'gallerist-item-next',
+      ui.nextItem,
+      vertical ? ICONS.next : ICONS.itemNext,
+      () => nav.nextItem(),
+    )
     position = el('div', 'gallerist-position')
     itemNav = el('div', 'gallerist-itemnav')
     itemNav.hidden = true // shown only for groups with more than one item (and not in linear mode)
@@ -668,10 +676,26 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.abort?.abort()
         rec.media?.destroy()
         const abort = new AbortController()
-        rec.media = pickAdapter(it.type, it)?.mount(it, rec.content, {
+        const ctx: DomAdapterCtx = {
           signal: abort.signal,
           priority: isCurrent ? 'high' : 'low',
-        })
+          strings: ui,
+          // mount it afresh; focus on the Retry going with the old media lands on the root, and
+          // comes back to the new Retry if it fails again (unless the user moved it on meanwhile)
+          retry: () => {
+            const had = rec.content.contains(document.activeElement)
+            if (had) root.focus({ preventScroll: true })
+            rec.itemId = ''
+            renderWindow()
+            if (had)
+              rec.media?.ready?.catch(() => {
+                const at = document.activeElement
+                if (at === root || at === document.body)
+                  rec.content.querySelector<HTMLElement>('.gallerist-media-pill button')?.focus()
+              })
+          },
+        }
+        rec.media = pickAdapter(it.type, it)?.mount(it, rec.content, ctx)
         rec.abort = abort
         rec.itemId = it.id
         rec.activated = false
@@ -719,25 +743,21 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
           })
       }
       // activate/deactivate media on slide enter/leave (spec §12 — play/pause for video)
-      if (isCurrent && !rec.activated) {
-        rec.media?.activate?.()
-        rec.activated = true
-      } else if (!isCurrent && rec.activated) {
-        rec.media?.deactivate?.()
-        rec.activated = false
+      if (isCurrent !== !!rec.activated) {
+        rec.media?.[isCurrent ? 'activate' : 'deactivate']?.()
+        rec.activated = isCurrent
       }
+      for (const n of [rec.slide, rec.content])
+        n.toggleAttribute('data-gallerist-current', isCurrent)
       if (isCurrent) {
         tagAxis(rec.slide, cur)
-        rec.slide.setAttribute('data-gallerist-current', '')
-        rec.content.setAttribute('data-gallerist-current', '')
         applyTransform(rec.content, state.zoom)
         if (it) {
           // Repaint (re-invokes user render() + rebuilds DOM) only when the item changes, including
           // new data for the same id (setCollection).
           // On a zoom-only change, update retained overlays in place (spec §9.2: no rebuild).
           if (rec.overlayItem !== it) {
-            const r = stage.getBoundingClientRect()
-            const stageSize = { w: r.width, h: r.height }
+            const size = stageSize()
             rec.overlayEls = paintOverlays(
               viewportLayer,
               rec.overlayHost,
@@ -747,9 +767,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
                 item: it,
                 viewer,
                 zoom: state.zoom,
-                stage: stageSize,
-                natural: rec.media?.naturalSize?.() ?? stageSize,
-                box: paintedBox(stageSize, rec.media?.naturalSize?.()),
+                stage: size,
+                natural: rec.media?.naturalSize?.() ?? size,
+                box: paintedBox(size, rec.media?.naturalSize?.()),
               },
             )
             rec.overlayItem = it
@@ -758,8 +778,6 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
           }
         }
       } else {
-        rec.slide.removeAttribute('data-gallerist-current')
-        rec.content.removeAttribute('data-gallerist-current')
         rec.overlayHost.replaceChildren()
         rec.overlayEls = undefined
         rec.overlayItem = undefined
@@ -838,26 +856,24 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       position.appendChild(text)
       if (mode !== 'counter') {
         for (let k = 0; k < itemCount; k++) {
-          const jump = el('button', mode === 'pills' ? 'gallerist-pill' : 'gallerist-dot', {
-            type: 'button',
-            'aria-label': ui.item(k + 1),
-          })
-          if (mode === 'pills') jump.textContent = String(k + 1)
-          jump.addEventListener('click', () => viewer.goTo(g, k))
-          position.appendChild(jump)
+          const pill = mode === 'pills'
+          position.appendChild(
+            button(
+              pill ? 'gallerist-pill' : 'gallerist-dot',
+              ui.item(k + 1),
+              pill ? String(k + 1) : '', // a number: no markup
+              () => viewer.goTo(g, k),
+            ),
+          )
         }
       }
       posG = g
       posM = itemCount
     }
-    const text = position.querySelector('.gallerist-position-text')
-    if (text) text.textContent = `${i + 1} / ${itemCount}`
-    for (const [k, jump] of position
-      .querySelectorAll('.gallerist-pill, .gallerist-dot')
-      .entries()) {
-      if (k === i) jump.setAttribute('data-active', '')
-      else jump.removeAttribute('data-active')
-    }
+    // the text, first (built above)
+    ;(position.firstChild as HTMLElement).textContent = `${i + 1} / ${itemCount}`
+    for (const [k, jump] of position.querySelectorAll('.gallerist-pill, .gallerist-dot').entries())
+      jump.toggleAttribute('data-active', k === i)
   }
 
   // Hide a control without dropping keyboard focus: if it (or a child) has focus, hand focus to the
@@ -1024,18 +1040,13 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     e.stopPropagation()
     nav.setPointerCapture?.(e.pointerId)
     panNavigatorTo(e)
-    const move = (ev: PointerEvent) => panNavigatorTo(ev)
-    const up = () => {
-      nav.removeEventListener('pointermove', move)
-      nav.removeEventListener('pointerup', up)
-      nav.removeEventListener('pointercancel', up)
-      nav.removeEventListener('lostpointercapture', up)
-    }
-    nav.addEventListener('pointermove', move)
-    nav.addEventListener('pointerup', up)
-    nav.addEventListener('pointercancel', up)
-    // hidden mid-drag (zoom reset): capture is lost and no pointerup arrives here
-    nav.addEventListener('lostpointercapture', up)
+    // the drag ends on a lift, a cancel, or hidden mid-drag (zoom reset): capture is lost and no
+    // pointerup arrives here
+    const done = new AbortController()
+    const on = { signal: done.signal }
+    nav.addEventListener('pointermove', panNavigatorTo, on)
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture'])
+      nav.addEventListener(t, () => done.abort(), on)
   }
 
   // ── attach / detach ──────────────────────────────────────────────────────────
@@ -1140,7 +1151,9 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // list walking its own ↑/↓) is not ours. Don't hijack typing inside an embedded control (overlay
     // input/textarea/select/contenteditable); Escape still closes from anywhere (I-UX2).
     // (A field in an open shadow root counts by itself: the event's first target, not its host.)
-    if (e.defaultPrevented || (isEditableTarget(e.composedPath()[0]) && e.key !== 'Escape')) return
+    const at = e.composedPath()[0] as Element
+    const field = isEditableTarget(at)
+    if (e.defaultPrevented || (field && e.key !== 'Escape')) return
     // A focused caption band scrolls with ↑/↓/Home/End rather than navigating. Scrolled here, not
     // left to the browser: WebKit on Linux (GTK/WPE) leaves the placard's band unscrolled.
     const by =
@@ -1171,6 +1184,24 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
       }
       return
     }
+    // Modified chords (Ctrl/Cmd/Alt) belong to the browser/OS, not a single-key map; a key typed
+    // with AltGr (Ctrl + Alt on Windows: `?` on some layouts) is still that key.
+    const chord = (e.ctrlKey || e.metaKey || e.altKey) && !e.getModifierState?.('AltGraph')
+    // The plugins' keys come first, ours after: a plugin's handler takes a key with preventDefault()
+    // (a rail's ↑/↓ for the items of a cluster), else ours for it runs too. Not a chord, nor from a
+    // field (Escape there is ours alone), nor an arrow from a widget in the viewer with arrows of its
+    // own (a dialog, menu, slider or menu button: the overlay root, a dialog, doesn't
+    // count); ours still run there, as before.
+    const own = /^Arrow/.test(e.key) && at.closest?.(WIDGETS)
+    // A handler that throws can't cancel ours (Escape still closes): its error is reported, as the
+    // core's emitter reports a listener's.
+    if (!chord && !field && (!own || own.contains(root)))
+      try {
+        pluginKeymap[e.key]?.(e)
+      } catch (err) {
+        reportHandlerError(err)
+      }
+    if (e.defaultPrevented) return
     switch (e.key) {
       case 'ArrowRight':
       case 'ArrowLeft':
@@ -1201,29 +1232,19 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         setRailCollapsed(!railCollapsed, true)
         break
       case 'Home':
+      case 'End': {
+        const end = e.key === 'End'
         if (linear) {
           ensureFlat()
-          const t = flatSeq[0]
+          const t = flatSeq.at(end ? -1 : 0)
           if (t) viewer.goTo(t.g, t.i)
-        } else viewer.goTo(0)
+        } else viewer.goTo(end ? viewer.getCollection().groups.length - 1 : 0)
         break
-      case 'End':
-        if (linear) {
-          ensureFlat()
-          const t = flatSeq[flatSeq.length - 1]
-          if (t) viewer.goTo(t.g, t.i)
-        } else viewer.goTo(viewer.getCollection().groups.length - 1)
-        break
+      }
       default:
-        // Modified chords (Ctrl/Cmd/Alt) belong to the browser/OS, not our single-letter map; a key
-        // typed with AltGr (Ctrl + Alt on Windows: `?` on some layouts) is still that key.
-        if ((e.ctrlKey || e.metaKey || e.altKey) && !e.getModifierState?.('AltGraph')) return
         // Within-group digit jumps are meaningless in linear mode (the pills retire), so skip them.
-        if (!linear && /^[1-9]$/.test(e.key)) {
+        if (!chord && !linear && /^[1-9]$/.test(e.key))
           viewer.goTo(viewer.getState().cursor.g, Number(e.key) - 1)
-        } else if (pluginKeymap[e.key]) {
-          pluginKeymap[e.key]?.(e)
-        }
         return
     }
     e.preventDefault()
@@ -1259,13 +1280,10 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     getContent: () => currentRec()?.content ?? null,
     getGeometry: () => {
       const r = stage.getBoundingClientRect()
+      const size = { w: r.width, h: r.height }
       // Contained model: the content layer fills the stage and scale 1 == fit; the media is
       // object-fit: contain inside it, so pan bounds use the painted box (see mediaBox).
-      return {
-        stageRect: { left: r.left, top: r.top, width: r.width, height: r.height },
-        naturalSize: { w: r.width, h: r.height },
-        mediaBox: mediaBox({ w: r.width, h: r.height }),
-      }
+      return { stageRect: r, naturalSize: size, mediaBox: mediaBox(size) }
     },
   })
 
@@ -1339,11 +1357,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     const size = stageSize()
     if (!(size.w > 0 && size.h > 0)) return
     const box = paintedBox(size, rec.media?.naturalSize?.())
-    const s = rec.content.style
-    s.setProperty('--gallerist-box-x', `${box.x}px`)
-    s.setProperty('--gallerist-box-y', `${box.y}px`)
-    s.setProperty('--gallerist-box-w', `${box.w}px`)
-    s.setProperty('--gallerist-box-h', `${box.h}px`)
+    for (const k of ['x', 'y', 'w', 'h'] as const)
+      rec.content.style.setProperty(`--gallerist-box-${k}`, `${box[k]}px`)
   }
   // What the committed zoom was last clamped against: the stage size and the current media's
   // painted box in it. And what the last re-clamp kept: the view it aimed for (before the clamp),
@@ -1431,6 +1446,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   // where they overlap it and inset the on-stage controls box by that much, so arrows and the item
   // navigator never end up underneath chrome (in every arrow layout, rail expanded or collapsed).
   let insetFrame = 0
+  // the stage's box, and the bands that can float over it (watched for size changes)
+  const bands = [main, bar, caption, regionHosts.footer, regionHosts.thumbnails, regionHosts.aside]
   const updateControlsInset = () => {
     insetFrame = 0
     if (!controlsBox) return
@@ -1443,14 +1460,8 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     let right = 0
     let bottom = 0
     let left = 0
-    for (const band of [
-      bar,
-      caption,
-      regionHosts.footer,
-      regionHosts.thumbnails,
-      regionHosts.aside,
-    ]) {
-      if (band.hidden) continue
+    for (const band of bands) {
+      if (band === main || band.hidden) continue
       const r = band.getBoundingClientRect()
       if (r.width < 1 || r.height < 1) continue
       if (r.width >= m.width * 0.5) {
@@ -1473,16 +1484,7 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
   }
   const bandObserver =
     controlsBox && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleInset) : null
-  for (const band of [
-    main,
-    bar,
-    caption,
-    regionHosts.footer,
-    regionHosts.thumbnails,
-    regionHosts.aside,
-  ]) {
-    bandObserver?.observe(band)
-  }
+  for (const band of bands) bandObserver?.observe(band)
   // ── plugin regions (spec §13) ──────────────────────────────────────────────
   const mountPluginRegions = createRegionMounter(regionHosts, { viewer, preset })
   // What the mounted plugins ask of the renderer, read when the plugin set changes and on

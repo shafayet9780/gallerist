@@ -250,6 +250,75 @@ for (const display of ['flat', 'stacked'] as const) {
   })
 }
 
+// Where a badge sits in its thumb's image (not the thumb, which a caption band under the image makes
+// taller), measured in every drawn item thumb (the current one's ring too):
+// inside the image, at its end edge (right, or left right to left) and its top or bottom edge
+const BOTTOM = '.gallerist { --gallerist-thumb-badge-inset-block: auto 3px; }'
+const badgeCorners = (page: Page) =>
+  page.locator('.gallerist-thumb-item').evaluateAll((els) =>
+    els.flatMap((t) => {
+      const img = (t.querySelector('.gallerist-thumb-img') as HTMLElement).getBoundingClientRect()
+      if (!img.width) return []
+      const b = (t.querySelector('.gallerist-thumb-badge') as HTMLElement).getBoundingClientRect()
+      const num = t.querySelector('.gallerist-thumb-num')?.getBoundingClientRect()
+      const end = getComputedStyle(t).direction === 'rtl' ? b.left - img.left : img.right - b.right
+      return [
+        {
+          inside:
+            b.left >= img.left &&
+            b.right <= img.right &&
+            b.top >= img.top &&
+            b.bottom <= img.bottom,
+          end: end >= 0 && end < 8,
+          top: b.top - img.top < 8,
+          bottom: img.bottom - b.bottom < 8,
+          clear:
+            !num ||
+            num.right <= b.left ||
+            num.left >= b.right ||
+            num.bottom <= b.top ||
+            num.top >= b.bottom,
+          belowImage: t.clientHeight - img.height > 1,
+        },
+      ]
+    }),
+  )
+const TOP_END = { inside: true, end: true, top: true, bottom: false, clear: true }
+const BOTTOM_END = { inside: true, end: true, top: false, bottom: true, clear: true }
+
+for (const dir of ['ltr', 'rtl'] as const)
+  for (const display of ['flat', 'stacked'] as const) {
+    test(`--gallerist-thumb-badge-inset-block: auto 3px puts a badge in its image's bottom end corner, over no caption, every skin, ${display}, ${dir}`, async ({
+      page,
+    }) => {
+      test.setTimeout(60_000)
+      for (const skin of ['gallery', 'console', 'editorial']) {
+        await open(page, `display=${display}&dir=${dir}&skin=${skin}&caps=1&num=1`)
+        await expect(
+          page.locator('.gallerist-thumb-item[data-active] .gallerist-thumb-caption'),
+        ).toBeVisible()
+        // the default: the top end corner
+        let thumbs = await badgeCorners(page)
+        expect(thumbs.length).toBeGreaterThan(3)
+        for (const { belowImage, ...t } of thumbs) expect(t).toEqual(TOP_END)
+        // a page's token (the theme's are in a cascade layer) takes it to the bottom end
+        await page.addStyleTag({ content: BOTTOM })
+        if (display === 'stacked') {
+          // a peek's thumbs too
+          await page.locator('.gallerist-thumb:not([data-active])').first().hover()
+          await expect(
+            page.locator('.gallerist-thumb-peek .gallerist-thumb-item').first(),
+          ).toBeVisible()
+        }
+        thumbs = await badgeCorners(page)
+        expect(thumbs.length).toBeGreaterThan(3)
+        // every thumb has a caption band under its image: a badge at the thumb's bottom would sit on it
+        expect(thumbs.every((t) => t.belowImage)).toBe(true)
+        for (const { belowImage, ...t } of thumbs) expect(t).toEqual(BOTTOM_END)
+      }
+    })
+  }
+
 test('clusters: the screens of one capture 2px apart, 8px between captures (row and column)', async ({
   page,
 }) => {
@@ -398,6 +467,112 @@ test('the notes popover: Escape closes it before the viewer, keys typed in it st
   await expect.poll(() => phase(page)).toBe('closed')
 })
 
+// 0.5: plugin-thumbnails' clusterKeys gives a flat rail's free ↑/↓ the other screen of the same
+// capture, through the plugin keymap the renderer now asks first (a host listened in the capture
+// phase before, which took them from a focused caption band and needed its own guards).
+const live = (page: Page) => page.locator('.gallerist-live').textContent()
+test('clusterKeys: ↑/↓ switch to the capture’s other screen on a flat rail, announced and listed', async ({
+  page,
+}) => {
+  await open(page, 'keys=1')
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 }) // 11:02, screen 2
+  const root = page.locator('.gallerist')
+  await root.focus()
+  const before = await live(page)
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual({ g: 1, i: 0 }) // screen 1
+  await expect.poll(() => live(page)).not.toBe(before)
+  await page.keyboard.press('ArrowUp') // the capture's first screen: nowhere to go
+  expect(await cursor(page)).toEqual({ g: 1, i: 0 })
+  // plain ↑/↓ only: Shift+↓ isn't taken, and the renderer's own does nothing on a flat rail
+  await page.keyboard.press('Shift+ArrowDown')
+  expect(await cursor(page)).toEqual({ g: 1, i: 0 })
+  // from the rail's current thumb too
+  await page.locator('.gallerist-thumbs button[data-item][data-active]').focus()
+  await page.keyboard.press('ArrowDown')
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+  await page.keyboard.press('ArrowDown') // the capture's last: the next capture is ← → away
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+  await page.keyboard.press('ArrowRight')
+  expect(await cursor(page)).toEqual({ g: 1, i: 2 }) // 11:07, screen 1
+  await page.keyboard.press('ArrowDown')
+  expect(await cursor(page)).toEqual({ g: 1, i: 3 })
+  // the shortcut list has them
+  await root.focus()
+  await page.keyboard.press('?')
+  const row = page.locator('.gallerist-shortcuts-row', {
+    hasText: 'Previous / next in the cluster',
+  })
+  await expect(row.locator('kbd')).toHaveText(['↑', '↓'])
+})
+
+test('without clusterKeys, ↑/↓ on a flat rail do what they did: nothing', async ({ page }) => {
+  await open(page)
+  await page.locator('.gallerist').focus()
+  for (const k of ['ArrowUp', 'ArrowDown', 'ArrowDown']) await page.keyboard.press(k)
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+  await page.keyboard.press('?')
+  await expect(page.locator('.gallerist-shortcuts')).toBeVisible()
+  await expect(page.locator('.gallerist-shortcuts-row', { hasText: 'in the cluster' })).toHaveCount(
+    0,
+  )
+})
+
+test('clusterKeys: a focused caption band that overflows keeps ↑/↓ for scrolling', async ({
+  page,
+}) => {
+  await open(page, 'keys=1')
+  // the host's caption grows past what the band shows (a short viewer, a long note)
+  await page.evaluate(() => {
+    const tall = document.createElement('div')
+    tall.style.blockSize = '2000px'
+    tall.textContent = 'A long caption'
+    document.querySelector('.hk-caption')?.after(tall)
+  })
+  const band = page.locator('.gallerist-caption')
+  await expect(band).toHaveAttribute('tabindex', '0')
+  await band.focus()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(() => band.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('ArrowUp')
+  await expect.poll(() => band.evaluate((el) => el.scrollTop)).toBe(0)
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+})
+
+test('clusterKeys: ↑/↓ stay with the note field, the notes dialog, its menu button and the list', async ({
+  page,
+}) => {
+  await open(page, 'keys=1')
+  const at = { g: 1, i: 1 }
+  // the notes button opens a dialog (aria-haspopup): a menu button's arrows aren't the rail's
+  await page.locator('.hk-note-btn').focus()
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual(at)
+  // in the note field, and on a button in the notes dialog
+  await page.locator('.gallerist').press('n')
+  await expect(page.locator('.hk-note-box')).toBeFocused()
+  await page.keyboard.press('ArrowUp')
+  await page.locator('.hk-add').focus()
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual(at)
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.hk-popover')).toHaveCount(0)
+  // with the shortcut list open
+  await page.locator('.gallerist').focus()
+  await page.keyboard.press('?')
+  await expect(page.locator('.gallerist-shortcuts')).toBeVisible()
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual(at)
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.gallerist-shortcuts')).toHaveCount(0)
+  // and on the viewer itself they're the rail's again
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual({ g: 1, i: 0 })
+})
+
 // With zoom, View and the shortcut list on the same viewer: ? lists the host's N with the viewer's
 // keys, a ? typed in the notes stays there, a ? on the notes button (taken by no one) still opens the
 // list, and the View popover's last row opens it.
@@ -500,6 +675,19 @@ test.describe('on a phone', () => {
     await expect(page.locator('.gallerist-zoom-level')).toBeHidden() // as before: − and + only
   })
 
+  test("a bottom badge sits in its image's bottom end corner, over no caption", async ({
+    page,
+  }) => {
+    for (const dir of ['ltr', 'rtl'] as const) {
+      await open(page, `dir=${dir}&caps=1&num=1`)
+      await page.addStyleTag({ content: BOTTOM })
+      const thumbs = await badgeCorners(page)
+      expect(thumbs.length).toBeGreaterThan(3)
+      expect(thumbs.every((t) => t.belowImage)).toBe(true)
+      for (const { belowImage, ...t } of thumbs) expect(t).toEqual(BOTTOM_END)
+    }
+  })
+
   test("the gesture list has the host's long press", async ({ page }) => {
     await page.goto('/hooks.html')
     await viewerSettled(page)
@@ -527,10 +715,15 @@ test.describe('on a phone', () => {
 
   // 0.4.1 (Apploye): where the current card and the cards either side of it couldn't all show, the
   // rail centred the current one, so the next card past a marker or a label line wider than its
-  // group's cards was cut off, though it would have shown whole with the current one. Now, where
-  // more lies between the current card and the one ahead (the way the cursor went) than behind it,
-  // the two show whole wherever they fit. wide=1 gives the marker and the 12:00 label line a fixed
-  // room, so the three don't fit whatever the fonts. A row rail (items) and a stacked one (groups).
+  // group's cards was cut off, though it would have shown whole with the current one. 0.5: wherever
+  // the three can't show, the current card and the one ahead (the way the cursor went) show whole
+  // where they fit, whatever lies behind (0.4.1 needed more room ahead than behind: a one-screen
+  // timeframe whose label line is wider than its card left the next one cut, by 44px here); and a
+  // phone's rail fades narrower, so the current card clear of its fade leaves the room (0.4.1: the
+  // card ahead past the marker cut by what the 40px fade took, 6px here). wide=1 gives the marker
+  // and the 12:00 label line a fixed room, rooms=1 every label line, so the three don't fit whatever
+  // the fonts; one=1 is one capture per timeframe (1–2 screens). A row rail (items) and a stacked
+  // one (groups).
   type Span = { id: string; a: number; z: number }
   const railNow = (page: Page, sel: string) =>
     page.evaluate(async (sel) => {
@@ -557,34 +750,43 @@ test.describe('on a phone', () => {
     }, sel)
   const span = (...cs: Span[]) => Math.max(...cs.map((c) => c.z)) - Math.min(...cs.map((c) => c.a))
 
-  for (const [display, sel, total, tightAt] of [
+  const ITEMS = 'button[data-item]'
+  const GROUPS = 'button[data-group]:not([data-item]):not(.gallerist-thumb-expand)'
+  for (const [display, sel, query, total, tightAt] of [
     [
       'flat',
-      'button[data-item]',
+      ITEMS,
+      'wide=1',
       19, // items (the rail draws a run of them)
       // past the marker (after 11:10) and past the 12:00 label line, both ways
       ['s77-1>s107-1', 's122-1>s132-1', 's107-1>s77-1', 's132-1>s122-1'],
     ],
+    ['stacked', GROUPS, 'wide=1', 7, ['tf70>tf105', 'tf105>tf70']], // timeframes; past the marker
     [
-      'stacked',
-      'button[data-group]:not([data-item]):not(.gallerist-thumb-expand)',
-      7, // timeframes
-      ['tf70>tf105', 'tf105>tf70'], // past the marker, both ways
+      'flat',
+      ITEMS,
+      'one=1&rooms=1',
+      11,
+      // past a wide label line: from the 11:45 timeframe's first screen past the one behind it, into
+      // a one-screen timeframe (12:00) and on, and back into one (11:10, 12:00)
+      ['s107-1>s107-2', 's122-1>s132-1', 's72-1>s62-2', 's122-1>s112-2'],
     ],
   ] as const)
     for (const dir of ['ltr', 'rtl'] as const) {
-      test(`a ${display} rail shows the card ahead whole past a marker or a wide label, ${dir}`, async ({
+      test(`a ${display} rail shows the card ahead whole beside the current one, ${query}, ${dir}`, async ({
         page,
       }) => {
         test.setTimeout(60_000)
-        await page.goto(`/hooks.html?wide=1&display=${display}&dir=${dir}`)
+        await page.goto(`/hooks.html?${query}&display=${display}&dir=${dir}`)
         await viewerSettled(page)
         await page.evaluate(() =>
           (window as unknown as { viewer: { goTo(g: number, i: number): void } }).viewer.goTo(0, 0),
         )
         await page.locator('.gallerist').focus()
-        // the steps where the three can't show but the current card and the one ahead can
+        // the steps where the three can't show but the current card and the one ahead can, and
+        // what each left of the one ahead past the rail's edge
         const tight: string[] = []
+        const cut: Record<string, number> = {}
         const [fwd, back] =
           dir === 'rtl' ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
         for (const [key, step] of [
@@ -601,7 +803,6 @@ test.describe('on a phone', () => {
             const behind = cards[k - step]
             const room = n.hi - n.lo
             const whole = (c: Span) => c.a >= n.lo - 1 && c.z <= n.hi + 1
-            const gap = (c?: Span) => (c ? Math.max(c.a - cur.z, cur.a - c.z) : 0)
             const at = `${key} to ${cur.id}`
             // (soft: every step that fails is reported, not just the first)
             expect.soft(whole(cur), `${at}: it shows whole`).toBe(true)
@@ -616,7 +817,7 @@ test.describe('on a phone', () => {
                 if (c) expect.soft(whole(c), `${at}: ${c.id} shows`).toBe(true)
               continue
             }
-            if (gap(ahead) > gap(behind) + 1 && span(cur, ahead) <= room - 1) {
+            if (span(cur, ahead) <= room - 1) {
               // whole, but for what the current card clear of the near fade leaves too little room
               // for: then it runs past the rail's far edge by that, in the far fade
               const short = span(cur, ahead) - (room - (ahead.a > cur.a ? n.fLo : n.fHi))
@@ -625,11 +826,16 @@ test.describe('on a phone', () => {
                 .soft(over, `${at}: ${ahead.id} ahead shows whole`)
                 .toBeLessThanOrEqual(Math.max(0, short) + 1)
               // well clear of the edge cases, whatever the fonts
-              if (span(behind, cur, ahead) > room + 15 && span(cur, ahead) < room - 15)
+              if (span(behind, cur, ahead) > room + 15 && span(cur, ahead) < room - 15) {
                 tight.push(`${cur.id}>${ahead.id}`)
+                cut[`${cur.id}>${ahead.id}`] = Math.round(over)
+              }
             }
           }
         expect(tight).toEqual(expect.arrayContaining([...tightAt]))
+        // and there, on a phone, the one ahead shows whole: nothing of it past the edge
+        for (const t of tightAt)
+          expect.soft(cut[t], `${t}: the one ahead cut by`).toBeLessThanOrEqual(1)
       })
     }
 

@@ -110,7 +110,8 @@ export interface ThumbnailsOptions {
   renderGroupMeta?: (group: Group, index: number, ctx: GroupMetaContext) => Decoration
   /**
    * A host's badge for each item thumb (a monitor number, a state), in the thumb's top end corner
-   * (the `numberItems` number takes the top start), wherever item thumbs show: a flat rail, the item
+   * (the `numberItems` number takes the top start; `--gallerist-thumb-badge-inset-block: auto 3px`
+   * takes it to the image's bottom end), wherever item thumbs show: a flat rail, the item
    * column, the peek, an index section. Its text joins the thumb's accessible name, as for
    * `renderGroupMeta`. Called as each thumb is drawn and on `refreshRail()`.
    */
@@ -118,9 +119,21 @@ export interface ThumbnailsOptions {
   /**
    * Clusters within a group: consecutive items with the same key (not `null`/`undefined`) sit close
    * together (`--gallerist-cluster-inner`, 2px), with a wider gap where the key changes
-   * (`--gallerist-cluster-gap`, 8px). Visual only: traversal, counts and names don't change.
+   * (`--gallerist-cluster-gap`, 8px). Visual only (but see `clusterKeys`): traversal, counts and
+   * names don't change.
    */
   cluster?: (item: Item, g: number, i: number) => string | number | null | undefined
+  /**
+   * ↑/↓ step to the item before / after the current one in its cluster (`cluster`) on a `flat`
+   * rail: a row walks with ←/→, so they had no use there (down a side rail they walk it, and a
+   * cluster's next item is the walk's next). Not down a side rail with `mount(…, { linear: false })`,
+   * where ↑/↓ step by group: they keep doing that. Where the current item has no neighbour in its
+   * cluster that way, ↑/↓ do what they did, and Shift+↑/↓ always do. Not from a focused caption
+   * band (it scrolls with them), a field, or a widget in the viewer with arrows of its own (a
+   * dialog, menu, slider, menu button, or a host's listbox, tab list, radio group, menu bar, tree
+   * or grid). Listed by plugin-shortcuts. Default false.
+   */
+  clusterKeys?: boolean
   /**
    * Markers between groups, which are not items: drawn in the rail (`flat` and `stacked`) in order
    * at their place, but never a stop for the keys, never counted, and not focusable. Read for each
@@ -304,9 +317,7 @@ const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?:
 }
 
 function appendCaption(btn: HTMLElement, text: string | undefined): void {
-  if (!text) return
-  const cap = make('span', 'gallerist-thumb-caption', text)
-  btn.appendChild(cap)
+  if (text) btn.appendChild(make('span', 'gallerist-thumb-caption', text))
 }
 
 /** A host's decoration in a `span.cls` hidden from assistive tech, and the text it adds to a name
@@ -372,7 +383,8 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
 // half a panel of what comes next in view, whichever way the cursor went. Cards of different
 // widths (index chips) can leave a wider neighbour cut once centred: where the three fit, the
 // scroll goes on from the centre just as far as shows them all; where they don't (a marker or a
-// wide label line between them), it centres the card and the one ahead together (centreBy). The card
+// wide label line between them, cards too wide for three), it centres the card and the one ahead
+// together where those two fit (centreBy). The card
 // itself stays clear of the panel's scroll-padding (the theme's: the rail's end fades, where the ‹ ›
 // page buttons sit too). The browser clamps that at either end of the rail, so the first and last
 // cards stop at their edges.
@@ -392,12 +404,12 @@ function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefi
 
 /** How far to scroll `box` along one axis: 0 while `btn` and its neighbours (`around`: the one
  *  behind it, then the one ahead, the way the cursor went) show whole, else what centres `btn` in
- *  it, moved on as little as shows them all where they fit. Where the three don't because more lies
- *  between `btn` and the one ahead than between it and the one behind (a marker, a label line wider
- *  than its cards), 0 while `btn` and the one ahead show whole, else what centres the two, so what
- *  comes next shows whole wherever it can (0.4.1). Otherwise (evenly spaced cards in a short panel,
- *  or the two don't fit either) `btn` centred, as before. A neighbour with no box (not laid out,
- *  hidden) doesn't count. `btn` itself shows clear of `box`'s scroll-padding (0.4.1: the rail's end
+ *  it, moved on as little as shows them all where they fit. Where the three don't, 0 while `btn` and
+ *  the one ahead show whole, else what centres the two, so what comes next shows whole wherever it
+ *  can (0.5; 0.4.1 did so only where more lay between `btn` and the one ahead than behind it, a
+ *  marker or a label line wider than its cards, and centred `btn` between evenly spaced cards).
+ *  Where the two don't fit either, `btn` centred. A neighbour with no box (not laid out, hidden)
+ *  doesn't count. `btn` itself shows clear of `box`'s scroll-padding (0.4.1: the rail's end
  *  fades): the scroll moves on as little as clears it, and 0 needs it clear too. */
 function centreBy(
   box: HTMLElement,
@@ -422,13 +434,10 @@ function centreBy(
     const q = el?.getBoundingClientRect()
     return q?.width || q?.height ? (q as DOMRect) : r
   }) as [DOMRect, DOMRect]
-  // the room between `btn` and a neighbour, either side of it (btn itself: less than none)
-  const gap = (q: DOMRect) => Math.max(q[lo] - r[hi], r[lo] - q[hi])
-  // the three; then, where more lies between btn and the one ahead than behind it, btn and that
-  // one (else the two either side, which can't fit where the three don't: btn is between them)
+  // the three; then btn and the one ahead
   for (const rs of [
     [r, b, a],
-    [gap(a) > gap(b) + 1 ? r : b, a],
+    [r, a],
   ]) {
     // the scrolls that show them whole run from `from` to `to` (none: they don't fit); 0 among
     // them: they show already, nothing moves. In whole px: WebKit drops a scroll's fraction, and
@@ -604,6 +613,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       return btn
     }
 
+    // the cluster key of item `i` in group `g` (none, or no such item: null)
+    const clusterOf = (g: number, i: number) => {
+      const item = viewer.getCollection().groups[g]?.items[i]
+      return (item && o.cluster?.(item, g, i)) ?? null
+    }
     // The host's badge (its text in the thumb's name) and the thumb's place in its cluster: `in` sits
     // close to the item before it, `start` begins a new cluster after another item.
     const decorateItem = (btn: HTMLElement, item: Item, g: number, i: number) => {
@@ -611,11 +625,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const badge = decoration(o.renderItemBadge?.(item, g, i), 'gallerist-thumb-badge')
       if (badge) btn.append(badge[0])
       btn.setAttribute('aria-label', named(t.item(i + 1), badge?.[1]))
-      const before = viewer.getCollection().groups[g]?.items[i - 1]
-      const own = o.cluster?.(item, g, i) ?? null
-      const prev = before ? (o.cluster?.(before, g, i - 1) ?? null) : null
-      const at =
-        prev !== null && prev === own ? 'in' : before && (prev ?? own) !== null ? 'start' : ''
+      const own = clusterOf(g, i)
+      const prev = clusterOf(g, i - 1)
+      const at = prev !== null && prev === own ? 'in' : i && (prev ?? own) !== null ? 'start' : ''
       if (at) btn.dataset.cluster = at
       else delete btn.dataset.cluster
     }
@@ -1658,6 +1670,24 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     const keys = { e: () => toggleActivePanel(), E: () => toggleActivePanel() }
+    // clusterKeys: plain ↑/↓ to the item before / after the current one in its cluster, where it
+    // has one (Shift+↑/↓ stay the renderer's; a chord never reaches a keymap). Not where ↑/↓ step
+    // by group (a side rail with `linear: false`): one key moving by item or group by turns misleads.
+    const step = (e: KeyboardEvent) => {
+      const { g, i } = viewer.getState().cursor
+      const to = i + (e.key === 'ArrowDown' ? 1 : -1)
+      const own = clusterOf(g, i)
+      if (
+        e.shiftKey ||
+        own === null ||
+        own !== clusterOf(g, to) ||
+        viewerRoot?.matches('[data-gallerist-orientation=vertical]:not([data-gallerist-linear])')
+      )
+        return
+      e.preventDefault()
+      viewer.goTo(g, to)
+    }
+    const arrows = { ArrowUp: step, ArrowDown: step }
     const instance: ThumbnailsInstance = {
       name: 'thumbnails',
       get display() {
@@ -1676,8 +1706,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // A flat rail has no item panel, nor has a rail not built yet (or never: another renderer), so
       // `e` stays another plugin's (the renderer reads the keymaps after mounting the regions, again
       // when the plugin set changes and on viewer.refresh(), which a switch calls).
+      // With `clusterKeys`, a flat rail takes ↑/↓ (down a side rail, where they walk it, a cluster's
+      // next item is the walk's next: the same step).
       get keymap() {
-        return isFlat || !root ? undefined : keys
+        return (root && (isFlat ? o.clusterKeys && arrows : keys)) || undefined
       },
     }
     return instance

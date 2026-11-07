@@ -201,6 +201,148 @@ describe('cluster', () => {
   })
 })
 
+// 0.5 (Apploye): a flat rail walks with ←/→, so ↑/↓ were free; `clusterKeys` gives them the other
+// screens of the same capture, with no host keyboard code
+describe('clusterKeys', () => {
+  const press = (k: string, at: Element = $('.gallerist')) => {
+    const e = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })
+    at.dispatchEvent(e)
+    return e.defaultPrevented
+  }
+  const flat = (opts: ThumbnailsOptions = {}) =>
+    open({ groupDisplay: 'flat', cluster: (i) => meta(i).cap, clusterKeys: true, ...opts })
+
+  it('↑/↓ step to the item before / after the current one in its cluster, and no further', () => {
+    const v = flat()
+    v.goTo(1, 0) // b0: capture 1, screen 1
+    expect(press('ArrowDown')).toBe(true)
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    // b1 ends capture 1: ↓ isn't taken (the renderer's ↓ on a flat row rail does nothing)
+    expect(press('ArrowDown')).toBe(true) // the renderer's own, a no-op here
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    expect(press('ArrowUp')).toBe(true)
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    press('ArrowUp') // b0 starts it
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    v.goTo(1, 3)
+    press('ArrowUp')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+    // items with no key are no cluster: c0, c1
+    v.goTo(2, 0)
+    press('ArrowDown')
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+    // ←/→ still walk every item
+    v.goTo(1, 0)
+    press('ArrowRight')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+  })
+
+  it('takes plain ↑/↓ only: Shift+↑/↓ stay the renderer’s', () => {
+    const v = flat()
+    v.goTo(1, 0)
+    for (const key of ['ArrowDown', 'ArrowUp']) {
+      const e = new KeyboardEvent('keydown', {
+        key,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      $('.gallerist').dispatchEvent(e)
+      expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    }
+    expect(press('ArrowDown')).toBe(true)
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+  })
+
+  it('announces the step as any other: the live region names the new item', () => {
+    const v = flat()
+    v.goTo(1, 0)
+    const live = $('.gallerist-live')
+    const before = live.textContent
+    press('ArrowDown')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    const said = live.textContent
+    expect(said).not.toBe(before)
+    v.goTo(1, 0)
+    press('ArrowRight') // what a step there by → says
+    expect(live.textContent).toBe(said)
+  })
+
+  it('off by default: ↑/↓ on a flat rail do what they did (nothing)', () => {
+    const v = open({ groupDisplay: 'flat', cluster: (i) => meta(i).cap })
+    v.goTo(1, 0)
+    press('ArrowDown')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+  })
+
+  it('a stacked rail keeps ↑/↓ for its items; down a side rail they still walk it', () => {
+    const stacked = flat({ groupDisplay: 'stacked' })
+    stacked.goTo(1, 1)
+    press('ArrowDown') // the item axis: to b2, across the cluster's edge
+    expect(stacked.getState().cursor).toEqual({ g: 1, i: 2 })
+    document.body.innerHTML = ''
+    const v = createViewer({
+      collection: collection(),
+      plugins: [
+        thumbnails({ groupDisplay: 'flat', cluster: (i) => meta(i).cap, clusterKeys: true }),
+      ],
+    })
+    mount(v, { rail: 'left' }) // ↑/↓ walk the rail
+    v.open()
+    v.goTo(1, 0)
+    for (const at of [1, 2, 3]) {
+      press('ArrowDown') // in the cluster, then across its edge: every item, as without the option
+      expect(v.getState().cursor).toEqual({ g: 1, i: at })
+    }
+    press('ArrowDown')
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+    press('ArrowUp')
+    press('ArrowUp')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+  })
+
+  it('down a side rail with linear: false, ↑/↓ keep stepping by group', () => {
+    const v = createViewer({
+      collection: collection(),
+      plugins: [
+        thumbnails({ groupDisplay: 'flat', cluster: (i) => meta(i).cap, clusterKeys: true }),
+      ],
+    })
+    mount(v, { rail: 'left', linear: false })
+    v.open()
+    v.goTo(1, 0) // b0, with b1 in its cluster
+    press('ArrowDown') // the next group there, not b1
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+    press('ArrowUp')
+    expect(v.getState().cursor.g).toBe(1)
+  })
+
+  it('follows a display switch: taken on flat, given back on stacked', () => {
+    const v = flat({ groupDisplay: 'stacked' })
+    v.goTo(1, 1)
+    setGroupDisplay(v, 'flat')
+    press('ArrowDown') // b1 ends capture 1
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+    press('ArrowUp')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    setGroupDisplay(v, 'stacked')
+    press('ArrowDown')
+    press('ArrowDown')
+    expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+  })
+
+  it("not from a field, a dialog or a menu button in the viewer, and not over a caption band's", () => {
+    const v = flat()
+    v.goTo(1, 0)
+    const root = $('.gallerist')
+    const host = root.appendChild(document.createElement('div'))
+    host.innerHTML =
+      '<input><div role="dialog"><button class="in">x</button></div><button aria-haspopup="menu">m</button>'
+    for (const sel of ['input', '.in', '[aria-haspopup]']) press('ArrowDown', $(sel))
+    expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+  })
+})
+
 describe('markers', () => {
   const manual: RailMarker = {
     id: 'm1',

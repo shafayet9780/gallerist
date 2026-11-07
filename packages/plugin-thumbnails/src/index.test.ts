@@ -2058,16 +2058,18 @@ describe('plugin-thumbnails — context around the current card, cards of differ
     v.next() // g8..g10 span 1050; g9 and g10 span 950: the two centred together (900..1850)
     expect(scroll).toBe(875)
     for (const k of [9, 10]) expect(whole(card(ROW, k)), `g${k}`).toBe(true)
-    v.next() // g10: the gap is behind it now: g10 centred (1805), g11 whole after it, as before
-    expect(scroll).toBe(1305)
+    // g10: the gap is behind it now, g9..g11 don't fit: g10 and g11 centred together (1760..1950;
+    // 0.5: 0.4.1 centred g10 alone, 1305, as more lay behind it than ahead)
+    v.next()
+    expect(scroll).toBe(1355)
     for (const k of [10, 11]) expect(whole(card(ROW, k)), `at g10: g${k}`).toBe(true)
     v.next() // g11: g10..g12 show, nothing moves
-    expect(scroll).toBe(1305)
+    expect(scroll).toBe(1355)
     v.goTo(10) // a step back: g9 is the one ahead now, past the gap and cut: g9 and g10 centred
     expect(scroll).toBe(875)
     for (const k of [9, 10]) expect(whole(card(ROW, k)), `back at g10: g${k}`).toBe(true)
-    v.prev() // g9: g8 ahead is next to it, the gap behind: g9 centred (945), g8 whole
-    expect(scroll).toBe(445)
+    v.prev() // g9: g8 ahead is next to it, the gap behind: g8 and g9 centred together (800..990)
+    expect(scroll).toBe(395)
     for (const k of [8, 9]) expect(whole(card(ROW, k)), `back at g9: g${k}`).toBe(true)
   })
 
@@ -2081,15 +2083,17 @@ describe('plugin-thumbnails — context around the current card, cards of differ
   })
 
   // where nothing more lies between them (cards evenly spaced, one too long for three to show), the
-  // current card is centred, as in 0.4.0, though it and the one ahead would fit
-  it('evenly spaced cards that cannot show three: the current one centred, as before', () => {
+  // current card and the one ahead show too (0.5, Apploye on a 390px phone: 0.4.1 centred the current
+  // card, as 0.4.0 did, and cut the next one though the two fit)
+  it('evenly spaced cards that cannot show three: the current one and the one ahead', () => {
     const v = chips(30)
     layOut('x', ROW, 900) // g9 900..990, g10 1000..1900, g11 1910..2000: 10 apart
     v.goTo(9)
-    expect(scroll).toBe(445) // g8..g10 don't fit: g9 centred
-    v.next() // g10: g9..g11 don't fit (1100), g10 and g11 would (1000): g10 centred all the same
-    expect(scroll).toBe(950)
-    expect(middle(card(ROW, 10))).toBe(EXTENT / 2)
+    expect(scroll).toBe(900) // g8..g10 don't fit (1100), g9 and g10 just do (1000)
+    for (const k of [9, 10]) expect(whole(card(ROW, k)), `g${k}`).toBe(true)
+    v.next() // g10: g9..g11 don't fit, g10 and g11 do
+    expect(scroll).toBe(1000)
+    for (const k of [10, 11]) expect(whole(card(ROW, k)), `at g10: g${k}`).toBe(true)
   })
 
   it('where even the card and the one ahead cannot fit, the current card is centred', () => {
@@ -2191,13 +2195,13 @@ describe('plugin-thumbnails — context around the current card, cards of differ
     v.goTo(11)
     v.goTo(10) // back: g9 ahead, past the gap: the two centred
     expect(scroll).toBe(875)
-    v.prev() // g9: g8 ahead, the gap behind: g9 centred
-    expect(scroll).toBe(445)
-    v.nextItem() // an item step in g9: still going back, nothing moves
+    v.prev() // g9: g8 ahead, the gap behind: g8 and g9 centred
+    expect(scroll).toBe(395)
+    v.nextItem() // an item step in g9: still going back, nothing moves (forward: g9 and g10, 875)
     expect(v.getState().cursor).toEqual({ g: 9, i: 1 })
-    expect(scroll).toBe(445)
+    expect(scroll).toBe(395)
     v.nextItem()
-    expect(scroll).toBe(445)
+    expect(scroll).toBe(395)
   })
 
   // 0.4.1 review: the cursor stepping onto the last card drawn: centring draws the cards past it, but
@@ -2251,9 +2255,9 @@ describe('plugin-thumbnails — context around the current card, cards of differ
       .find((p) => p.name === 'thumbnails') as ThumbnailsInstance
     layOut('x', '.gallerist-thumb', 90, { gap: 760 }) // g9 900..990, g10 1760..1850, g11 1860..
     rail0.setDisplay('stacked')
-    // still going forward: g11 ahead, next to it; the gap behind: g10 centred, as a step forward
-    // there centres it (not g9 ahead, which a step back would bring in: 875)
-    expect(scroll).toBe(1305)
+    // still going forward: g11 ahead, next to it: g10 and g11 centred, as a step forward there
+    // shows them (not g9 ahead, which a step back would bring in: 875)
+    expect(scroll).toBe(1355)
   })
 
   it('a side rail: down the column, by scrollTop', () => {

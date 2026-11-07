@@ -28,13 +28,14 @@ mount(viewer)
 - **Context around the current card.** While the current card and the cards on either side of it
   show whole, the rail doesn't move, so clicking a card in view doesn't shift it. Once one of them
   would be cut off by an edge, the rail scrolls to centre the current card, so a step always shows
-  what comes next. Where the three can't show together because more lies between the current card
-  and the next one the way you're going (a marker, a group label wider than its cards) than behind
-  it, the rail shows the current card and that next one whole, centred together, wherever the two
-  fit (0.4.1). The current card itself always lands clear of the rail's scroll-padding, which the
-  theme sets to the end fade (`--gallerist-rail-fade`, where the **‹ ›** buttons sit too), so it is
-  never dimmed or covered; where the room is short, the card ahead runs into the far fade instead
-  (0.4.1). "The next one the way you're going" follows the last step that moved along the rail: a step
+  what comes next. Where the three can't show together (a marker or a group label wider than its
+  cards between them, or cards too wide for three), the rail shows the current card and the next one
+  the way you're going whole, centred together, wherever the two fit (0.5; 0.4.1 did so only where
+  more lay ahead than behind, and centred the current card otherwise). The current card itself
+  always lands clear of the rail's scroll-padding, which the theme sets to the end fade
+  (`--gallerist-rail-fade`, where the **‹ ›** buttons sit too), so it is never dimmed or covered;
+  where the room is short, the card ahead runs into the far fade instead (0.4.1). On a phone the
+  theme's fade is 16px (0.5), so the two fit whole there wherever they'd fit beside 16px. "The next one the way you're going" follows the last step that moved along the rail: a step
   between the items of one group, the items toggle or reopening the viewer keeps it. At either end of
   the rail the scroll stops at the first or last card. This applies to every rail that scrolls (`flat`,
   `stacked`, `index` rows and chips, side rails, right to left) and to the item column, where the item
@@ -160,8 +161,9 @@ thumbnails({
 | `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 | `renderGroupMeta` | `(group, index, { display, place }) => Node \| string \| null` | none | A host's decoration per group: flat, at the end of its label line; stacked, under the card (and with a `timeline`, at the end of its time label). See [Host decorations](#host-decorations-and-markers). |
-| `renderItemBadge` | `(item, g, i) => Node \| string \| null` | none | A host's badge in each item thumb's top end corner. |
-| `cluster`      | `(item, g, i) => string \| number \| null` | none | Consecutive items with the same key sit 2px apart, 8px between clusters. Visual only. |
+| `renderItemBadge` | `(item, g, i) => Node \| string \| null` | none | A host's badge in each item thumb's top end corner (bottom end with `--gallerist-thumb-badge-inset-block: auto 3px`). |
+| `cluster`      | `(item, g, i) => string \| number \| null` | none | Consecutive items with the same key sit 2px apart, 8px between clusters. Visual, unless `clusterKeys`. |
+| `clusterKeys`  | `boolean`                    | `false`     | `flat`: plain ↑/↓ step to the item before / after the current one in its cluster (another monitor of the same capture). See [Host decorations](#host-decorations-and-markers). |
 | `markers`      | `(collection) => RailMarker[]` | none | Entries between groups that are not items (time without screenshots): drawn, never a stop. |
 
 Presets configure these for you: with `mount(viewer, { preset })` (or React's `preset` prop) every
@@ -223,13 +225,44 @@ refreshRail(viewer)
   (the rail draws only a run of them) and on `refreshRail()`.
 - **`renderItemBadge(item, g, i)`**: in each item thumb's top end corner, wherever item thumbs show
   (a flat rail, the item column, the peek, an index section). The `numberItems` number takes the top
-  start; the focus ring is outside the thumb.
+  start; the focus ring is outside the thumb. `--gallerist-thumb-badge-inset-block` (0.5) is the
+  badge's `inset-block` from the thumb's image (`3px auto`, the top). A screenshot reviewer whose
+  thumbs' tops hold the window titles, the part people recognise, takes it to the bottom end:
+  ```css
+  .gallerist { --gallerist-thumb-badge-inset-block: auto 3px; }
+  ```
+  It is measured from the image, not the thumb: a caption band under the image stays clear. Nothing
+  else sits in an item thumb's bottom end corner (the number is top start; the caption, the current
+  thumb's border and the focus ring are outside the image; plugin-video and plugin-pins draw nothing
+  on the rail), so there is no precedence to settle. A host's own mark in that corner (a video's
+  length, say) belongs in the badge, as one decoration.
 - **`cluster(item, g, i)`**: consecutive items with the same key (not `null`/`undefined`) sit
   `--gallerist-cluster-inner` apart (2px), with `--gallerist-cluster-gap` (8px) where the key
   changes, in a row and in a column alike. Items without a key keep the plain gap. Traversal, counts
   and names don't change: ↑/↓ (or ←/→ on a flat rail) still step one item at a time, so the other
   monitor of the same capture is the next item. Thumbs carry `data-cluster="in"` (continues the one
   before) or `"start"` (a new one after another).
+- **`clusterKeys: true`** (0.5) gives a flat rail's ↑/↓, which a row rail walking with ←/→ leaves
+  free, to the clusters: ↓ steps to the next item of the current one's cluster, ↑ to the one before,
+  announced as any step is. Plain ↑/↓ only: Shift+↑/↓ (and a chord) do what they did. At the
+  cluster's end (or on an item with no key) ↑/↓ do what they did:
+  nothing on a row rail; down a side rail, where ↑/↓ walk it, the cluster's next item is the walk's
+  next anyway. Down a side rail with `mount(…, { linear: false })` ↑/↓ step by group, and keep
+  doing that (a key that moved by item or by group by turns would mislead). A stacked rail keeps
+  ↑/↓ for its items. Through the plugin keymap the renderer asks first, so ↑/↓ stay with a focused
+  caption band that scrolls, a text field, and a widget in the viewer with arrows of its own (a
+  dialog, menu, slider or menu button, a host's listbox, tab list, radio group, menu bar, tree or
+  grid). plugin-shortcuts lists them ("Previous / next in the cluster",
+  `strings.prevNextCluster`). A reviewer whose captures span monitors needs no keyboard code of its
+  own:
+  ```ts
+  thumbnails({
+    groupDisplay: 'flat',
+    cluster: (item, g) => `${g}:${item.meta.capturedAt}`, // the monitors of one capture
+    clusterKeys: true, // ↑/↓: the capture's other monitor
+  })
+  shortcuts({ strings: { prevNextCluster: 'Other monitor, same capture' } })
+  ```
 - **`markers(collection)`** returns `RailMarker`s: `{ id, after?, before?, label, caption?, render?,
   tip? }`. A marker is drawn after the group `after` names (else before `before`'s), in the order
   given, on flat and stacked rails; one whose group isn't in the collection, or whose `id` an earlier

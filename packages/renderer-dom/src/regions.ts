@@ -40,7 +40,7 @@ export function createRegionMounter(
           // RegionName is open-ended in the contract, but the DOM renderer hosts only a fixed set;
           // warn instead of silently dropping the plugin's UI (review S-A2).
           console.warn(
-            `[gallerist] plugin "${plugin.name}" targets region "${name}", which the default renderer does not host`,
+            `[gallerist] plugin "${plugin.name}": no region "${name}" in the DOM renderer`,
           )
           continue
         }
@@ -52,7 +52,7 @@ export function createRegionMounter(
         const list = desired.get(host) ?? []
         if (!ADDITIVE.has(name) && claimedBy.has(name)) {
           console.warn(
-            `[gallerist] region "${name}" claimed by multiple plugins; "${plugin.name}" wins over "${claimedBy.get(name)}"`,
+            `[gallerist] region "${name}": plugin "${plugin.name}" wins over "${claimedBy.get(name)}"`,
           )
           list.length = 0
         }

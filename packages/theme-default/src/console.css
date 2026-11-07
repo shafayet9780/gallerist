@@ -39,7 +39,7 @@
     --gallerist-caption-band: transparent;
     --gallerist-group-bg: #1a1c1f;
     --gallerist-placeholder: rgb(255 255 255 / 0.04);
-    --gallerist-shimmer: rgb(255 255 255 / 0.05);
+    --gallerist-shimmer: rgb(255 255 255 / 0.09); /* a skeleton's sweep: plain on the dark stage */
     --gallerist-shadow: 0 24px 60px rgb(0 0 0 / 0.45);
     --gallerist-stack-shadow: 3px 3px 0 -1px #3a3f46, 6px 6px 0 -2px #2a2e34;
     --gallerist-blur: none;

@@ -108,7 +108,9 @@ export interface Item<IM = unknown> {
   caption?: string
   /** enables zoom-from-origin & bounds without a load. */
   naturalSize?: { w: number; h: number }
-  /** LQIP: data-URI or dominant color, painted instantly (decision P0-J, spec §27.7). */
+  /** Shown at once while `source` loads (decision P0-J, spec §27.7): an image URL (best the thumb
+   *  the page already loaded, or a data URI), drawn blurred in the image's box until the image is
+   *  in, or a CSS colour, a flat fill there. The DOM renderer documents how it shows. */
   placeholder?: string
   meta?: IM
   overlays?: OverlaySpec[]

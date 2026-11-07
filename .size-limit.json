@@ -13,7 +13,7 @@
       "packages/core/dist/index.js": "{ createViewer }",
       "packages/renderer-dom/dist/index.js": "{ mount }"
     },
-    "limit": "16.65 kB",
+    "limit": "17.11 kB",
     "gzip": true
   },
   {
@@ -28,7 +28,7 @@
       "packages/renderer-dom/dist/index.js": "{ mount }",
       "packages/plugin-thumbnails/dist/index.js": "{ thumbnails }"
     },
-    "limit": "25.6 kB",
+    "limit": "26.13 kB",
     "gzip": true
   },
   {
@@ -84,13 +84,13 @@
     "path": "packages/plugin-shortcuts/dist/index.js",
     "import": "{ shortcuts }",
     "ignore": ["@gallerist/core"],
-    "limit": "2.85 kB",
+    "limit": "2.86 kB",
     "gzip": true
   },
   {
     "name": "theme base.css (gz)",
     "path": "packages/theme-default/src/base.css",
-    "limit": "10 kB",
+    "limit": "10.42 kB",
     "gzip": true
   },
   {

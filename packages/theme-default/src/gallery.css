@@ -36,7 +36,7 @@
     --gallerist-caption-band: transparent;
     --gallerist-group-bg: rgb(255 255 255 / 0.05);
     --gallerist-placeholder: rgb(255 255 255 / 0.04);
-    --gallerist-shimmer: rgb(255 255 255 / 0.06);
+    --gallerist-shimmer: rgb(255 255 255 / 0.08);
     --gallerist-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
     --gallerist-stack-shadow: 3px 3px 0 -1px #2c2c2f, 6px 6px 0 -2px #232326;
     --gallerist-blur: blur(16px) saturate(140%);
