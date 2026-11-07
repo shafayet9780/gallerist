@@ -1,5 +1,60 @@
 # Changelog
 
+## v0.4.1
+
+A patch release: every package goes from 0.4.0 to 0.4.1 (one fixed version group). Two fixes from the
+Apploye reviewer's check of its viewer on 0.4.0, the Console skin's compact toolbar from the 0.3.4
+mockup, and a wider gap before a flat rail's group meta. Peer ranges stay `>=0.3.0 <1`.
+
+### Upgrading: what looks different
+- **theme-default**: with a fine pointer (a mouse or trackpad) the Console skin's toolbar is compact:
+  tools are 36px (were 44px) with 18px glyphs (were 22px; Close 20px), plugin-zoom's "− 100% +" is one
+  bordered group 30px tall instead of three loose 44px tools, and a 1 × 20 hairline sits before Close
+  (on touch too, 9px of room). A page that measured or restyled the Console bar's tools should check
+  them; `--gallerist-tool-size: 44px`, `--gallerist-tool-icon: 22px`, `--gallerist-close-icon: 22px`,
+  `--gallerist-zoom-group: 0` and `--gallerist-close-rule: 0px` on `.gallerist` bring 0.4.0's bar back.
+  A touch keeps 44px targets; Gallery and Editorial are unchanged.
+- **theme-default**: a flat rail's group label and its `renderGroupMeta` meta are 12px apart (were
+  8px), so a group whose label line is wider than its cards is 4px wider.
+
+### Fixes
+- **plugin-thumbnails (fixed)**: the next card past a marker or a wide label shows whole. On a 390px
+  phone the flat rail centred the current card wherever it and the cards either side of it couldn't
+  all show, which is what happens when a `markers()` entry, or a group label widened by
+  `renderGroupMeta`, lies between them; the next timeframe's first card was then cut off, though it
+  would have shown whole beside the current one. Now, where the three can't show and more lies
+  between the current card and the one ahead (the next one stepping forward, the previous one
+  stepping back) than between it and the one behind, the rail shows the current card and the one
+  ahead whole, centred together, and stays put while those two already show; where even the two
+  can't fit, it centres the current card. Where the three fit, and where cards are evenly spaced
+  (index chips on a phone, a short side rail), nothing changes. Flat, stacked, index, side and
+  right-to-left rails, windowed too, and the stacked item column (its next item). The rail's scrolls
+  are whole pixels, so WebKit (which drops a scroll's fraction) no longer cuts up to 2px off a card
+  meant to show whole.
+- **plugin-shortcuts (fixed)**: `?` opens the list as soon as the viewer has focus, during its opening
+  fade too, as the other keys already did (it was ignored until the fade ended). It never opens over a
+  viewer that is closing; `open()` from the host follows the same rule.
+
+### The compact Console toolbar (from the 0.3.4 mockup, section 4)
+- **theme-default (new)**: tokens for the bar: `--gallerist-tool-size` (a tool's box, default
+  `--gallerist-target`, 44px), `--gallerist-tool-icon` (22px), `--gallerist-close-icon` (the tool
+  glyph), `--gallerist-zoom-group` (0: three loose zoom tools; 1: one group in a hairline border, its
+  parts 6px narrower and 8px shorter than a tool, the percentage between two hairlines, glyphs 3px
+  smaller) and `--gallerist-close-rule` (room before Close with a 1 × 20 hairline centred in it; 0px:
+  none). Console sets 36px / 18px / 20px and the zoom group under `(pointer: fine)`, and the hairline
+  (9px) everywhere, as the mockup's phone bar has it. Gallery and Editorial keep 44px tools and no
+  hairline: their round and editorial tools read as touch-sized chrome, and a patch release leaves
+  their look alone. Focus rings show whole as before (the toolbar guard now runs with the zoom tool),
+  the strip still lets pointers through its free space, and a phone still leaves out the zoom tool and
+  an overlay's fullscreen.
+
+### Sizes (gzipped; 0.4.0 → 0.4.1; no limit raised)
+- core + renderer-dom 16,650 B (unchanged; limit 16,650).
+- core + renderer-dom + thumbnails 25,484 → 25,496 B (limit 25,500).
+- plugin-shortcuts 2,834 → 2,824 B (limit 2,850); plugin-zoom 1,645 B (unchanged; limit 1,650).
+- theme-default base.css 9,390 → 9,718 B (limit 10 kB); console.css 1,298 → 1,355 B.
+- `@gallerist/cdn` 38,244 → 38,269 B (limit 40 kB).
+
 ## v0.4.0
 
 A minor release: every package goes from 0.3.3 to 0.4.0, and some things behave differently (the
