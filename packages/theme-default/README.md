@@ -54,6 +54,9 @@ drawn as a border, so forced colours keep it.
 The rail (`.gallerist-thumbs`) has a `scroll-padding` of `--gallerist-rail-fade` (40px) at its ends,
 inline on a sideways rail and block on a side rail: plugin-thumbnails reads it to keep the current
 card clear of the end fades and the ‹ › buttons in them, and a card focused with Tab lands clear too.
+On a phone (600px wide or less with a coarse pointer, where the ‹ › buttons never show) the fade is
+16px (0.5), so the current card kept clear of it leaves room for the next card whole beside it. A
+page's own `--gallerist-rail-fade` wins (the theme's tokens are in a cascade layer).
 
 The theme follows `forced-colors: active` (Windows High Contrast): the View popover's chosen segment
 takes the system's selection colours and the focus rings the text colour. The rail's

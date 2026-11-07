@@ -28,13 +28,14 @@ mount(viewer)
 - **Context around the current card.** While the current card and the cards on either side of it
   show whole, the rail doesn't move, so clicking a card in view doesn't shift it. Once one of them
   would be cut off by an edge, the rail scrolls to centre the current card, so a step always shows
-  what comes next. Where the three can't show together because more lies between the current card
-  and the next one the way you're going (a marker, a group label wider than its cards) than behind
-  it, the rail shows the current card and that next one whole, centred together, wherever the two
-  fit (0.4.1). The current card itself always lands clear of the rail's scroll-padding, which the
-  theme sets to the end fade (`--gallerist-rail-fade`, where the **‹ ›** buttons sit too), so it is
-  never dimmed or covered; where the room is short, the card ahead runs into the far fade instead
-  (0.4.1). "The next one the way you're going" follows the last step that moved along the rail: a step
+  what comes next. Where the three can't show together (a marker or a group label wider than its
+  cards between them, or cards too wide for three), the rail shows the current card and the next one
+  the way you're going whole, centred together, wherever the two fit (0.5; 0.4.1 did so only where
+  more lay ahead than behind, and centred the current card otherwise). The current card itself
+  always lands clear of the rail's scroll-padding, which the theme sets to the end fade
+  (`--gallerist-rail-fade`, where the **‹ ›** buttons sit too), so it is never dimmed or covered;
+  where the room is short, the card ahead runs into the far fade instead (0.4.1). On a phone the
+  theme's fade is 16px (0.5), so the two fit whole there wherever they'd fit beside 16px. "The next one the way you're going" follows the last step that moved along the rail: a step
   between the items of one group, the items toggle or reopening the viewer keeps it. At either end of
   the rail the scroll stops at the first or last card. This applies to every rail that scrolls (`flat`,
   `stacked`, `index` rows and chips, side rails, right to left) and to the item column, where the item

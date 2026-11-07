@@ -372,7 +372,8 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
 // half a panel of what comes next in view, whichever way the cursor went. Cards of different
 // widths (index chips) can leave a wider neighbour cut once centred: where the three fit, the
 // scroll goes on from the centre just as far as shows them all; where they don't (a marker or a
-// wide label line between them), it centres the card and the one ahead together (centreBy). The card
+// wide label line between them, cards too wide for three), it centres the card and the one ahead
+// together where those two fit (centreBy). The card
 // itself stays clear of the panel's scroll-padding (the theme's: the rail's end fades, where the ‹ ›
 // page buttons sit too). The browser clamps that at either end of the rail, so the first and last
 // cards stop at their edges.
@@ -392,12 +393,12 @@ function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefi
 
 /** How far to scroll `box` along one axis: 0 while `btn` and its neighbours (`around`: the one
  *  behind it, then the one ahead, the way the cursor went) show whole, else what centres `btn` in
- *  it, moved on as little as shows them all where they fit. Where the three don't because more lies
- *  between `btn` and the one ahead than between it and the one behind (a marker, a label line wider
- *  than its cards), 0 while `btn` and the one ahead show whole, else what centres the two, so what
- *  comes next shows whole wherever it can (0.4.1). Otherwise (evenly spaced cards in a short panel,
- *  or the two don't fit either) `btn` centred, as before. A neighbour with no box (not laid out,
- *  hidden) doesn't count. `btn` itself shows clear of `box`'s scroll-padding (0.4.1: the rail's end
+ *  it, moved on as little as shows them all where they fit. Where the three don't, 0 while `btn` and
+ *  the one ahead show whole, else what centres the two, so what comes next shows whole wherever it
+ *  can (0.5; 0.4.1 did so only where more lay between `btn` and the one ahead than behind it, a
+ *  marker or a label line wider than its cards, and centred `btn` between evenly spaced cards).
+ *  Where the two don't fit either, `btn` centred. A neighbour with no box (not laid out, hidden)
+ *  doesn't count. `btn` itself shows clear of `box`'s scroll-padding (0.4.1: the rail's end
  *  fades): the scroll moves on as little as clears it, and 0 needs it clear too. */
 function centreBy(
   box: HTMLElement,
@@ -422,13 +423,10 @@ function centreBy(
     const q = el?.getBoundingClientRect()
     return q?.width || q?.height ? (q as DOMRect) : r
   }) as [DOMRect, DOMRect]
-  // the room between `btn` and a neighbour, either side of it (btn itself: less than none)
-  const gap = (q: DOMRect) => Math.max(q[lo] - r[hi], r[lo] - q[hi])
-  // the three; then, where more lies between btn and the one ahead than behind it, btn and that
-  // one (else the two either side, which can't fit where the three don't: btn is between them)
+  // the three; then btn and the one ahead
   for (const rs of [
     [r, b, a],
-    [gap(a) > gap(b) + 1 ? r : b, a],
+    [r, a],
   ]) {
     // the scrolls that show them whole run from `from` to `to` (none: they don't fit); 0 among
     // them: they show already, nothing moves. In whole px: WebKit drops a scroll's fraction, and

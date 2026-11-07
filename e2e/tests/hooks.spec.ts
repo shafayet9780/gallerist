@@ -527,10 +527,15 @@ test.describe('on a phone', () => {
 
   // 0.4.1 (Apploye): where the current card and the cards either side of it couldn't all show, the
   // rail centred the current one, so the next card past a marker or a label line wider than its
-  // group's cards was cut off, though it would have shown whole with the current one. Now, where
-  // more lies between the current card and the one ahead (the way the cursor went) than behind it,
-  // the two show whole wherever they fit. wide=1 gives the marker and the 12:00 label line a fixed
-  // room, so the three don't fit whatever the fonts. A row rail (items) and a stacked one (groups).
+  // group's cards was cut off, though it would have shown whole with the current one. 0.5: wherever
+  // the three can't show, the current card and the one ahead (the way the cursor went) show whole
+  // where they fit, whatever lies behind (0.4.1 needed more room ahead than behind: a one-screen
+  // timeframe whose label line is wider than its card left the next one cut, by 44px here); and a
+  // phone's rail fades narrower, so the current card clear of its fade leaves the room (0.4.1: the
+  // card ahead past the marker cut by what the 40px fade took, 6px here). wide=1 gives the marker
+  // and the 12:00 label line a fixed room, rooms=1 every label line, so the three don't fit whatever
+  // the fonts; one=1 is one capture per timeframe (1–2 screens). A row rail (items) and a stacked
+  // one (groups).
   type Span = { id: string; a: number; z: number }
   const railNow = (page: Page, sel: string) =>
     page.evaluate(async (sel) => {
@@ -557,34 +562,43 @@ test.describe('on a phone', () => {
     }, sel)
   const span = (...cs: Span[]) => Math.max(...cs.map((c) => c.z)) - Math.min(...cs.map((c) => c.a))
 
-  for (const [display, sel, total, tightAt] of [
+  const ITEMS = 'button[data-item]'
+  const GROUPS = 'button[data-group]:not([data-item]):not(.gallerist-thumb-expand)'
+  for (const [display, sel, query, total, tightAt] of [
     [
       'flat',
-      'button[data-item]',
+      ITEMS,
+      'wide=1',
       19, // items (the rail draws a run of them)
       // past the marker (after 11:10) and past the 12:00 label line, both ways
       ['s77-1>s107-1', 's122-1>s132-1', 's107-1>s77-1', 's132-1>s122-1'],
     ],
+    ['stacked', GROUPS, 'wide=1', 7, ['tf70>tf105', 'tf105>tf70']], // timeframes; past the marker
     [
-      'stacked',
-      'button[data-group]:not([data-item]):not(.gallerist-thumb-expand)',
-      7, // timeframes
-      ['tf70>tf105', 'tf105>tf70'], // past the marker, both ways
+      'flat',
+      ITEMS,
+      'one=1&rooms=1',
+      11,
+      // past a wide label line: from the 11:45 timeframe's first screen past the one behind it, into
+      // a one-screen timeframe (12:00) and on, and back into one (11:10, 12:00)
+      ['s107-1>s107-2', 's122-1>s132-1', 's72-1>s62-2', 's122-1>s112-2'],
     ],
   ] as const)
     for (const dir of ['ltr', 'rtl'] as const) {
-      test(`a ${display} rail shows the card ahead whole past a marker or a wide label, ${dir}`, async ({
+      test(`a ${display} rail shows the card ahead whole beside the current one, ${query}, ${dir}`, async ({
         page,
       }) => {
         test.setTimeout(60_000)
-        await page.goto(`/hooks.html?wide=1&display=${display}&dir=${dir}`)
+        await page.goto(`/hooks.html?${query}&display=${display}&dir=${dir}`)
         await viewerSettled(page)
         await page.evaluate(() =>
           (window as unknown as { viewer: { goTo(g: number, i: number): void } }).viewer.goTo(0, 0),
         )
         await page.locator('.gallerist').focus()
-        // the steps where the three can't show but the current card and the one ahead can
+        // the steps where the three can't show but the current card and the one ahead can, and
+        // what each left of the one ahead past the rail's edge
         const tight: string[] = []
+        const cut: Record<string, number> = {}
         const [fwd, back] =
           dir === 'rtl' ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
         for (const [key, step] of [
@@ -601,7 +615,6 @@ test.describe('on a phone', () => {
             const behind = cards[k - step]
             const room = n.hi - n.lo
             const whole = (c: Span) => c.a >= n.lo - 1 && c.z <= n.hi + 1
-            const gap = (c?: Span) => (c ? Math.max(c.a - cur.z, cur.a - c.z) : 0)
             const at = `${key} to ${cur.id}`
             // (soft: every step that fails is reported, not just the first)
             expect.soft(whole(cur), `${at}: it shows whole`).toBe(true)
@@ -616,7 +629,7 @@ test.describe('on a phone', () => {
                 if (c) expect.soft(whole(c), `${at}: ${c.id} shows`).toBe(true)
               continue
             }
-            if (gap(ahead) > gap(behind) + 1 && span(cur, ahead) <= room - 1) {
+            if (span(cur, ahead) <= room - 1) {
               // whole, but for what the current card clear of the near fade leaves too little room
               // for: then it runs past the rail's far edge by that, in the far fade
               const short = span(cur, ahead) - (room - (ahead.a > cur.a ? n.fLo : n.fHi))
@@ -625,11 +638,16 @@ test.describe('on a phone', () => {
                 .soft(over, `${at}: ${ahead.id} ahead shows whole`)
                 .toBeLessThanOrEqual(Math.max(0, short) + 1)
               // well clear of the edge cases, whatever the fonts
-              if (span(behind, cur, ahead) > room + 15 && span(cur, ahead) < room - 15)
+              if (span(behind, cur, ahead) > room + 15 && span(cur, ahead) < room - 15) {
                 tight.push(`${cur.id}>${ahead.id}`)
+                cut[`${cur.id}>${ahead.id}`] = Math.round(over)
+              }
             }
           }
         expect(tight).toEqual(expect.arrayContaining([...tightAt]))
+        // and there, on a phone, the one ahead shows whole: nothing of it past the edge
+        for (const t of tightAt)
+          expect.soft(cut[t], `${t}: the one ahead cut by`).toBeLessThanOrEqual(1)
       })
     }
 

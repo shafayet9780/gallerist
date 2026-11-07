@@ -8,6 +8,7 @@
 //    over the stage; Escape in it closes it, not the viewer; N opens it (a plugin keymap)
 //  • the zoom tool, the View popover and the shortcut list (?) with the host's N and long press
 // Query: display=flat|stacked (default flat) · skin · scheme · dir=rtl · preset (default reviewer) ·
+// one=1, rooms=1 (below) ·
 // wide=1: the marker's box and the 12:00 timeframe's label line take a fixed room (whatever the
 // fonts), so on a 390px phone the cards either side of them and the current one can't all show
 import { type Group, type Item, type Plugin, createViewer } from '@gallerist/core'
@@ -62,18 +63,23 @@ const FRAMES: Array<[number, number | null, number, number]> = [
   [130, 55, 2, 1],
 ]
 const palette = ['#3b4a6b', '#4a6b5b', '#6b4a5b', '#5b5b3b', '#3b5b6b', '#6b5b4a']
-const groups: Array<Group<Frame, Shot>> = FRAMES.map(([start, activity, caps, screens], g) => ({
-  id: `tf${start}`,
-  meta: { range: `${clock(start)} – ${clock(start + 10)}`, activity },
-  items: Array.from({ length: caps * screens }, (_, k) =>
-    // capture by capture, then monitor
-    shot(
-      (k % screens) + 1,
-      start + 2 + Math.floor(k / screens) * 5,
-      palette[(g + k) % 6] ?? '#444',
+// one=1: one capture per timeframe (1–2 screens, as a 10-minute timeframe with one capture has)
+const one = p.has('one')
+const groups: Array<Group<Frame, Shot>> = FRAMES.map(([start, activity, c, screens], g) => {
+  const caps = one ? 1 : c
+  return {
+    id: `tf${start}`,
+    meta: { range: `${clock(start)} – ${clock(start + 10)}`, activity },
+    items: Array.from({ length: caps * screens }, (_, k) =>
+      // capture by capture, then monitor
+      shot(
+        (k % screens) + 1,
+        start + 2 + Math.floor(k / screens) * 5,
+        palette[(g + k) % 6] ?? '#444',
+      ),
     ),
-  ),
-}))
+  }
+})
 
 // the host's notes, per timeframe
 const notes: Record<string, string[]> = {
@@ -114,6 +120,8 @@ const noteCount = (id: string) => {
 }
 
 const wide = p.has('wide')
+// rooms=1: every timeframe's label line takes that fixed room (a one-screen timeframe widens for it)
+const rooms = p.has('rooms')
 const manual: RailMarker = {
   id: 'manual-1',
   after: 'tf70',
@@ -141,7 +149,7 @@ const rail = thumbnails({
     const count = noteCount(g.id)
     if (display === 'stacked' && place === 'below') return readout(f, true)
     if (display === 'stacked') return count
-    const line = el('span', wide && g.id === 'tf120' ? 'hk-line hk-room' : 'hk-line')
+    const line = el('span', rooms || (wide && g.id === 'tf120') ? 'hk-line hk-room' : 'hk-line')
     if (count) line.append(count)
     line.append(readout(f, false))
     line.setAttribute(

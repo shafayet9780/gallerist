@@ -110,6 +110,13 @@
     --gallerist-arrow-hover-bg: var(--gallerist-arrow-bg);
     --gallerist-itemnav-button-hover-bg: var(--gallerist-itemnav-button-bg);
   }
+  /* a phone's rail fades 16px (no ‹ › page buttons sit in it on touch): the current card kept clear
+     of the fade leaves room for the card ahead whole beside it */
+  @media (max-width: 600px) and (pointer: coarse) {
+    .gallerist {
+      --gallerist-rail-fade: 16px;
+    }
+  }
 }
 
 .gallerist {

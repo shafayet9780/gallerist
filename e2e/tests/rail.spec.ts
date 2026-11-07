@@ -157,8 +157,8 @@ const around = (n: RailNow, id: string) => {
 const spanOf = (n: RailNow, id: string) => n.cards.find((c) => c.id === id)
 
 // Step `steps` times with `key`, `step` cards along the rail's order (1: toward its end). After each
-// step the current card and its neighbours show whole (or, where the three can't fit for more lying
-// between the current one and the one ahead, the way the walk goes, than behind it: those two;
+// step the current card and its neighbours show whole (or, where the three can't fit, the current
+// one and the one ahead, the way the walk goes, where those two fit: 0.5, whatever lies behind;
 // otherwise the current one shows whole, centred); the rail moved only if one of them didn't show
 // whole before the step; and a move centres the current card unless the rail stopped at an end, or,
 // where the three fit but centring would cut one of them (index chips follow their labels), goes on
@@ -173,17 +173,16 @@ const walk = async (page: Page, flat: boolean, key: string, steps: number, step:
     const [prev, cur, next] = around(now, now.id) as [Span | undefined, Span, Span | undefined]
     expect(cur, `${now.id} drawn`).toBeDefined()
     // the cards that should show: the three, else the current one and the one ahead, else itself
+    // (fitting within 1px, as the rail counts them)
     const fits = (cs: Array<Span | undefined>) => {
       const set = cs.filter((c): c is Span => !!c)
       const z = Math.max(...set.map((c) => c.z))
-      return z - Math.min(...set.map((c) => c.a)) <= now.hi - now.lo + 0.5 ? set : null
+      return z - Math.min(...set.map((c) => c.a)) <= now.hi - now.lo + 1 ? set : null
     }
-    const [behind, ahead] = step > 0 ? [prev, next] : [next, prev]
+    const ahead = step > 0 ? next : prev
     const three = fits([prev, cur, next])
-    // the room between the current card and another (none: 0)
-    const room = (c?: Span) => (c ? Math.max(c.a - cur.z, cur.a - c.z) : 0)
-    // the current one and the one ahead, where more lies between them than behind (a marker)
-    const two = three || room(ahead) <= room(behind) + 1 ? null : fits([cur, ahead])
+    // else the current one and the one ahead
+    const two = three ? null : fits([cur, ahead])
     const set = three ?? two ?? [cur]
     // the current card clear of the fades; the one ahead of two may run into the far one, and past
     // the rail's edge as far as the near one leaves too little room for both (0.4.1 review)
