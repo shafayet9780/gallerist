@@ -193,9 +193,10 @@ function focusableWithin(root: HTMLElement): HTMLElement[] {
   )
 }
 // Widgets with arrow keys of their own: a plugin's arrow keys aren't asked from inside one.
-// Not the viewer's own listboxes (a rail's, a grid's): their arrows are the viewer's.
+// Not the viewer's own listboxes (a rail's, a grid's; their class starts `gallerist-`): their arrows
+// are the viewer's. A host class that only contains `gallerist-` is still the host's.
 const WIDGETS =
-  '[role=dialog],[role^=menu],[role=slider],[aria-haspopup]:not([aria-haspopup=false]),:is([role=listbox],[role=tablist],[role=radiogroup],[role^=tree],[role=grid]):not([class*=gallerist-])'
+  '[role=dialog],[role^=menu],[role=slider],[aria-haspopup]:not([aria-haspopup=false]),:is([role=listbox],[role=tablist],[role=radiogroup],[role^=tree],[role=grid]):not([class^=gallerist-])'
 /** True when the key event originates from a control where typing must not be hijacked. */
 function isEditableTarget(target?: EventTarget | null): boolean {
   const node = target as HTMLElement | null

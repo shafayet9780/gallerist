@@ -2125,6 +2125,8 @@ describe('mount — modal accessibility (WS-3)', () => {
         ...['listbox', 'tablist', 'radiogroup', 'menubar', 'tree', 'grid', 'treegrid'].map(
           (role) => `<div role="${role}"><div tabindex="0">in a ${role}</div></div>`,
         ),
+        // a host class that only contains "gallerist-" is still the host's
+        '<div role="tablist" class="app-gallerist-tabs"><div tabindex="0">host tabs</div></div>',
       ]) {
         const host = root.appendChild(document.createElement('div'))
         host.innerHTML = html
@@ -2133,7 +2135,7 @@ describe('mount — modal accessibility (WS-3)', () => {
         at.dispatchEvent(key({ key: 'n', cancelable: true }))
       }
       expect(take).not.toHaveBeenCalled()
-      expect(letter).toHaveBeenCalledTimes(12)
+      expect(letter).toHaveBeenCalledTimes(13)
       // the overlay root is a dialog itself, and a rail thumb in it is no widget of that kind
       root.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
       expect(take).toHaveBeenCalledTimes(1)
