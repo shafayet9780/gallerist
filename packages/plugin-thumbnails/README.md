@@ -247,9 +247,12 @@ refreshRail(viewer)
   announced as any step is. Plain ↑/↓ only: Shift+↑/↓ (and a chord) do what they did. At the
   cluster's end (or on an item with no key) ↑/↓ do what they did:
   nothing on a row rail; down a side rail, where ↑/↓ walk it, the cluster's next item is the walk's
-  next anyway. A stacked rail keeps ↑/↓ for its items. Through the plugin keymap the renderer asks
-  first, so ↑/↓ stay with a focused caption band that scrolls, a text field, and a dialog, menu,
-  slider or menu button in the viewer. plugin-shortcuts lists them ("Previous / next in the cluster",
+  next anyway. Down a side rail with `mount(…, { linear: false })` ↑/↓ step by group, and keep
+  doing that (a key that moved by item or by group by turns would mislead). A stacked rail keeps
+  ↑/↓ for its items. Through the plugin keymap the renderer asks first, so ↑/↓ stay with a focused
+  caption band that scrolls, a text field, and a widget in the viewer with arrows of its own (a
+  dialog, menu, slider or menu button, a host's listbox, tab list, radio group, menu bar, tree or
+  grid). plugin-shortcuts lists them ("Previous / next in the cluster",
   `strings.prevNextCluster`). A reviewer whose captures span monitors needs no keyboard code of its
   own:
   ```ts

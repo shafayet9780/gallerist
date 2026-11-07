@@ -301,6 +301,22 @@ describe('clusterKeys', () => {
     expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
   })
 
+  it('down a side rail with linear: false, ↑/↓ keep stepping by group', () => {
+    const v = createViewer({
+      collection: collection(),
+      plugins: [
+        thumbnails({ groupDisplay: 'flat', cluster: (i) => meta(i).cap, clusterKeys: true }),
+      ],
+    })
+    mount(v, { rail: 'left', linear: false })
+    v.open()
+    v.goTo(1, 0) // b0, with b1 in its cluster
+    press('ArrowDown') // the next group there, not b1
+    expect(v.getState().cursor).toEqual({ g: 2, i: 0 })
+    press('ArrowUp')
+    expect(v.getState().cursor.g).toBe(1)
+  })
+
   it('follows a display switch: taken on flat, given back on stacked', () => {
     const v = flat({ groupDisplay: 'stacked' })
     v.goTo(1, 1)

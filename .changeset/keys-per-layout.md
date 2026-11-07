@@ -9,15 +9,19 @@ can rebind one for a layout. A handler takes a key with `preventDefault()`, and 
 nothing with it; otherwise the renderer's own key for it (an arrow, Home/End, `+`/`-`/`0`, `t`, 1–9,
 Escape) runs after. A plugin is not asked for a chord (Ctrl, ⌘, Alt; AltGr is fine), a key a handler
 took already, a key from a text field (shadow roots too; Escape there is the renderer's alone), an
-arrow key from inside a dialog, menu or slider in the viewer or from a menu button (`aria-haspopup`;
-the overlay's root, a dialog, doesn't count), and a focused caption band that scrolls keeps ↑/↓ /
+arrow key from inside a dialog, menu or slider in the viewer, a host's listbox, tab list, radio
+group, menu bar, tree or grid (not the viewer's own rail or grid), or from a menu button
+(`aria-haspopup`, not `"false"`; the overlay's root, a dialog, doesn't count), and a focused caption band that scrolls keeps ↑/↓ /
 Home / End for scrolling first. A host no longer needs a capture-phase listener to take an arrow key.
+A handler that throws doesn't stop the renderer's own key (Escape still closes); its error is
+reported (`reportError`, else `console.error`).
 
 **plugin-thumbnails (new):** `clusterKeys: true` gives a flat rail's ↑/↓ (a row rail walks with ←/→)
 to its clusters: ↓ steps to the next item of the current one's `cluster`, ↑ to the one before,
 announced as any step is; at the cluster's end they do what they did. Plain ↑/↓ only: Shift+↑/↓
 (and a chord) stay the renderer's. A stacked rail keeps ↑/↓ for its
-items; down a side rail, where ↑/↓ walk the rail, the cluster's next item is the walk's next. A
+items; down a side rail, where ↑/↓ walk the rail, the cluster's next item is the walk's next, and
+a side rail with `mount(…, { linear: false })`, where ↑/↓ step by group, keeps them for that. A
 reviewer whose captures span monitors (`cluster: (item, g) => \`${g}:${capture}\``) switches monitors
 with ↑/↓ and no keyboard code of its own, and a keyboard user can still scroll a long caption band.
 
@@ -29,5 +33,5 @@ key won); now it runs first, and the renderer's key runs too unless the handler 
 `preventDefault()`. A plugin given a renderer key on purpose (`grid({ key: 't' })`) now toggles both.
 A host that took ↑/↓ with a capture-phase `keydown` listener and `preventDefault()` keeps working (the
 renderer still leaves a key a handler took); with plugin-thumbnails' `clusterKeys` it can delete it.
-A plugin's arrow keys no longer reach it from inside a dialog, menu or slider in the viewer, or from a
-menu button.
+A plugin's arrow keys no longer reach it from inside a dialog, menu or slider in the viewer, a host's
+listbox, tab list, radio group, menu bar, tree or grid, or from a menu button.

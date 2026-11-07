@@ -126,10 +126,12 @@ export interface ThumbnailsOptions {
   /**
    * ↑/↓ step to the item before / after the current one in its cluster (`cluster`) on a `flat`
    * rail: a row walks with ←/→, so they had no use there (down a side rail they walk it, and a
-   * cluster's next item is the walk's next). Where the current item has no neighbour in its cluster
-   * that way, ↑/↓ do what they did, and Shift+↑/↓ always do. Not from a focused caption band (it scrolls with them), a
-   * field, or a dialog, menu, slider or menu button in the viewer. Listed by plugin-shortcuts.
-   * Default false.
+   * cluster's next item is the walk's next). Not down a side rail with `mount(…, { linear: false })`,
+   * where ↑/↓ step by group: they keep doing that. Where the current item has no neighbour in its
+   * cluster that way, ↑/↓ do what they did, and Shift+↑/↓ always do. Not from a focused caption
+   * band (it scrolls with them), a field, or a widget in the viewer with arrows of its own (a
+   * dialog, menu, slider, menu button, or a host's listbox, tab list, radio group, menu bar, tree
+   * or grid). Listed by plugin-shortcuts. Default false.
    */
   clusterKeys?: boolean
   /**
@@ -1669,12 +1671,19 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
 
     const keys = { e: () => toggleActivePanel(), E: () => toggleActivePanel() }
     // clusterKeys: plain ↑/↓ to the item before / after the current one in its cluster, where it
-    // has one (Shift+↑/↓ stay the renderer's; a chord never reaches a keymap)
+    // has one (Shift+↑/↓ stay the renderer's; a chord never reaches a keymap). Not where ↑/↓ step
+    // by group (a side rail with `linear: false`): one key moving by item or group by turns misleads.
     const step = (e: KeyboardEvent) => {
       const { g, i } = viewer.getState().cursor
       const to = i + (e.key === 'ArrowDown' ? 1 : -1)
       const own = clusterOf(g, i)
-      if (e.shiftKey || own === null || own !== clusterOf(g, to)) return
+      if (
+        e.shiftKey ||
+        own === null ||
+        own !== clusterOf(g, to) ||
+        viewerRoot?.matches('[data-gallerist-orientation=vertical]:not([data-gallerist-linear])')
+      )
+        return
       e.preventDefault()
       viewer.goTo(g, to)
     }
