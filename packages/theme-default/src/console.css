@@ -63,6 +63,7 @@
     --gallerist-tool-border: 0 solid transparent;
     --gallerist-tool-fg: var(--gallerist-fg-muted);
     --gallerist-tool-hover-bg: #1e2125;
+    --gallerist-close-rule: 9px; /* a hairline before Close */
     --gallerist-arrow-size: var(--gallerist-target);
     --gallerist-arrow-bg: var(--gallerist-chrome-bg);
     --gallerist-arrow-border: 1px solid var(--gallerist-hairline);
@@ -113,6 +114,17 @@
     --gallerist-seg-track: #111215;
     --gallerist-seg-on: #2b2f35;
     --gallerist-seg-on-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.5);
+  }
+
+  /* a compact bar for a mouse or trackpad (the mockup): 36px tools, 18px glyphs (Close 20px), the
+     zoom tool one bordered group. A touch keeps 44px targets. */
+  @media (pointer: fine) {
+    .gallerist[data-gallerist-skin="console"] {
+      --gallerist-tool-size: 36px;
+      --gallerist-tool-icon: 18px;
+      --gallerist-close-icon: calc(var(--gallerist-tool-icon) + 2px); /* 20px: follows the glyphs */
+      --gallerist-zoom-group: 1;
+    }
   }
 
   /* accents */

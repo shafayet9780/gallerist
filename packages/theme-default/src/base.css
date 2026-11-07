@@ -15,6 +15,16 @@
   .gallerist {
     /* structure: sizes every skin shares (a skin may tune them; the layout lint checks each skin) */
     --gallerist-target: 44px;
+    /* the bar's tools: their box and glyph (Close's glyph its own); Console takes 36 / 18 / 20 with
+       a fine pointer. A touch keeps the 44px target. */
+    --gallerist-tool-size: var(--gallerist-target);
+    --gallerist-tool-icon: 22px;
+    --gallerist-close-icon: var(--gallerist-tool-icon);
+    /* plugin-zoom's − 100% +: 0 three loose tools, 1 one bordered group a tool's height less 6px
+       (Console with a fine pointer) */
+    --gallerist-zoom-group: 0;
+    /* room before Close, a hairline 20px tall at its start (Console 9px; 0: none) */
+    --gallerist-close-rule: 0px;
     --gallerist-thumb-h: 84px;
     --gallerist-rail-handle-h: 22px;
     --gallerist-toolbar-h: 56px; /* toolbar band height; a vertical rail starts below it */
@@ -497,6 +507,9 @@
   align-items: center;
   padding: 8px 12px;
   overflow-x: auto;
+  /* a card brought into view (the current one, a focused one) lands clear of the end fades, and of
+     the ‹ › page buttons in them (plugin-thumbnails reads it) */
+  scroll-padding-inline: var(--gallerist-rail-fade);
   scrollbar-width: none;
   -webkit-user-select: none;
   user-select: none;
@@ -509,6 +522,7 @@
 }
 .gallerist-thumbs[data-gallerist-scroll="y"] {
   --_fade-to: to bottom;
+  scroll-padding: var(--gallerist-rail-fade) 0;
 }
 .gallerist[data-gallerist-dir="rtl"] .gallerist-thumbs[data-gallerist-scroll="x"] {
   --_fade-to: to left;
@@ -981,7 +995,7 @@
 .gallerist-thumb-group-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px; /* the label, then the meta (the mockup) */
   min-height: 14px;
 }
 .gallerist-thumb-group-head[hidden] {
@@ -1119,6 +1133,8 @@
   backdrop-filter: var(--gallerist-blur);
 }
 .gallerist-bar button {
+  min-width: var(--gallerist-tool-size);
+  min-height: var(--gallerist-tool-size);
   border: var(--gallerist-tool-border);
   background: var(--gallerist-tool-bg);
   color: var(--gallerist-tool-fg);
@@ -1171,21 +1187,77 @@
   display: block;
   pointer-events: none;
 }
+.gallerist-bar .gallerist-icon {
+  width: var(--gallerist-tool-icon);
+  height: var(--gallerist-tool-icon);
+}
+.gallerist-bar .gallerist-close .gallerist-icon {
+  width: var(--gallerist-close-icon);
+  height: var(--gallerist-close-icon);
+}
+/* a hairline before Close, in the room --gallerist-close-rule makes (none at 0) */
+.gallerist-bar .gallerist-close {
+  position: relative;
+  margin-inline-start: var(--gallerist-close-rule);
+}
+.gallerist-bar .gallerist-close::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: calc(-1 * var(--gallerist-close-rule));
+  top: calc(50% - 10px);
+  height: 20px;
+  /* a border, not a background: forced colours keep a border's line (in the text colour) */
+  border-inline-start: min(1px, var(--gallerist-close-rule)) solid var(--gallerist-hairline);
+  pointer-events: none;
+}
 
 /* ── the zoom tool (plugin-zoom): − 100% + ───────────────────────────────────────── */
+/* --gallerist-zoom-group (--_g) 0: three tools 2px apart; 1: one group in a hairline, its parts
+   6px narrower and 8px shorter than a tool (30 × 28 of 36), the percentage between two hairlines */
 .gallerist-zoom-tool {
+  --_g: var(--gallerist-zoom-group);
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: calc(2px - 2px * var(--_g));
+  border: calc(1px * var(--_g)) solid var(--gallerist-hairline);
+  border-radius: var(--gallerist-radius);
 }
 .gallerist-zoom-tool[hidden] {
   display: none;
 }
+/* (a bar tool's specificity, so the percentage's own width wins) */
+.gallerist-zoom-tool > button {
+  min-width: calc(var(--gallerist-tool-size) - 6px * var(--_g));
+  min-height: calc(var(--gallerist-tool-size) - 8px * var(--_g));
+  border-radius: calc(var(--gallerist-control-radius) * (1 - var(--_g)));
+}
+/* the group's ends follow its corners */
+.gallerist-bar .gallerist-zoom-tool > :first-child {
+  border-start-start-radius: var(--_r);
+  border-end-start-radius: var(--_r);
+}
+.gallerist-bar .gallerist-zoom-tool > :last-child {
+  border-start-end-radius: var(--_r);
+  border-end-end-radius: var(--_r);
+}
+.gallerist-zoom-tool > * {
+  --_r: calc(
+    var(--gallerist-control-radius) *
+    (1 - var(--_g)) +
+    (var(--gallerist-radius) - 1px) *
+    var(--_g)
+  );
+}
+.gallerist-bar .gallerist-zoom-tool .gallerist-icon {
+  width: calc(var(--gallerist-tool-icon) - 3px * var(--_g));
+  height: calc(var(--gallerist-tool-icon) - 3px * var(--_g));
+}
 .gallerist-bar .gallerist-zoom-level {
   min-width: 4.5em;
   padding: 0 4px;
-  font: 600 13px / 1 var(--gallerist-mono);
+  font: 600 calc(13px - 1px * var(--_g)) / 1 var(--gallerist-mono);
   font-variant-numeric: tabular-nums;
+  border-inline: calc(1px * var(--_g)) solid var(--gallerist-hairline);
 }
 /* at fit there's nothing to reset: the percentage keeps its colour */
 .gallerist-bar .gallerist-zoom-level[aria-disabled="true"] {
@@ -2583,6 +2655,10 @@
     gap: 4px;
     padding-inline: max(8px, env(safe-area-inset-left, 0px))
       max(8px, env(safe-area-inset-right, 0px));
+  }
+  /* the hairline before Close keeps the middle of its room (the bar's gap is 4px less here) */
+  .gallerist-bar .gallerist-close::before {
+    inset-inline-start: calc(2px - var(--gallerist-close-rule));
   }
   .gallerist-title {
     font-size: 13px;

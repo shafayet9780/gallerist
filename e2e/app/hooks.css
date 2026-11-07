@@ -130,3 +130,13 @@
     display: none;
   }
 }
+/* wide=1 (hooks.ts): a fixed room, whatever the fonts' widths */
+.hk-room {
+  box-sizing: border-box;
+  inline-size: 170px;
+  justify-content: flex-end;
+}
+.hk-room-marker {
+  display: inline-block;
+  inline-size: 150px;
+}

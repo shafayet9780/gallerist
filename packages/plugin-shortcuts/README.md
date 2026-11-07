@@ -34,11 +34,13 @@ mount(viewer, { preset: 'reviewer' })
 
 Nothing joins the toolbar (it is crowded enough). The list opens:
 
-- on **`?`** while the viewer has focus (not while typing in a field in it, not with Ctrl, ⌘ or Alt);
+- on **`?`** while the viewer has focus, from its first frame (its opening fade included; not while
+  it closes, not while typing in a field in it, not with Ctrl, ⌘ or Alt);
 - from the [View menu](../plugin-view/README.md)'s last row, when both plugins are registered;
 - from the host: `shortcuts()` returns the plugin with `open(keys?)` and `close()`, for a help button
-  of your own (`open()` returns `false` when no viewer it is registered on is open). The instance
-  (named `shortcuts`, `ShortcutsInstance`) has the same `open()` / `close()`, `isOpen`, and `label`.
+  of your own (`open()` returns `false` when no viewer it is registered on is open or opening). The
+  instance (named `shortcuts`, `ShortcutsInstance`) has the same `open()` / `close()`, `isOpen`, and
+  `label`.
 
 `open()` with no argument shows the gestures on a coarse pointer (a phone, a tablet) and the keys
 otherwise; `open(true)` the keys, `open(false)` the gestures. `?` always shows the keys (a keyboard

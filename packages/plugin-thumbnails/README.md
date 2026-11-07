@@ -28,10 +28,18 @@ mount(viewer)
 - **Context around the current card.** While the current card and the cards on either side of it
   show whole, the rail doesn't move, so clicking a card in view doesn't shift it. Once one of them
   would be cut off by an edge, the rail scrolls to centre the current card, so a step always shows
-  what comes next. At either end of the rail the scroll stops at the first or last card. This applies
-  to every rail that scrolls (`flat`, `stacked`, `index` rows and chips, side rails, right to left) and
-  to the item column. These scrolls are instant, with no animation, so there is nothing to turn off
-  for `prefers-reduced-motion`.
+  what comes next. Where the three can't show together because more lies between the current card
+  and the next one the way you're going (a marker, a group label wider than its cards) than behind
+  it, the rail shows the current card and that next one whole, centred together, wherever the two
+  fit (0.4.1). The current card itself always lands clear of the rail's scroll-padding, which the
+  theme sets to the end fade (`--gallerist-rail-fade`, where the **‹ ›** buttons sit too), so it is
+  never dimmed or covered; where the room is short, the card ahead runs into the far fade instead
+  (0.4.1). "The next one the way you're going" follows the last step that moved along the rail: a step
+  between the items of one group, the items toggle or reopening the viewer keeps it. At either end of
+  the rail the scroll stops at the first or last card. This applies to every rail that scrolls (`flat`,
+  `stacked`, `index` rows and chips, side rails, right to left) and to the item column, where the item
+  ahead is always the next one (the column doesn't track which way you went). These scrolls are
+  instant, with no animation, so there is nothing to turn off for `prefers-reduced-motion`.
 - **Pull, don't scroll.** The rail shows no scrollbar (in every engine). A mouse or pen **drags** it:
   past 5px along the rail (10px with a pen) a press is a drag, which scrolls the rail and never clicks
   the card it started on; short of that, or across the rail, it's a click, which selects. A press
@@ -44,7 +52,8 @@ mount(viewer)
   or trackpad swipe, and a pinch, are left to the browser. Each end with more beyond it (scrolled
   away, or cards not drawn yet: the rail draws a run of them) **fades**
   (`data-gallerist-more-start` / `data-gallerist-more-end` on the rail, the theme's mask, 40px by
-  `--gallerist-rail-fade`), on a side rail too. On a sideways rail, **‹ ›** buttons at those ends
+  `--gallerist-rail-fade`; the theme's `scroll-padding` on the rail is the same width, so a card
+  brought into view, or focused with Tab, lands clear of it), on a side rail too. On a sideways rail, **‹ ›** buttons at those ends
   (`.gallerist-rail-page`, in the rail region) show while a mouse is over the rail and page it by 80%
   of its width, gliding unless the user prefers reduced motion; they are out of the tab order and
   hidden from assistive tech, as the keys already walk the rail and bring the current card into view.

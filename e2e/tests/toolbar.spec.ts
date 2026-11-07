@@ -20,9 +20,9 @@ const SKINS = ['gallery', 'console', 'editorial'] as const
 const SCHEMES = ['dark', 'light'] as const
 const LOOKS = {
   default: 'view=1',
-  reviewer: 'preset=reviewer&view=1&captions=1',
+  reviewer: 'preset=reviewer&view=1&captions=1&zoom-tool=1',
   editorial: 'preset=editorial&view=1&captions=1',
-  'reviewer rtl': 'preset=reviewer&view=1&captions=1&dir=rtl',
+  'reviewer rtl': 'preset=reviewer&view=1&captions=1&zoom-tool=1&dir=rtl',
 }
 
 // the strip's keyboard-reachable tools, in order (a tool a plugin holds hidden is skipped)
@@ -150,6 +150,8 @@ const GEOMETRY: Record<string, [string, string?][]> = {
     ['preset=reviewer&view=1&captions=1&dir=rtl'],
     ['preset=reviewer&view=1&captions=1', 'title hidden by the host'],
     ['preset=reviewer&view=1&captions=1', 'tools all hidden'],
+    ['preset=reviewer&view=1&captions=1&zoom-tool=1&skin=console'],
+    ['preset=reviewer&view=1&captions=1&zoom-tool=1&skin=console&dir=rtl'],
     ['preset=immersive&view=1'],
     ['preset=immersive&view=1&controls=0&dir=rtl'],
     ['preset=immersive&view=1&captions=1'],
@@ -206,7 +208,11 @@ const barGeometry = (page: Page) =>
       counter: span(bar.querySelector('.gallerist-counter')),
       title: span(bar.querySelector('.gallerist-title')),
       before,
-      after: span(kids[at + 1]),
+      // (from its margin box: Console keeps room before Close for a hairline)
+      after: ((a) =>
+        a && [a[0] - Number.parseFloat(getComputedStyle(kids[at + 1]).marginInlineStart), a[1]])(
+        span(kids[at + 1]),
+      ),
       tools: tools.map(box),
       overflows: strip.scrollWidth > strip.clientWidth + 1,
       // (a tool the strip has scrolled partly out of view: where it shows)
@@ -318,4 +324,163 @@ test.describe('fullscreen on a 390px screen', () => {
     await expect(page.locator('.gallerist[data-gallerist-mode="inline"]')).toBeVisible()
     await expect(page.locator('.gallerist-fullscreen-btn')).toBeVisible()
   })
+})
+
+// 0.4.1: the Console skin's bar is compact for a fine pointer (the mockup): 36px tools with 18px
+// glyphs (Close 20px), the zoom tool one bordered group 30px tall (− and + 30 × 28 with 15px glyphs,
+// the percentage 54px wide between two hairlines), and a 1 × 20 hairline before Close, 8px clear of
+// what is either side of it (6px on a phone). A touch keeps 44px tools and 22px glyphs (the hairline
+// stays); Gallery and Editorial keep 44px tools and no hairline.
+const barSizes = (page: Page) =>
+  page.evaluate(() => {
+    const bar = document.querySelector('.gallerist-bar') as HTMLElement
+    const rtl = getComputedStyle(bar).direction === 'rtl'
+    const W = document.documentElement.clientWidth
+    // a box along the inline axis (RTL mirrored)
+    const box = (el: Element | null | undefined) => {
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      return {
+        s: rtl ? W - r.right : r.left,
+        e: rtl ? W - r.left : r.right,
+        w: r.width,
+        h: r.height,
+      }
+    }
+    const shown = (el: Element) => el.checkVisibility()
+    const icon = (el: Element) => box(el.querySelector('.gallerist-icon'))
+    const tools = [...bar.querySelectorAll('button')]
+      .filter((b) => shown(b) && !b.closest('.gallerist-zoom-tool'))
+      .map((b) => ({
+        name: b.getAttribute('aria-label') ?? b.className,
+        close: b.classList.contains('gallerist-close'),
+        box: box(b),
+        icon: icon(b),
+      }))
+    const group = bar.querySelector('.gallerist-zoom-tool')
+    const zoom =
+      group && shown(group)
+        ? {
+            box: box(group),
+            border: getComputedStyle(group).borderTopWidth,
+            parts: [...group.children].map((c) => ({
+              box: box(c),
+              icon: icon(c),
+              start: getComputedStyle(c).borderInlineStartWidth,
+            })),
+          }
+        : null
+    const close = bar.querySelector('.gallerist-close') as HTMLElement
+    const rule = getComputedStyle(close, '::before')
+    const at = box(close) as { s: number; e: number }
+    const off = Number.parseFloat(rtl ? rule.right : rule.left)
+    // what is before Close: the last shown tool in the strip (none: the bar's start)
+    const strip = bar.querySelector('.gallerist-region-toolbar') as HTMLElement
+    const last = [...strip.children].filter(shown).at(-1)
+    return {
+      tools,
+      zoom,
+      rule: {
+        // the line is its inline-start border (forced colours keep a border, 0.4.1)
+        w: Number.parseFloat(rule.width) + Number.parseFloat(rule.borderInlineStartWidth),
+        h: Number.parseFloat(rule.height),
+        before: at.s + off - (box(last)?.e ?? 0),
+        after: at.s - (at.s + off + Number.parseFloat(rule.borderInlineStartWidth)),
+      },
+    }
+  })
+
+const near = (a: number | undefined, b: number, slack = 0.5) => Math.abs((a ?? -1e9) - b) <= slack
+
+test.describe('the compact console bar', () => {
+  for (const [what, ctx] of [
+    ['a mouse', VIEWPORTS.desktop],
+    ['a touch', VIEWPORTS.phone],
+  ] as const) {
+    test.describe(what, () => {
+      test.use(ctx)
+      const fine = what === 'a mouse'
+      for (const skin of SKINS)
+        for (const scheme of SCHEMES)
+          for (const dir of fine && skin === 'console' ? ['ltr', 'rtl'] : ['ltr']) {
+            test(`${skin} ${scheme} ${dir}`, async ({ page }) => {
+              const compact = fine && skin === 'console'
+              await page.goto(
+                `/layout.html?preset=reviewer&view=1&captions=1&zoom-tool=1&skin=${skin}&scheme=${scheme}&dir=${dir}`,
+              )
+              await viewerSettled(page)
+              const b = await barSizes(page)
+              const problems: string[] = []
+              const tool = compact ? 36 : 44
+              expect(b.tools.length).toBeGreaterThanOrEqual(fine ? 5 : 3) // fullscreen, save, View, close
+              for (const t of b.tools) {
+                const glyph = compact ? (t.close ? 20 : 18) : 22
+                if (!near(t.box?.w, tool) || !near(t.box?.h, tool))
+                  problems.push(`${t.name}: ${t.box?.w} × ${t.box?.h}, not ${tool}`)
+                if (t.icon && (!near(t.icon.w, glyph) || !near(t.icon.h, glyph)))
+                  problems.push(`${t.name}'s glyph: ${t.icon.w} × ${t.icon.h}, not ${glyph}`)
+              }
+              if (fine) {
+                const z = b.zoom
+                expect(z, 'the zoom tool').not.toBeNull()
+                const [out, level, into] = z?.parts ?? []
+                if (compact) {
+                  expect(z?.border).toBe('1px')
+                  expect(z?.box?.h).toBeCloseTo(30, 0)
+                  for (const p of [out, into]) {
+                    expect(p?.box?.w).toBeCloseTo(30, 0)
+                    expect(p?.box?.h).toBeCloseTo(28, 0)
+                    expect(p?.icon?.w).toBeCloseTo(15, 0)
+                  }
+                  expect(level?.box?.w).toBeCloseTo(54, 0) // a tabular width, whatever the face
+                  expect(level?.box?.h).toBeCloseTo(28, 0)
+                  expect(level?.start).toBe('1px') // the hairlines either side of it
+                  // one group: the parts touch
+                  expect(Math.abs((level?.box?.s ?? 0) - (out?.box?.e ?? 0))).toBeLessThan(0.5)
+                  expect(Math.abs((into?.box?.s ?? 0) - (level?.box?.e ?? 0))).toBeLessThan(0.5)
+                } else {
+                  // three loose tools, as in 0.4.0
+                  expect(z?.border).toBe('0px')
+                  for (const p of [out, into]) expect(p?.box?.w).toBeCloseTo(44, 0)
+                  expect(Math.round((level?.box?.s ?? 0) - (out?.box?.e ?? 0))).toBe(2)
+                }
+              } else expect(b.zoom, 'a phone leaves the zoom tool out').toBeNull()
+              if (skin === 'console') {
+                expect(b.rule.w).toBe(1)
+                expect(b.rule.h).toBe(20)
+                // centred in the room before Close: 8px either side (6px on a phone, its gap 4px)
+                const clear = fine ? 8 : 6
+                if (!near(b.rule.before, clear, 1) || !near(b.rule.after, clear, 1))
+                  problems.push(`the hairline: ${b.rule.before} | 1 | ${b.rule.after}`)
+              } else expect(b.rule.w).toBe(0)
+              expect(problems).toEqual([])
+            })
+          }
+    })
+  }
+})
+
+// 0.4.1 review: forced colours paint a background over in the canvas colour, so the hairline before
+// Close, drawn as one, went with them; drawn as a border, it keeps a line in the system's text colour
+test('forced colours: the hairline before Close still shows', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'forced colours are emulated in Chromium only')
+  await page.emulateMedia({ forcedColors: 'active' })
+  await page.goto('/layout.html?preset=reviewer&view=1&captions=1&zoom-tool=1&skin=console')
+  await viewerSettled(page)
+  const r = await page.evaluate(() => {
+    const rule = getComputedStyle(
+      document.querySelector('.gallerist-bar .gallerist-close') as Element,
+      '::before',
+    )
+    const border = Number.parseFloat(rule.borderInlineStartWidth)
+    return {
+      // the line's colour: its border's, else its background's
+      line: border ? rule.borderInlineStartColor : rule.backgroundColor,
+      wide: border || Number.parseFloat(rule.width),
+      bar: getComputedStyle(document.querySelector('.gallerist-bar') as Element).backgroundColor,
+    }
+  })
+  expect(r.wide).toBe(1)
+  expect(r.line).not.toMatch(/^rgba\(.*, 0\)$/) // not transparent
+  expect(r.line, 'not the bar’s canvas colour').not.toBe(r.bar)
 })

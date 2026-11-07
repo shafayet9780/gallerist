@@ -1,7 +1,7 @@
 // Windowing helpers for the rail: which run of cards to draw, and how to change it without the
 // visible cards jumping. Pure or DOM-reading only; the plugin owns the DOM writes.
 
-const INF = Number.POSITIVE_INFINITY
+const INF = 1 / 0 // Infinity, in fewer bytes
 
 export type Axis = 'x' | 'y'
 
@@ -92,10 +92,15 @@ export function middleOf(scroller: Element, hosts: Element[], axis: Axis): numbe
   return best
 }
 
+// what keepPlace's whole-px scrolls left out, per scroller: carried into its next one, so cards of
+// fractional width (84 × 16/9) don't drift up to 0.5px a re-window, all the same way (0.4.1)
+const owed = new WeakMap<Element, number>()
+
 /**
  * Run `mutate`, then scroll `scroller` so `ref` sits where it was: cards added or dropped before it
  * don't move what's on screen. The scroller needs `overflow-anchor: none`, or the browser's own scroll
- * anchoring could correct the same shift twice.
+ * anchoring could correct the same shift twice. Scrolls whole px; the fraction left out is carried to
+ * the next call for the same scroller, so what shows stays within half a px of where it was.
  */
 export function keepPlace(
   scroller: HTMLElement,
@@ -106,7 +111,11 @@ export function keepPlace(
   const before = ref && axis ? edge(ref.getBoundingClientRect(), axis) : null
   mutate()
   if (before === null || !ref?.isConnected || !axis) return
-  const shift = edge(ref.getBoundingClientRect(), axis) - before
+  // whole px: WebKit drops a scroll's fraction, and two such drops (the reveal, then this) can cut
+  // 2px off a card meant to show whole
+  const want = edge(ref.getBoundingClientRect(), axis) - before + (owed.get(scroller) ?? 0)
+  const shift = Math.round(want)
+  owed.set(scroller, want - shift)
   if (!shift) return
   if (axis === 'x') scroller.scrollLeft += shift
   else scroller.scrollTop += shift

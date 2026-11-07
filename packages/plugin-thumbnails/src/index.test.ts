@@ -1104,10 +1104,28 @@ describe('thumbnails — timeline and numbered items (M18)', () => {
       at('b2', 200) // 200..290: shows whole
       v.nextItem()
       expect(panel.scrollTop).toBe(0) // b1 and both its neighbours show: nothing moves
-      at('b2', 250) // 250..340: cut by the panel's bottom
+      at('b2', 320) // 320..410: cut by the panel's bottom, and too far for b1 and b2 to fit
       v.prevItem()
       v.nextItem()
       expect(panel.scrollTop).toBe(145 - 150) // b1's middle (145) on the panel's (150)
+    })
+
+    // 0.4.1: the three can't fit (b0..b2 span 340), but b1 and the item after it can (240)
+    it('shows the active item and the one after it whole where the three cannot fit', () => {
+      const v = open()
+      v.next()
+      const panel = document.querySelector('.gallerist-thumb-items') as HTMLElement
+      panel.style.overflowY = 'auto'
+      panel.getBoundingClientRect = () => rect(0, 300)
+      const at = (id: string, top: number) => {
+        const el = panel.querySelector(`[data-item="${id}"]`) as HTMLElement
+        el.getBoundingClientRect = () => rect(top, top + 90)
+      }
+      at('b0', 0)
+      at('b1', 100)
+      at('b2', 250) // 250..340: cut by the panel's bottom
+      v.nextItem()
+      expect(panel.scrollTop).toBe(70) // b1 and b2 (100..340) centred together
     })
 
     it('leaves a panel alone when the active item already shows', () => {
@@ -1864,11 +1882,22 @@ describe('plugin-thumbnails — context around the current card, cards of differ
   const EXTENT = 1000
   let rail: HTMLElement
   let scroll = 0
-  // card k: 90 long, but card 10 is `wide`; 10 between cards. Where it starts at scroll 0 along the
-  // rail's reading direction (`start`), and its box at a scroll (mirrored in a right-to-left rail)
+  // card k: 90 long, but card 10 is `wide`; 10 between cards, and `gap` more before card 10 (what a
+  // marker or a label line wider than its group's cards takes, 0.4.1). Where it starts at scroll 0
+  // along the rail's reading direction (`start`), and its box at a scroll (mirrored in a right-to-left
+  // rail)
+  // (`gapAt`: the card the gap comes before, 10 unless set)
   const len = (wide: number) => (k: number) => (k === 10 ? wide : 90)
-  const start = (wide: number) => (k: number) => k * 100 + (k > 10 ? wide - 90 : 0)
-  const layOut = (axis: 'x' | 'y', sel: string, wide: number, { rtl = false } = {}) => {
+  const start =
+    (wide: number, gap: number, gapAt = 10) =>
+    (k: number) =>
+      k * 100 + (k > 10 ? wide - 90 : 0) + (k >= gapAt ? gap : 0)
+  const layOut = (
+    axis: 'x' | 'y',
+    sel: string,
+    wide: number,
+    { rtl = false, gap = 0, gapAt = 10 } = {},
+  ) => {
     rail = document.querySelector('.gallerist-thumbs') as HTMLElement
     scroll = 0
     if (axis === 'x') rail.style.overflowX = 'auto'
@@ -1878,12 +1907,14 @@ describe('plugin-thumbnails — context around the current card, cards of differ
     const groupOf = (el: HTMLElement) =>
       el.matches(sel) && el.dataset.group ? Number(el.dataset.group.slice(1)) : -1
     const at = (k: number) => {
-      const a = start(wide)(k)
+      const a = start(wide, gap, gapAt)(k)
       return rtl ? EXTENT - a - len(wide)(k) : a
     }
+    // as far as the last drawn card reaches
     const max = () => {
-      const n = cards().length
-      return n ? Math.max(0, start(wide)(n - 1) + len(wide)(n - 1) - EXTENT) : 0
+      const last = cards().at(-1)
+      const n = last ? groupOf(last) : -1
+      return n < 0 ? 0 : Math.max(0, start(wide, gap, gapAt)(n) + len(wide)(n) - EXTENT)
     }
     Object.defineProperty(rail, prop, {
       configurable: true,
@@ -2016,6 +2047,215 @@ describe('plugin-thumbnails — context around the current card, cards of differ
     walk(v, ROW, 30, 'x')
   })
 
+  // 0.4.1 (Apploye, a 390px phone): a marker or a wide label line between the current card and the
+  // next left no room for the three, so the rail centred the current card and cut the next one,
+  // though the two fit together
+  it('where the three cannot fit for what lies between, the card ahead still shows whole', () => {
+    const v = chips(30)
+    layOut('x', ROW, 90, { gap: 760 }) // g9 900..990, then 760 more: g10 1760..1850
+    v.goTo(8)
+    expect(scroll).toBe(0)
+    v.next() // g8..g10 span 1050; g9 and g10 span 950: the two centred together (900..1850)
+    expect(scroll).toBe(875)
+    for (const k of [9, 10]) expect(whole(card(ROW, k)), `g${k}`).toBe(true)
+    v.next() // g10: the gap is behind it now: g10 centred (1805), g11 whole after it, as before
+    expect(scroll).toBe(1305)
+    for (const k of [10, 11]) expect(whole(card(ROW, k)), `at g10: g${k}`).toBe(true)
+    v.next() // g11: g10..g12 show, nothing moves
+    expect(scroll).toBe(1305)
+    v.goTo(10) // a step back: g9 is the one ahead now, past the gap and cut: g9 and g10 centred
+    expect(scroll).toBe(875)
+    for (const k of [9, 10]) expect(whole(card(ROW, k)), `back at g10: g${k}`).toBe(true)
+    v.prev() // g9: g8 ahead is next to it, the gap behind: g9 centred (945), g8 whole
+    expect(scroll).toBe(445)
+    for (const k of [8, 9]) expect(whole(card(ROW, k)), `back at g9: g${k}`).toBe(true)
+  })
+
+  it('a card that already shows with the one ahead moves nothing, though the three cannot fit', () => {
+    const v = chips(30)
+    layOut('x', ROW, 90, { gap: 760 })
+    v.goTo(8)
+    rail.scrollLeft = 880 // by hand: g8 cut (-80..10), g9 at 20..110, g10 at 880..970
+    v.next() // g9: g8..g10 don't fit, g9 and g10 show
+    expect(scroll).toBe(880)
+  })
+
+  // where nothing more lies between them (cards evenly spaced, one too long for three to show), the
+  // current card is centred, as in 0.4.0, though it and the one ahead would fit
+  it('evenly spaced cards that cannot show three: the current one centred, as before', () => {
+    const v = chips(30)
+    layOut('x', ROW, 900) // g9 900..990, g10 1000..1900, g11 1910..2000: 10 apart
+    v.goTo(9)
+    expect(scroll).toBe(445) // g8..g10 don't fit: g9 centred
+    v.next() // g10: g9..g11 don't fit (1100), g10 and g11 would (1000): g10 centred all the same
+    expect(scroll).toBe(950)
+    expect(middle(card(ROW, 10))).toBe(EXTENT / 2)
+  })
+
+  it('where even the card and the one ahead cannot fit, the current card is centred', () => {
+    const v = chips(30)
+    layOut('x', ROW, 90, { gap: 920 }) // g9 900..990, g10 1920..2010: the two span 1110
+    v.goTo(8)
+    v.next()
+    expect(scroll).toBe(445)
+    expect(middle(card(ROW, 9))).toBe(EXTENT / 2)
+  })
+
+  it('right to left: the card ahead past a gap shows whole', () => {
+    document.documentElement.setAttribute('dir', 'rtl')
+    const v = chips(30)
+    layOut('x', ROW, 90, { rtl: true, gap: 760 })
+    v.goTo(8)
+    v.next()
+    expect(scroll).toBe(-875)
+    for (const k of [9, 10]) expect(whole(card(ROW, k)), `g${k}`).toBe(true)
+  })
+
+  it('a side rail: the card ahead past a gap shows whole, by scrollTop', () => {
+    const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 50 })] })
+    mount(v, { rail: 'left' })
+    v.open()
+    layOut('y', '.gallerist-thumb', 90, { gap: 760 })
+    v.goTo(8)
+    v.next()
+    expect(scroll).toBe(875)
+    for (const k of [9, 10]) expect(whole(card('.gallerist-thumb', k), 'y'), `g${k}`).toBe(true)
+  })
+
+  // 0.4.1 review: the pair centred together left the current card in the rail's end fade (40px; on a
+  // 390px phone 17px of room each end), under the ‹ › page button on a hover device. The theme's
+  // scroll-padding is the fade: the current card shows clear of it, the card ahead may run into the
+  // far one.
+  const fade = (px: number, side: 'Left' | 'Top' = 'Left') => {
+    rail.style[`scrollPadding${side}`] = `${px}px`
+    rail.style[`scrollPadding${side === 'Left' ? 'Right' : 'Bottom'}`] = `${px}px`
+  }
+  const clear = (el: Element | null, f: number, axis: 'x' | 'y' = 'x') => {
+    const r = el?.getBoundingClientRect() as DOMRect
+    const [a, z] = axis === 'x' ? [r.left, r.right] : [r.top, r.bottom]
+    return a >= f && z <= EXTENT - f
+  }
+  it('the current card shows clear of the scroll-padding (the end fade) with the one ahead', () => {
+    const v = chips(30)
+    layOut('x', ROW, 90, { gap: 760 })
+    fade(40)
+    v.goTo(8)
+    expect(scroll).toBe(0)
+    v.next() // the two centred (875) would leave g9 at 25..115: as near as clears it, 40..130
+    expect(scroll).toBe(860)
+    expect(clear(card(ROW, 9), 40), 'g9 clear').toBe(true)
+    expect(whole(card(ROW, 10)), 'g10 whole').toBe(true) // into the far fade: 900..990
+    // shown whole with the one ahead but in the fade: not left there
+    v.prev()
+    rail.scrollLeft = 880 // by hand: g9 at 20..110, g10 at 880..970
+    v.next()
+    expect(scroll).toBe(860)
+    // clear of it and whole with the one ahead: nothing moves
+    v.prev()
+    rail.scrollLeft = 850 // g9 at 50..140, g10 at 910..1000
+    v.next()
+    expect(scroll).toBe(850)
+  })
+
+  it('right to left and down a side rail: the current card clear of the end fade', () => {
+    document.documentElement.setAttribute('dir', 'rtl')
+    const v = chips(30)
+    layOut('x', ROW, 90, { rtl: true, gap: 760 })
+    fade(40)
+    v.goTo(8)
+    v.next()
+    expect(scroll).toBe(-860)
+    expect(clear(card(ROW, 9), 40), 'g9 clear').toBe(true)
+    expect(whole(card(ROW, 10)), 'g10 whole').toBe(true)
+    v.destroy()
+    document.body.innerHTML = ''
+    document.documentElement.removeAttribute('dir')
+    vi.restoreAllMocks()
+    const w = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 50 })] })
+    mount(w, { rail: 'left' })
+    w.open()
+    layOut('y', '.gallerist-thumb', 90, { gap: 760 })
+    fade(40, 'Top')
+    w.goTo(8)
+    w.next()
+    expect(scroll).toBe(860)
+    expect(clear(card('.gallerist-thumb', 9), 40, 'y'), 'g9 clear').toBe(true)
+  })
+
+  // 0.4.1 review: a reveal that doesn't move the current card (an item step in its group, the item
+  // panel's toggle, a reopen) took the way the cursor went to be forward, so the card ahead flipped
+  // to the other side and the rail jumped
+  it('a reveal that leaves the current card where it is keeps the way the cursor went', () => {
+    const v = chips(30)
+    layOut('x', ROW, 90, { gap: 760 })
+    v.goTo(11)
+    v.goTo(10) // back: g9 ahead, past the gap: the two centred
+    expect(scroll).toBe(875)
+    v.prev() // g9: g8 ahead, the gap behind: g9 centred
+    expect(scroll).toBe(445)
+    v.nextItem() // an item step in g9: still going back, nothing moves
+    expect(v.getState().cursor).toEqual({ g: 9, i: 1 })
+    expect(scroll).toBe(445)
+    v.nextItem()
+    expect(scroll).toBe(445)
+  })
+
+  // 0.4.1 review: the cursor stepping onto the last card drawn: centring draws the cards past it, but
+  // the reveal read its neighbours before that, so the card ahead counted as missing
+  it('a step onto the last card drawn reads the card ahead once the run has drawn it', async () => {
+    const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 2 })] })
+    mount(v)
+    v.open()
+    v.goTo(7) // drawn: g5..g9 (no layout yet)
+    layOut('x', '.gallerist-thumb', 90, { gap: 760, gapAt: 11 }) // g10 1000..1090, g11 1860..1950
+    Object.defineProperty(rail, 'clientWidth', { configurable: true, value: 800 })
+    rail.dispatchEvent(new Event('scroll'))
+    await new Promise<void>((r) => requestAnimationFrame(() => r()))
+    // measured: 9 cards a rail, the run g0..g10 around g5 in the middle
+    expect(card('.gallerist-thumb', 10)).not.toBeNull()
+    expect(card('.gallerist-thumb', 11)).toBeNull()
+    v.goTo(10) // g10, cut: the rail draws g11 on, then shows g10 and g11 centred together
+    expect(scroll).toBe(975)
+    for (const k of [10, 11]) expect(whole(card('.gallerist-thumb', k)), `g${k}`).toBe(true)
+  })
+
+  it('a step onto the last card drawn, whole, draws the card ahead to see whether it shows', async () => {
+    const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 2 })] })
+    mount(v)
+    v.open()
+    v.goTo(6) // drawn: g4..g8 (no layout yet)
+    layOut('x', '.gallerist-thumb', 90, { gap: 760 }) // g9 900..990, g10 1760..1850
+    Object.defineProperty(rail, 'clientWidth', { configurable: true, value: 600 })
+    rail.dispatchEvent(new Event('scroll'))
+    await new Promise<void>((r) => requestAnimationFrame(() => r()))
+    // measured: 7 cards a rail, the run g1..g9 around g5 in the middle
+    expect(card('.gallerist-thumb', 9)).not.toBeNull()
+    expect(card('.gallerist-thumb', 10)).toBeNull()
+    v.goTo(9) // g9 shows whole; g10 past the gap, not drawn: drawn, then the two centred
+    expect(scroll).toBe(875)
+    for (const k of [9, 10]) expect(whole(card('.gallerist-thumb', k)), `g${k}`).toBe(true)
+  })
+
+  // 0.4.1 review: the last place the cursor was revealed counted a flat rail's items, and a stacked
+  // rail's groups: after a switch, the way it went came out of the two
+  it('a display switch keeps the way the cursor went', () => {
+    const v = createViewer({
+      collection: many(30, 3),
+      plugins: [thumbnails({ groupDisplay: 'flat', overscan: 50 })],
+    })
+    mount(v)
+    v.open()
+    v.goTo(10) // forward: item 30 of the flat rail
+    const rail0 = getInternals(v)
+      .getPlugins()
+      .find((p) => p.name === 'thumbnails') as ThumbnailsInstance
+    layOut('x', '.gallerist-thumb', 90, { gap: 760 }) // g9 900..990, g10 1760..1850, g11 1860..
+    rail0.setDisplay('stacked')
+    // still going forward: g11 ahead, next to it; the gap behind: g10 centred, as a step forward
+    // there centres it (not g9 ahead, which a step back would bring in: 875)
+    expect(scroll).toBe(1305)
+  })
+
   it('a side rail: down the column, by scrollTop', () => {
     const v = createViewer({ collection: many(30), plugins: [thumbnails({ overscan: 50 })] })
     mount(v, { rail: 'left' })
@@ -2113,6 +2353,36 @@ describe('strip helpers', () => {
     expect(scroller.scrollLeft).toBe(240)
     keepPlace(scroller, ref, null, () => {}) // no axis measured yet: nothing to correct
     expect(scroller.scrollLeft).toBe(240)
+  })
+
+  // 0.4.1: cards 84 × 16/9 (149.33px) wide: each re-window moves the reference by a fraction. A whole
+  // px scroll each time, rounded alone, errs the same way every time (0.33px, 30 re-windows: 10px off);
+  // the fraction carried keeps what shows within half a px of where it was.
+  it('keepPlace carries the fraction its whole-px scrolls leave out', () => {
+    const scroller = document.createElement('div')
+    let scroll = 0
+    Object.defineProperty(scroller, 'scrollLeft', {
+      configurable: true,
+      get: () => scroll,
+      set: (v: number) => {
+        scroll = Math.trunc(v) // whole px, as WebKit keeps them
+      },
+    })
+    let drawn = 0 // what the re-windows put before the reference
+    const ref = document.createElement('span')
+    scroller.appendChild(ref)
+    document.body.appendChild(scroller)
+    ref.getBoundingClientRect = () => ({ left: 500 + drawn - scroll, top: 0 }) as DOMRect
+    for (let k = 1; k <= 30; k++) {
+      keepPlace(scroller, ref, 'x', () => {
+        drawn += (84 * 16) / 9
+      })
+      // the reference stays within half a px of 500
+      expect(
+        Math.abs(ref.getBoundingClientRect().left - 500),
+        `re-window ${k}`,
+      ).toBeLessThanOrEqual(0.5 + 1e-9)
+    }
   })
 })
 

@@ -28,7 +28,7 @@
       "packages/renderer-dom/dist/index.js": "{ mount }",
       "packages/plugin-thumbnails/dist/index.js": "{ thumbnails }"
     },
-    "limit": "25.5 kB",
+    "limit": "25.6 kB",
     "gzip": true
   },
   {

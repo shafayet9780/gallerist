@@ -225,6 +225,40 @@ describe('plugin-shortcuts — opening and closing', () => {
     expect(plugin.open()).toBe(false)
   })
 
+  // 0.4.1 (Apploye): ? did nothing until the opening fade ended, though the other keys worked
+  it('? opens it while the viewer is opening, and it stays once open; not while closing', () => {
+    const plugin = shortcuts()
+    const v = createViewer({ collection: collection(), plugins: [plugin] })
+    mount(v)
+    // a transition that reports back only when told to (the theme's fade, held)
+    const settle: Array<() => void> = []
+    getInternals(v).setLifecycleDriver({
+      opening: (done) => settle.push(done),
+      closing: (done) => settle.push(done),
+    })
+    v.open()
+    expect(v.getState().phase).toBe('opening')
+    root().focus()
+    press('?', { shiftKey: true })
+    expect(dialog()).not.toBeNull()
+    expect(focused()).toBe(dialog())
+    settle.shift()?.()
+    expect(v.getState().phase).toBe('open')
+    expect(dialog()).not.toBeNull()
+    press('Escape')
+    expect(dialog()).toBeNull()
+    expect(v.getState().phase).toBe('open')
+    // a viewer going away doesn't get it: not on ?, not from the host
+    v.close()
+    expect(v.getState().phase).toBe('closing')
+    root().focus()
+    press('?', { shiftKey: true })
+    expect(dialog()).toBeNull()
+    expect(plugin.open(true)).toBe(false)
+    settle.shift()?.()
+    expect(v.getState().phase).toBe('closed')
+  })
+
   it('the host opens and closes it: plugin.open() / close(), and the instance', () => {
     const { plugin } = setup()
     expect(plugin.open(true)).toBe(true)
