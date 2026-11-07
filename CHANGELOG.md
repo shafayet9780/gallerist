@@ -17,7 +17,7 @@ mockup, and a wider gap before a flat rail's group meta. Peer ranges stay `>=0.3
 - **theme-default**: the rail (`.gallerist-thumbs`) has a `scroll-padding` of `--gallerist-rail-fade`
   (40px) at its ends (inline; block on a side rail), which plugin-thumbnails reads to keep the current
   card clear of the end fades. A card focused with Tab lands clear of them too. A page that set its own
-  `scroll-padding` on the rail moves the current card's margin with it.
+  `scroll-padding` on the rail (a symmetric length) moves the current card's margin with it.
 - **theme-default**: a flat rail's group label and its `renderGroupMeta` meta are 12px apart (were
   8px), so a group whose label line is wider than its cards is 4px wider.
 
@@ -34,7 +34,7 @@ mockup, and a wider gap before a flat rail's group meta. Peer ranges stay `>=0.3
   (index chips on a phone, a short side rail), nothing changes. Flat, stacked, index, side and
   right-to-left rails, windowed too, and the stacked item column (its next item; the column doesn't
   track which way the cursor went). The current card shows clear of the rail's end fades (the
-  theme's `scroll-padding`, 40px), so it is never dimmed or under a ‹ › page button; where that leaves
+  theme's `scroll-padding`, 40px), so, where the card fits, it is not dimmed or under a ‹ › page button; where that leaves
   too little room for the two (the 390px phone), the card ahead runs into the far fade. The way the
   cursor went is the last step along the rail: a step between one group's items, the items toggle
   (`e`), reopening the viewer, a display switch or new data keep it. A step onto the last card the rail
