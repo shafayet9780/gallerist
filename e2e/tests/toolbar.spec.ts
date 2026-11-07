@@ -381,10 +381,11 @@ const barSizes = (page: Page) =>
       tools,
       zoom,
       rule: {
-        w: Number.parseFloat(rule.width),
+        // the line is its inline-start border (forced colours keep a border, 0.4.1)
+        w: Number.parseFloat(rule.width) + Number.parseFloat(rule.borderInlineStartWidth),
         h: Number.parseFloat(rule.height),
         before: at.s + off - (box(last)?.e ?? 0),
-        after: at.s - (at.s + off + Number.parseFloat(rule.width)),
+        after: at.s - (at.s + off + Number.parseFloat(rule.borderInlineStartWidth)),
       },
     }
   })
@@ -457,4 +458,29 @@ test.describe('the compact console bar', () => {
           }
     })
   }
+})
+
+// 0.4.1 review: forced colours paint a background over in the canvas colour, so the hairline before
+// Close, drawn as one, went with them; drawn as a border, it keeps a line in the system's text colour
+test('forced colours: the hairline before Close still shows', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'forced colours are emulated in Chromium only')
+  await page.emulateMedia({ forcedColors: 'active' })
+  await page.goto('/layout.html?preset=reviewer&view=1&captions=1&zoom-tool=1&skin=console')
+  await viewerSettled(page)
+  const r = await page.evaluate(() => {
+    const rule = getComputedStyle(
+      document.querySelector('.gallerist-bar .gallerist-close') as Element,
+      '::before',
+    )
+    const border = Number.parseFloat(rule.borderInlineStartWidth)
+    return {
+      // the line's colour: its border's, else its background's
+      line: border ? rule.borderInlineStartColor : rule.backgroundColor,
+      wide: border || Number.parseFloat(rule.width),
+      bar: getComputedStyle(document.querySelector('.gallerist-bar') as Element).backgroundColor,
+    }
+  })
+  expect(r.wide).toBe(1)
+  expect(r.line).not.toMatch(/^rgba\(.*, 0\)$/) // not transparent
+  expect(r.line, 'not the bar’s canvas colour').not.toBe(r.bar)
 })

@@ -122,7 +122,7 @@
     .gallerist[data-gallerist-skin="console"] {
       --gallerist-tool-size: 36px;
       --gallerist-tool-icon: 18px;
-      --gallerist-close-icon: 20px;
+      --gallerist-close-icon: calc(var(--gallerist-tool-icon) + 2px); /* 20px: follows the glyphs */
       --gallerist-zoom-group: 1;
     }
   }

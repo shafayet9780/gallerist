@@ -1205,9 +1205,9 @@
   position: absolute;
   inset-inline-start: calc(-1 * var(--gallerist-close-rule));
   top: calc(50% - 10px);
-  width: min(1px, var(--gallerist-close-rule));
   height: 20px;
-  background: var(--gallerist-hairline);
+  /* a border, not a background: forced colours keep a border's line (in the text colour) */
+  border-inline-start: min(1px, var(--gallerist-close-rule)) solid var(--gallerist-hairline);
   pointer-events: none;
 }
 
