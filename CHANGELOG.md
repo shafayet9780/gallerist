@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.5.0
+
+A minor release: every package goes from 0.4.1 to 0.5.0 (one fixed version group). Plugins can take
+the renderer's keys, a flat rail's ↑/↓ can walk a cluster, the phone rail shows the card ahead whole,
+an item badge can sit in the bottom corner, and `placeholder` finally shows while an image loads.
+Peer ranges stay `>=0.3.0 <1`. Each package's CHANGELOG has the full notes.
+
+### Upgrading: what behaves or looks different
+- **renderer-dom**: a plugin's `keymap` is asked before the renderer's own keys (an arrow, Home/End,
+  `+`/`-`/`0`, `t`, 1–9, Escape). An entry for one of them used to be ignored; now it runs first, and
+  the renderer's key runs too unless the handler calls `preventDefault()`. A plugin given a renderer
+  key on purpose (`grid({ key: 't' })`) now toggles both. A host's capture-phase `keydown` listener
+  that took a key with `preventDefault()` keeps working. A plugin's arrow keys no longer come from
+  inside a dialog, menu or slider in the viewer, a host's listbox, tab list, radio group, menu bar,
+  tree or grid, or from a menu button.
+- **renderer-dom**: an item's `placeholder` now shows (it was painted on the image while the image was
+  still hidden): an image placeholder blurred in the image's box, a colour filling it. Make sure it is
+  a thumbnail of the same picture, or drop it. The full-stage shimmer of a slow load is gone (a
+  skeleton, the placeholder and a "Loading full size…" pill replace it). A bare string such as
+  `thumb.jpg` or `thumb` is now an image URL, and `rgb(0 0 0 / 50%)` a colour. `Strings` has three new
+  required members (`loadingFull`, `loadFailed`, `retry`): `mount(…, { strings })` fills them in, but
+  a whole `Strings` object built by hand must add them.
+- **theme-default**: on a phone (`(max-width: 600px) and (pointer: coarse)`) `--gallerist-rail-fade`
+  and the rail's `scroll-padding` are 16px (were 40px); `--gallerist-rail-fade: 40px` on `.gallerist`
+  brings 0.4.1's back. The image's fade-in is 150ms (was 180ms). The Console and Gallery dark skeleton
+  shimmer is brighter. `.gallerist-content` is a size container.
+- **theme-default**: an item thumb (`.gallerist-thumb-item`) is a one-column grid (was a flex column).
+  A page that styled its children as flex items sets `display: flex; flex-direction: column` on it.
+- **plugin-thumbnails**: wherever the current card and its neighbours can't all show, the current card
+  and the one ahead are centred together where those two fit (0.4.1 centred the current card alone
+  unless more lay ahead), so a narrow index-chip rail between evenly spaced cards moves a little.
+
+### New
+- **plugin-thumbnails**: `clusterKeys: true`: on a flat rail, plain ↑/↓ step to the next / previous
+  item of the current one's `cluster` (a screenshot reviewer's other monitor), with no host keyboard
+  code; a focused caption band still scrolls with ↑/↓. Not on a stacked rail, not with Shift or a
+  chord, and not on a side rail with `linear: false`, where ↑/↓ step by group.
+- **plugin-shortcuts**: lists "Previous / next in the cluster" while `clusterKeys` holds ↑/↓
+  (`strings.prevNextCluster`).
+- **renderer-dom**: the loading sequence: the placeholder at once (blurred by
+  `--gallerist-placeholder-blur`, 6px), the image fading in over `--gallerist-dur-reveal` (150ms) as
+  the blur clears, a quiet "Loading full size…" pill after `--gallerist-loading-delay` (400ms; its
+  polite status line stays empty until then), a failure that keeps the placeholder with a Retry
+  button (keyboard focus comes back to it if the retry fails too), and a skeleton after 300ms when
+  there is no placeholder (`--gallerist-media-ratio`, 3/2, sizes it without `naturalSize`). Reduced
+  motion: no blur, shimmer or spin. Adapters get `strings` and `retry()` in their context.
+- **theme-default**: `--gallerist-thumb-badge-inset-block` places `renderItemBadge`'s badge from the
+  thumb's image (`3px auto`, top end, as before; `auto 3px`, bottom end).
+- **theme-default**: rail state tokens, each defaulting to today's look:
+  `--gallerist-label-current` / `--gallerist-label-current-weight` (the current group's label),
+  `--gallerist-thumb-focus-style` (`dashed` tells focus from a solid selection ring),
+  `--gallerist-thumb-focus-offset-current`, and `--gallerist-thumb-focus-opacity`
+  (`var(--gallerist-thumb-idle-opacity)` keeps a focused thumb that isn't current dimmed).
+
+### Fixes
+- **renderer-dom**: a plugin keymap handler that throws no longer stops the renderer's own key
+  (Escape still closes); its error is reported.
+- **plugin-thumbnails / theme-default**: on a 390px phone the next card past a marker or a wide group
+  label shows whole (it was cut by up to 48px).
+
+### Sizes
+core + renderer-dom 17.11 kB (was 16.65), + plugin-thumbnails 26.13 kB (was 25.6), base.css
+10.42 kB (was 10), plugin-shortcuts 2.86 kB (was 2.85); the CDN bundle is 38.9 kB of 40.
+
 ## v0.4.1
 
 A patch release: every package goes from 0.4.0 to 0.4.1 (one fixed version group). Two fixes from the

@@ -1,5 +1,73 @@
 # @gallerist/plugin-thumbnails
 
+## 0.5.0
+
+### Minor Changes
+
+- 25e58a2: **renderer-dom (changed):** a plugin's `keymap` is asked before the renderer's own keys, so a plugin
+  can rebind one for a layout. A handler takes a key with `preventDefault()`, and the renderer then does
+  nothing with it; otherwise the renderer's own key for it (an arrow, Home/End, `+`/`-`/`0`, `t`, 1–9,
+  Escape) runs after. A plugin is not asked for a chord (Ctrl, ⌘, Alt; AltGr is fine), a key a handler
+  took already, a key from a text field (shadow roots too; Escape there is the renderer's alone), an
+  arrow key from inside a dialog, menu or slider in the viewer, a host's listbox, tab list, radio
+  group, menu bar, tree or grid (not the viewer's own rail or grid), or from a menu button
+  (`aria-haspopup`, not `"false"`; the overlay's root, a dialog, doesn't count), and a focused caption band that scrolls keeps ↑/↓ /
+  Home / End for scrolling first. A host no longer needs a capture-phase listener to take an arrow key.
+  A handler that throws doesn't stop the renderer's own key (Escape still closes); its error is
+  reported (`reportError`, else `console.error`).
+
+  **plugin-thumbnails (new):** `clusterKeys: true` gives a flat rail's ↑/↓ (a row rail walks with ←/→)
+  to its clusters: ↓ steps to the next item of the current one's `cluster`, ↑ to the one before,
+  announced as any step is; at the cluster's end they do what they did. Plain ↑/↓ only: Shift+↑/↓
+  (and a chord) stay the renderer's. A stacked rail keeps ↑/↓ for its
+  items; down a side rail, where ↑/↓ walk the rail, the cluster's next item is the walk's next, and
+  a side rail with `mount(…, { linear: false })`, where ↑/↓ step by group, keeps them for that. A
+  reviewer whose captures span monitors (`cluster: (item, g) => \`${g}:${capture}\``) switches monitors
+  with ↑/↓ and no keyboard code of its own, and a keyboard user can still scroll a long caption band.
+
+  **plugin-shortcuts (new):** lists ↑/↓ "Previous / next in the cluster" while plugin-thumbnails'
+  `clusterKeys` holds them (`strings.prevNextCluster`).
+
+  Upgrading: a plugin keymap entry for one of the renderer's keys used to be ignored (the renderer's
+  key won); now it runs first, and the renderer's key runs too unless the handler calls
+  `preventDefault()`. A plugin given a renderer key on purpose (`grid({ key: 't' })`) now toggles both.
+  A host that took ↑/↓ with a capture-phase `keydown` listener and `preventDefault()` keeps working (the
+  renderer still leaves a key a handler took); with plugin-thumbnails' `clusterKeys` it can delete it.
+  A plugin's arrow keys no longer reach it from inside a dialog, menu or slider in the viewer, a host's
+  listbox, tab list, radio group, menu bar, tree or grid, or from a menu button.
+
+- 39a85f6: **plugin-thumbnails (changed):** wherever the current card and the cards either side of it can't all
+  show, the rail shows the current card and the next one the way the cursor goes whole, centred
+  together, wherever those two fit, whatever lies behind. 0.4.1 did so only where more lay between the
+  current card and the one ahead than behind it, and otherwise centred the current card, which cut the
+  next one off: on a 390px phone, stepping into a one-screen timeframe whose label line is wider than
+  its card (44–48px cut in the e2e fixture), or between evenly spaced cards too wide for three. Where the
+  two don't fit either, the current card is still centred; where the three fit, nothing changes.
+
+  **theme-default (changed):** on a phone (`(max-width: 600px) and (pointer: coarse)`, where the rail's
+  ‹ › page buttons never show) `--gallerist-rail-fade` is 16px (was 40px), and so is the rail's
+  `scroll-padding`. The current card, kept clear of the fade, now leaves room for the card ahead past a
+  marker or a wide label (0.4.1 left it cut by what the 40px fade took: 6px in the e2e fixture, 16px in
+  Apploye's). A desktop, and a narrow window with a mouse, keep 40px.
+
+  Upgrading: a page that relied on 0.4.1's centring between evenly spaced cards (a narrow index-chip
+  rail) sees the current card and the next one centred together instead. A page that wants 0.4.1's
+  phone fade sets `--gallerist-rail-fade: 40px` on `.gallerist` (a page's tokens win over the theme's).
+
+- 69193d3: **theme-default (new):** `--gallerist-thumb-badge-inset-block` places an item thumb's badge
+  (plugin-thumbnails `renderItemBadge`): its `inset-block` from the thumb's image, `3px auto` (the top
+  end corner, as before). `.gallerist { --gallerist-thumb-badge-inset-block: auto 3px; }` puts it in the
+  image's bottom end corner, for a screenshot reviewer whose thumbs' tops hold the window titles. It is
+  measured from the image, not the thumb, so a caption band under the image stays clear, in every skin,
+  right to left, on flat and stacked rails, in the peek and on a phone. Nothing else sits in that corner.
+
+  **plugin-thumbnails (docs):** `renderItemBadge` documents the token.
+
+  Upgrading: an item thumb (`.gallerist-thumb-item`) is a one-column grid (was a flex column), so the
+  badge can be placed in its image's row; its image and caption band lay out as before. A page that
+  styled an item thumb's children as flex items (`order`, `flex-grow`) sets `display: flex;
+flex-direction: column` on `.gallerist-thumb-item` to keep them.
+
 ## 0.4.1
 
 ### Patch Changes

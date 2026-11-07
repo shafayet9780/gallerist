@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-zoom",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Gallerist plugin — a zoom tool in the toolbar: zoom out, the current zoom (press to fit), zoom in, with the + / - / 0 keys and a live percentage during pinch and wheel zoom.",
   "license": "MIT",
   "type": "module",
