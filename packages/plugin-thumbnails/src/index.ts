@@ -110,7 +110,8 @@ export interface ThumbnailsOptions {
   renderGroupMeta?: (group: Group, index: number, ctx: GroupMetaContext) => Decoration
   /**
    * A host's badge for each item thumb (a monitor number, a state), in the thumb's top end corner
-   * (the `numberItems` number takes the top start), wherever item thumbs show: a flat rail, the item
+   * (the `numberItems` number takes the top start; `--gallerist-thumb-badge-inset-block: auto 3px`
+   * takes it to the image's bottom end), wherever item thumbs show: a flat rail, the item
    * column, the peek, an index section. Its text joins the thumb's accessible name, as for
    * `renderGroupMeta`. Called as each thumb is drawn and on `refreshRail()`.
    */

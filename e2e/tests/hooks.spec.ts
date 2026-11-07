@@ -250,6 +250,75 @@ for (const display of ['flat', 'stacked'] as const) {
   })
 }
 
+// Where a badge sits in its thumb's image (not the thumb, which a caption band under the image makes
+// taller), measured in every drawn item thumb (the current one's ring too):
+// inside the image, at its end edge (right, or left right to left) and its top or bottom edge
+const BOTTOM = '.gallerist { --gallerist-thumb-badge-inset-block: auto 3px; }'
+const badgeCorners = (page: Page) =>
+  page.locator('.gallerist-thumb-item').evaluateAll((els) =>
+    els.flatMap((t) => {
+      const img = (t.querySelector('.gallerist-thumb-img') as HTMLElement).getBoundingClientRect()
+      if (!img.width) return []
+      const b = (t.querySelector('.gallerist-thumb-badge') as HTMLElement).getBoundingClientRect()
+      const num = t.querySelector('.gallerist-thumb-num')?.getBoundingClientRect()
+      const end = getComputedStyle(t).direction === 'rtl' ? b.left - img.left : img.right - b.right
+      return [
+        {
+          inside:
+            b.left >= img.left &&
+            b.right <= img.right &&
+            b.top >= img.top &&
+            b.bottom <= img.bottom,
+          end: end >= 0 && end < 8,
+          top: b.top - img.top < 8,
+          bottom: img.bottom - b.bottom < 8,
+          clear:
+            !num ||
+            num.right <= b.left ||
+            num.left >= b.right ||
+            num.bottom <= b.top ||
+            num.top >= b.bottom,
+          belowImage: t.clientHeight - img.height > 1,
+        },
+      ]
+    }),
+  )
+const TOP_END = { inside: true, end: true, top: true, bottom: false, clear: true }
+const BOTTOM_END = { inside: true, end: true, top: false, bottom: true, clear: true }
+
+for (const dir of ['ltr', 'rtl'] as const)
+  for (const display of ['flat', 'stacked'] as const) {
+    test(`--gallerist-thumb-badge-inset-block: auto 3px puts a badge in its image's bottom end corner, over no caption, every skin, ${display}, ${dir}`, async ({
+      page,
+    }) => {
+      test.setTimeout(60_000)
+      for (const skin of ['gallery', 'console', 'editorial']) {
+        await open(page, `display=${display}&dir=${dir}&skin=${skin}&caps=1&num=1`)
+        await expect(
+          page.locator('.gallerist-thumb-item[data-active] .gallerist-thumb-caption'),
+        ).toBeVisible()
+        // the default: the top end corner
+        let thumbs = await badgeCorners(page)
+        expect(thumbs.length).toBeGreaterThan(3)
+        for (const { belowImage, ...t } of thumbs) expect(t).toEqual(TOP_END)
+        // a page's token (the theme's are in a cascade layer) takes it to the bottom end
+        await page.addStyleTag({ content: BOTTOM })
+        if (display === 'stacked') {
+          // a peek's thumbs too
+          await page.locator('.gallerist-thumb:not([data-active])').first().hover()
+          await expect(
+            page.locator('.gallerist-thumb-peek .gallerist-thumb-item').first(),
+          ).toBeVisible()
+        }
+        thumbs = await badgeCorners(page)
+        expect(thumbs.length).toBeGreaterThan(3)
+        // every thumb has a caption band under its image: a badge at the thumb's bottom would sit on it
+        expect(thumbs.every((t) => t.belowImage)).toBe(true)
+        for (const { belowImage, ...t } of thumbs) expect(t).toEqual(BOTTOM_END)
+      }
+    })
+  }
+
 test('clusters: the screens of one capture 2px apart, 8px between captures (row and column)', async ({
   page,
 }) => {
@@ -601,6 +670,19 @@ test.describe('on a phone', () => {
     await expect(page.locator('.gallerist-zoom-out')).toBeVisible()
     await expect(page.locator('.gallerist-fullscreen-btn')).toBeVisible()
     await expect(page.locator('.gallerist-zoom-level')).toBeHidden() // as before: − and + only
+  })
+
+  test("a bottom badge sits in its image's bottom end corner, over no caption", async ({
+    page,
+  }) => {
+    for (const dir of ['ltr', 'rtl'] as const) {
+      await open(page, `dir=${dir}&caps=1&num=1`)
+      await page.addStyleTag({ content: BOTTOM })
+      const thumbs = await badgeCorners(page)
+      expect(thumbs.length).toBeGreaterThan(3)
+      expect(thumbs.every((t) => t.belowImage)).toBe(true)
+      for (const { belowImage, ...t } of thumbs) expect(t).toEqual(BOTTOM_END)
+    }
   })
 
   test("the gesture list has the host's long press", async ({ page }) => {

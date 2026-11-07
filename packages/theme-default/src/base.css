@@ -97,6 +97,9 @@
     /* item clusters (thumbnails `cluster`): the gap inside one, and between two */
     --gallerist-cluster-inner: 2px;
     --gallerist-cluster-gap: 8px;
+    /* an item thumb's badge (thumbnails `renderItemBadge`), its `inset-block` from the image's edges:
+       the top end corner; `auto 3px` takes it to the bottom end */
+    --gallerist-thumb-badge-inset-block: 3px auto;
 
     /* popovers (the View menu, the shortcut list) sit a step above the bands; a segmented control
        is a recessed track with its checked segment raised */
@@ -728,10 +731,13 @@
 .gallerist-thumbs-aside[hidden] {
   display: none;
 }
+/* a grid, not a flex column: its image's row is a box the badge can sit in (a caption band or a
+   touch's 44px under the image stay out of it) */
 .gallerist-thumb-item {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   flex: 0 0 auto;
   width: calc(var(--gallerist-thumb-h) * 1.2);
   padding: 0;
@@ -1017,10 +1023,13 @@
   width: calc(var(--gallerist-thumb-h) * 1.4);
   min-height: 14px;
 }
-/* an item's badge: the top end corner (a number from `numberItems` has the start) */
+/* an item's badge: the image's top end corner (a number from `numberItems` has the start), or its
+   bottom end with `--gallerist-thumb-badge-inset-block: auto 3px`; placed in the image's grid row (an
+   absolute box's `auto` grid line is the thumb's edge: the row's end line is named) */
 .gallerist-thumb-badge {
   position: absolute;
-  top: 3px;
+  grid-row: 1 / 2;
+  inset-block: var(--gallerist-thumb-badge-inset-block);
   inset-inline-end: 3px;
   display: flex;
   align-items: center;

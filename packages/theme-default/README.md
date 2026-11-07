@@ -61,7 +61,10 @@ page's own `--gallerist-rail-fade` wins (the theme's tokens are in a cascade lay
 The theme follows `forced-colors: active` (Windows High Contrast): the View popover's chosen segment
 takes the system's selection colours and the focus rings the text colour. The rail's
 item clusters (`thumbnails({ cluster })`) use `--gallerist-cluster-inner` (2px) inside a cluster and
-`--gallerist-cluster-gap` (8px) between two.
+`--gallerist-cluster-gap` (8px) between two. An item thumb's badge (`thumbnails({ renderItemBadge })`)
+sits `--gallerist-thumb-badge-inset-block` from its image's top and bottom, as `inset-block` takes
+them: `3px auto`, the top end corner; `auto 3px` puts it in the bottom end corner, still on the image
+(a caption band under it stays clear).
 
 Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 

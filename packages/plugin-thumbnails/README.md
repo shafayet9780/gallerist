@@ -161,7 +161,7 @@ thumbnails({
 | `groupDisplay: 'index'` | | | A section index: a row per group with its cover, `group.caption`, `group.meta.subtitle` and item count; the active group's items expand under its row (always as a row, so `itemAxis` doesn't apply, and there's no peek). A bottom rail, or any rail at 900px wide or less, shows chips instead; chips don't expand items. Used by the `tour` preset. |
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 | `renderGroupMeta` | `(group, index, { display, place }) => Node \| string \| null` | none | A host's decoration per group: flat, at the end of its label line; stacked, under the card (and with a `timeline`, at the end of its time label). See [Host decorations](#host-decorations-and-markers). |
-| `renderItemBadge` | `(item, g, i) => Node \| string \| null` | none | A host's badge in each item thumb's top end corner. |
+| `renderItemBadge` | `(item, g, i) => Node \| string \| null` | none | A host's badge in each item thumb's top end corner (bottom end with `--gallerist-thumb-badge-inset-block: auto 3px`). |
 | `cluster`      | `(item, g, i) => string \| number \| null` | none | Consecutive items with the same key sit 2px apart, 8px between clusters. Visual, unless `clusterKeys`. |
 | `clusterKeys`  | `boolean`                    | `false`     | `flat`: ↑/↓ step to the item before / after the current one in its cluster (another monitor of the same capture). See [Host decorations](#host-decorations-and-markers). |
 | `markers`      | `(collection) => RailMarker[]` | none | Entries between groups that are not items (time without screenshots): drawn, never a stop. |
@@ -225,7 +225,17 @@ refreshRail(viewer)
   (the rail draws only a run of them) and on `refreshRail()`.
 - **`renderItemBadge(item, g, i)`**: in each item thumb's top end corner, wherever item thumbs show
   (a flat rail, the item column, the peek, an index section). The `numberItems` number takes the top
-  start; the focus ring is outside the thumb.
+  start; the focus ring is outside the thumb. `--gallerist-thumb-badge-inset-block` (0.5) is the
+  badge's `inset-block` from the thumb's image (`3px auto`, the top). A screenshot reviewer whose
+  thumbs' tops hold the window titles, the part people recognise, takes it to the bottom end:
+  ```css
+  .gallerist { --gallerist-thumb-badge-inset-block: auto 3px; }
+  ```
+  It is measured from the image, not the thumb: a caption band under the image stays clear. Nothing
+  else sits in an item thumb's bottom end corner (the number is top start; the caption, the current
+  thumb's border and the focus ring are outside the image; plugin-video and plugin-pins draw nothing
+  on the rail), so there is no precedence to settle. A host's own mark in that corner (a video's
+  length, say) belongs in the badge, as one decoration.
 - **`cluster(item, g, i)`**: consecutive items with the same key (not `null`/`undefined`) sit
   `--gallerist-cluster-inner` apart (2px), with `--gallerist-cluster-gap` (8px) where the key
   changes, in a row and in a column alike. Items without a key keep the plain gap. Traversal, counts

@@ -9,6 +9,7 @@
 //  • the zoom tool, the View popover and the shortcut list (?) with the host's N and long press
 // Query: display=flat|stacked (default flat) · skin · scheme · dir=rtl · preset (default reviewer) ·
 // keys=1: clusterKeys (↑/↓ to the capture's other screen) · one=1, rooms=1 (below) ·
+// caps=1: a caption band under each screen's thumb · num=1: numberItems ·
 // wide=1: the marker's box and the 12:00 timeframe's label line take a fixed room (whatever the
 // fonts), so on a 390px phone the cards either side of them and the current one can't all show
 import { type Group, type Item, type Plugin, createViewer } from '@gallerist/core'
@@ -49,6 +50,7 @@ const shot = (screen: number, capture: number, color: string): Item<Shot> => ({
   )}`,
   naturalSize: { w: 1600, h: 1000 },
   alt: `Screenshot at ${clock(capture)}, monitor ${screen}`,
+  ...(p.has('caps') ? { caption: `${clock(capture)} · screen ${screen}` } : {}),
   meta: { capture, screen },
 })
 
@@ -171,6 +173,7 @@ const rail = thumbnails({
   cluster: (item) => (item.meta as Shot).capture,
   // keys=1: ↑/↓ to the other screen of the same capture (a flat rail walks with ←/→)
   clusterKeys: p.has('keys'),
+  numberItems: p.has('num'),
   markers: () => [manual],
 })
 
