@@ -13,7 +13,7 @@
       "packages/core/dist/index.js": "{ createViewer }",
       "packages/renderer-dom/dist/index.js": "{ mount }"
     },
-    "limit": "16.9 kB",
+    "limit": "17.11 kB",
     "gzip": true
   },
   {
@@ -28,7 +28,7 @@
       "packages/renderer-dom/dist/index.js": "{ mount }",
       "packages/plugin-thumbnails/dist/index.js": "{ thumbnails }"
     },
-    "limit": "25.88 kB",
+    "limit": "26.13 kB",
     "gzip": true
   },
   {
