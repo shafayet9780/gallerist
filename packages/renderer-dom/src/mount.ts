@@ -14,7 +14,7 @@ import type {
   ZoomState,
 } from '@gallerist/core'
 import { clampPanToBox, clampScale, getInternals } from '@gallerist/core/internal'
-import { imageAdapter, mountImage } from './adapters/image'
+import { type DomAdapterCtx, imageAdapter, mountImage } from './adapters/image'
 import { type Accent, type ColorScheme, type Skin, applyAppearance } from './appearance'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
@@ -673,10 +673,18 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
         rec.abort?.abort()
         rec.media?.destroy()
         const abort = new AbortController()
-        rec.media = pickAdapter(it.type, it)?.mount(it, rec.content, {
+        const ctx: DomAdapterCtx = {
           signal: abort.signal,
           priority: isCurrent ? 'high' : 'low',
-        })
+          strings: ui,
+          // mount it afresh; focus on the Retry going with the old media lands on the root
+          retry: () => {
+            if (rec.content.contains(document.activeElement)) root.focus({ preventScroll: true })
+            rec.itemId = ''
+            renderWindow()
+          },
+        }
+        rec.media = pickAdapter(it.type, it)?.mount(it, rec.content, ctx)
         rec.abort = abort
         rec.itemId = it.id
         rec.activated = false

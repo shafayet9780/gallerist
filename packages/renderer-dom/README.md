@@ -24,6 +24,34 @@ viewer.open()
 
 Full docs: the [monorepo README](https://github.com/shafayet9780/gallerist#readme) and [`docs/`](https://github.com/shafayet9780/gallerist/tree/main/docs).
 
+## Loading: `placeholder`
+
+An item's `placeholder` shows the moment the item does, in the box the image will paint in (its
+`naturalSize` gives the box; without one, the placeholder image's own shape, or
+`--gallerist-media-ratio`). Pass the thumbnail URL the rail or the page has already loaded: it is
+in the browser's cache, so it paints in the same frame as the step, with no flash of an empty stage.
+
+```ts
+{ id: 'a', type: 'image', source: 'a-2400.jpg', thumb: 'a-320.jpg', placeholder: 'a-320.jpg',
+  naturalSize: { w: 2400, h: 1350 } }
+```
+
+- **An image URL** (or a data URI) is drawn blurred (`--gallerist-placeholder-blur`, 6px), clipped
+  to the image's box; the image fades in over it (`--gallerist-dur-reveal`, 150ms) as the blur
+  clears. A load still running after `--gallerist-loading-delay` (400ms) shows a pill in the box's
+  bottom end corner: "Loading full size…" (`strings.loadingFull`), a polite `role="status"` line
+  that says nothing on a fast load. A failed load keeps the placeholder, sharp, and the pill says
+  "Couldn't load full size" (`strings.loadFailed`) with a Retry button (`strings.retry`) that loads
+  the item afresh (focus on it goes to the viewer).
+- **A colour** (`#2a3340`, `rgb(…)`) fills the box. A failure shows the error card.
+- **None:** a skeleton fills the box after 300ms, with a shimmer (`--gallerist-placeholder`,
+  `--gallerist-shimmer`). A failure shows the error card.
+
+With reduced motion the placeholder isn't blurred, the skeleton and the spinner hold still, and the
+image still fades in. Zoom acts on the content layer, so a wheel, pinch or double tap before the
+image is in zooms the placeholder with it (and re-fits once the image's size is known);
+`@gallerist/plugin-zoom`'s − + wait for the image.
+
 ## Keys and host UI inside the viewer
 
 The viewer's keys (arrows, Home/End, digits, `+`/`-`/`0`, `t`, plugin keys) do nothing in a text

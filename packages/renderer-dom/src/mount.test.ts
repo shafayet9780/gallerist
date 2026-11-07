@@ -825,6 +825,37 @@ describe('mount — load lifecycle', () => {
     expect(loadError.mock.calls[0]?.[0]).toMatchObject({ id: 'a0', error: boom })
     expect(v.getState().loaded.a0).toBe('error')
   })
+
+  it("Retry on a failed image's pill loads it afresh, its focus going to the root", async () => {
+    const loaded = vi.fn()
+    const v = createViewer({
+      collection: {
+        groups: [{ id: 'g', items: [{ ...item('a0'), placeholder: 'a0-thumb.jpg' }] }],
+      },
+      on: { loaded },
+    })
+    mount(v, { strings: { retry: 'Again' } })
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const first = root.querySelector('.gallerist-media-image') as HTMLImageElement
+    first.dispatchEvent(new Event('error'))
+    await flush()
+    expect(v.getState().loaded.a0).toBe('error')
+    const retry = root.querySelector<HTMLButtonElement>('.gallerist-media-pill button')
+    expect(retry?.textContent).toBe('Again')
+    retry?.focus()
+    retry?.click()
+    expect(document.activeElement).toBe(root)
+    const again = root.querySelector('.gallerist-media-image') as HTMLImageElement
+    expect(again).not.toBe(first)
+    expect(root.querySelectorAll('.gallerist-media-image')).toHaveLength(1)
+    expect(root.querySelectorAll('.gallerist-media-placeholder')).toHaveLength(1)
+    expect(v.getState().loaded.a0).toBe('loading')
+    again.dispatchEvent(new Event('load'))
+    await flush()
+    expect(v.getState().loaded.a0).toBe('loaded')
+    expect(loaded).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('mount — overlays option', () => {

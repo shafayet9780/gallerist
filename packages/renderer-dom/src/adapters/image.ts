@@ -1,52 +1,97 @@
 // Image media adapter (spec §12, decision P0-J). Lives in the renderer because it touches DOM.
-// Responsive srcset, decode-before-reveal, LQIP placeholder, naturalSize hint, abortable load.
+// Responsive srcset, decode-before-reveal, a placeholder in the image's box, naturalSize hint,
+// abortable load.
 
 import type { AdapterCtx, Item, MediaAdapter, MountedMedia } from '@gallerist/core'
+import { DEFAULT_STRINGS, type Strings } from '../strings'
 
-const COLOR_RE = /^(#|rgb|hsl|[a-z]+$)/i
+/** What the DOM renderer adds to an adapter's context. */
+export interface DomAdapterCtx extends AdapterCtx {
+  /** the renderer's UI text */
+  strings?: Strings
+  /** mount the item again: a fresh, abortable load (a Retry control's action) */
+  retry?: () => void
+}
 
-// Chars that could escape the url("…") literal and inject extra CSS (e.g. a second url() that
-// fires an attacker-controlled request). Quotes/backslash/newlines are rejected for the url path.
-const CSS_URL_UNSAFE = /["\\\n\r]/
+// a colour (`#123`, `red`, `rgb(0 0 0 / 50%)`, `oklch(…)`); anything else is an image URL
+const COLOR_RE = /^(#[\da-f]{3,8}|[a-z-]+(\(.*\))?)$/i
 
 // Static broken-image glyph (lucide "image-off"); safe to inject as markup (no user data).
 const BROKEN_ICON =
   '<svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.4 10.4a2 2 0 1 1-2.8-2.8"/><path d="M21 15.5V5a2 2 0 0 0-2-2H8.5"/><path d="M3.6 3.6A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14a2 2 0 0 0 1.4-.6"/><path d="m5 21 7-7"/><path d="m2 2 20 20"/></svg>'
-
-function applyPlaceholder(el: HTMLElement, placeholder: string): void {
-  if (placeholder.startsWith('data:') || placeholder.includes('/')) {
-    if (CSS_URL_UNSAFE.test(placeholder)) return // reject breakout attempts — paint nothing
-    el.style.backgroundImage = `url("${placeholder}")`
-    el.style.backgroundSize = 'cover'
-    el.style.backgroundPosition = 'center'
-  } else if (COLOR_RE.test(placeholder)) {
-    el.style.backgroundColor = placeholder
-  }
-}
 
 export function imageAdapter(): MediaAdapter {
   return { type: 'image', mount: mountImage }
 }
 
 /** The built-in image adapter's mount; the renderer preloads only items it would mount. */
-export function mountImage(item: Item, slot: HTMLElement, ctx: AdapterCtx): MountedMedia {
+export function mountImage(item: Item, slot: HTMLElement, ctx: DomAdapterCtx): MountedMedia {
+  const t = ctx.strings ?? DEFAULT_STRINGS
   const img = document.createElement('img')
   img.setAttribute('decoding', 'async')
   img.setAttribute('fetchpriority', ctx.priority ?? 'auto')
   img.className = 'gallerist-media gallerist-media-image'
   if (item.alt !== undefined) img.alt = item.alt
-  if (item.placeholder) applyPlaceholder(img, item.placeholder)
-  slot.appendChild(img)
+
+  // The placeholder, in the box the image will paint in (the theme sizes it from the ratio): an
+  // image URL (best the thumb the rail already loaded) blurred until the image is in, a colour as a
+  // flat fill, or nothing: a skeleton. A slow load says so in a pill in the box's corner.
+  const box = document.createElement('div')
+  box.className = 'gallerist-media-placeholder'
+  const ratio = (w: number, h: number) => {
+    if (w && h) box.style.setProperty('--gallerist-media-ratio', `${w} / ${h}`)
+  }
+  const ph = item.placeholder
+  const size = item.naturalSize
+  if (size) ratio(size.w, size.h)
+  let status: Element | null = null // the pill's live line
+  if (ph && COLOR_RE.test(ph)) box.style.backgroundColor = ph
+  else if (ph) {
+    const pv = document.createElement('img')
+    pv.alt = ''
+    // its shape stands in for the image's until that's known (a cached thumb has it at once)
+    const fit = () => size || ratio(pv.naturalWidth, pv.naturalHeight)
+    pv.onload = fit
+    pv.src = ph
+    fit()
+    // shown after a delay (the theme's; it draws the spinner); the live line's text changes once,
+    // on a failure
+    const pill = document.createElement('div')
+    pill.className = 'gallerist-media-pill'
+    status = document.createElement('span')
+    status.setAttribute('role', 'status')
+    status.textContent = t.loadingFull
+    pill.appendChild(status)
+    box.append(pv, pill)
+  } else box.setAttribute('data-gallerist-skeleton', '')
+  slot.append(box, img)
+  const settle = (state: string) => {
+    img.setAttribute(state, '')
+    box.setAttribute(state, '')
+  }
 
   // A loader may resolve to a custom element instead of an <img>; track the live node.
   let element: HTMLElement = img
 
-  // On load failure, show a centered error card (icon + the item's alt as a caption) instead
-  // of the browser's default top-left broken-image glyph, which overlapped the chrome (I-UX3).
+  // On load failure with an image placeholder, it stays, sharp, and the pill offers Retry. With
+  // none, a centered error card (icon + the item's alt as a caption) instead of the browser's
+  // default top-left broken-image glyph, which overlapped the chrome (I-UX3).
   let errorEl: HTMLElement | null = null
   const showError = () => {
+    settle('data-gallerist-error') // keeps the img hidden
+    if (status) {
+      status.textContent = t.loadFailed
+      if (ctx.retry) {
+        const retry = document.createElement('button')
+        retry.type = 'button'
+        retry.textContent = t.retry
+        retry.onclick = ctx.retry
+        status.after(retry)
+      }
+      return
+    }
     if (errorEl) return
-    img.setAttribute('data-gallerist-error', '') // keeps the img hidden + excludes it from shimmer
+    box.remove()
     const card = document.createElement('div')
     card.className = 'gallerist-media-error'
     card.setAttribute('role', 'img')
@@ -88,7 +133,8 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: AdapterCtx): Moun
         // decode can reject on detached/aborted nodes — fall through and reveal anyway.
       }
       cleanup()
-      img.setAttribute('data-gallerist-loaded', '')
+      settle('data-gallerist-loaded')
+      status?.parentElement?.remove() // the pill
       resolve()
     }
     const onError = () => {
@@ -120,6 +166,7 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: AdapterCtx): Moun
             img.remove()
             slot.appendChild(res)
             res.setAttribute('data-gallerist-loaded', '')
+            box.remove()
             element = res
             resolve()
           }
@@ -148,6 +195,7 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: AdapterCtx): Moun
     destroy() {
       img.removeAttribute('src')
       element.remove()
+      box.remove()
       errorEl?.remove() // the error card is a slot sibling, not `element`
     },
   }

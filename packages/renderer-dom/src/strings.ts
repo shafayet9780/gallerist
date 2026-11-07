@@ -27,6 +27,10 @@ export interface Strings {
   groupOf: (n: number, total: number) => string
   /** announced on item navigation (and for every item in linear mode), e.g. "Item 3 of 5" */
   itemOf: (n: number, total: number) => string
+  /** a slow image's status over its placeholder, and its failure (with `retry`, a button) */
+  loadingFull: string
+  loadFailed: string
+  retry: string
 }
 
 export const DEFAULT_STRINGS: Strings = {
@@ -46,4 +50,7 @@ export const DEFAULT_STRINGS: Strings = {
   item: (n) => `Item ${n}`,
   groupOf: (n, total) => `Group ${n} of ${total}`,
   itemOf: (n, total) => `Item ${n} of ${total}`,
+  loadingFull: 'Loading full size…',
+  loadFailed: 'Couldn’t load full size',
+  retry: 'Retry',
 }

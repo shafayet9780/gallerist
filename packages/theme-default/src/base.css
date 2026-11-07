@@ -43,6 +43,13 @@
     --gallerist-dur-gentle: 280ms;
     --gallerist-dur-exit: 180ms; /* exits run shorter than entrances */
     --gallerist-dur-panel: 220ms; /* the rail collapsing, the item column opening (plugin-thumbnails) */
+    --gallerist-dur-reveal: 150ms; /* a loaded image fading in over its placeholder */
+
+    /* loading: an image placeholder's blur, the ratio of a box with no size to go by (a skeleton),
+       and how long a load runs before its "Loading full size" pill shows */
+    --gallerist-placeholder-blur: 6px;
+    --gallerist-media-ratio: 3 / 2;
+    --gallerist-loading-delay: 400ms;
 
     /* the accent: each skin names its accents as a dark/light pair, the scheme picks one */
     --gallerist-accent: var(--gallerist-accent-dark);
@@ -317,13 +324,144 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background-repeat: no-repeat;
-  background-position: center;
   opacity: 0;
-  transition: opacity 180ms ease-out;
+  transition: opacity var(--gallerist-dur-reveal) var(--gallerist-ease-out);
 }
 .gallerist-media-image[data-gallerist-loaded] {
   opacity: 1;
+}
+.gallerist-media-image[data-gallerist-error] {
+  visibility: hidden;
+}
+/* `item.placeholder` in the image's box (ratio: naturalSize, the placeholder's, or the token). An
+   image one is blurred, overscanned 2× the blur and clipped (no fringe); the blur clears as the image
+   fades in, then it hides; a failure keeps it, sharp. None: a skeleton after 300ms. */
+.gallerist-content {
+  container-type: size;
+}
+.gallerist-media-placeholder {
+  --_i: 0px;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(100cqw - 2 * var(--_i), (100cqh - 2 * var(--_i)) * var(--gallerist-media-ratio));
+  height: min(100cqh - 2 * var(--_i), (100cqw - 2 * var(--_i)) / (var(--gallerist-media-ratio)));
+  overflow: hidden;
+}
+.gallerist[data-gallerist-frame] .gallerist-media-placeholder {
+  --_i: var(--gallerist-frame-inset);
+}
+.gallerist-media-placeholder > img {
+  --_o: calc(-2 * var(--gallerist-placeholder-blur));
+  position: absolute;
+  inset: var(--_o);
+  width: calc(100% - 2 * var(--_o));
+  height: calc(100% - 2 * var(--_o));
+  object-fit: cover;
+  filter: blur(var(--gallerist-placeholder-blur));
+  transition: var(--gallerist-dur-reveal) var(--gallerist-ease-out);
+  transition-property: filter, inset, width, height;
+}
+.gallerist-media-placeholder:is([data-gallerist-loaded], [data-gallerist-error]) > img {
+  --_o: 0px;
+  filter: none;
+}
+.gallerist-media-placeholder[data-gallerist-loaded] {
+  visibility: hidden;
+  transition: visibility 0s var(--gallerist-dur-reveal);
+}
+.gallerist-media-placeholder[data-gallerist-skeleton] {
+  background: var(--gallerist-placeholder);
+  animation: gallerist-fade var(--gallerist-dur-exit) 0.3s backwards;
+}
+/* (not once hidden: it would run on) */
+.gallerist-media-placeholder[data-gallerist-skeleton]:not([data-gallerist-loaded])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+      100deg,
+      transparent 30%,
+      var(--gallerist-shimmer) 50%,
+      transparent 70%
+    )
+    150% 0 / 220% 100%;
+  animation: gallerist-shimmer 1.4s ease-in-out 0.3s infinite;
+}
+@keyframes gallerist-shimmer {
+  to {
+    background-position: -50% 0;
+  }
+}
+/* a slow load's pill, bottom end: after the delay, or at once on a failure (Retry). Neutral: warning
+   colours are a host's data colours */
+.gallerist-media-pill {
+  position: absolute;
+  bottom: 12px;
+  inset-inline-end: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  min-height: 30px;
+  box-sizing: border-box;
+  padding: 2px 12px 2px 10px;
+  border: 1px solid var(--gallerist-hairline);
+  border-radius: 99px;
+  background: var(--gallerist-panel);
+  color: var(--gallerist-fg-muted);
+  font: 12.5px / 1.3 var(--gallerist-font);
+  animation: gallerist-fade var(--gallerist-dur-exit) var(--gallerist-loading-delay) backwards;
+}
+/* the spinner; on a failure, a ! in a ring */
+.gallerist-media-pill::before {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  font: 700 9px / 10px var(--gallerist-font);
+  text-align: center;
+  animation: gallerist-spin 0.9s linear infinite;
+}
+[data-gallerist-error] > .gallerist-media-pill {
+  color: var(--gallerist-fg);
+  animation: none;
+}
+[data-gallerist-error] > .gallerist-media-pill::before {
+  content: "!";
+  border-color: currentColor;
+  animation: none;
+}
+.gallerist-media-pill > button {
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 3px 2px;
+  border-radius: 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.gallerist-media-pill > button::before {
+  content: "·" / "";
+  display: inline-block;
+  margin-inline-end: 8px;
+  color: var(--gallerist-fg-muted);
+}
+.gallerist-media-pill > button:focus-visible {
+  outline: 2px solid var(--gallerist-focus);
+  outline-offset: 2px;
+}
+@keyframes gallerist-spin {
+  to {
+    transform: rotate(1turn);
+  }
 }
 /* A failed load shows a centered error card (icon + the item's alt as a caption) instead of a
    blank stage or the browser's default top-left broken-image glyph (I-UX3). The broken <img>
@@ -350,34 +488,14 @@
   max-width: 40ch;
   color: var(--gallerist-fg);
 }
-/* Loading shimmer for slow media — shown only while an image is still pending (no loaded/error
-   marker yet), delayed so fast loads never flash it. Degrades to nothing where :has is absent. */
-.gallerist-content:has(
-    .gallerist-media-image:not([data-gallerist-loaded]):not([data-gallerist-error])
-  )::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    100deg,
-    transparent 35%,
-    var(--gallerist-shimmer) 50%,
-    transparent 65%
-  );
-  background-size: 200% 100%;
-  animation: gallerist-shimmer 1.4s ease-in-out 0.6s infinite;
-}
-@keyframes gallerist-shimmer {
-  from {
-    background-position: 150% 0;
-  }
-  to {
-    background-position: -50% 0;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .gallerist-content::before {
+  .gallerist-media-placeholder > img {
+    --_o: 0px;
+    filter: none;
+    transition: none;
+  }
+  .gallerist-media-placeholder[data-gallerist-skeleton]:not([data-gallerist-loaded])::after,
+  .gallerist-media-pill::before {
     animation: none;
   }
 }
@@ -2215,8 +2333,8 @@
 }
 
 /* the `tour` preset: the photo keeps clear of the arrows and the item navigator */
-.gallerist[data-gallerist-preset="tour"][data-gallerist-frame] .gallerist-media,
-.gallerist[data-gallerist-preset="tour"][data-gallerist-frame] .gallerist-media-image {
+.gallerist[data-gallerist-preset="tour"][data-gallerist-frame]
+  :is(.gallerist-media, .gallerist-media-placeholder) {
   border-radius: 16px;
 }
 
@@ -2597,7 +2715,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gallerist-media-image,
   .gallerist-bar,
   .gallerist-controls > button,
   .gallerist-itemnav,

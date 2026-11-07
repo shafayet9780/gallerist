@@ -58,6 +58,13 @@ On a phone (600px wide or less with a coarse pointer, where the ‹ › buttons 
 16px (0.5), so the current card kept clear of it leaves room for the next card whole beside it. A
 page's own `--gallerist-rail-fade` wins (the theme's tokens are in a cascade layer).
 
+Loading (0.5): an item's `placeholder` image is blurred `--gallerist-placeholder-blur` (6px) and
+clipped to the image's box; the image fades in over it in `--gallerist-dur-reveal` (150ms). A box
+with no size to go by takes `--gallerist-media-ratio` (`3 / 2`). A load still running after
+`--gallerist-loading-delay` (400ms) shows a "Loading full size" pill (the panel, hairline and muted
+text tokens; no warning colours). With no placeholder the box is a skeleton after 300ms:
+`--gallerist-placeholder` with a `--gallerist-shimmer` sweep. See the renderer's README.
+
 The theme follows `forced-colors: active` (Windows High Contrast): the View popover's chosen segment
 takes the system's selection colours and the focus rings the text colour. The rail's
 item clusters (`thumbnails({ cluster })`) use `--gallerist-cluster-inner` (2px) inside a cluster and

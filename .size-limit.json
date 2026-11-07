@@ -13,7 +13,7 @@
       "packages/core/dist/index.js": "{ createViewer }",
       "packages/renderer-dom/dist/index.js": "{ mount }"
     },
-    "limit": "16.65 kB",
+    "limit": "16.9 kB",
     "gzip": true
   },
   {
@@ -28,7 +28,7 @@
       "packages/renderer-dom/dist/index.js": "{ mount }",
       "packages/plugin-thumbnails/dist/index.js": "{ thumbnails }"
     },
-    "limit": "25.6 kB",
+    "limit": "25.88 kB",
     "gzip": true
   },
   {
@@ -90,7 +90,7 @@
   {
     "name": "theme base.css (gz)",
     "path": "packages/theme-default/src/base.css",
-    "limit": "10 kB",
+    "limit": "10.42 kB",
     "gzip": true
   },
   {
