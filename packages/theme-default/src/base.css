@@ -108,7 +108,8 @@
        the top end corner; `auto 3px` takes it to the bottom end */
     --gallerist-thumb-badge-inset-block: 3px auto;
     /* the rail's current group label (flat) or time label (timeline), and a focused thumb's ring:
-       its outline-style, and its offset on the current thumb (whose ring is outside it) */
+       its outline-style, and its offset on the current thumb (whose ring is outside it). A focused
+       thumb that isn't current: --gallerist-thumb-focus-opacity (unset: 1) */
     --gallerist-label-current: var(--gallerist-accent);
     --gallerist-label-current-weight: 500;
     --gallerist-thumb-focus-style: solid;
@@ -752,13 +753,15 @@
   border-color: var(--gallerist-thumb-active-border);
   box-shadow: var(--gallerist-thumb-ring);
 }
-.gallerist-thumb:not([data-active]) > .gallerist-thumb-img,
-.gallerist-thumb-item:not([data-active]) > .gallerist-thumb-img {
+:is(.gallerist-thumb, .gallerist-thumb-item):not([data-active]) > .gallerist-thumb-img {
   opacity: var(--gallerist-thumb-idle-opacity);
   transition: opacity var(--gallerist-dur-gentle) var(--gallerist-ease-out);
 }
-.gallerist-thumb:is(:hover, :focus-visible) > .gallerist-thumb-img,
-.gallerist-thumb-item:is(:hover, :focus-visible) > .gallerist-thumb-img {
+:is(.gallerist-thumb, .gallerist-thumb-item):not([data-active]):focus-visible
+  > .gallerist-thumb-img {
+  opacity: var(--gallerist-thumb-focus-opacity, 1);
+}
+:is(.gallerist-thumb, .gallerist-thumb-item):not([data-active]):hover > .gallerist-thumb-img {
   opacity: 1;
 }
 .gallerist-thumb:focus-visible,

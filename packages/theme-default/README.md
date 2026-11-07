@@ -70,7 +70,10 @@ The rail's current label (a flat rail's group label, a timeline's time label) is
 `--gallerist-label-current` (the accent) at `--gallerist-label-current-weight` (500). A focused thumb's
 ring is 2px `--gallerist-focus` in `--gallerist-thumb-focus-style` (`solid`; `dashed` tells it apart
 from a solid selection ring), 2px out, or `--gallerist-thumb-focus-offset-current` (2px) out on the
-current thumb, whose ring (`--gallerist-thumb-ring`, `--gallerist-item-ring`) may sit outside it.
+current thumb, whose ring (`--gallerist-thumb-ring`, `--gallerist-item-ring`) may sit outside it. A
+focused thumb that isn't current shows at `--gallerist-thumb-focus-opacity` (1, as when hovered);
+`var(--gallerist-thumb-idle-opacity)` keeps it dimmed, so only the current one is bright (hover still
+brightens it).
 
 The theme follows `forced-colors: active` (Windows High Contrast): the View popover's chosen segment
 takes the system's selection colours and the focus rings the text colour. The rail's

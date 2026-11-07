@@ -2,6 +2,7 @@
 // a side rail, keeps every card on screen drawn (U17 review: a right-to-left rail used to fold its
 // run back to the start, leaving the visible part of the rail empty).
 import { type Page, expect, test } from '@playwright/test'
+import { viewerSettled } from './settled'
 
 const open = async (page: Page, query: string) => {
   await page.goto(`/perf.html?config=default&shape=2000x5&${query}`)
@@ -378,4 +379,42 @@ test('a click on a card in view moves the rail only to keep its neighbours in vi
   const c = spanOf(centred, last.id) as Span
   expect(Math.abs((c.a + c.z) / 2 - (centred.lo + centred.hi) / 2)).toBeLessThan(2)
   for (const n of around(centred, last.id)) expect(whole(centred, n)).toBe(true)
+})
+
+// 0.5: a focused thumb that isn't current brightens as on hover (the default), or keeps the idle
+// opacity with --gallerist-thumb-focus-opacity, so the one bright thumb is always the current one
+test('--gallerist-thumb-focus-opacity: a focused thumb that is not current, bright or dimmed', async ({
+  page,
+}) => {
+  await page.goto('/layout.html?preset=reviewer&skin=console&display=flat&custom=short')
+  await viewerSettled(page)
+  const other = page.locator('.gallerist-thumb-item:not([data-active])').nth(1)
+  const current = page.locator('.gallerist-thumb-item[data-active]')
+  await expect(other).toBeVisible()
+  const opacity = (thumb: typeof other) =>
+    thumb.locator('.gallerist-thumb-img').evaluate(async (i) => {
+      await Promise.all(i.getAnimations().map((a) => a.finished))
+      return Number(getComputedStyle(i).opacity)
+    })
+  const idle = await opacity(other)
+  expect(idle).toBeLessThan(1)
+  await page.mouse.move(0, 0)
+  await page.keyboard.press('Shift') // keyboard modality: a scripted focus shows its ring
+  await other.focus()
+  expect(await other.evaluate((t) => t.matches(':focus-visible'))).toBe(true)
+  await expect(other).not.toHaveAttribute('data-active', '')
+  expect(await opacity(other)).toBe(1)
+  await page.evaluate(() =>
+    (document.querySelector('.gallerist') as HTMLElement).style.setProperty(
+      '--gallerist-thumb-focus-opacity',
+      'var(--gallerist-thumb-idle-opacity)',
+    ),
+  )
+  expect(await opacity(other)).toBeCloseTo(idle)
+  // the current thumb stays bright with focus on it, and hover still brightens a focused one
+  await current.focus()
+  expect(await opacity(current)).toBe(1)
+  await other.focus()
+  await other.hover()
+  expect(await opacity(other)).toBe(1)
 })
