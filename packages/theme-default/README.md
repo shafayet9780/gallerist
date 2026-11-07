@@ -42,11 +42,18 @@ shows − and + only). A bar whose only tools are these two (and `controls: fals
 phone, empty: leave the plugins out there, or keep the tools with the tokens.
 
 The bar's tools are `--gallerist-tool-size` (44px) with `--gallerist-tool-icon` glyphs (22px;
-Close's `--gallerist-close-icon`). With a fine pointer (a mouse or trackpad) the Console skin's bar is
-compact: 36px tools, 18px glyphs (Close 20px), and plugin-zoom's "− 100% +" one bordered group 30px
-tall (`--gallerist-zoom-group: 1`; 0, the default, keeps three loose tools). A touch keeps 44px
-targets; Gallery and Editorial keep 44px tools. `--gallerist-close-rule` makes room before Close with a
-1 × 20 hairline in it (Console 9px; 0, the default, none).
+Close's `--gallerist-close-icon`, the tool glyph unless set). With a fine pointer (a mouse or trackpad)
+the Console skin's bar is compact: 36px tools, 18px glyphs, Close's 2px larger (Console sets
+`--gallerist-close-icon` to `--gallerist-tool-icon` + 2px, so it follows a page's glyph size; set it
+too to size Close apart), and plugin-zoom's "− 100% +" one bordered group 30px tall
+(`--gallerist-zoom-group: 1`; 0, the default, keeps three loose tools; a unitless 0 or 1, nothing
+else). A touch keeps 44px targets; Gallery and Editorial keep 44px tools. `--gallerist-close-rule` is
+the room before Close (a length: Console 9px; 0px, the default, none), not the line: the 1 × 20 hairline in it is
+drawn as a border, so forced colours keep it.
+
+The rail (`.gallerist-thumbs`) has a `scroll-padding` of `--gallerist-rail-fade` (40px) at its ends,
+inline on a sideways rail and block on a side rail: plugin-thumbnails reads it to keep the current
+card clear of the end fades and the ‹ › buttons in them, and a card focused with Tab lands clear too.
 
 The theme follows `forced-colors: active` (Windows High Contrast): the View popover's chosen segment
 takes the system's selection colours and the focus rings the text colour. The rail's

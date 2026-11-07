@@ -14,6 +14,10 @@ mockup, and a wider gap before a flat rail's group meta. Peer ranges stay `>=0.3
   them; `--gallerist-tool-size: 44px`, `--gallerist-tool-icon: 22px`, `--gallerist-close-icon: 22px`,
   `--gallerist-zoom-group: 0` and `--gallerist-close-rule: 0px` on `.gallerist` bring 0.4.0's bar back.
   A touch keeps 44px targets; Gallery and Editorial are unchanged.
+- **theme-default**: the rail (`.gallerist-thumbs`) has a `scroll-padding` of `--gallerist-rail-fade`
+  (40px) at its ends (inline; block on a side rail), which plugin-thumbnails reads to keep the current
+  card clear of the end fades. A card focused with Tab lands clear of them too. A page that set its own
+  `scroll-padding` on the rail moves the current card's margin with it.
 - **theme-default**: a flat rail's group label and its `renderGroupMeta` meta are 12px apart (were
   8px), so a group whose label line is wider than its cards is 4px wider.
 
@@ -28,9 +32,16 @@ mockup, and a wider gap before a flat rail's group meta. Peer ranges stay `>=0.3
   ahead whole, centred together, and stays put while those two already show; where even the two
   can't fit, it centres the current card. Where the three fit, and where cards are evenly spaced
   (index chips on a phone, a short side rail), nothing changes. Flat, stacked, index, side and
-  right-to-left rails, windowed too, and the stacked item column (its next item). The rail's scrolls
-  are whole pixels, so WebKit (which drops a scroll's fraction) no longer cuts up to 2px off a card
-  meant to show whole.
+  right-to-left rails, windowed too, and the stacked item column (its next item; the column doesn't
+  track which way the cursor went). The current card shows clear of the rail's end fades (the
+  theme's `scroll-padding`, 40px), so it is never dimmed or under a ‹ › page button; where that leaves
+  too little room for the two (the 390px phone), the card ahead runs into the far fade. The way the
+  cursor went is the last step along the rail: a step between one group's items, the items toggle
+  (`e`), reopening the viewer, a display switch or new data keep it. A step onto the last card the rail
+  has drawn draws the card ahead first, so it counts. The rail's scrolls are whole pixels, so WebKit
+  (which drops a scroll's fraction) no longer cuts up to 2px off a card meant to show whole; keeping
+  its place while it draws and drops cards carries the fraction over, so cards of fractional width
+  (84 × 16/9) don't drift half a pixel a time.
 - **plugin-shortcuts (fixed)**: `?` opens the list as soon as the viewer has focus, during its opening
   fade too, as the other keys already did (it was ignored until the fade ended). It never opens over a
   viewer that is closing; `open()` from the host follows the same rule.
@@ -41,19 +52,23 @@ mockup, and a wider gap before a flat rail's group meta. Peer ranges stay `>=0.3
   glyph), `--gallerist-zoom-group` (0: three loose zoom tools; 1: one group in a hairline border, its
   parts 6px narrower and 8px shorter than a tool, the percentage between two hairlines, glyphs 3px
   smaller) and `--gallerist-close-rule` (room before Close with a 1 × 20 hairline centred in it; 0px:
-  none). Console sets 36px / 18px / 20px and the zoom group under `(pointer: fine)`, and the hairline
-  (9px) everywhere, as the mockup's phone bar has it. Gallery and Editorial keep 44px tools and no
-  hairline: their round and editorial tools read as touch-sized chrome, and a patch release leaves
+  none; the room, not the line). `--gallerist-zoom-group` is a unitless 0 or 1. Console sets 36px /
+  18px and Close's glyph 2px larger (it follows `--gallerist-tool-icon`) with the zoom group under
+  `(pointer: fine)`, and the hairline (9px) everywhere, as the mockup's phone bar has it. The hairline
+  is a border, so it shows in forced colours (Windows High Contrast). Gallery and Editorial keep 44px
+  tools and no hairline: their round and editorial tools read as touch-sized chrome, and a patch release leaves
   their look alone. Focus rings show whole as before (the toolbar guard now runs with the zoom tool),
   the strip still lets pointers through its free space, and a phone still leaves out the zoom tool and
   an overlay's fullscreen.
 
-### Sizes (gzipped; 0.4.0 → 0.4.1; no limit raised)
+### Sizes (gzipped; 0.4.0 → 0.4.1; one limit raised, owner-approved)
 - core + renderer-dom 16,650 B (unchanged; limit 16,650).
-- core + renderer-dom + thumbnails 25,484 → 25,496 B (limit 25,500).
+- core + renderer-dom + thumbnails 25,484 → 25,599 B (limit 25.5 → **25.6 kB**: the current card clear
+  of the end fades, the way the cursor went kept, the card ahead drawn before it counts, and the
+  re-window's fraction carried).
 - plugin-shortcuts 2,834 → 2,824 B (limit 2,850); plugin-zoom 1,645 B (unchanged; limit 1,650).
-- theme-default base.css 9,390 → 9,718 B (limit 10 kB); console.css 1,298 → 1,355 B.
-- `@gallerist/cdn` 38,244 → 38,269 B (limit 40 kB).
+- theme-default base.css 9,390 → 9,733 B (limit 10 kB); console.css 1,298 → 1,367 B.
+- `@gallerist/cdn` 38,244 → 38,387 B (limit 40 kB).
 
 ## v0.4.0
 
