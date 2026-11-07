@@ -15,7 +15,8 @@ Home / End for scrolling first. A host no longer needs a capture-phase listener 
 
 **plugin-thumbnails (new):** `clusterKeys: true` gives a flat rail's ↑/↓ (a row rail walks with ←/→)
 to its clusters: ↓ steps to the next item of the current one's `cluster`, ↑ to the one before,
-announced as any step is; at the cluster's end they do what they did. A stacked rail keeps ↑/↓ for its
+announced as any step is; at the cluster's end they do what they did. Plain ↑/↓ only: Shift+↑/↓
+(and a chord) stay the renderer's. A stacked rail keeps ↑/↓ for its
 items; down a side rail, where ↑/↓ walk the rail, the cluster's next item is the walk's next. A
 reviewer whose captures span monitors (`cluster: (item, g) => \`${g}:${capture}\``) switches monitors
 with ↑/↓ and no keyboard code of its own, and a keyboard user can still scroll a long caption band.

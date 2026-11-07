@@ -484,6 +484,9 @@ test('clusterKeys: ↑/↓ switch to the capture’s other screen on a flat rail
   await expect.poll(() => live(page)).not.toBe(before)
   await page.keyboard.press('ArrowUp') // the capture's first screen: nowhere to go
   expect(await cursor(page)).toEqual({ g: 1, i: 0 })
+  // plain ↑/↓ only: Shift+↓ isn't taken, and the renderer's own does nothing on a flat rail
+  await page.keyboard.press('Shift+ArrowDown')
+  expect(await cursor(page)).toEqual({ g: 1, i: 0 })
   // from the rail's current thumb too
   await page.locator('.gallerist-thumbs button[data-item][data-active]').focus()
   await page.keyboard.press('ArrowDown')

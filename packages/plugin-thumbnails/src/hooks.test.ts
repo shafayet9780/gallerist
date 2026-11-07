@@ -237,6 +237,23 @@ describe('clusterKeys', () => {
     expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
   })
 
+  it('takes plain ↑/↓ only: Shift+↑/↓ stay the renderer’s', () => {
+    const v = flat()
+    v.goTo(1, 0)
+    for (const key of ['ArrowDown', 'ArrowUp']) {
+      const e = new KeyboardEvent('keydown', {
+        key,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      $('.gallerist').dispatchEvent(e)
+      expect(v.getState().cursor).toEqual({ g: 1, i: 0 })
+    }
+    expect(press('ArrowDown')).toBe(true)
+    expect(v.getState().cursor).toEqual({ g: 1, i: 1 })
+  })
+
   it('announces the step as any other: the live region names the new item', () => {
     const v = flat()
     v.goTo(1, 0)

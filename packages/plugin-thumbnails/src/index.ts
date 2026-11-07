@@ -127,7 +127,7 @@ export interface ThumbnailsOptions {
    * ↑/↓ step to the item before / after the current one in its cluster (`cluster`) on a `flat`
    * rail: a row walks with ←/→, so they had no use there (down a side rail they walk it, and a
    * cluster's next item is the walk's next). Where the current item has no neighbour in its cluster
-   * that way, ↑/↓ do what they did. Not from a focused caption band (it scrolls with them), a
+   * that way, ↑/↓ do what they did, and Shift+↑/↓ always do. Not from a focused caption band (it scrolls with them), a
    * field, or a dialog, menu, slider or menu button in the viewer. Listed by plugin-shortcuts.
    * Default false.
    */
@@ -1668,12 +1668,13 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     const keys = { e: () => toggleActivePanel(), E: () => toggleActivePanel() }
-    // clusterKeys: ↑/↓ to the item before / after the current one in its cluster, where it has one
+    // clusterKeys: plain ↑/↓ to the item before / after the current one in its cluster, where it
+    // has one (Shift+↑/↓ stay the renderer's; a chord never reaches a keymap)
     const step = (e: KeyboardEvent) => {
       const { g, i } = viewer.getState().cursor
       const to = i + (e.key === 'ArrowDown' ? 1 : -1)
       const own = clusterOf(g, i)
-      if (own === null || own !== clusterOf(g, to)) return
+      if (e.shiftKey || own === null || own !== clusterOf(g, to)) return
       e.preventDefault()
       viewer.goTo(g, to)
     }

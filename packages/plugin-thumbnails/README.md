@@ -163,7 +163,7 @@ thumbnails({
 | `renderGroupMeta` | `(group, index, { display, place }) => Node \| string \| null` | none | A host's decoration per group: flat, at the end of its label line; stacked, under the card (and with a `timeline`, at the end of its time label). See [Host decorations](#host-decorations-and-markers). |
 | `renderItemBadge` | `(item, g, i) => Node \| string \| null` | none | A host's badge in each item thumb's top end corner (bottom end with `--gallerist-thumb-badge-inset-block: auto 3px`). |
 | `cluster`      | `(item, g, i) => string \| number \| null` | none | Consecutive items with the same key sit 2px apart, 8px between clusters. Visual, unless `clusterKeys`. |
-| `clusterKeys`  | `boolean`                    | `false`     | `flat`: ↑/↓ step to the item before / after the current one in its cluster (another monitor of the same capture). See [Host decorations](#host-decorations-and-markers). |
+| `clusterKeys`  | `boolean`                    | `false`     | `flat`: plain ↑/↓ step to the item before / after the current one in its cluster (another monitor of the same capture). See [Host decorations](#host-decorations-and-markers). |
 | `markers`      | `(collection) => RailMarker[]` | none | Entries between groups that are not items (time without screenshots): drawn, never a stop. |
 
 Presets configure these for you: with `mount(viewer, { preset })` (or React's `preset` prop) every
@@ -244,7 +244,8 @@ refreshRail(viewer)
   before) or `"start"` (a new one after another).
 - **`clusterKeys: true`** (0.5) gives a flat rail's ↑/↓, which a row rail walking with ←/→ leaves
   free, to the clusters: ↓ steps to the next item of the current one's cluster, ↑ to the one before,
-  announced as any step is. At the cluster's end (or on an item with no key) ↑/↓ do what they did:
+  announced as any step is. Plain ↑/↓ only: Shift+↑/↓ (and a chord) do what they did. At the
+  cluster's end (or on an item with no key) ↑/↓ do what they did:
   nothing on a row rail; down a side rail, where ↑/↓ walk it, the cluster's next item is the walk's
   next anyway. A stacked rail keeps ↑/↓ for its items. Through the plugin keymap the renderer asks
   first, so ↑/↓ stay with a focused caption band that scrolls, a text field, and a dialog, menu,
