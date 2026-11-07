@@ -118,9 +118,19 @@ export interface ThumbnailsOptions {
   /**
    * Clusters within a group: consecutive items with the same key (not `null`/`undefined`) sit close
    * together (`--gallerist-cluster-inner`, 2px), with a wider gap where the key changes
-   * (`--gallerist-cluster-gap`, 8px). Visual only: traversal, counts and names don't change.
+   * (`--gallerist-cluster-gap`, 8px). Visual only (but see `clusterKeys`): traversal, counts and
+   * names don't change.
    */
   cluster?: (item: Item, g: number, i: number) => string | number | null | undefined
+  /**
+   * ↑/↓ step to the item before / after the current one in its cluster (`cluster`) on a `flat`
+   * rail: a row walks with ←/→, so they had no use there (down a side rail they walk it, and a
+   * cluster's next item is the walk's next). Where the current item has no neighbour in its cluster
+   * that way, ↑/↓ do what they did. Not from a focused caption band (it scrolls with them), a
+   * field, or a dialog, menu, slider or menu button in the viewer. Listed by plugin-shortcuts.
+   * Default false.
+   */
+  clusterKeys?: boolean
   /**
    * Markers between groups, which are not items: drawn in the rail (`flat` and `stacked`) in order
    * at their place, but never a stop for the keys, never counted, and not focusable. Read for each
@@ -304,9 +314,7 @@ const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?:
 }
 
 function appendCaption(btn: HTMLElement, text: string | undefined): void {
-  if (!text) return
-  const cap = make('span', 'gallerist-thumb-caption', text)
-  btn.appendChild(cap)
+  if (text) btn.appendChild(make('span', 'gallerist-thumb-caption', text))
 }
 
 /** A host's decoration in a `span.cls` hidden from assistive tech, and the text it adds to a name
@@ -602,6 +610,11 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       return btn
     }
 
+    // the cluster key of item `i` in group `g` (none, or no such item: null)
+    const clusterOf = (g: number, i: number) => {
+      const item = viewer.getCollection().groups[g]?.items[i]
+      return (item && o.cluster?.(item, g, i)) ?? null
+    }
     // The host's badge (its text in the thumb's name) and the thumb's place in its cluster: `in` sits
     // close to the item before it, `start` begins a new cluster after another item.
     const decorateItem = (btn: HTMLElement, item: Item, g: number, i: number) => {
@@ -609,11 +622,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const badge = decoration(o.renderItemBadge?.(item, g, i), 'gallerist-thumb-badge')
       if (badge) btn.append(badge[0])
       btn.setAttribute('aria-label', named(t.item(i + 1), badge?.[1]))
-      const before = viewer.getCollection().groups[g]?.items[i - 1]
-      const own = o.cluster?.(item, g, i) ?? null
-      const prev = before ? (o.cluster?.(before, g, i - 1) ?? null) : null
-      const at =
-        prev !== null && prev === own ? 'in' : before && (prev ?? own) !== null ? 'start' : ''
+      const own = clusterOf(g, i)
+      const prev = clusterOf(g, i - 1)
+      const at = prev !== null && prev === own ? 'in' : i && (prev ?? own) !== null ? 'start' : ''
       if (at) btn.dataset.cluster = at
       else delete btn.dataset.cluster
     }
@@ -1656,6 +1667,16 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
     }
 
     const keys = { e: () => toggleActivePanel(), E: () => toggleActivePanel() }
+    // clusterKeys: ↑/↓ to the item before / after the current one in its cluster, where it has one
+    const step = (e: KeyboardEvent) => {
+      const { g, i } = viewer.getState().cursor
+      const to = i + (e.key === 'ArrowDown' ? 1 : -1)
+      const own = clusterOf(g, i)
+      if (own === null || own !== clusterOf(g, to)) return
+      e.preventDefault()
+      viewer.goTo(g, to)
+    }
+    const arrows = { ArrowUp: step, ArrowDown: step }
     const instance: ThumbnailsInstance = {
       name: 'thumbnails',
       get display() {
@@ -1674,8 +1695,10 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       // A flat rail has no item panel, nor has a rail not built yet (or never: another renderer), so
       // `e` stays another plugin's (the renderer reads the keymaps after mounting the regions, again
       // when the plugin set changes and on viewer.refresh(), which a switch calls).
+      // With `clusterKeys`, a flat rail takes ↑/↓ (down a side rail, where they walk it, a cluster's
+      // next item is the walk's next: the same step).
       get keymap() {
-        return isFlat || !root ? undefined : keys
+        return (root && (isFlat ? o.clusterKeys && arrows : keys)) || undefined
       },
     }
     return instance

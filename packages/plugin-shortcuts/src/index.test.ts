@@ -362,6 +362,26 @@ describe('plugin-shortcuts — what it lists', () => {
     ])
   })
 
+  it("a row rail with plugin-thumbnails' clusterKeys: ↑/↓ through a cluster; not down a side rail", () => {
+    const rail = () => thumbnails({ groupDisplay: 'flat', cluster: () => 1, clusterKeys: true })
+    setup({ strings: { prevNextCluster: 'Other monitor' } }, { plugins: [rail()] })
+    root().focus()
+    press('?')
+    expect(listed().Move).toEqual([
+      ['Previous / next', '← →'],
+      ['Other monitor', '↑ ↓'],
+      ['First / last', 'Home End'],
+    ])
+    document.body.innerHTML = ''
+    setup(undefined, { plugins: [rail()], mountOpts: { rail: 'left' } })
+    root().focus()
+    press('?')
+    expect(listed().Move).toEqual([
+      ['Previous / next', '↑ ↓'],
+      ['First / last', 'Home End'],
+    ])
+  })
+
   it('every group a single item: no item axis', () => {
     setup(undefined, { one: true })
     root().focus()

@@ -41,7 +41,13 @@ its region this way in `flat` mode. A plugin that changes the marker on a region
 rail switching its display at run time) calls `viewer.refresh()` after, and the renderer reads it
 again, with the counter, the item navigator and the arrows' names. The plugins' keymaps are read at
 the same times, so a `keymap` getter can drop a key a layout doesn't use and leave it to an earlier
-plugin (a flat rail leaves `e`). Without built-in controls (`controls: false`) the bar shows while the
+plugin (a flat rail leaves `e`), or add one it does (a flat rail with `clusterKeys` takes ↑/↓). The
+DOM renderer asks the keymaps before its own keys (arrows, Home/End, `+`/`-`/`0`, `t`, 1–9, Escape):
+a handler that takes a key calls `preventDefault()`, and the renderer then does nothing with it;
+otherwise the renderer's own key runs after. Not asked: a chord (Ctrl, ⌘, Alt; AltGr is fine), a key
+a handler before took already, a key from a text field (shadow roots included; Escape there is the
+renderer's alone), an arrow from inside a dialog, menu or slider in the viewer or from a menu button
+(`aria-haspopup`), and ↑/↓/Home/End on a focused caption band that scrolls. Without built-in controls (`controls: false`) the bar shows while the
 toolbar holds a tool, but for tools marked `data-gallerist-off`: a tool its plugin keeps hidden for a
 later layout (a flat rail's items toggle, a View menu with nothing to offer) carries that marker
 beside `hidden`, and the plugin calls `viewer.refresh()` when it changes. A tool that only toggles
@@ -95,8 +101,9 @@ its UI from `ctx.preset` builds it again for that mount (see `plugin-thumbnails`
   (`.gallerist-content[data-gallerist-current]`, `transform: translate(…) scale(s)`) before it
   commits. Watch `style` on the viewer root's subtree with a `MutationObserver` to read it live, and
   ignore a scale below 1 (a drag to dismiss shrinks the content too). To take a key from the
-  renderer's own keymap (`+`, `-`, `0` are built in, not plugin keymap entries), listen on the root in
-  the capture phase and `stopImmediatePropagation()`; skip text fields and modified keys.
+  renderer's own keymap (`+`, `-`, `0` are built in), give it a keymap entry that calls
+  `preventDefault()` (0.5); plugin-zoom still listens on the root in the capture phase and
+  `stopImmediatePropagation()`s, so its keys reach no keymap while its `keys` are on.
 - **A modal layer over the viewer** (`plugin-shortcuts`): put it in the viewer's root (found from a
   hidden node in a region, marked `data-gallerist-off` so a bar shows not for it alone), set `inert`
   on the root's other children while it shows (and only on those not inert already), and take keys in

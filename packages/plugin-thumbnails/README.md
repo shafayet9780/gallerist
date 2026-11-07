@@ -162,7 +162,8 @@ thumbnails({
 | `numberItems`  | `boolean`                    | `false`     | Number the item thumbs (1, 2, 3…) so they can be referred to, e.g. "monitor 2". |
 | `renderGroupMeta` | `(group, index, { display, place }) => Node \| string \| null` | none | A host's decoration per group: flat, at the end of its label line; stacked, under the card (and with a `timeline`, at the end of its time label). See [Host decorations](#host-decorations-and-markers). |
 | `renderItemBadge` | `(item, g, i) => Node \| string \| null` | none | A host's badge in each item thumb's top end corner. |
-| `cluster`      | `(item, g, i) => string \| number \| null` | none | Consecutive items with the same key sit 2px apart, 8px between clusters. Visual only. |
+| `cluster`      | `(item, g, i) => string \| number \| null` | none | Consecutive items with the same key sit 2px apart, 8px between clusters. Visual, unless `clusterKeys`. |
+| `clusterKeys`  | `boolean`                    | `false`     | `flat`: ↑/↓ step to the item before / after the current one in its cluster (another monitor of the same capture). See [Host decorations](#host-decorations-and-markers). |
 | `markers`      | `(collection) => RailMarker[]` | none | Entries between groups that are not items (time without screenshots): drawn, never a stop. |
 
 Presets configure these for you: with `mount(viewer, { preset })` (or React's `preset` prop) every
@@ -231,6 +232,23 @@ refreshRail(viewer)
   and names don't change: ↑/↓ (or ←/→ on a flat rail) still step one item at a time, so the other
   monitor of the same capture is the next item. Thumbs carry `data-cluster="in"` (continues the one
   before) or `"start"` (a new one after another).
+- **`clusterKeys: true`** (0.5) gives a flat rail's ↑/↓, which a row rail walking with ←/→ leaves
+  free, to the clusters: ↓ steps to the next item of the current one's cluster, ↑ to the one before,
+  announced as any step is. At the cluster's end (or on an item with no key) ↑/↓ do what they did:
+  nothing on a row rail; down a side rail, where ↑/↓ walk it, the cluster's next item is the walk's
+  next anyway. A stacked rail keeps ↑/↓ for its items. Through the plugin keymap the renderer asks
+  first, so ↑/↓ stay with a focused caption band that scrolls, a text field, and a dialog, menu,
+  slider or menu button in the viewer. plugin-shortcuts lists them ("Previous / next in the cluster",
+  `strings.prevNextCluster`). A reviewer whose captures span monitors needs no keyboard code of its
+  own:
+  ```ts
+  thumbnails({
+    groupDisplay: 'flat',
+    cluster: (item, g) => `${g}:${item.meta.capturedAt}`, // the monitors of one capture
+    clusterKeys: true, // ↑/↓: the capture's other monitor
+  })
+  shortcuts({ strings: { prevNextCluster: 'Other monitor, same capture' } })
+  ```
 - **`markers(collection)`** returns `RailMarker`s: `{ id, after?, before?, label, caption?, render?,
   tip? }`. A marker is drawn after the group `after` names (else before `before`'s), in the order
   given, on flat and stacked rails; one whose group isn't in the collection, or whose `id` an earlier

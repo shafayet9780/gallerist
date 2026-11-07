@@ -84,7 +84,7 @@
     "path": "packages/plugin-shortcuts/dist/index.js",
     "import": "{ shortcuts }",
     "ignore": ["@gallerist/core"],
-    "limit": "2.85 kB",
+    "limit": "2.86 kB",
     "gzip": true
   },
   {

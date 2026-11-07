@@ -46,6 +46,8 @@ export interface ShortcutsStrings {
   prevNext: string
   prevNextGroup: string
   prevNextItem: string
+  /** ↑/↓ on a flat rail with plugin-thumbnails' `clusterKeys` */
+  prevNextCluster: string
   nextItem: string
   firstLast: string
   firstLastGroup: string
@@ -90,6 +92,7 @@ export const DEFAULT_SHORTCUTS_STRINGS: ShortcutsStrings = {
   prevNext: 'Previous / next',
   prevNextGroup: 'Previous / next group',
   prevNextItem: 'Previous / next in the group',
+  prevNextCluster: 'Previous / next in the cluster',
   nextItem: 'Next in the group',
   firstLast: 'First / last',
   firstLastGroup: 'First / last group',
@@ -219,6 +222,11 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
             ]
           : [
               [t.prevNext, vertical ? along : across],
+              // a row rail's ↑/↓ through a cluster (plugin-thumbnails' clusterKeys; down a side rail
+              // they walk it), while it holds them
+              ...(!vertical && held('thumbnails', 'ArrowDown')
+                ? [[t.prevNextCluster, along] as Row]
+                : []),
               [t.firstLast, [t.home, t.end]],
             ]
         const fs = (document as { webkitFullscreenEnabled?: boolean }).webkitFullscreenEnabled

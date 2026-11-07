@@ -398,6 +398,109 @@ test('the notes popover: Escape closes it before the viewer, keys typed in it st
   await expect.poll(() => phase(page)).toBe('closed')
 })
 
+// 0.5: plugin-thumbnails' clusterKeys gives a flat rail's free ↑/↓ the other screen of the same
+// capture, through the plugin keymap the renderer now asks first (a host listened in the capture
+// phase before, which took them from a focused caption band and needed its own guards).
+const live = (page: Page) => page.locator('.gallerist-live').textContent()
+test('clusterKeys: ↑/↓ switch to the capture’s other screen on a flat rail, announced and listed', async ({
+  page,
+}) => {
+  await open(page, 'keys=1')
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 }) // 11:02, screen 2
+  const root = page.locator('.gallerist')
+  await root.focus()
+  const before = await live(page)
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual({ g: 1, i: 0 }) // screen 1
+  await expect.poll(() => live(page)).not.toBe(before)
+  await page.keyboard.press('ArrowUp') // the capture's first screen: nowhere to go
+  expect(await cursor(page)).toEqual({ g: 1, i: 0 })
+  // from the rail's current thumb too
+  await page.locator('.gallerist-thumbs button[data-item][data-active]').focus()
+  await page.keyboard.press('ArrowDown')
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+  await page.keyboard.press('ArrowDown') // the capture's last: the next capture is ← → away
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+  await page.keyboard.press('ArrowRight')
+  expect(await cursor(page)).toEqual({ g: 1, i: 2 }) // 11:07, screen 1
+  await page.keyboard.press('ArrowDown')
+  expect(await cursor(page)).toEqual({ g: 1, i: 3 })
+  // the shortcut list has them
+  await root.focus()
+  await page.keyboard.press('?')
+  const row = page.locator('.gallerist-shortcuts-row', {
+    hasText: 'Previous / next in the cluster',
+  })
+  await expect(row.locator('kbd')).toHaveText(['↑', '↓'])
+})
+
+test('without clusterKeys, ↑/↓ on a flat rail do what they did: nothing', async ({ page }) => {
+  await open(page)
+  await page.locator('.gallerist').focus()
+  for (const k of ['ArrowUp', 'ArrowDown', 'ArrowDown']) await page.keyboard.press(k)
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+  await page.keyboard.press('?')
+  await expect(page.locator('.gallerist-shortcuts')).toBeVisible()
+  await expect(page.locator('.gallerist-shortcuts-row', { hasText: 'in the cluster' })).toHaveCount(
+    0,
+  )
+})
+
+test('clusterKeys: a focused caption band that overflows keeps ↑/↓ for scrolling', async ({
+  page,
+}) => {
+  await open(page, 'keys=1')
+  // the host's caption grows past what the band shows (a short viewer, a long note)
+  await page.evaluate(() => {
+    const tall = document.createElement('div')
+    tall.style.blockSize = '2000px'
+    tall.textContent = 'A long caption'
+    document.querySelector('.hk-caption')?.after(tall)
+  })
+  const band = page.locator('.gallerist-caption')
+  await expect(band).toHaveAttribute('tabindex', '0')
+  await band.focus()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(() => band.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('ArrowUp')
+  await expect.poll(() => band.evaluate((el) => el.scrollTop)).toBe(0)
+  expect(await cursor(page)).toEqual({ g: 1, i: 1 })
+})
+
+test('clusterKeys: ↑/↓ stay with the note field, the notes dialog, its menu button and the list', async ({
+  page,
+}) => {
+  await open(page, 'keys=1')
+  const at = { g: 1, i: 1 }
+  // the notes button opens a dialog (aria-haspopup): a menu button's arrows aren't the rail's
+  await page.locator('.hk-note-btn').focus()
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual(at)
+  // in the note field, and on a button in the notes dialog
+  await page.locator('.gallerist').press('n')
+  await expect(page.locator('.hk-note-box')).toBeFocused()
+  await page.keyboard.press('ArrowUp')
+  await page.locator('.hk-add').focus()
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual(at)
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.hk-popover')).toHaveCount(0)
+  // with the shortcut list open
+  await page.locator('.gallerist').focus()
+  await page.keyboard.press('?')
+  await expect(page.locator('.gallerist-shortcuts')).toBeVisible()
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual(at)
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.gallerist-shortcuts')).toHaveCount(0)
+  // and on the viewer itself they're the rail's again
+  await page.keyboard.press('ArrowUp')
+  expect(await cursor(page)).toEqual({ g: 1, i: 0 })
+})
+
 // With zoom, View and the shortcut list on the same viewer: ? lists the host's N with the viewer's
 // keys, a ? typed in the notes stays there, a ? on the notes button (taken by no one) still opens the
 // list, and the View popover's last row opens it.

@@ -1965,6 +1965,127 @@ describe('mount — modal accessibility (WS-3)', () => {
     expect(hit).toHaveBeenCalledTimes(1)
   })
 
+  // 0.5: the plugins' keys come before the renderer's own, so a plugin can rebind ↑/↓ for a layout
+  describe("a plugin's keymap is asked before the renderer's own keys", () => {
+    const setup = (handler: (e: KeyboardEvent) => void) => {
+      const v = createViewer({
+        collection: collection(),
+        startAt: { g: 1, i: 1 },
+        plugins: [() => ({ name: 'keys', keymap: { ArrowDown: handler, ArrowUp: handler } })],
+      })
+      mount(v)
+      v.open()
+      const root = document.querySelector('.gallerist') as HTMLElement
+      return { v, root }
+    }
+
+    it('a handler that takes the key (preventDefault) leaves the renderer nothing to do', () => {
+      const take = vi.fn((e: KeyboardEvent) => e.preventDefault())
+      const { v, root } = setup(take)
+      root.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+      expect(take).toHaveBeenCalledTimes(1)
+      expect(v.getState().cursor).toEqual({ g: 1, i: 1 }) // no nextItem
+    })
+
+    it("one that doesn't take it lets the renderer's own key run after it", () => {
+      const pass = vi.fn()
+      const { v, root } = setup(pass)
+      root.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+      expect(pass).toHaveBeenCalledTimes(1)
+      expect(v.getState().cursor).toEqual({ g: 1, i: 2 })
+    })
+
+    it('not asked for a chord, a key taken already, or from a field (Escape too)', () => {
+      const take = vi.fn((e: KeyboardEvent) => e.preventDefault())
+      const v = createViewer({
+        collection: collection(),
+        plugins: [() => ({ name: 'keys', keymap: { ArrowDown: take, Escape: take } })],
+      })
+      mount(v)
+      v.open()
+      const root = document.querySelector('.gallerist') as HTMLElement
+      root.dispatchEvent(key({ key: 'ArrowDown', ctrlKey: true, cancelable: true }))
+      const taken = key({ key: 'ArrowDown', cancelable: true })
+      taken.preventDefault()
+      root.dispatchEvent(taken)
+      const input = root.appendChild(document.createElement('input'))
+      input.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+      input.dispatchEvent(key({ key: 'Escape', cancelable: true }))
+      expect(take).not.toHaveBeenCalled()
+      expect(v.getState().phase).not.toBe('open') // Escape from a field still closes the viewer
+    })
+
+    it('an arrow from a widget in the viewer with arrows of its own is not asked; a letter is', () => {
+      const take = vi.fn((e: KeyboardEvent) => e.preventDefault())
+      const letter = vi.fn()
+      const v = createViewer({
+        collection: collection(),
+        plugins: [() => ({ name: 'keys', keymap: { ArrowUp: take, ArrowDown: take, n: letter } })],
+      })
+      mount(v)
+      v.open()
+      const root = document.querySelector('.gallerist') as HTMLElement
+      for (const html of [
+        '<div role="dialog"><button>in a dialog</button></div>',
+        '<div role="menu"><div role="menuitem" tabindex="-1">in a menu</div></div>',
+        '<div role="slider" tabindex="0"></div>',
+        '<div role="dialog"><a href="#x" tabindex="0">a link in a dialog</a></div>',
+        '<button aria-haspopup="dialog">menu button</button>',
+      ]) {
+        const host = root.appendChild(document.createElement('div'))
+        host.innerHTML = html
+        const at = host.querySelector('button, [tabindex]') as HTMLElement
+        at.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+        at.dispatchEvent(key({ key: 'n', cancelable: true }))
+      }
+      expect(take).not.toHaveBeenCalled()
+      expect(letter).toHaveBeenCalledTimes(5)
+      // the overlay root is a dialog itself, and a rail thumb in it is no widget of that kind
+      root.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+      expect(take).toHaveBeenCalledTimes(1)
+    })
+
+    it('a focused caption band keeps ↑/↓ for scrolling', () => {
+      const fits: (() => void)[] = []
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(cb: () => void) {
+            fits.push(cb)
+          }
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        },
+      )
+      try {
+        const take = vi.fn((e: KeyboardEvent) => e.preventDefault())
+        const v = createViewer({
+          collection: collection(),
+          plugins: [
+            () => ({
+              name: 'keys',
+              keymap: { ArrowDown: take },
+              regions: { caption: () => document.createElement('div') },
+            }),
+          ],
+        })
+        mount(v)
+        v.open()
+        const band = document.querySelector('.gallerist-caption') as HTMLElement
+        Object.defineProperty(band, 'scrollHeight', { get: () => 300, configurable: true })
+        Object.defineProperty(band, 'clientHeight', { get: () => 100, configurable: true })
+        for (const fit of fits) fit()
+        expect(band.getAttribute('tabindex')).toBe('0')
+        band.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
+        expect(take).not.toHaveBeenCalled()
+        expect(band.scrollTop).toBeGreaterThan(0)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  })
+
   it('describes the viewer with the caption (aria-describedby)', () => {
     const v = createViewer({
       collection: {

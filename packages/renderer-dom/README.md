@@ -34,6 +34,17 @@ Escape nobody took still closes the viewer, from a field too. A plugin key that 
 field (a "notes" key opening a note box) should `preventDefault()` too, or the field gets the
 character.
 
+A plugin's `keymap` is asked before the viewer's own keys (0.5), so a plugin can rebind one for a
+layout: a handler that takes the key calls `preventDefault()`, and the viewer then does nothing with
+it; one that doesn't leaves the viewer's own key, if it has one, to run after. plugin-thumbnails'
+`clusterKeys` takes ↑/↓ this way on a flat rail. A plugin is not asked for a key typed with Ctrl, ⌘ or
+Alt (AltGr is fine: `?` on some layouts), a key taken already, or one from a text field (Escape there
+is the viewer's alone); nor for an arrow key from a widget in the viewer that has arrow keys of its
+own: inside a dialog, a menu or a slider (`role="dialog"`, `"menu"`, `"slider"`; the overlay's root
+doesn't count), or on a menu button (`aria-haspopup`). A focused caption band that scrolls keeps
+↑/↓/Home/End for scrolling before anyone is asked. So a host no longer needs a capture-phase listener
+to take an arrow key.
+
 ## Markup init
 
 `bind()` opens a viewer from `<a href="big.jpg" data-gallerist="trip">` links, with no collection to

@@ -8,7 +8,7 @@
 //    over the stage; Escape in it closes it, not the viewer; N opens it (a plugin keymap)
 //  • the zoom tool, the View popover and the shortcut list (?) with the host's N and long press
 // Query: display=flat|stacked (default flat) · skin · scheme · dir=rtl · preset (default reviewer) ·
-// one=1, rooms=1 (below) ·
+// keys=1: clusterKeys (↑/↓ to the capture's other screen) · one=1, rooms=1 (below) ·
 // wide=1: the marker's box and the 12:00 timeframe's label line take a fixed room (whatever the
 // fonts), so on a 390px phone the cards either side of them and the current one can't all show
 import { type Group, type Item, type Plugin, createViewer } from '@gallerist/core'
@@ -169,6 +169,8 @@ const rail = thumbnails({
     return b
   },
   cluster: (item) => (item.meta as Shot).capture,
+  // keys=1: ↑/↓ to the other screen of the same capture (a flat rail walks with ←/→)
+  clusterKeys: p.has('keys'),
   markers: () => [manual],
 })
 

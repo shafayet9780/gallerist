@@ -53,8 +53,9 @@ does nothing:
 
 - **Move.** With items grouped (a stacked or index rail, or none): ←/→ move between groups, ↑/↓
   within one, Home/End to the first / last group, 1–9 to an item in the group. A row rail
-  (`groupDisplay: 'flat'`, or `linear`) walks every item in order: ←/→ and Home/End only. So does a
-  collection where every group holds one item. A side rail (`groupAxis: 'vertical'`) turns the axes
+  (`groupDisplay: 'flat'`, or `linear`) walks every item in order: ←/→ and Home/End only, and ↑/↓
+  through a cluster while plugin-thumbnails' `clusterKeys` holds them (`strings.prevNextCluster`). So
+  does a collection where every group holds one item. A side rail (`groupAxis: 'vertical'`) turns the axes
   (↑/↓ between groups). Right to left, ← moves forward, and the list shows → ← for previous / next.
 - **Zoom.** `+`, `−`, `0`: the renderer's keys, or [plugin-zoom](../plugin-zoom/README.md)'s stops
   when it is registered. Only while the collection has an item that can zoom: an image, or with
@@ -64,10 +65,11 @@ does nothing:
   browser can fullscreen an element), T to show or hide the thumbnails (with a rail), E for the
   group's items (a stacked rail), G for the grid, P and C for pins (C with `onPlace`), D (or its
   `key`) to download, `?` for this list, Esc to close (an overlay viewer). A plugin's key shows only
-  while that plugin holds it: a later plugin that took the key hides it. The renderer reads its own
-  keys first (the arrows, Home/End, `+` `=` `-` `0`, `t`, and 1–9 while items are grouped), so a
-  plugin given one of them (`grid({ key: 't' })`) never gets it and shouldn't be: the list would
-  show it. `?` typed with AltGr (Ctrl + Alt on Windows) counts as `?`.
+  while that plugin holds it: a later plugin that took the key hides it. The renderer asks the
+  plugins' keys before its own (the arrows, Home/End, `+` `=` `-` `0`, `t`, and 1–9 while items are
+  grouped; 0.5), and runs its own after unless the plugin took the key (`preventDefault()`): a plugin
+  given one of them that doesn't take it (`grid({ key: 't' })`) runs as well as the renderer's, and
+  the list shows both. `?` typed with AltGr (Ctrl + Alt on Windows) counts as `?`.
 - **Your own**, from `shortcuts`: `{ label, keys?, gesture?, section? }`. `keys` are drawn as key
   caps; `section` names a built-in section (its title: `strings.move`, `zoom`, `viewer`) or a new one
   after them; without it the entry joins Viewer. An entry with a `gesture` is listed with the
