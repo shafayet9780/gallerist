@@ -66,6 +66,43 @@ test('? opens the list for this layout; Escape closes it, and only it', async ({
   await expect(list(page)).toBeHidden()
 })
 
+// 0.4.1 (Apploye): ? did nothing while the viewer faded in (phase "opening"), though the other keys
+// worked. The fade in and out are held long here (4s), so the keys land inside them whatever the
+// machine's speed.
+test('? opens the list while the viewer is opening; not while it is closing', async ({ page }) => {
+  await open(page)
+  const viewer = (to: 'open' | 'close') =>
+    page.evaluate(
+      (to) => (window as unknown as { viewer: Record<string, () => void> }).viewer[to]?.(),
+      to,
+    )
+  const hold = (token: string) =>
+    page.addStyleTag({ content: `.gallerist { --gallerist-dur-${token}: 4s !important; }` })
+  await viewer('close')
+  await expect(root(page)).toHaveCount(0)
+  await hold('gentle')
+  await viewer('open')
+  await expect(root(page)).toHaveAttribute('data-gallerist-phase', 'opening')
+  await expect(root(page)).toBeFocused()
+  await page.keyboard.press('Shift+Slash') // ?
+  await expect(list(page)).toBeVisible()
+  await expect(root(page)).toHaveAttribute('data-gallerist-phase', 'opening')
+  await expect(list(page)).toBeFocused()
+  // it stays when the viewer is open
+  await expect(root(page)).toHaveAttribute('data-gallerist-phase', 'open', { timeout: 10_000 })
+  await expect(list(page)).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(list(page)).toBeHidden()
+  // closing: ? doesn't open it over a viewer going away
+  await hold('exit')
+  await viewer('close')
+  await expect(root(page)).toHaveAttribute('data-gallerist-phase', 'closing')
+  await root(page).focus()
+  await page.keyboard.press('Shift+Slash')
+  await expect(root(page)).toHaveAttribute('data-gallerist-phase', 'closing')
+  await expect(list(page)).toHaveCount(0)
+})
+
 test('keys pressed in it never reach the viewer', async ({ page }) => {
   await open(page, `${REVIEWER}&zoom-tool=1`)
   await help(page)

@@ -130,15 +130,15 @@ export interface ShortcutsInstance extends PluginInstance {
   /** what `open()` shows now: the title of the keys, or of the gestures on a coarse pointer */
   readonly label: string
   readonly isOpen: boolean
-  /** Opens the list on the open viewer: the keys (`true`), the gestures (`false`), or by the
-   *  pointer (default). False when there is no open viewer to show it in. */
+  /** Opens the list on the open (or opening) viewer: the keys (`true`), the gestures (`false`), or
+   *  by the pointer (default). False when there is no such viewer to show it in (closing, closed). */
   open(keys?: boolean): boolean
   close(): void
 }
 
 /** `shortcuts()`: a plugin, with `open()` / `close()` for the host (a help button of its own). */
 export interface ShortcutsPlugin extends Plugin {
-  /** Opens the list on the viewer this plugin was last registered on that is open. */
+  /** Opens the list on the viewer this plugin was last registered on that is open (or opening). */
   open(keys?: boolean): boolean
   close(): void
 }
@@ -324,7 +324,8 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
 
     const open = (keys = !coarse()): boolean => {
       const r = root()
-      if (!r || !anchor?.isConnected || viewer.getState().phase !== 'open') return false
+      // on a viewer that is open or opening (its keys work from its first frame), not one going away
+      if (!r || !anchor?.isConnected || /^clos/.test(viewer.getState().phase)) return false
       close()
       back = (r.getRootNode() as Document | ShadowRoot).activeElement as HTMLElement | null
       const s = el('div', 'gallerist-shortcuts-scrim')
@@ -397,7 +398,7 @@ export function shortcuts(opts: ShortcutsOptions = {}): ShortcutsPlugin {
       init() {
         live.push(instance)
         unsub = viewer.subscribe((st) => {
-          if (st.phase === 'closing' || st.phase === 'closed') close()
+          if (/^clos/.test(st.phase)) close() // closing or closed
         })
       },
       destroy() {
