@@ -65,7 +65,7 @@ for (const dir of ['ltr', 'rtl'] as const) {
       expect(g.cut).toBe(false) // the label shows whole
       expect(g.headFits).toBe(true)
       expect(g.line).toBeLessThan(2) // one line
-      expect(g.apart).toBeGreaterThanOrEqual(7) // the meta after the label, clear of it
+      expect(g.apart).toBeGreaterThanOrEqual(11.5) // the meta 12px after the label (0.4.1; was 8)
       expect(Math.abs(g.start)).toBeLessThan(1) // the label at the group's start…
       // …the meta at its end: the row's end, or past it where the label line widens the group
       if (!g.widened) expect(Math.abs(g.end)).toBeLessThan(1)

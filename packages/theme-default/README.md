@@ -41,6 +41,13 @@ screen; an inline viewer keeps it. Keep them with `--gallerist-phone-zoom: flex`
 shows − and + only). A bar whose only tools are these two (and `controls: false`) still shows on a
 phone, empty: leave the plugins out there, or keep the tools with the tokens.
 
+The bar's tools are `--gallerist-tool-size` (44px) with `--gallerist-tool-icon` glyphs (22px;
+Close's `--gallerist-close-icon`). With a fine pointer (a mouse or trackpad) the Console skin's bar is
+compact: 36px tools, 18px glyphs (Close 20px), and plugin-zoom's "− 100% +" one bordered group 30px
+tall (`--gallerist-zoom-group: 1`; 0, the default, keeps three loose tools). A touch keeps 44px
+targets; Gallery and Editorial keep 44px tools. `--gallerist-close-rule` makes room before Close with a
+1 × 20 hairline in it (Console 9px; 0, the default, none).
+
 The theme follows `forced-colors: active` (Windows High Contrast): the View popover's chosen segment
 takes the system's selection colours and the focus rings the text colour. The rail's
 item clusters (`thumbnails({ cluster })`) use `--gallerist-cluster-inner` (2px) inside a cluster and

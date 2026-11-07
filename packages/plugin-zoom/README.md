@@ -69,6 +69,9 @@ its keys is announced in the viewer's live region (`150%`); a pinch or a wheel o
 ## Look
 
 The buttons are bar tools like the others, so they take each skin's tool style, in both schemes.
+With a fine pointer the Console skin draws them as one group in a hairline border, 30px tall, the
+percentage between two hairlines (`--gallerist-zoom-group: 1`); a touch, Gallery and Editorial keep
+three loose 44px tools.
 Right to left the group mirrors with the bar (− stays at the inline start, now on the right). The
 percentage uses tabular figures and keeps one width, so the bar doesn't shift as it changes. On a phone (600px wide or less) the bar
 leaves the tool out (a pinch zooms there, and a double tap fits); a page that keeps it
