@@ -856,6 +856,65 @@ describe('mount — load lifecycle', () => {
     expect(v.getState().loaded.a0).toBe('loaded')
     expect(loaded).toHaveBeenCalledTimes(1)
   })
+
+  it('a Retry that had focus and fails again gives the new Retry the focus back', async () => {
+    const v = createViewer({
+      collection: {
+        groups: [{ id: 'g', items: [{ ...item('a0'), placeholder: 'a0-thumb.jpg' }] }],
+      },
+    })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const fail = async () => {
+      root.querySelector('.gallerist-media-image')?.dispatchEvent(new Event('error'))
+      await flush()
+      return root.querySelector<HTMLButtonElement>('.gallerist-media-pill button')
+    }
+    const first = await fail()
+    first?.focus()
+    first?.click()
+    expect(document.activeElement).toBe(root)
+    const second = await fail()
+    expect(second).not.toBe(first)
+    expect(document.activeElement).toBe(second)
+    // and again, for as long as it fails
+    second?.click()
+    const third = await fail()
+    expect(document.activeElement).toBe(third)
+  })
+
+  it("a Retry's second failure doesn't take focus the user moved, nor focus it never had", async () => {
+    const v = createViewer({
+      collection: {
+        groups: [{ id: 'g', items: [{ ...item('a0'), placeholder: 'a0-thumb.jpg' }] }],
+      },
+    })
+    mount(v)
+    v.open()
+    const root = document.querySelector('.gallerist') as HTMLElement
+    const fail = async () => {
+      root.querySelector('.gallerist-media-image')?.dispatchEvent(new Event('error'))
+      await flush()
+      return root.querySelector<HTMLButtonElement>('.gallerist-media-pill button')
+    }
+    const first = await fail()
+    first?.focus()
+    first?.click()
+    const close = root.querySelector<HTMLButtonElement>('.gallerist-close')
+    expect(close).not.toBeNull()
+    close?.focus() // the user moved on
+    await fail()
+    expect(document.activeElement).toBe(close)
+    // a Retry clicked without focus on it (a pointer that doesn't focus buttons)
+    root.focus()
+    const unfocused = root.querySelector<HTMLButtonElement>('.gallerist-media-pill button')
+    close?.focus()
+    unfocused?.click()
+    root.focus()
+    await fail()
+    expect(document.activeElement).toBe(root)
+  })
 })
 
 describe('mount — overlays option', () => {
@@ -2062,6 +2121,10 @@ describe('mount — modal accessibility (WS-3)', () => {
         '<div role="slider" tabindex="0"></div>',
         '<div role="dialog"><a href="#x" tabindex="0">a link in a dialog</a></div>',
         '<button aria-haspopup="dialog">menu button</button>',
+        // a host's widgets with arrow keys of their own
+        ...['listbox', 'tablist', 'radiogroup', 'menubar', 'tree', 'grid', 'treegrid'].map(
+          (role) => `<div role="${role}"><div tabindex="0">in a ${role}</div></div>`,
+        ),
       ]) {
         const host = root.appendChild(document.createElement('div'))
         host.innerHTML = html
@@ -2070,10 +2133,51 @@ describe('mount — modal accessibility (WS-3)', () => {
         at.dispatchEvent(key({ key: 'n', cancelable: true }))
       }
       expect(take).not.toHaveBeenCalled()
-      expect(letter).toHaveBeenCalledTimes(5)
+      expect(letter).toHaveBeenCalledTimes(12)
       // the overlay root is a dialog itself, and a rail thumb in it is no widget of that kind
       root.dispatchEvent(key({ key: 'ArrowDown', cancelable: true }))
       expect(take).toHaveBeenCalledTimes(1)
+      // nor is a button that says it opens no popup, nor the viewer's own listbox (a rail's)
+      for (const html of [
+        '<button aria-haspopup="false">no popup</button>',
+        '<div role="listbox" class="gallerist-thumbs"><div role="option" tabindex="0"></div></div>',
+      ]) {
+        const host = root.appendChild(document.createElement('div'))
+        host.innerHTML = html
+        ;(host.querySelector('button, [tabindex]') as HTMLElement).dispatchEvent(
+          key({ key: 'ArrowDown', cancelable: true }),
+        )
+      }
+      expect(take).toHaveBeenCalledTimes(3)
+    })
+
+    it('a handler that throws is reported and the renderer still handles the key', () => {
+      const boom = new Error('plugin key')
+      const report = vi.fn()
+      vi.stubGlobal('reportError', report)
+      try {
+        const v = createViewer({
+          collection: collection(),
+          plugins: [
+            () => ({
+              name: 'keys',
+              keymap: {
+                Escape: () => {
+                  throw boom
+                },
+              },
+            }),
+          ],
+        })
+        mount(v)
+        v.open()
+        const root = document.querySelector('.gallerist') as HTMLElement
+        root.dispatchEvent(key({ key: 'Escape', cancelable: true }))
+        expect(report).toHaveBeenCalledWith(boom)
+        expect(v.getState().phase).not.toBe('open') // Escape still closed the viewer
+      } finally {
+        vi.unstubAllGlobals()
+      }
     })
 
     it('a focused caption band keeps ↑/↓ for scrolling', () => {

@@ -106,9 +106,10 @@ test.describe('loading: an image placeholder', () => {
       ;(window as unknown as { viewer: { nextItem(): void } }).viewer.nextItem()
       const s = document.querySelector('.gallerist-slide[data-gallerist-current]')
       const p = s?.querySelector('.gallerist-media-pill')
-      return p ? Number(getComputedStyle(p).opacity) : -1
+      // and says nothing yet: opacity alone wouldn't keep a live region quiet
+      return p ? [Number(getComputedStyle(p).opacity), p.textContent] : -1
     })
-    expect(fresh).toBe(0)
+    expect(fresh).toEqual([0, ''])
     const delay = await pill(page).evaluate((p) => p.getAnimations()[0]?.effect?.getTiming().delay)
     expect(delay).toBe(400)
     expect(await settledOpacity(pill(page))).toBe(1)
@@ -245,6 +246,21 @@ test.describe('loading: an image placeholder', () => {
     expect(await page.evaluate(() => document.activeElement?.classList.contains('gallerist'))).toBe(
       true,
     )
+  })
+
+  test('a Retry from the keyboard that fails again puts focus on the new Retry', async ({
+    page,
+  }) => {
+    await serve(page, 'fail')
+    await open(page, '/loading.html')
+    const retry = pill(page).getByRole('button', { name: 'Retry' })
+    await expect(retry).toBeVisible()
+    await retry.focus()
+    await page.keyboard.press('Enter')
+    await expect(retry).toBeFocused() // the new one: the old went with its media
+    await page.keyboard.press('Enter')
+    await expect(retry).toBeFocused()
+    await expect(pill(page).getByRole('status')).toHaveText('Couldn’t load full size')
   })
 
   test('the zoom tool waits for the image', async ({ page }) => {

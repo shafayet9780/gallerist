@@ -40,12 +40,16 @@ in the browser's cache, so it paints in the same frame as the step, with no flas
   to the image's box; the image fades in over it (`--gallerist-dur-reveal`, 150ms) as the blur
   clears. A load still running after `--gallerist-loading-delay` (400ms) shows a pill in the box's
   bottom end corner: "Loading full size…" (`strings.loadingFull`), a polite `role="status"` line
-  that says nothing on a fast load. A failed load keeps the placeholder, sharp, and the pill says
-  "Couldn't load full size" (`strings.loadFailed`) with a Retry button (`strings.retry`) that loads
-  the item afresh (focus on it goes to the viewer).
-- **A colour** (`#2a3340`, `rgb(…)`) fills the box. A failure shows the error card.
+  that stays empty until that delay (read from the token), so a fast load says nothing. A failed
+  load keeps the placeholder, sharp, and the pill says "Couldn't load full size"
+  (`strings.loadFailed`) with a Retry button (`strings.retry`) that loads the item afresh (focus on
+  it goes to the viewer; if the load fails again and focus is still there, the new Retry takes it).
+- **A colour** (`#2a3340`, `red`, `rgb(…)`: a value that reads as one and that the browser parses
+  as a colour, `CSS.supports('color', …)`; a bare word that isn't one, `thumb`, is a URL) fills the
+  box, with no pill. A failure shows the error card.
 - **None:** a skeleton fills the box after 300ms, with a shimmer (`--gallerist-placeholder`,
-  `--gallerist-shimmer`). A failure shows the error card.
+  `--gallerist-shimmer`), gone the moment the image is in (it fades in over the stage). A failure
+  shows the error card.
 
 With reduced motion the placeholder isn't blurred, the skeleton and the spinner hold still, and the
 image still fades in. Zoom acts on the content layer, so a wheel, pinch or double tap before the
@@ -69,9 +73,13 @@ it; one that doesn't leaves the viewer's own key, if it has one, to run after. p
 Alt (AltGr is fine: `?` on some layouts), a key taken already, or one from a text field (Escape there
 is the viewer's alone); nor for an arrow key from a widget in the viewer that has arrow keys of its
 own: inside a dialog, a menu or a slider (`role="dialog"`, `"menu"`, `"slider"`; the overlay's root
-doesn't count), or on a menu button (`aria-haspopup`). A focused caption band that scrolls keeps
-↑/↓/Home/End for scrolling before anyone is asked. So a host no longer needs a capture-phase listener
-to take an arrow key.
+doesn't count), a host's listbox, tab list, radio group, menu bar, tree or grid (`role="listbox"`,
+`"tablist"`, `"radiogroup"`, `"menubar"`, `"tree"`, `"grid"`, `"treegrid"`; not the viewer's own
+rail or grid, whose arrows are the viewer's), or on a menu button (`aria-haspopup`, not `"false"`).
+A focused caption band that scrolls keeps ↑/↓/Home/End for scrolling before anyone is asked. So a
+host no longer needs a capture-phase listener to take an arrow key. A keymap handler that throws
+doesn't stop the viewer's own key (Escape still closes); its error is reported (`reportError`, else
+`console.error`).
 
 ## Markup init
 

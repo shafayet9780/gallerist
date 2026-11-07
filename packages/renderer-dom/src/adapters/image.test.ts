@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { AdapterCtx, Item } from '@gallerist/core'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_STRINGS } from '../strings'
 import { imageAdapter } from './image'
 
@@ -76,8 +76,110 @@ describe('imageAdapter', () => {
     expect(box?.querySelector('img')?.alt).toBe('') // decorative: the image's alt names it
     expect(m.element.style.backgroundImage).toBe('') // nothing painted on the hidden <img>
     const status = box?.querySelector('.gallerist-media-pill [role="status"]')
-    expect(status?.textContent).toBe('Loading full size…')
+    expect(status).not.toBeNull()
     expect(box?.querySelector('button')).toBeNull()
+  })
+
+  describe("the pill's status line", () => {
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.restoreAllMocks()
+    })
+    const pill = (s: HTMLElement) => s.querySelector('.gallerist-media-pill [role="status"]')
+
+    it('is empty until the loading delay, then says it once', () => {
+      vi.useFakeTimers()
+      const s = slot()
+      imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+      expect(pill(s)?.textContent).toBe('')
+      vi.advanceTimersByTime(399)
+      expect(pill(s)?.textContent).toBe('')
+      vi.advanceTimersByTime(1)
+      expect(pill(s)?.textContent).toBe('Loading full size…')
+    })
+
+    it('takes the delay from --gallerist-loading-delay', () => {
+      vi.useFakeTimers()
+      const real = window.getComputedStyle
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+        const style = real(el)
+        const get = style.getPropertyValue.bind(style)
+        style.getPropertyValue = (name: string) =>
+          name === '--gallerist-loading-delay' ? ' 1.5s' : get(name)
+        return style
+      })
+      const s = slot()
+      imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+      vi.advanceTimersByTime(1499)
+      expect(pill(s)?.textContent).toBe('')
+      vi.advanceTimersByTime(1)
+      expect(pill(s)?.textContent).toBe('Loading full size…')
+    })
+
+    it('says nothing on a fast load and leaves no timer', async () => {
+      vi.useFakeTimers()
+      const s = slot()
+      const m = imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+      const status = pill(s)
+      m.element.dispatchEvent(new Event('load'))
+      await m.ready
+      expect(vi.getTimerCount()).toBe(0)
+      vi.advanceTimersByTime(1000)
+      expect(status?.textContent).toBe('')
+    })
+
+    it('leaves no timer after destroy or an abort (navigation)', () => {
+      vi.useFakeTimers()
+      const m = imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), slot(), ctx())
+      expect(vi.getTimerCount()).toBe(1)
+      m.destroy()
+      expect(vi.getTimerCount()).toBe(0)
+      const abort = new AbortController()
+      imageAdapter().mount(
+        img({ placeholder: 'a-thumb.jpg' }),
+        slot(),
+        ctx({ signal: abort.signal }),
+      )
+      expect(vi.getTimerCount()).toBe(1)
+      abort.abort()
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('says the failure when it fails, before the delay too', async () => {
+      vi.useFakeTimers()
+      const s = slot()
+      const m = imageAdapter().mount(img({ placeholder: 'a-thumb.jpg' }), s, ctx())
+      m.element.dispatchEvent(new Event('error'))
+      await expect(m.ready).rejects.toThrow()
+      expect(pill(s)?.textContent).toBe('Couldn’t load full size')
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('has no pill (and no timer) for a colour or no placeholder', () => {
+      vi.useFakeTimers()
+      for (const placeholder of ['#123', undefined]) {
+        const s = slot()
+        imageAdapter().mount(img({ placeholder }), s, ctx())
+        expect(s.querySelector('.gallerist-media-pill')).toBeNull()
+      }
+      expect(vi.getTimerCount()).toBe(0)
+    })
+  })
+
+  it('a bare word the browser does not parse as a colour is an image URL', () => {
+    vi.stubGlobal('CSS', { supports: (_p: string, v?: string) => v !== 'thumb' })
+    try {
+      const s = slot()
+      imageAdapter().mount(img({ placeholder: 'thumb' }), s, ctx())
+      expect(s.querySelector('.gallerist-media-placeholder img')?.getAttribute('src')).toBe('thumb')
+      const red = slot()
+      imageAdapter().mount(img({ placeholder: 'red' }), red, ctx())
+      expect(
+        red.querySelector<HTMLElement>('.gallerist-media-placeholder')?.style.backgroundColor,
+      ).toBe('red')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('takes the ratio from the placeholder image when the item has no naturalSize', () => {
@@ -145,13 +247,26 @@ describe('imageAdapter', () => {
       loadFailed: 'Échec',
       retry: 'Réessayer',
     }
+    vi.useFakeTimers()
+    const early = slot()
+    imageAdapter().mount(
+      img({ placeholder: 'a-thumb.jpg' }),
+      early,
+      ctx({
+        strings,
+      } as Partial<AdapterCtx>),
+    )
+    vi.advanceTimersByTime(400)
+    expect(early.querySelector('.gallerist-media-pill [role="status"]')?.textContent).toBe(
+      'Chargement…',
+    )
+    vi.useRealTimers()
     const m = imageAdapter().mount(
       img({ placeholder: 'a-thumb.jpg' }),
       s,
       ctx({ strings } as Partial<AdapterCtx>),
     )
     const status = s.querySelector('.gallerist-media-pill [role="status"]')
-    expect(status?.textContent).toBe('Chargement…')
     m.element.dispatchEvent(new Event('error'))
     await expect(m.ready).rejects.toThrow()
     expect(status?.textContent).toBe('Échec')

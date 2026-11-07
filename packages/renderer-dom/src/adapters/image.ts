@@ -13,8 +13,16 @@ export interface DomAdapterCtx extends AdapterCtx {
   retry?: () => void
 }
 
-// a colour (`#123`, `red`, `rgb(0 0 0 / 50%)`, `oklch(…)`); anything else is an image URL
+// a colour (`#123`, `red`, `rgb(0 0 0 / 50%)`, `oklch(…)`) when it reads as one and the browser
+// parses it as one (a bare `thumb` is a URL); anything else is an image URL
 const COLOR_RE = /^(#[\da-f]{3,8}|[a-z-]+(\(.*\))?)$/i
+const isColor = (v: string) => COLOR_RE.test(v) && CSS.supports('color', v)
+
+/** A CSS time (`400ms`, `0.3s`) in ms; 0 for anything else. */
+export const cssMs = (v: string): number => {
+  const n = Number.parseFloat(v)
+  return Number.isFinite(n) ? (v.trim().endsWith('ms') ? n : n * 1000) : 0
+}
 
 // Static broken-image glyph (lucide "image-off"); safe to inject as markup (no user data).
 const BROKEN_ICON =
@@ -35,7 +43,8 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: DomAdapterCtx): M
 
   // The placeholder, in the box the image will paint in (the theme sizes it from the ratio): an
   // image URL (best the thumb the rail already loaded) blurred until the image is in, a colour as a
-  // flat fill, or nothing: a skeleton. A slow load says so in a pill in the box's corner.
+  // flat fill, or nothing: a skeleton. A slow load says so in a pill in the box's corner (an image
+  // placeholder's only).
   const box = document.createElement('div')
   box.className = 'gallerist-media-placeholder'
   const ratio = (w: number, h: number) => {
@@ -45,7 +54,8 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: DomAdapterCtx): M
   const size = item.naturalSize
   if (size) ratio(size.w, size.h)
   let status: Element | null = null // the pill's live line
-  if (ph && COLOR_RE.test(ph)) box.style.backgroundColor = ph
+  let timer: ReturnType<typeof setTimeout> | undefined
+  if (ph && isColor(ph)) box.style.backgroundColor = ph
   else if (ph) {
     const pv = document.createElement('img')
     pv.alt = ''
@@ -54,17 +64,27 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: DomAdapterCtx): M
     pv.onload = fit
     pv.src = ph
     fit()
-    // shown after a delay (the theme's; it draws the spinner); the live line's text changes once,
-    // on a failure
+    // shown after a delay (the theme's; it draws the spinner). Its live line is empty until then,
+    // so a fast load says nothing (opacity alone doesn't silence it), then says it once, and on a
+    // failure says that.
     const pill = document.createElement('div')
     pill.className = 'gallerist-media-pill'
     status = document.createElement('span')
     status.setAttribute('role', 'status')
-    status.textContent = t.loadingFull
     pill.appendChild(status)
     box.append(pv, pill)
   } else box.setAttribute('data-gallerist-skeleton', '')
   slot.append(box, img)
+  if (status) {
+    const line = status
+    const delay = getComputedStyle(box).getPropertyValue('--gallerist-loading-delay')
+    timer = setTimeout(
+      () => {
+        line.textContent = t.loadingFull
+      },
+      delay ? cssMs(delay) : 400,
+    )
+  }
   const settle = (state: string) => {
     img.setAttribute(state, '')
     box.setAttribute(state, '')
@@ -117,10 +137,10 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: DomAdapterCtx): M
       reject(abortErr())
       return
     }
+    const off = new AbortController()
     const cleanup = () => {
-      img.removeEventListener('load', onLoad)
-      img.removeEventListener('error', onError)
-      ctx.signal.removeEventListener('abort', onAbort)
+      clearTimeout(timer)
+      off.abort()
     }
     const onAbort = () => {
       cleanup()
@@ -142,9 +162,10 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: DomAdapterCtx): M
       showError()
       reject(new Error(`image load error: ${item.id}`))
     }
-    img.addEventListener('load', onLoad)
-    img.addEventListener('error', onError)
-    ctx.signal.addEventListener('abort', onAbort)
+    const on = { signal: off.signal }
+    img.addEventListener('load', onLoad, on)
+    img.addEventListener('error', onError, on)
+    ctx.signal.addEventListener('abort', onAbort, on)
 
     const src = item.source
     if (typeof src === 'string') {
@@ -193,6 +214,7 @@ export function mountImage(item: Item, slot: HTMLElement, ctx: DomAdapterCtx): M
       return img.naturalWidth ? { w: img.naturalWidth, h: img.naturalHeight } : null
     },
     destroy() {
+      clearTimeout(timer)
       img.removeAttribute('src')
       element.remove()
       box.remove()

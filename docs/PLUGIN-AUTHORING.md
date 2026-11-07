@@ -44,10 +44,11 @@ the same times, so a `keymap` getter can drop a key a layout doesn't use and lea
 plugin (a flat rail leaves `e`), or add one it does (a flat rail with `clusterKeys` takes ↑/↓). The
 DOM renderer asks the keymaps before its own keys (arrows, Home/End, `+`/`-`/`0`, `t`, 1–9, Escape):
 a handler that takes a key calls `preventDefault()`, and the renderer then does nothing with it;
-otherwise the renderer's own key runs after. Not asked: a chord (Ctrl, ⌘, Alt; AltGr is fine), a key
+otherwise the renderer's own key runs after (also when the handler throws: its error is reported). Not asked: a chord (Ctrl, ⌘, Alt; AltGr is fine), a key
 a handler before took already, a key from a text field (shadow roots included; Escape there is the
-renderer's alone), an arrow from inside a dialog, menu or slider in the viewer or from a menu button
-(`aria-haspopup`), and ↑/↓/Home/End on a focused caption band that scrolls. Without built-in controls (`controls: false`) the bar shows while the
+renderer's alone), an arrow from inside a dialog, menu or slider in the viewer, a host's listbox,
+tab list, radio group, menu bar, tree or grid (not the viewer's own rail or grid), or from a menu
+button (`aria-haspopup`, not `"false"`), and ↑/↓/Home/End on a focused caption band that scrolls. Without built-in controls (`controls: false`) the bar shows while the
 toolbar holds a tool, but for tools marked `data-gallerist-off`: a tool its plugin keeps hidden for a
 later layout (a flat rail's items toggle, a View menu with nothing to offer) carries that marker
 beside `hidden`, and the plugin calls `viewer.refresh()` when it changes. A tool that only toggles

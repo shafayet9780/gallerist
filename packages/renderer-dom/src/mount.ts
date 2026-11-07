@@ -13,8 +13,13 @@ import type {
   ViewerApi,
   ZoomState,
 } from '@gallerist/core'
-import { clampPanToBox, clampScale, getInternals } from '@gallerist/core/internal'
-import { type DomAdapterCtx, imageAdapter, mountImage } from './adapters/image'
+import {
+  clampPanToBox,
+  clampScale,
+  getInternals,
+  reportHandlerError,
+} from '@gallerist/core/internal'
+import { type DomAdapterCtx, cssMs, imageAdapter, mountImage } from './adapters/image'
 import { type Accent, type ColorScheme, type Skin, applyAppearance } from './appearance'
 import { attachGestures } from './gestures'
 import { ICONS } from './icons'
@@ -188,7 +193,9 @@ function focusableWithin(root: HTMLElement): HTMLElement[] {
   )
 }
 // Widgets with arrow keys of their own: a plugin's arrow keys aren't asked from inside one.
-const WIDGETS = '[role=dialog],[role=menu],[role=slider],[aria-haspopup]'
+// Not the viewer's own listboxes (a rail's, a grid's): their arrows are the viewer's.
+const WIDGETS =
+  '[role=dialog],[role^=menu],[role=slider],[aria-haspopup]:not([aria-haspopup=false]),:is([role=listbox],[role=tablist],[role=radiogroup],[role^=tree],[role=grid]):not([class*=gallerist-])'
 /** True when the key event originates from a control where typing must not be hijacked. */
 function isEditableTarget(target?: EventTarget | null): boolean {
   const node = target as HTMLElement | null
@@ -198,11 +205,6 @@ function isEditableTarget(target?: EventTarget | null): boolean {
 /** Longest animation (delay + duration × iterations) in ms from a computed style's comma lists.
  *  An infinite animation counts one iteration: it never ends, so the timer settles after one. */
 function animationMs(style: CSSStyleDeclaration): number {
-  const ms = (v: string) => {
-    const n = Number.parseFloat(v)
-    if (!Number.isFinite(n)) return 0
-    return v.trim().endsWith('ms') ? n : n * 1000
-  }
   const count = (v: string | undefined) => {
     const n = Number.parseFloat(v ?? '1')
     return Number.isFinite(n) && n > 0 ? n : 1
@@ -213,7 +215,7 @@ function animationMs(style: CSSStyleDeclaration): number {
   const iterations = (style.animationIterationCount || '1').split(',')
   return Math.max(
     0,
-    ...durations.map((d, i) => ms(at(delays, i) ?? '0s') + ms(d) * count(at(iterations, i))),
+    ...durations.map((d, i) => cssMs(at(delays, i) ?? '0s') + cssMs(d) * count(at(iterations, i))),
   )
 }
 
@@ -677,11 +679,19 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
           signal: abort.signal,
           priority: isCurrent ? 'high' : 'low',
           strings: ui,
-          // mount it afresh; focus on the Retry going with the old media lands on the root
+          // mount it afresh; focus on the Retry going with the old media lands on the root, and
+          // comes back to the new Retry if it fails again (unless the user moved it on meanwhile)
           retry: () => {
-            if (rec.content.contains(document.activeElement)) root.focus({ preventScroll: true })
+            const had = rec.content.contains(document.activeElement)
+            if (had) root.focus({ preventScroll: true })
             rec.itemId = ''
             renderWindow()
+            if (had)
+              rec.media?.ready?.catch(() => {
+                const at = document.activeElement
+                if (at === root || at === document.body)
+                  rec.content.querySelector<HTMLElement>('.gallerist-media-pill button')?.focus()
+              })
           },
         }
         rec.media = pickAdapter(it.type, it)?.mount(it, rec.content, ctx)
@@ -1182,7 +1192,14 @@ export function mount(viewer: ViewerApi, opts: MountOptions = {}): RendererHandl
     // own (a dialog, menu, slider or menu button: the overlay root, a dialog, doesn't
     // count); ours still run there, as before.
     const own = /^Arrow/.test(e.key) && at.closest?.(WIDGETS)
-    if (!chord && !field && (!own || own.contains(root))) pluginKeymap[e.key]?.(e)
+    // A handler that throws can't cancel ours (Escape still closes): its error is reported, as the
+    // core's emitter reports a listener's.
+    if (!chord && !field && (!own || own.contains(root)))
+      try {
+        pluginKeymap[e.key]?.(e)
+      } catch (err) {
+        reportHandlerError(err)
+      }
     if (e.defaultPrevented) return
     switch (e.key) {
       case 'ArrowRight':
