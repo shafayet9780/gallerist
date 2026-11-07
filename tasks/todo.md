@@ -174,6 +174,7 @@
 - [ ] Real-device pass before 0.5: iOS Safari and Android Chrome pinch/scroll on pin cards, Safari trackpad pinch (`gesture*` events) over the stage
 - [ ] **M22** Atlas: renderer `peek`, `plugin-atlas` (skyline minimap, map mode), first-run hint
 - [ ] **M23** Review plugins: triage, compare, then slideshow, rotate, share, info, timeline, filter, redaction
+- [ ] 0.5.x nits from the 0.5 re-review: `cssMs` (renderer-dom `adapters/image.ts`) reads `400MS` as seconds and `calc(200ms)` as 0 (CSS times are case-insensitive; calc should resolve or fall back to the pill's own delay); the status timer isn't cleaned up when the signal is already aborted at load start (direct `imageAdapter` callers only), and can say "Loading…" briefly if it fires during `decode()`. Budgets sit at the measured sizes (no headroom): core+renderer 17.11 kB, +thumbnails 26.13 kB, base.css 10.42 kB, shortcuts 2.86 kB
 - [ ] Vue adapter; release 0.5
 
 ## Later
