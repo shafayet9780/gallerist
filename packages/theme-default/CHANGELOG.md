@@ -1,5 +1,102 @@
 # @gallerist/theme-default
 
+## 0.5.0
+
+### Minor Changes
+
+- 1490006: **renderer-dom (changed):** an item's `placeholder` now shows. It is drawn at once in the box the
+  image will paint in (from `naturalSize`, else the placeholder image's own shape, else
+  `--gallerist-media-ratio`): an image URL or data URI blurred and clipped to that box, a colour as a
+  flat fill. The image fades in over it and the blur clears. A load still running after 400ms shows a
+  quiet pill in the box's bottom end corner, "Loading full size…" (a polite `role="status"` line, empty
+  until that delay, so a fast load neither shows nor says it). A failed load keeps the image placeholder, sharp, and the pill says
+  "Couldn't load full size" with a Retry button that loads the item afresh (focus on it goes to the
+  viewer, and back to the new Retry if the load fails again while focus is still there). A colour
+  placeholder gets no pill. With no placeholder, a skeleton fills the box after 300ms, gone at once
+  when the image is in (a failure still shows the error card). New strings:
+  `loadingFull`, `loadFailed`, `retry`. Adapters get `strings` and `retry()` in their context
+  (`DomAdapterCtx`). Pass the thumbnail URL the page already loaded as `placeholder`: it is cached, so
+  moving between items never flashes an empty stage. With reduced motion the placeholder isn't
+  blurred, nothing shimmers or spins, and the image still fades in (it no longer cuts in).
+
+  **theme-default (new):** `--gallerist-placeholder-blur` (6px), `--gallerist-dur-reveal` (150ms, the
+  image's fade-in; was 180ms), `--gallerist-media-ratio` (`3 / 2`), `--gallerist-loading-delay` (400ms).
+  The Console and Gallery dark skeleton shimmer is brighter (`--gallerist-shimmer` 9% / 8%, was 5% /
+  6%). `.gallerist-content` is a size container (`container-type: size`).
+
+  **core (docs):** `Item.placeholder` documents what it takes and how it shows.
+
+  Upgrading: a `placeholder` that never showed (it was painted on the image while the image was still
+  hidden) now shows while the image loads: an image placeholder blurred in the image's box, a colour
+  filling that box. Check that it is the same picture as the image (a thumbnail of it), or drop it.
+  The full-stage shimmer that started 600ms into a slow load is gone: the skeleton, the placeholder
+  and the pill take its place. A string placeholder is a colour when it reads as one (`#…`, a name,
+  `rgb(…)` and other functions) and the browser parses it as one (`CSS.supports('color', …)`),
+  otherwise an image URL (a bare `thumb.jpg` or `thumb` is now a URL; `rgb(0 0 0 / 50%)` is now a
+  colour). `Strings` has three new required members, `loadingFull`, `loadFailed` and `retry`:
+  `mount(viewer, { strings })` takes a partial set and fills them in, but code that builds a whole
+  `Strings` object itself (a typed translation table) must add them.
+
+- 1b121a3: **theme-default (new):** five tokens for the rail's current and focused states, each defaulting to
+  today's look. `--gallerist-label-current` (the accent) and `--gallerist-label-current-weight` (500)
+  style the current group's label on a flat rail and the current time label on a timeline (its tick
+  too), so a page whose accent means something else (a Save button) can keep the label neutral.
+  `--gallerist-thumb-focus-style` (`solid`) is a focused thumb's outline style: `dashed` tells keyboard
+  focus apart from a solid selection ring. `--gallerist-thumb-focus-offset-current` (2px) moves the
+  focus ring further out on the current thumb, whose ring sits outside it.
+  `--gallerist-thumb-focus-opacity` (1) is the opacity of a focused thumb that isn't current: today it
+  brightens as on hover; `var(--gallerist-thumb-idle-opacity)` keeps it dimmed, so the bright thumb is
+  always the current one (hover still brightens). A screenshot reviewer's
+  neutral selection, in a page's CSS:
+
+  ```css
+  .gallerist {
+    --gallerist-selection: #f5f6f7;
+    --gallerist-thumb-active-border: var(
+      --gallerist-rail-bg
+    ); /* the 2px dark gap */
+    --gallerist-item-ring: 0 0 0 2px var(--gallerist-selection);
+    --gallerist-label-current: #f5f6f7;
+    --gallerist-label-current-weight: 600;
+    --gallerist-focus: #f5f6f7;
+    --gallerist-thumb-focus-style: dashed;
+    --gallerist-thumb-focus-offset-current: 6px;
+    --gallerist-thumb-focus-opacity: var(--gallerist-thumb-idle-opacity);
+  }
+  ```
+
+- 39a85f6: **plugin-thumbnails (changed):** wherever the current card and the cards either side of it can't all
+  show, the rail shows the current card and the next one the way the cursor goes whole, centred
+  together, wherever those two fit, whatever lies behind. 0.4.1 did so only where more lay between the
+  current card and the one ahead than behind it, and otherwise centred the current card, which cut the
+  next one off: on a 390px phone, stepping into a one-screen timeframe whose label line is wider than
+  its card (44–48px cut in the e2e fixture), or between evenly spaced cards too wide for three. Where the
+  two don't fit either, the current card is still centred; where the three fit, nothing changes.
+
+  **theme-default (changed):** on a phone (`(max-width: 600px) and (pointer: coarse)`, where the rail's
+  ‹ › page buttons never show) `--gallerist-rail-fade` is 16px (was 40px), and so is the rail's
+  `scroll-padding`. The current card, kept clear of the fade, now leaves room for the card ahead past a
+  marker or a wide label (0.4.1 left it cut by what the 40px fade took: 6px in the e2e fixture, 16px in
+  Apploye's). A desktop, and a narrow window with a mouse, keep 40px.
+
+  Upgrading: a page that relied on 0.4.1's centring between evenly spaced cards (a narrow index-chip
+  rail) sees the current card and the next one centred together instead. A page that wants 0.4.1's
+  phone fade sets `--gallerist-rail-fade: 40px` on `.gallerist` (a page's tokens win over the theme's).
+
+- 69193d3: **theme-default (new):** `--gallerist-thumb-badge-inset-block` places an item thumb's badge
+  (plugin-thumbnails `renderItemBadge`): its `inset-block` from the thumb's image, `3px auto` (the top
+  end corner, as before). `.gallerist { --gallerist-thumb-badge-inset-block: auto 3px; }` puts it in the
+  image's bottom end corner, for a screenshot reviewer whose thumbs' tops hold the window titles. It is
+  measured from the image, not the thumb, so a caption band under the image stays clear, in every skin,
+  right to left, on flat and stacked rails, in the peek and on a phone. Nothing else sits in that corner.
+
+  **plugin-thumbnails (docs):** `renderItemBadge` documents the token.
+
+  Upgrading: an item thumb (`.gallerist-thumb-item`) is a one-column grid (was a flex column), so the
+  badge can be placed in its image's row; its image and caption band lay out as before. A page that
+  styled an item thumb's children as flex items (`order`, `flex-grow`) sets `display: flex;
+flex-direction: column` on `.gallerist-thumb-item` to keep them.
+
 ## 0.4.1
 
 ### Patch Changes
