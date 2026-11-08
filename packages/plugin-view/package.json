@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-view",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Gallerist plugin — a View menu in the toolbar: switch the thumbnails rail layout (stacked or row) and the colour scheme (dark or light) on an open viewer.",
   "license": "MIT",
   "type": "module",
