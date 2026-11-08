@@ -2,9 +2,9 @@
 
 ## v0.5.1
 
-A patch release: every package goes from 0.5.0 to 0.5.1 (one fixed version group). One fix from the
+A patch release: every package goes from 0.5.0 to 0.5.1 (one fixed version group). Two fixes from the
 Apploye reviewer's check of its viewer on 0.5.0: the blurred loading placeholder on a page with a CSS
-reset. Peer ranges stay `>=0.3.0 <1`.
+reset, and a zoom navigator frame that a neutral accent all but hid. Peer ranges stay `>=0.3.0 <1`.
 
 ### Fixes
 - **theme-default**: on a page with a CSS reset such as Tailwind's preflight, the blurred placeholder
@@ -14,6 +14,11 @@ reset. Peer ranges stay `>=0.3.0 <1`.
   along the box's end and bottom edges. It now sets `max-width: none; max-height: none`. The viewer's
   other media (the stage image and video, rail and peek thumbs, grid cells, pins, the error icon and
   the toolbar icons) already kept their size under such a reset.
+- **theme-default**: the zoom navigator's frame takes a new token, `--gallerist-navigator-border`
+  (unset: the accent, so nothing changes by default). A host whose accent is neutral (Apploye's
+  near-black on the light scheme) had a frame of about 1.1:1 over a dark screenshot's dimmed
+  surround; set a light one there, such as `#fff` (3.35:1 or more over any image). The skins' own
+  accents keep about 3:1, so no scheme changes its default.
 
 ### Sizes
 Unchanged: base.css 10.42 kB of 10.42 kB.

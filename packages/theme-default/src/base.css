@@ -281,6 +281,7 @@
   inset: 0;
   transform-origin: 0 0;
   will-change: transform;
+  container-type: size; /* the placeholder's box is sized in its cq units */
 }
 
 /* ── overlays (spec §9) ────────────────────────────────────────────────────── */
@@ -343,9 +344,6 @@
 /* `item.placeholder` in the image's box (ratio: naturalSize, the placeholder's, or the token). An
    image one is blurred, overscanned 2× the blur and clipped (no fringe), sharp as the image fades in,
    then hidden; a failure keeps it, sharp. None: a skeleton after 300ms, gone when the image is in. */
-.gallerist-content {
-  container-type: size;
-}
 .gallerist-media-placeholder {
   --_i: 0px;
   position: absolute;
@@ -2108,7 +2106,8 @@
 .gallerist-navigator-view {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px solid var(--gallerist-accent);
+  /* --gallerist-navigator-border (unset: the accent); a host with a neutral accent sets a light one */
+  border: 1.5px solid var(--gallerist-navigator-border, var(--gallerist-accent));
   box-shadow: 0 0 0 999px rgb(0 0 0 / 0.45);
   pointer-events: none;
 }
@@ -2539,21 +2538,17 @@
   height: 22px;
 }
 /* chevron points the way the rail will travel: left rail hides leftward, shows rightward. */
-.gallerist[data-gallerist-rail-pos="left"] .gallerist-rail-toggle .gallerist-icon {
-  transform: rotate(90deg);
-}
-.gallerist[data-gallerist-rail-pos="left"]
-  .gallerist-rail-toggle[aria-pressed="true"]
-  .gallerist-icon {
-  transform: rotate(-90deg);
-}
-.gallerist[data-gallerist-rail-pos="right"] .gallerist-rail-toggle .gallerist-icon {
-  transform: rotate(-90deg);
-}
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-rail-toggle .gallerist-icon,
 .gallerist[data-gallerist-rail-pos="right"]
   .gallerist-rail-toggle[aria-pressed="true"]
   .gallerist-icon {
   transform: rotate(90deg);
+}
+.gallerist[data-gallerist-rail-pos="left"]
+  .gallerist-rail-toggle[aria-pressed="true"]
+  .gallerist-icon,
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-rail-toggle .gallerist-icon {
+  transform: rotate(-90deg);
 }
 /* a peek flyout opens toward the stage (away from a side rail), top-aligned */
 .gallerist[data-gallerist-rail-pos="left"] .gallerist-thumb-peek {
@@ -2812,19 +2807,18 @@
   .gallerist-title {
     font-size: 13px;
   }
+}
+/* a phone, or a short viewer (a phone turned sideways): compact caption type */
+@media (max-width: 600px), (max-height: 500px) {
   .gallerist-caption {
     padding: 6px 12px;
     font-size: 13px;
   }
 }
-/* a short viewer (a phone turned sideways): compact caption type, and a bottom rail's handle sits
-   beside the strip instead of on top of it, so the stage keeps its share of the height. The rail keeps
-   its full height: a tall caption band scrolls rather than squeezing the strip off the screen. */
+/* a short viewer: a bottom rail's handle sits beside the strip instead of on top of it, so the stage
+   keeps its share of the height. The rail keeps its full height: a tall caption band scrolls rather
+   than squeezing the strip off the screen. */
 @media (max-height: 500px) {
-  .gallerist-caption {
-    padding: 6px 12px;
-    font-size: 13px;
-  }
   .gallerist[data-gallerist-orientation="horizontal"] .gallerist-region-thumbnails {
     flex-direction: row;
     min-height: auto;

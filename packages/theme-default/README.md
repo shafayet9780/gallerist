@@ -66,6 +66,14 @@ text tokens; no warning colours). With no placeholder the box is a skeleton afte
 `--gallerist-placeholder` with a `--gallerist-shimmer` sweep, gone at once when the image is in. No
 loading animation outlives the load. See the renderer's README.
 
+The zoom navigator (`@gallerist/plugin-zoom`) frames the part of the image in view with a 1.5px
+line in `--gallerist-navigator-border` (unset: the accent) over the rest, which is dimmed 45%. A page
+whose accent is neutral (a near-black accent on the light scheme, so "current" carries no hue) should
+set a light one, such as `#fff`: the dimmed surround is at most 55% white, so a white frame keeps
+3.35:1 or more against it over any image, where a near-black one falls to about 1.1:1 over a dark
+screenshot. The skins' own accents keep about 3:1 there (2.5–3.9:1, Editorial's cobalt the lowest),
+so the default stays the accent in both schemes.
+
 The rail's current label (a flat rail's group label, a timeline's time label) is
 `--gallerist-label-current` (the accent) at `--gallerist-label-current-weight` (500). A focused thumb's
 ring is 2px `--gallerist-focus` in `--gallerist-thumb-focus-style` (`solid`; `dashed` tells it apart
