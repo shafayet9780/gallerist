@@ -29,3 +29,9 @@ near-black accent on the light scheme) got a frame that all but vanished over a 
 surround dimmed 45% (about 1.1:1). Set a light one there, such as `#fff`, which keeps 3.35:1 or more
 against the dimmed surround over any image. The skins' own accents keep about 3:1, so no scheme
 changes its default.
+
+Upgrading: a page with a `box-sizing: border-box` reset gets the designed sizes now: the toolbar is
+12px taller (Console 56 → 68px, Editorial 72 → 85px), a side rail and a side index are 24px wider, and
+the stage is smaller by as much. A page that tuned `--gallerist-toolbar-h`, `--gallerist-rail-w` or
+its own layout to make up for the smaller chrome should check those values. Without such a reset,
+nothing changes.

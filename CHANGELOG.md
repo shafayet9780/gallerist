@@ -7,6 +7,14 @@ the Apploye reviewer's check of its viewer on 0.5.0: on a page with a CSS reset,
 placeholder and the chrome's sizes; and a zoom navigator frame that a neutral accent all but hid. Peer
 ranges stay `>=0.3.0 <1`.
 
+### Upgrading: what looks different
+- **theme-default**: a page with a `box-sizing: border-box` reset (Tailwind's preflight) has had the
+  chrome smaller than designed, and now gets the designed sizes: the toolbar grows by 12px (Console
+  56 → 68px, Editorial 72 → 85px with its border), a side rail and a side index grow 24px wider, and
+  the stage shrinks by as much. A page that tuned `--gallerist-toolbar-h`, `--gallerist-rail-w` or
+  its own layout to make up for the smaller chrome should look at those values again. A page without
+  such a reset sees no change.
+
 ### Fixes
 - **theme-default**: on a page with a CSS reset such as Tailwind's preflight, the blurred placeholder
   fills the image's box while the image loads. The reset's `img { max-width: 100% }` capped the

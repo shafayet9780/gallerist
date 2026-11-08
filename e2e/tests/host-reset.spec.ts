@@ -205,7 +205,11 @@ const scenes: Record<string, (skin: string) => Scene> = {
   'the loading pill': (skin) => ({
     url: `/loading.html?skin=${skin}&hold=1`,
     sels: [...BAR, '.gallerist-media-pill', '.gallerist-thumb'],
-    act: (page) => expect(page.locator(`${current} .gallerist-media-pill`)).toBeVisible(),
+    // its status text arrives after --gallerist-loading-delay and widens it: measure once it has
+    act: async (page) => {
+      await expect(page.locator(`${current} .gallerist-media-pill`)).toBeVisible()
+      await expect(page.locator(`${current} .gallerist-media-pill [role=status]`)).not.toBeEmpty()
+    },
   }),
   Retry: (skin) => ({
     url: `/loading.html?skin=${skin}`,
