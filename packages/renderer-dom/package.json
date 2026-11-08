@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/renderer-dom",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Default DOM renderer for Gallerist — the only ring that touches the DOM.",
   "license": "MIT",
   "type": "module",
