@@ -368,6 +368,9 @@
   filter: blur(var(--gallerist-placeholder-blur));
   transition: var(--gallerist-dur-reveal) var(--gallerist-ease-out);
   transition-property: filter, inset, width, height;
+  /* a host reset's `img { max-width: 100% }` would cut the overscan short on the end and bottom */
+  max-width: none;
+  max-height: none;
 }
 .gallerist-media-placeholder:is([data-gallerist-loaded], [data-gallerist-error]) > img {
   --_o: 0px;

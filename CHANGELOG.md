@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.5.1
+
+A patch release: every package goes from 0.5.0 to 0.5.1 (one fixed version group). One fix from the
+Apploye reviewer's check of its viewer on 0.5.0: the blurred loading placeholder on a page with a CSS
+reset. Peer ranges stay `>=0.3.0 <1`.
+
+### Fixes
+- **theme-default**: on a page with a CSS reset such as Tailwind's preflight, the blurred placeholder
+  fills the image's box while the image loads. The reset's `img { max-width: 100% }` capped the
+  placeholder image, which is drawn 2 × `--gallerist-placeholder-blur` larger than its box on every
+  side so the blur's fringe is clipped, so it sat 12px up and to the left and left a soft 12px strip
+  along the box's end and bottom edges. It now sets `max-width: none; max-height: none`. The viewer's
+  other media (the stage image and video, rail and peek thumbs, grid cells, pins, the error icon and
+  the toolbar icons) already kept their size under such a reset.
+
+### Sizes
+Unchanged: base.css 10.42 kB of 10.42 kB.
+
 ## v0.5.0
 
 A minor release: every package goes from 0.4.1 to 0.5.0 (one fixed version group). Plugins can take
