@@ -8,6 +8,7 @@ import { zoom } from '@gallerist/plugin-zoom'
 import { type ColorScheme, mount } from '@gallerist/renderer-dom'
 import '@gallerist/theme-default/gallerist.css'
 import '@gallerist/theme-default/console.css'
+import '@gallerist/theme-default/editorial.css'
 
 const p = new URLSearchParams(location.search)
 const ph = p.get('ph') ?? 'url'

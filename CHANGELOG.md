@@ -2,9 +2,10 @@
 
 ## v0.5.1
 
-A patch release: every package goes from 0.5.0 to 0.5.1 (one fixed version group). Two fixes from the
-Apploye reviewer's check of its viewer on 0.5.0: the blurred loading placeholder on a page with a CSS
-reset, and a zoom navigator frame that a neutral accent all but hid. Peer ranges stay `>=0.3.0 <1`.
+A patch release: every package goes from 0.5.0 to 0.5.1 (one fixed version group). Three fixes from
+the Apploye reviewer's check of its viewer on 0.5.0: on a page with a CSS reset, the blurred loading
+placeholder and the chrome's sizes; and a zoom navigator frame that a neutral accent all but hid. Peer
+ranges stay `>=0.3.0 <1`.
 
 ### Fixes
 - **theme-default**: on a page with a CSS reset such as Tailwind's preflight, the blurred placeholder
@@ -14,6 +15,12 @@ reset, and a zoom navigator frame that a neutral accent all but hid. Peer ranges
   along the box's end and bottom edges. It now sets `max-width: none; max-height: none`. The viewer's
   other media (the stage image and video, rail and peek thumbs, grid cells, pins, the error icon and
   the toolbar icons) already kept their size under such a reset.
+- **theme-default**: on a page whose reset makes every element `box-sizing: border-box` (Tailwind's
+  preflight), the chrome keeps its size. The toolbar was 12px shorter (13px with a skin's border),
+  so the stage grew; a side index (the tour's cards) and a side rail were 24px narrower; the index
+  and grid section counts lost their padding and the zoom navigator its border. Those five elements
+  now set `box-sizing: content-box` (an unlayered class rule, so it wins over the reset). Measured in
+  all three skins, every element of the viewer is the size it is without a reset.
 - **theme-default**: the zoom navigator's frame takes a new token, `--gallerist-navigator-border`
   (unset: the accent, so nothing changes by default). A host whose accent is neutral (Apploye's
   near-black on the light scheme) had a frame of about 1.1:1 over a dark screenshot's dimmed
@@ -21,7 +28,7 @@ reset, and a zoom navigator frame that a neutral accent all but hid. Peer ranges
   accents keep about 3:1, so no scheme changes its default.
 
 ### Sizes
-Unchanged: base.css 10.42 kB of 10.42 kB.
+Unchanged: base.css 10.42 kB of 10.42 kB (a few rules merged or shortened to shorthands make room).
 
 ## v0.5.0
 
