@@ -263,6 +263,36 @@ test('with the tool hidden, the renderer’s reset shows while zoomed', async ({
   await expect(page.locator('.gallerist-zoom-reset')).toBeVisible()
 })
 
+// The navigator's frame: --gallerist-navigator-border, the accent unless a page sets it. A host whose
+// accent is neutral (near-black on the light scheme) sets a light one, or the frame all but vanishes
+// on the dimmed surround of a dark screenshot.
+const frame = (page: Page) =>
+  page.locator('.gallerist-navigator-view').evaluate((v) => {
+    const probe = document.createElement('i')
+    probe.style.color = 'var(--gallerist-accent)'
+    v.closest('.gallerist')?.append(probe)
+    const accent = getComputedStyle(probe).color
+    probe.remove()
+    const cs = getComputedStyle(v)
+    return { color: cs.borderTopColor, width: cs.borderTopWidth, style: cs.borderTopStyle, accent }
+  })
+for (const look of ['skin=gallery', 'skin=console&scheme=light', 'skin=editorial'])
+  test(`the navigator frame is the accent unless --gallerist-navigator-border is set (${look})`, async ({
+    page,
+  }) => {
+    await open(page, `/layout.html?preset=reviewer&${look}&zoom-tool=1&zoom=2`)
+    await expect(page.locator('.gallerist-navigator')).toBeVisible()
+    const before = await frame(page)
+    expect(before.color).toBe(before.accent)
+    await page.addStyleTag({
+      content: '.gallerist { --gallerist-accent: #16181b; --gallerist-navigator-border: #fff }',
+    })
+    const after = await frame(page)
+    expect(after.accent).toBe('rgb(22, 24, 27)') // the page's accent applies (or this proves nothing)
+    expect(after.color).toBe('rgb(255, 255, 255)')
+    expect([after.width, after.style]).toEqual([before.width, 'solid'])
+  })
+
 test.describe('on a phone, zoomed', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
 

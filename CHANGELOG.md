@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.5.1
+
+A patch release: every package goes from 0.5.0 to 0.5.1 (one fixed version group). Three fixes from
+the Apploye reviewer's check of its viewer on 0.5.0: on a page with a CSS reset, the blurred loading
+placeholder and the chrome's sizes; and a zoom navigator frame that a neutral accent all but hid. Peer
+ranges stay `>=0.3.0 <1`.
+
+### Upgrading: what looks different
+- **theme-default**: a page with a `box-sizing: border-box` reset (Tailwind's preflight) has had the
+  chrome smaller than designed, and now gets the designed sizes: the toolbar grows by 12px (Console
+  56 → 68px, Editorial 72 → 85px with its border), a side rail and a side index grow 24px wider, and
+  the stage shrinks by as much. A page that tuned `--gallerist-toolbar-h`, `--gallerist-rail-w` or
+  its own layout to make up for the smaller chrome should look at those values again. A page without
+  such a reset sees no change.
+
+### Fixes
+- **theme-default**: on a page with a CSS reset such as Tailwind's preflight, the blurred placeholder
+  fills the image's box while the image loads. The reset's `img { max-width: 100% }` capped the
+  placeholder image, which is drawn 2 × `--gallerist-placeholder-blur` larger than its box on every
+  side so the blur's fringe is clipped, so it sat 12px up and to the left and left a soft 12px strip
+  along the box's end and bottom edges. It now sets `max-width: none; max-height: none`. The viewer's
+  other media (the stage image and video, rail and peek thumbs, grid cells, pins, the error icon and
+  the toolbar icons) already kept their size under such a reset.
+- **theme-default**: on a page whose reset makes every element `box-sizing: border-box` (Tailwind's
+  preflight), the chrome keeps its size. The toolbar was 12px shorter (13px with a skin's border),
+  so the stage grew; a side index (the tour's cards) and a side rail were 24px narrower; the index
+  and grid section counts lost their padding and the zoom navigator its border. Those five elements
+  now set `box-sizing: content-box` (an unlayered class rule, so it wins over the reset). Measured in
+  all three skins, every element of the viewer is the size it is without a reset.
+- **theme-default**: the zoom navigator's frame takes a new token, `--gallerist-navigator-border`
+  (unset: the accent, so nothing changes by default). A host whose accent is neutral (Apploye's
+  near-black on the light scheme) had a frame of about 1.1:1 over a dark screenshot's dimmed
+  surround; set a light one there, such as `#fff` (3.35:1 or more over any image). The skins' own
+  accents keep about 3:1, so no scheme changes its default.
+
+### Sizes
+Unchanged: base.css 10.42 kB of 10.42 kB (a few rules merged or shortened to shorthands make room).
+
 ## v0.5.0
 
 A minor release: every package goes from 0.4.1 to 0.5.0 (one fixed version group). Plugins can take

@@ -281,6 +281,7 @@
   inset: 0;
   transform-origin: 0 0;
   will-change: transform;
+  container-type: size; /* the placeholder's box is sized in its cq units */
 }
 
 /* ── overlays (spec §9) ────────────────────────────────────────────────────── */
@@ -343,9 +344,6 @@
 /* `item.placeholder` in the image's box (ratio: naturalSize, the placeholder's, or the token). An
    image one is blurred, overscanned 2× the blur and clipped (no fringe), sharp as the image fades in,
    then hidden; a failure keeps it, sharp. None: a skeleton after 300ms, gone when the image is in. */
-.gallerist-content {
-  container-type: size;
-}
 .gallerist-media-placeholder {
   --_i: 0px;
   position: absolute;
@@ -368,6 +366,9 @@
   filter: blur(var(--gallerist-placeholder-blur));
   transition: var(--gallerist-dur-reveal) var(--gallerist-ease-out);
   transition-property: filter, inset, width, height;
+  /* a host reset's `img { max-width: 100% }` would cut the overscan short on the end and bottom */
+  max-width: none;
+  max-height: none;
 }
 .gallerist-media-placeholder:is([data-gallerist-loaded], [data-gallerist-error]) > img {
   --_o: 0px;
@@ -633,6 +634,11 @@
    no text or image selection while it's pulled; an end with more beyond it fades */
 .gallerist-thumbs {
   --_fade-to: to right;
+  /* explicit, as on the bar, the navigator and the counts: each is a length plus its padding or
+     border, which a page's `*{box-sizing:border-box}` (Tailwind's preflight) took out of it (0.5.0: a
+     side rail or index 24px narrower, the bar 12px shorter). A class beats that reset, as these rules
+     are unlayered; inside a cascade layer it would lose to the reset whatever the specificity */
+  box-sizing: content-box;
   --_fade-start: 0px;
   --_fade-end: 0px;
   display: flex;
@@ -962,9 +968,6 @@
   height: 1px;
   background: var(--gallerist-hairline);
 }
-.gallerist-thumb-wrap {
-  isolation: isolate; /* keeps the track line behind its own label */
-}
 .gallerist-thumb-wrap[data-active] .gallerist-thumb-time {
   color: var(--gallerist-label-current);
   font-weight: var(--gallerist-label-current-weight);
@@ -1022,6 +1025,7 @@
    opens the peek while the card itself still navigates on first tap. */
 .gallerist-thumb-wrap {
   position: relative;
+  isolation: isolate; /* a timeline keeps the track line behind its own label */
   flex: 0 0 auto;
   display: flex;
   flex-direction: column; /* a label over the card, a host's meta under it (the caret floats) */
@@ -1783,6 +1787,7 @@
 /* ── top bar: counter → title → tools → zoom reset → close ─────────────────────── */
 .gallerist-bar {
   grid-area: bar;
+  box-sizing: content-box; /* the band is --gallerist-toolbar-h plus its padding, whatever the reset */
   position: relative;
   z-index: 3;
   background: var(--gallerist-bar-bg);
@@ -2080,6 +2085,7 @@
    the visible part, everything outside it dimmed */
 .gallerist-navigator {
   position: absolute;
+  box-sizing: content-box; /* the token, plus the border, whatever the page's reset */
   z-index: 4;
   inset-inline-start: 12px;
   inset-block-end: 12px;
@@ -2105,7 +2111,8 @@
 .gallerist-navigator-view {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px solid var(--gallerist-accent);
+  /* --gallerist-navigator-border (unset: the accent); a host with a neutral accent sets a light one */
+  border: 1.5px solid var(--gallerist-navigator-border, var(--gallerist-accent));
   box-shadow: 0 0 0 999px rgb(0 0 0 / 0.45);
   pointer-events: none;
 }
@@ -2417,6 +2424,7 @@
   color: var(--gallerist-fg-muted);
 }
 .gallerist-thumb-row-count {
+  box-sizing: content-box; /* min-width + padding, whatever the page's reset */
   flex: none;
   min-width: 24px;
   padding: 2px 6px;
@@ -2428,8 +2436,7 @@
 }
 /* the active section's items, a wrapping row under its row */
 .gallerist[data-gallerist-orientation] .gallerist-thumb-section > .gallerist-thumb-items {
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-flow: wrap;
   max-height: none;
   overflow: visible;
   padding: 0 0 6px;
@@ -2516,8 +2523,7 @@
   width: var(--gallerist-rail-w);
   flex-direction: column;
   align-items: stretch;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden auto;
 }
 .gallerist[data-gallerist-orientation="vertical"] .gallerist-rail-handle {
   height: auto;
@@ -2536,21 +2542,17 @@
   height: 22px;
 }
 /* chevron points the way the rail will travel: left rail hides leftward, shows rightward. */
-.gallerist[data-gallerist-rail-pos="left"] .gallerist-rail-toggle .gallerist-icon {
-  transform: rotate(90deg);
-}
-.gallerist[data-gallerist-rail-pos="left"]
-  .gallerist-rail-toggle[aria-pressed="true"]
-  .gallerist-icon {
-  transform: rotate(-90deg);
-}
-.gallerist[data-gallerist-rail-pos="right"] .gallerist-rail-toggle .gallerist-icon {
-  transform: rotate(-90deg);
-}
+.gallerist[data-gallerist-rail-pos="left"] .gallerist-rail-toggle .gallerist-icon,
 .gallerist[data-gallerist-rail-pos="right"]
   .gallerist-rail-toggle[aria-pressed="true"]
   .gallerist-icon {
   transform: rotate(90deg);
+}
+.gallerist[data-gallerist-rail-pos="left"]
+  .gallerist-rail-toggle[aria-pressed="true"]
+  .gallerist-icon,
+.gallerist[data-gallerist-rail-pos="right"] .gallerist-rail-toggle .gallerist-icon {
+  transform: rotate(-90deg);
 }
 /* a peek flyout opens toward the stage (away from a side rail), top-aligned */
 .gallerist[data-gallerist-rail-pos="left"] .gallerist-thumb-peek {
@@ -2570,8 +2572,7 @@
    main spans every track; bar, caption and rail keep their own tracks (so they still never
    collide) and stack above it. */
 .gallerist[data-gallerist-preset="immersive"] .gallerist-main {
-  grid-row: 1 / -1;
-  grid-column: 1 / -1;
+  grid-area: 1 / 1 / -1 / -1;
 }
 /* minimal UI: no side stack (the in-stage item navigator covers the item axis) */
 .gallerist[data-gallerist-preset="immersive"] .gallerist-region-aside,
@@ -2809,19 +2810,18 @@
   .gallerist-title {
     font-size: 13px;
   }
+}
+/* a phone, or a short viewer (a phone turned sideways): compact caption type */
+@media (max-width: 600px), (max-height: 500px) {
   .gallerist-caption {
     padding: 6px 12px;
     font-size: 13px;
   }
 }
-/* a short viewer (a phone turned sideways): compact caption type, and a bottom rail's handle sits
-   beside the strip instead of on top of it, so the stage keeps its share of the height. The rail keeps
-   its full height: a tall caption band scrolls rather than squeezing the strip off the screen. */
+/* a short viewer: a bottom rail's handle sits beside the strip instead of on top of it, so the stage
+   keeps its share of the height. The rail keeps its full height: a tall caption band scrolls rather
+   than squeezing the strip off the screen. */
 @media (max-height: 500px) {
-  .gallerist-caption {
-    padding: 6px 12px;
-    font-size: 13px;
-  }
   .gallerist[data-gallerist-orientation="horizontal"] .gallerist-region-thumbnails {
     flex-direction: row;
     min-height: auto;
@@ -2933,8 +2933,7 @@
     width: auto;
     gap: 8px;
     padding: 8px 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: auto hidden;
   }
   .gallerist[data-gallerist-orientation="vertical"]
     .gallerist-thumbs[data-display="index"]
@@ -3034,8 +3033,7 @@
 .gallerist[data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
   > .gallerist-itemnav {
   grid-area: caption;
-  align-self: start;
-  justify-self: end;
+  place-self: start end;
   position: relative;
   z-index: 3;
   inset: auto;
@@ -3045,7 +3043,7 @@
   block-size: var(--gallerist-dock-h);
   margin: 4px 12px;
   border-radius: min(var(--gallerist-itemnav-radius), var(--gallerist-radius)); /* a box, not a pill */
-  flex-flow: row wrap;
+  flex-flow: wrap;
   place-content: center;
   gap: 2px 4px;
   padding: 4px;
@@ -3087,8 +3085,7 @@
       [data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"]
     )[data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
     > .gallerist-itemnav {
-    align-self: end;
-    justify-self: start;
+    place-self: end start;
   }
   .gallerist:where(
       [data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"]
@@ -3104,8 +3101,7 @@
     )
     > .gallerist-itemnav {
     grid-area: aside;
-    align-self: start;
-    justify-self: stretch;
+    place-self: start stretch;
     inline-size: auto;
     min-inline-size: var(--gallerist-dock-w);
     contain: inline-size; /* as wide as the column, which it doesn't widen past its own minimum */
@@ -3131,8 +3127,7 @@
 .gallerist[data-gallerist-preset="immersive"][data-gallerist-arrows="docked"][data-gallerist-axis][data-gallerist-orientation][data-gallerist-rail]
   > .gallerist-itemnav {
   grid-area: main;
-  align-self: end;
-  justify-self: end;
+  place-self: end;
   inline-size: var(--gallerist-dock-w);
   margin: 12px;
 }

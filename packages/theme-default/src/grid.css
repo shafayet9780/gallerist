@@ -105,6 +105,7 @@
 }
 .gallerist-grid-section-count {
   flex: none;
+  box-sizing: content-box; /* min-width + padding, whatever the page's reset */
   min-width: 24px;
   padding: 2px 6px;
   border-radius: 999px;
