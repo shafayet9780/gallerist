@@ -224,6 +224,94 @@ test('stacked down a side rail: a time label keeps to the rail, cut, whole in it
   await expect(label).toHaveAttribute('title', '11:00 – 11:10')
 })
 
+// The track is a leader: it starts a little past a label's text (and the meta at its end) and runs
+// through the rail gap to the next card's tick. 0.5.1 drew it behind the whole label, through the
+// text: a strikethrough on the Light scheme. The reviewer's short times leave a long leader; the
+// note counts' labels run past their cards, so theirs is only the bit in the gap.
+// Where the line is, is read from layout, not from the theme's numbers: only the label's `::after`
+// takes the pointer, so the points along the label's middle that hit the label are the line's. Hit
+// testing takes a point at x as the px from x to x + 1 (Chromium and WebKit alike): it hits a box
+// whose left edge is up to 1px past it. So the scan runs left to right on the page, a step at a
+// time, and puts the line's left edge 1px past its first hit and its right edge just past its last
+// (each half a step back from the last point that could be it): to within half a step, whichever way
+// the rail runs.
+for (const [name, url] of [
+  ['ltr', '/hooks.html?display=stacked'],
+  ['rtl', '/hooks.html?display=stacked&dir=rtl'],
+  ['short times', '/layout.html?preset=reviewer&display=stacked&scheme=light'],
+] as const)
+  test(`stacked: the track starts past each label's text and reaches the next tick, ${name}`, async ({
+    page,
+  }) => {
+    await page.goto(url)
+    await viewerSettled(page)
+    await expect(page.locator('.gallerist-thumb-time').first()).toBeVisible()
+    await page.addStyleTag({
+      content: `.gallerist-thumb-time, .gallerist-thumb-time * { pointer-events: none !important }
+        .gallerist-thumb-time::after { pointer-events: auto !important }`,
+    })
+    const STEP = 0.25
+    const { gap, lines } = await page.evaluate((step) => {
+      const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+      const rtl = getComputedStyle(rail).direction === 'rtl'
+      const W = document.documentElement.clientWidth
+      // along the inline axis, from its start
+      const x = (el: Element): [number, number] => {
+        const r = el.getBoundingClientRect()
+        return rtl ? [W - r.right, W - r.left] : [r.left, r.right]
+      }
+      const gap = Number.parseFloat(getComputedStyle(rail).columnGap)
+      const [r0, r1] = x(rail)
+      return {
+        gap,
+        lines: [...rail.querySelectorAll('.gallerist-thumb-time')].flatMap((label) => {
+          const [a, z] = x(label)
+          // the line ends a gap past the label: scan a little further, all inside the rail's clip
+          const far = z + gap + 4
+          if (a < r0 || far > r1) return []
+          const box = label.getBoundingClientRect()
+          const y = box.top + box.height / 2
+          // on the page, left to right: the label's span and the bit past its end
+          const [lo, hi] = rtl ? [W - far, box.right] : [box.left, far]
+          const on: number[] = []
+          for (let p = lo - 2; p <= hi; p += step)
+            if (document.elementsFromPoint(p, y).includes(label)) on.push(p)
+          const left = (on[0] ?? Number.NaN) + 1 - step / 2
+          const right = (on.at(-1) ?? Number.NaN) + step / 2
+          // the next card's tick starts its label (none where a marker comes between)
+          const next = label
+            .closest('.gallerist-thumb-wrap')
+            ?.nextElementSibling?.querySelector(':scope > .gallerist-thumb-time')
+          return [
+            {
+              start: rtl ? W - right : left,
+              end: rtl ? W - left : right,
+              hits: on.length,
+              span: (on.at(-1) ?? Number.NaN) - (on[0] ?? Number.NaN),
+              content: Math.max(...[...label.children].map((c) => x(c)[1])),
+              tick: next ? x(next)[0] : z + gap,
+            },
+          ]
+        }),
+      }
+    }, STEP)
+    expect(lines.length).toBeGreaterThan(4)
+    let long = 0
+    for (const [k, l] of lines.entries()) {
+      const at = `label ${k}`
+      // one unbroken line
+      expect(l.hits, at).toBe(Math.round(l.span / STEP) + 1)
+      // clear of the text (and the meta), by a small gap (3px: into the label's 6px)
+      expect(l.start - l.content, at).toBeGreaterThan(1.5)
+      expect(l.start - l.content, at).toBeLessThan(4.5)
+      // through the rail gap to the next card's tick (its ring covers the end)
+      expect(Math.abs(l.end - l.tick), at).toBeLessThan(0.5)
+      if (l.end - l.start > gap + 4) long++
+    }
+    // the short times' leaders run most of a card
+    if (name === 'short times') expect(long).toBe(lines.length)
+  })
+
 for (const display of ['flat', 'stacked'] as const) {
   test(`monitor badges: in the top end corner, named, clear of the number, ${display}`, async ({
     page,
@@ -838,6 +926,67 @@ test.describe('on a phone', () => {
           expect.soft(cut[t], `${t}: the one ahead cut by`).toBeLessThanOrEqual(1)
       })
     }
+
+  // 0.5.2 (Apploye, once its rail meta lost the activity meter): group widths fractional. A step's
+  // reveal scrolled in whole px to bring the card ahead just inside the rail's edge, and the
+  // re-window after it (dropping the cards far behind) made up a fraction owed from before the
+  // reveal on top of its own rounding: the card ahead ended up past the edge by as much as 1.5px
+  // (here 1.1px stepping forward, 1.25px stepping back; Apploye's step 12 of 24, 1.1px). Each label
+  // line a fractional room, the thumbs a fractional height, at 2x as Apploye's phone checks run.
+  test.describe('at 2x', () => {
+    test.use({ deviceScaleFactor: 2 })
+    for (const [room, h] of [
+      [159.48, 45.13],
+      [152.37, 45.13],
+    ] as const)
+      test(`fractional group widths: the cards that show whole stay inside the rail, ${room}px rooms, ${h}px thumbs`, async ({
+        page,
+      }) => {
+        test.setTimeout(60_000)
+        await page.goto('/hooks.html?rooms=1&display=flat')
+        await page.addStyleTag({
+          content: `.hk-room { inline-size: ${room}px !important } .gallerist { --gallerist-thumb-h: ${h}px !important }`,
+        })
+        await viewerSettled(page)
+        await page.evaluate(() =>
+          (window as unknown as { viewer: { goTo(g: number, i: number): void } }).viewer.goTo(0, 0),
+        )
+        await page.locator('.gallerist').focus()
+        const total = await page.evaluate(() =>
+          (
+            window as unknown as { viewer: { getCollection(): { groups: { items: unknown[] }[] } } }
+          ).viewer
+            .getCollection()
+            .groups.reduce((n, g) => n + g.items.length, 0),
+        )
+        for (const [key, step] of [
+          ['ArrowRight', 1],
+          ['ArrowLeft', -1],
+        ] as const)
+          for (let s = 0; s < total - 1; s++) {
+            await page.keyboard.press(key)
+            const n = await railNow(page, ITEMS)
+            const k = n.cards.findIndex((c) => c.id === n.id)
+            const [behind, cur, ahead] = [n.cards[k - step], n.cards[k] as Span, n.cards[k + step]]
+            const room = n.hi - n.lo
+            // how far past the rail's edge
+            const over = (c: Span) => Math.max(0, n.lo - c.a, c.z - n.hi)
+            const at = `${key} to ${cur.id}`
+            if (!ahead) continue
+            if (!behind || span(behind, cur, ahead) <= room - 1) {
+              for (const c of [behind, cur, ahead])
+                if (c) expect.soft(over(c), `${at}: ${c.id} past the edge`).toBeLessThanOrEqual(1)
+            } else if (span(cur, ahead) <= room - 1) {
+              // as above: the card ahead may run past the far edge by what the current card clear
+              // of the near fade leaves too little room for
+              const short = span(cur, ahead) - (room - (ahead.a > cur.a ? n.fLo : n.fHi))
+              expect
+                .soft(over(ahead), `${at}: ${ahead.id} ahead past the edge`)
+                .toBeLessThanOrEqual(Math.max(0, short) + 1)
+            }
+          }
+      })
+  })
 
   test('the rail and the notes sheet at 390px', async ({ page }) => {
     await open(page)

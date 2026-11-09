@@ -48,7 +48,15 @@ import type {
 import { ICONS, getInternals } from '@gallerist/core/internal'
 import { GLIDE, createGlides, sizeOf, toMs } from './motion'
 import { type Strip, attachStrip } from './scroll'
-import { type Axis, axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
+import {
+  type Axis,
+  axisOf,
+  keepPlace,
+  measureRun,
+  middleOf,
+  scrollWhole,
+  spanAround,
+} from './strip'
 
 /** Cards drawn beyond the visible ones on each side, so a step or a short scroll lands on drawn cards. */
 const MARGIN = 3
@@ -316,6 +324,12 @@ const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?:
   return node
 }
 
+/** `el`, hidden from assistive tech (its text is in a name already). */
+const mute = <E extends Element>(el: E) => {
+  el.setAttribute('aria-hidden', 'true')
+  return el
+}
+
 function appendCaption(btn: HTMLElement, text: string | undefined): void {
   if (text) btn.appendChild(make('span', 'gallerist-thumb-caption', text))
 }
@@ -324,8 +338,7 @@ function appendCaption(btn: HTMLElement, text: string | undefined): void {
  *  instead: a node's `aria-label`, else its text. `null` when there's nothing to draw. */
 function decoration(d: Decoration, cls: string): [HTMLElement, string] | null {
   if (d == null || d === '') return null
-  const el = make('span', cls)
-  el.setAttribute('aria-hidden', 'true')
+  const el = mute(make('span', cls))
   el.append(d)
   // from the wrapper: a fragment is empty once appended, and a number has no text of its own
   const text = (d as Element).getAttribute?.('aria-label') ?? el.textContent
@@ -389,16 +402,19 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
 // page buttons sit too). The browser clamps that at either end of the rail, so the first and last
 // cards stop at their edges.
 // Instant, as every scroll of the rail is (there is no motion to take out under
-// prefers-reduced-motion).
+// prefers-reduced-motion). It scrolls whole px and owes the fraction it leaves out to the re-window
+// that follows (scrollWhole), so the cards land within half a px of where centreBy puts them.
 function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefined>): void {
   if (!btn) return
   const target = btn.getBoundingClientRect()
   if (!target.width && !target.height) return // hidden (an index chip's items): nothing to reveal
   for (let box = btn.parentElement; box; box = box.parentElement) {
     if (box.classList.contains('gallerist')) return
-    const { overflowX, overflowY } = getComputedStyle(box)
-    if (/auto|scroll/.test(overflowX)) box.scrollLeft += centreBy(box, btn, around, 'x')
-    if (/auto|scroll/.test(overflowY)) box.scrollTop += centreBy(box, btn, around, 'y')
+    for (const axis of ['x', 'y'] as const) {
+      const by = centreBy(box, btn, around, axis)
+      // nothing to move (or no scroll that way): no scroll, and what the last re-window owes stays owed
+      if (by) scrollWhole(box, axis, by)
+    }
   }
 }
 
@@ -410,25 +426,29 @@ function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefi
  *  marker or a label line wider than its cards, and centred `btn` between evenly spaced cards).
  *  Where the two don't fit either, `btn` centred. A neighbour with no box (not laid out, hidden)
  *  doesn't count. `btn` itself shows clear of `box`'s scroll-padding (0.4.1: the rail's end
- *  fades): the scroll moves on as little as clears it, and 0 needs it clear too. */
+ *  fades): the scroll moves on as little as clears it, and 0 needs it clear too. 0 where `box`
+ *  doesn't scroll along `axis` (reveal walks every box up to the viewer's root). */
 function centreBy(
   box: HTMLElement,
   btn: HTMLElement,
   around: Array<HTMLElement | undefined>,
   axis: Axis,
 ): number {
-  const [lo, hi] = axis === 'x' ? (['left', 'right'] as const) : (['top', 'bottom'] as const)
+  const [lo, hi, overflow, pad] =
+    axis === 'x'
+      ? (['left', 'right', 'overflowX', 'scrollPaddingLeft'] as const)
+      : (['top', 'bottom', 'overflowY', 'scrollPaddingTop'] as const)
+  const cs = getComputedStyle(box)
+  if (!/auto|scroll/.test(cs[overflow])) return 0 // it doesn't scroll that way
   const edge = box.getBoundingClientRect()
   const r = btn.getBoundingClientRect()
-  const by = (r[lo] + r[hi] - edge[lo] - edge[hi]) / 2
   // the scrolls that show `btn` clear of the scroll-padding (the theme's is the rail's end fade,
   // symmetric: one side read): c0 to c1
-  const f =
-    Number.parseFloat(
-      getComputedStyle(box)[axis === 'x' ? 'scrollPaddingLeft' : 'scrollPaddingTop'],
-    ) || 0
+  const f = Number.parseFloat(cs[pad]) || 0
   const c0 = r[hi] - edge[hi] + f
   const c1 = r[lo] - edge[lo] - f
+  // the one that centres it, midway (the padding cancels out)
+  const by = (c0 + c1) / 2
   // a neighbour's box (none, or not laid out: btn's own, which changes nothing below)
   const [b, a] = around.map((el) => {
     const q = el?.getBoundingClientRect()
@@ -440,17 +460,22 @@ function centreBy(
     [r, a],
   ]) {
     // the scrolls that show them whole run from `from` to `to` (none: they don't fit); 0 among
-    // them: they show already, nothing moves. In whole px: WebKit drops a scroll's fraction, and
-    // with keepPlace's after it a card at the edge could lose up to 2px.
+    // them: they show already, nothing moves. Not rounded: reveal scrolls whole px and owes the
+    // rest, which the re-window after it makes up (0.5.2: rounded here, then again by the
+    // re-window with a fraction owed from before, a card brought to the edge ended past it).
     const from = Math.max(...rs.map((q) => q[hi])) - edge[hi]
     const to = Math.min(...rs.map((q) => q[lo])) - edge[lo]
+    const mid = (from + to) / 2
     if (from <= to + 1)
       return from <= 1 && to >= -1 && c0 <= 1 && c1 >= -1
         ? 0
-        : // then as near as that keeps btn clear (where it can: not past its start)
-          Math.round(clamp(clamp(rs[2] ? by : (from + to) / 2, from, to), c0, c1))
+        : // then as near as that keeps btn clear (where it can: not past its start). Where they
+          // overrun the rail by under a px (they count as fitting), both ends share it: 0.5.2,
+          // the one at the far end showed whole and the other was cut by all of it and the
+          // scroll's rounding, past 1px (the card ahead, stepping back at 1x)
+          clamp(from > to ? mid : clamp(rs[2] ? by : mid, from, to), c0, c1)
   }
-  return Math.round(by)
+  return by
 }
 
 /** `x` within `lo`..`hi`; `lo` where they cross. */
@@ -603,11 +628,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       setPos(btn, iIndex + 1, viewer.getCollection().groups[gIndex]?.items.length ?? 0)
       btn.dataset.item = item.id
       btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
-      if (o.numberItems) {
-        const num = make('span', 'gallerist-thumb-num', String(iIndex + 1))
-        num.setAttribute('aria-hidden', 'true') // the label already says "Item n"
-        btn.appendChild(num)
-      }
+      // the label already says "Item n"
+      if (o.numberItems)
+        btn.appendChild(mute(make('span', 'gallerist-thumb-num', String(iIndex + 1))))
       appendCaption(btn, captionOf(item))
       decorateItem(btn, item, gIndex, iIndex)
       return btn
@@ -723,10 +746,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const cover = groupThumb(group)
       coverUrls.set(group.id, cover)
       btn.appendChild(lazyImg(cover, observer))
-      if (multi) {
-        const badge = make('span', 'gallerist-thumb-count', String(group.items.length))
-        btn.appendChild(badge)
-      }
+      if (multi) btn.appendChild(make('span', 'gallerist-thumb-count', String(group.items.length)))
       appendCaption(btn, captionOf(group))
 
       // peek wiring (multi-item groups only) — `host` is the node appended to the rail, so the
@@ -744,8 +764,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
       if (timeLabel) {
         const wrap = wrapCard()
-        const label = make('span', 'gallerist-thumb-time')
-        label.setAttribute('aria-hidden', 'true') // folded into the card's name below
+        const label = mute(make('span', 'gallerist-thumb-time')) // folded into the card's name below
         const text = make('span', 'gallerist-thumb-time-text', time ?? '')
         // the whole label as its title while it's cut (past three card heights, the theme's cap)
         if (time) titleWhenCut(label, text, time)
@@ -893,9 +912,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       el.setAttribute('role', 'group')
       el.setAttribute('aria-label', m.label)
       if (m.caption || timeLabel) {
-        const cap = make('span', 'gallerist-rail-marker-cap', m.caption ?? '')
-        cap.setAttribute('aria-hidden', 'true')
-        el.append(cap)
+        el.append(mute(make('span', 'gallerist-rail-marker-cap', m.caption ?? '')))
       }
       const body = decoration(m.render?.(m) ?? m.label, 'gallerist-rail-marker-body')
       if (body) el.append(body[0])
@@ -1197,8 +1214,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         wrap.appendChild(line)
       }
       if (label) {
-        const cap = make('span', 'gallerist-thumb-group-cap', label)
-        cap.setAttribute('aria-hidden', 'true') // already in the group's name
+        const cap = mute(make('span', 'gallerist-thumb-group-cap', label)) // already in the group's name
         titleWhenCut(cap, cap, label) // one too long even for a widened group
         line.appendChild(cap)
       }

@@ -92,15 +92,39 @@ export function middleOf(scroller: Element, hosts: Element[], axis: Axis): numbe
   return best
 }
 
-// what keepPlace's whole-px scrolls left out, per scroller: carried into its next one, so cards of
-// fractional width (84 × 16/9) don't drift up to 0.5px a re-window, all the same way (0.4.1)
-const owed = new WeakMap<Element, number>()
+// what the rail's whole-px scrolls left out, per scroller and axis: carried into keepPlace's next
+// one, so cards of fractional width (84 × 16/9) don't drift up to 0.5px a re-window, all the same way
+// (0.4.1). One per axis: a reveal scrolls a box along both where it can (a horizontal strip's
+// overflow-y computes to auto), and a fraction across the rail must not stand in for the one along it.
+const owed = { x: new WeakMap<Element, number>(), y: new WeakMap<Element, number>() }
+
+/**
+ * Scroll `scroller` along `axis` by `by` px, in whole px (WebKit drops a scroll's fraction, and two
+ * such drops can cut 2px off a card meant to show whole), and owe what that left out: the next
+ * keepPlace along `axis` makes it up, so what shows lands within half a px of where `by` puts it.
+ * What was owed before is settled: `by` was measured from where the cards are now, so it already
+ * counts it. Only the fraction is owed, even where the strip's end stops the scroll short: never more
+ * than half a px. A `by` of 0 settles what was owed too (a re-window whose shift cancels it); a reveal
+ * with nothing to move doesn't call this, so what a re-window owes stays owed.
+ * 0.5.2: a reveal scrolled on its own, by a rounded px, and left the carry as it was. The re-window
+ * after it then made up a fraction owed from before the reveal (as much as half a px, the cards having
+ * moved since) on top of its own rounding and the reveal's: on a phone, a next card that the reveal had
+ * brought just inside the rail's edge ended up to 1.5px past it (Apploye, with fractional group widths).
+ */
+export function scrollWhole(scroller: HTMLElement, axis: Axis, by: number): void {
+  const shift = Math.round(by)
+  owed[axis].set(scroller, by - shift)
+  // no write when nothing moves (a re-window runs mid-scroll: leave the strip alone, as 0.5.1 did)
+  if (!shift) return
+  if (axis === 'x') scroller.scrollLeft += shift
+  else scroller.scrollTop += shift
+}
 
 /**
  * Run `mutate`, then scroll `scroller` so `ref` sits where it was: cards added or dropped before it
  * don't move what's on screen. The scroller needs `overflow-anchor: none`, or the browser's own scroll
- * anchoring could correct the same shift twice. Scrolls whole px; the fraction left out is carried to
- * the next call for the same scroller, so what shows stays within half a px of where it was.
+ * anchoring could correct the same shift twice. Scrolls whole px (scrollWhole), making up what the
+ * last one left out, so what shows stays within half a px of where it was.
  */
 export function keepPlace(
   scroller: HTMLElement,
@@ -108,15 +132,16 @@ export function keepPlace(
   axis: Axis | null,
   mutate: () => void,
 ): void {
-  const before = ref && axis ? edge(ref.getBoundingClientRect(), axis) : null
+  if (!ref || !axis) {
+    mutate()
+    return
+  }
+  const before = edge(ref.getBoundingClientRect(), axis)
   mutate()
-  if (before === null || !ref?.isConnected || !axis) return
-  // whole px: WebKit drops a scroll's fraction, and two such drops (the reveal, then this) can cut
-  // 2px off a card meant to show whole
-  const want = edge(ref.getBoundingClientRect(), axis) - before + (owed.get(scroller) ?? 0)
-  const shift = Math.round(want)
-  owed.set(scroller, want - shift)
-  if (!shift) return
-  if (axis === 'x') scroller.scrollLeft += shift
-  else scroller.scrollTop += shift
+  if (ref.isConnected)
+    scrollWhole(
+      scroller,
+      axis,
+      edge(ref.getBoundingClientRect(), axis) - before + (owed[axis].get(scroller) ?? 0),
+    )
 }

@@ -5,7 +5,7 @@ import { getInternals } from '@gallerist/core/internal'
 import { type PresetName, mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type ThumbnailsInstance, getGroupDisplay, setGroupDisplay, thumbnails } from './index'
-import { axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
+import { axisOf, keepPlace, measureRun, middleOf, scrollWhole, spanAround } from './strip'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
 const collection = (): Collection => ({
@@ -2387,6 +2387,81 @@ describe('strip helpers', () => {
         `re-window ${k}`,
       ).toBeLessThanOrEqual(0.5 + 1e-9)
     }
+  })
+
+  // A rail on a mock scroller: scrollLeft keeps whole px, as WebKit does, and stops at `max`; `drawn`
+  // is what the re-windows put before the reference, which sits at 500 with nothing scrolled.
+  const mockRail = (max = Number.POSITIVE_INFINITY) => {
+    const scroller = document.createElement('div')
+    const at = { scroll: 0, drawn: 0 }
+    Object.defineProperty(scroller, 'scrollLeft', {
+      configurable: true,
+      get: () => at.scroll,
+      set: (v: number) => {
+        at.scroll = Math.min(max, Math.trunc(v))
+      },
+    })
+    const ref = document.createElement('span')
+    scroller.appendChild(ref)
+    document.body.appendChild(scroller)
+    const left = () => 500 + at.drawn - at.scroll
+    ref.getBoundingClientRect = () => ({ left: left(), top: 0 }) as DOMRect
+    const rewindow = (by: number) =>
+      keepPlace(scroller, ref, 'x', () => {
+        at.drawn += by
+      })
+    return { scroller, at, left, rewindow }
+  }
+
+  // 0.5.2 (Apploye): a reveal's scroll, between re-windows, was rounded on its own and left the carry
+  // as it was; the re-window after it then made up that stale fraction on top of its own rounding and
+  // the reveal's, and a card brought to the rail's edge ended past it by over 1px. scrollWhole owes
+  // what it leaves out instead, settling what was owed before (its `by` was measured from where the
+  // cards are), so the reveal and the re-window together land within half a px of the reveal's mark.
+  it('scrollWhole: a reveal between re-windows lands within half a px of its mark', () => {
+    const { scroller, left, rewindow } = mockRail()
+    // re-windows that leave a fraction owed: the reference 0.4px short of where it was
+    rewindow(100.4)
+    rewindow(-200.8)
+    expect(left() - 500).toBeCloseTo(-0.4)
+    // the reveal: the reference to 120.3 exactly, then a re-window drops 162.37px of cards before it
+    scrollWhole(scroller, 'x', left() - 120.3)
+    rewindow(-162.37)
+    expect(Math.abs(left() - 120.3)).toBeLessThanOrEqual(0.5 + 1e-9)
+  })
+
+  // A scroll stopped short at the strip's end owes only its fraction: the re-window after it doesn't
+  // run on to make up the rest (it would scroll the cards it holds in place away by that much).
+  it('scrollWhole: a scroll stopped short at the end owes only its fraction', () => {
+    const { scroller, at, left, rewindow } = mockRail(1000)
+    scroller.scrollLeft = 1000 // at the end
+    const was = left()
+    scrollWhole(scroller, 'x', 40.4) // past the end: it doesn't move
+    expect(at.scroll).toBe(1000)
+    rewindow(-100) // 100px of cards before the reference dropped
+    expect(Math.abs(left() - was)).toBeLessThanOrEqual(0.5 + 1e-9)
+  })
+
+  // 0.5.2 review: a re-window whose shift cancels what was owed scrolls nothing, and owes nothing.
+  // scrollWhole skipped a 0 outright and left the old fraction owed, which the next re-window then
+  // made up a second time: 100.375, -0.375 and 200.25 left the reference 0.75px off.
+  it('keepPlace: a re-window that cancels what was owed settles it', () => {
+    const { left, rewindow } = mockRail()
+    for (const by of [100.375, -0.375, 200.25]) {
+      rewindow(by)
+      expect(Math.abs(left() - 500), `after ${by}`).toBeLessThanOrEqual(0.5 + 1e-9)
+    }
+  })
+
+  // 0.5.2 review: a reveal scrolls a box along both axes where it can (a horizontal strip's overflow-y
+  // computes to auto), and with one carry for both, a fraction it owed across the rail took the
+  // place of the one owed along it: the next re-window made up the wrong one.
+  it('keepPlace: what a scroll across the rail owes stays apart from the carry along it', () => {
+    const { scroller, left, rewindow } = mockRail()
+    rewindow(100.4) // the reference 0.4px off where it was, owed
+    scrollWhole(scroller, 'y', -0.4) // a reveal's fraction across the rail
+    rewindow(100.4)
+    expect(Math.abs(left() - 500)).toBeLessThanOrEqual(0.5 + 1e-9)
   })
 })
 

@@ -137,9 +137,23 @@
 }
 
 .gallerist {
-  color: var(--gallerist-fg);
   font-family: var(--gallerist-font);
   font-variant-numeric: tabular-nums;
+}
+/* A page's `* { font-family: …; font-weight: … }` (Apploye's Montserrat 500) matches every element,
+   so an element of the viewer that sets no font of its own took the page's instead of its parent's:
+   the stacked rail's time text went sans and lost the current label's weight; the index rows, the
+   position count, the View menu, the shortcut list and the loading pill's text took its family. Each
+   one inherits both, unless a rule below sets its own: this comes before them all, and a class beats
+   the page's unlayered `*`. The root sets a family but no weight, so it takes the page's (as it takes
+   a body's): text drawn at the regular weight sets it (the caption's). A button keeps the browser's
+   font (an icon button sets none, and its line box would change); a host's own nodes (a group's
+   meta, a badge, a caption) keep the page's. It beats a host's layered font rules on these classes
+   too (no rule can beat an unlayered `*` but not those): see the 0.5.2 changelog. */
+[class^="gallerist-"]:where(:not(button)),
+.gallerist-shortcuts *,
+.gallerist-media-pill span {
+  font: inherit;
 }
 
 /* ── layout (base): the root is a grid of areas ───────────────────────────────
@@ -592,6 +606,8 @@
   grid-area: rail;
   position: relative;
   z-index: 2;
+  display: flex; /* the handle and the strip, stacked (a side rail: side by side) */
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -821,7 +837,8 @@
 .gallerist-thumb[data-active] .gallerist-thumb-caption {
   color: var(--gallerist-selection);
 }
-.gallerist-thumb-items {
+.gallerist-thumb-items,
+.gallerist-thumb-group-row {
   display: flex;
   gap: 6px;
   align-items: center;
@@ -903,7 +920,6 @@
   align-items: flex-start;
 }
 .gallerist-thumb-time {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -939,10 +955,6 @@
   left: auto;
   right: calc(var(--gallerist-thumb-h) * 1.4 - 26px);
 }
-/* a side rail's band edge faces the stage, not the bar */
-.gallerist[data-gallerist-orientation="vertical"] .gallerist-thumbs-region {
-  border-block-start: 0 none;
-}
 .gallerist[data-gallerist-rail-pos="left"] .gallerist-thumbs-region {
   border-right: var(--gallerist-rail-border);
 }
@@ -958,19 +970,18 @@
   background: var(--gallerist-fg-muted);
   box-shadow: 0 0 0 3px var(--gallerist-rail-track-gap);
 }
-/* the track: each label's line runs through its gap to the next card */
+/* the track: each label's line is a leader from the end of its text (and a host's meta) through its
+   gap to the next card's tick, so it never strikes through the text. It takes the label's free room
+   and 8px more (the rail gap). Its margins (3px into the 6px gap, 8px out) cancel its min-width and
+   that gap, so it adds nothing to the label's width: a label as long as its text stays that long,
+   and its line is then just the 5px in the gap (the next tick's ring covers the last 3) */
 .gallerist-thumb-time::after {
   content: "";
-  position: absolute;
-  z-index: -1;
-  inset-inline: 0 -8px;
-  top: 50%;
+  flex: 1 0 0;
+  min-width: 5px;
   height: 1px;
+  margin-inline: -3px -8px;
   background: var(--gallerist-hairline);
-}
-.gallerist-thumb-wrap[data-active] .gallerist-thumb-time {
-  color: var(--gallerist-label-current);
-  font-weight: var(--gallerist-label-current-weight);
 }
 .gallerist-thumb-wrap[data-active] .gallerist-thumb-time::before {
   background: var(--gallerist-label-current);
@@ -1025,7 +1036,6 @@
    opens the peek while the card itself still navigates on first tap. */
 .gallerist-thumb-wrap {
   position: relative;
-  isolation: isolate; /* a timeline keeps the track line behind its own label */
   flex: 0 0 auto;
   display: flex;
   flex-direction: column; /* a label over the card, a host's meta under it (the caret floats) */
@@ -1092,14 +1102,10 @@
 .gallerist-thumbs[data-timeline] .gallerist-thumb-group-cap {
   font-family: var(--gallerist-mono);
 }
-.gallerist-thumb-group[data-active] .gallerist-thumb-group-cap {
+.gallerist-thumb-group[data-active] .gallerist-thumb-group-cap,
+.gallerist-thumb-wrap[data-active] .gallerist-thumb-time {
   color: var(--gallerist-label-current);
   font-weight: var(--gallerist-label-current-weight);
-}
-.gallerist-thumb-group-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
 }
 /* a group the drawn run cuts: its card at the cut fades (unless current or focused) */
 .gallerist-thumb-group[data-partial-start]
@@ -1683,10 +1689,6 @@
 .gallerist-shortcuts-close:focus {
   outline: none;
 }
-.gallerist-shortcuts-close:focus-visible {
-  outline: 2px solid var(--gallerist-focus);
-  outline-offset: 1px;
-}
 .gallerist-shortcuts-body {
   display: flex;
   min-height: 0;
@@ -1854,6 +1856,7 @@
 .gallerist-caption-text {
   font-family: var(--gallerist-caption-font);
   font-style: var(--gallerist-caption-style);
+  font-weight: 400; /* not the root's: a page's `* { font-weight }` sets that */
 }
 /* a caption renderer (plugin-captions, React <Gallerist.Caption>) owns the band: it grows with its
    content from the text band's height, and the stage gives up the room. A placard keeps its slot. */
@@ -2075,11 +2078,6 @@
   width: var(--gallerist-dot-active-along);
   height: var(--gallerist-dot-active-across);
 }
-.gallerist-dot:focus-visible,
-.gallerist-pill:focus-visible {
-  outline: 2px solid var(--gallerist-focus);
-  outline-offset: 1px;
-}
 
 /* zoom navigator: a minimap of the zoomed image in the bottom inline-start corner; the view box is
    the visible part, everything outside it dimmed */
@@ -2257,10 +2255,6 @@
 }
 
 /* ── rail: collapse to its handle (the stage grows into the freed track) ─────────── */
-.gallerist-region-thumbnails {
-  display: flex;
-  flex-direction: column;
-}
 .gallerist[data-gallerist-rail="collapsed"] .gallerist-thumbs-region:not([data-gallerist-glide]) {
   display: none;
 }
@@ -2389,7 +2383,10 @@
 .gallerist-thumb-row:hover {
   background: var(--gallerist-tool-hover-bg);
 }
-.gallerist-thumb-row:focus-visible {
+.gallerist-thumb-row:focus-visible,
+.gallerist-shortcuts-close:focus-visible,
+.gallerist-dot:focus-visible,
+.gallerist-pill:focus-visible {
   outline: 2px solid var(--gallerist-focus);
   outline-offset: 1px;
 }
@@ -2502,6 +2499,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  border-block-start: 0 none; /* its band edge faces the stage, not the bar */
 }
 .gallerist[data-gallerist-orientation="vertical"][data-gallerist-rail="collapsed"]
   .gallerist-thumbs-region:not([data-gallerist-glide]) {
@@ -2785,14 +2783,12 @@
   }
   /* editorial: the placard drops under the work, as the caption band */
   .gallerist[data-gallerist-preset="editorial"][data-gallerist-rail-pos="bottom"] {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto auto;
-    grid-template-areas:
-      "bar"
-      "main"
-      "caption"
-      "footer"
-      "rail";
+    grid-template:
+      "bar" auto
+      "main" minmax(var(--gallerist-stage-floor), 1fr)
+      "caption" auto
+      "footer" auto
+      "rail" auto / minmax(0, 1fr);
   }
   /* the bottom edge belongs to the item position chip: the navigator goes to the top corner */
   .gallerist-navigator {
@@ -2902,14 +2898,12 @@
     display: none; /* chips don't expand their items */
   }
   .gallerist[data-gallerist-rail-pos]:has(.gallerist-thumbs[data-display="index"]) {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(var(--gallerist-stage-floor), 1fr) auto auto auto;
-    grid-template-areas:
-      "bar"
-      "main"
-      "caption"
-      "footer"
-      "rail";
+    grid-template:
+      "bar" auto
+      "main" minmax(var(--gallerist-stage-floor), 1fr)
+      "caption" auto
+      "footer" auto
+      "rail" auto / minmax(0, 1fr);
   }
   .gallerist[data-gallerist-orientation="vertical"]
     .gallerist-region-thumbnails:has(.gallerist-thumbs[data-display="index"]) {
