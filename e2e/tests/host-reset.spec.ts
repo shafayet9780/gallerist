@@ -269,7 +269,9 @@ for (const skin of ['gallery', 'console', 'editorial'])
 // both). So did the index rows, the position count, the View menu, the shortcut list and the
 // loading pill's text. Every element holding text keeps the family and weight it has without it.
 
-const FONT_RESET = '*{font-family:serif;font-weight:400}'
+// At 500, not the browser's 400: a weight that leaks from the page (the root takes it, setting a
+// family but no weight) then shows (0.5.2 review: the caption text took it).
+const FONT_RESET = '*{font-family:serif;font-weight:500}'
 
 /** Each visible element of the viewer that holds text of its own: its family and weight. */
 const fonts = (page: Page) =>
@@ -311,7 +313,7 @@ for (const skin of ['gallery', 'console', 'editorial'])
         i.remove()
         return `${fontFamily} ${fontWeight}`
       })
-      expect(probe).toBe('serif 400')
+      expect(probe).toBe('serif 500')
       await s.act?.(other)
       expect(plain.length, 'none to compare').toBeGreaterThan(0)
       expect(await fonts(other)).toEqual(plain)

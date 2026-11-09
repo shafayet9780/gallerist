@@ -11,16 +11,30 @@ by a px past the rail's edge where group widths are fractional. Peer ranges stay
 - **theme-default**: a host's meta in a stacked time label (`renderGroupMeta`, `place: 'label'`) sits
   right after the time, the track's leader after it, rather than at the label's far end. Where the
   label is as long as its text (the meta's usual case) nothing moves.
+- **theme-default**: the viewer's own elements reset their font to their parent's (`font: inherit`
+  on a class, unlayered), so that reset now beats a host's font rule aimed at a Gallerist class from
+  a cascade layer (Tailwind v4 puts everything in one), whatever its specificity, and an unlayered
+  one of a single class that loads before the theme. Such a rule must now be unlayered and load
+  after the theme, or be more specific than one class (`.gallerist .gallerist-thumb-time-text`).
+  E.g. `@layer host { .gallerist-thumb-time-text { font-weight: 700 } }` worked on 0.5.1 and no
+  longer does. It is the price of beating an unlayered `*`: no rule can, and still lose to a layer.
+- **theme-default**: the caption text is drawn at 400, its designed weight; it took the viewer
+  root's, which is the page's (a body or a `*` rule at another weight changed it).
+- **theme-default**: a stacked card's wrapper (`.gallerist-thumb-wrap`) no longer isolates its
+  stacking, nor is its time label positioned: a host's z-indexed content in a group's meta stacks
+  with the rail's, and absolutely positioned content in a label's meta anchors to the wrapper.
 
 ### Fixes
 - **theme-default**: on a page with `* { font-family: …; font-weight: … }` (Apploye's Montserrat
   500), the viewer's text keeps its font. That rule matches every element, so one that set no font of
   its own took the page's: the stacked rail's time text went sans and the current label lost
   `--gallerist-label-current-weight`; the index rows, the item position count, the View menu, the
-  shortcut list and the loading pill's text took the page's family. Every element of the viewer now
-  inherits its parent's family and weight unless the theme sets its own (buttons keep the browser's
-  font, as before); a host's own nodes still follow the page. Checked in all three skins against the
-  same page without the rule.
+  shortcut list and the loading pill's text took the page's family. Each of the viewer's elements
+  now inherits its parent's family and weight unless the theme sets its own (buttons keep the
+  browser's font, as before). The root, which sets a family but no weight, still takes the page's
+  weight, as it takes a body's; the caption text, which inherited it, now sets its own. A host's own
+  nodes still follow the page. Checked in all three skins against the same page without the rule,
+  at a weight other than the browser's default (500), so a leak of it shows.
 - **theme-default**: the stacked rail's track line no longer strikes through the time labels (plain
   to see on the Light scheme). It is a leader from the end of the label's text (and a host's meta) to
   the next card's tick; a label as long as its text keeps its width, and shows its line only in the
@@ -30,11 +44,13 @@ by a px past the rail's edge where group widths are fractional. Peer ranges stay
   by more than 1px at the rail's edge (1.1px on a 390px phone at 2x: the next timeframe's first
   screen). The step's whole-px scroll and the re-window's after it each rounded, the re-window also
   making up a fraction left over from before the step; the step now hands its own fraction to the
-  re-window, so the two land within half a px of the mark. Cards that overrun the rail by under a px
+  re-window, so the two land within half a px of the mark. The fraction is carried per axis (a
+  reveal scrolls a box both ways where it can), and a re-window that moves nothing settles it. Cards that overrun the rail by under a px
   share it between both ends (stepping back, the card ahead took all of it).
 
 ### Sizes
-Unchanged: base.css 10.42 kB of 10.42 kB (a few rules merged or shortened to shorthands make room).
+Unchanged: base.css 10.42 kB of 10.42 kB (a few rules merged or shortened to shorthands make room);
+core + renderer-dom + plugin-thumbnails 26.12 kB of 26.13 kB (the rail's hidden spans share a helper).
 
 ## v0.5.1
 

@@ -324,6 +324,12 @@ const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?:
   return node
 }
 
+/** `el`, hidden from assistive tech (its text is in a name already). */
+const mute = <E extends Element>(el: E) => {
+  el.setAttribute('aria-hidden', 'true')
+  return el
+}
+
 function appendCaption(btn: HTMLElement, text: string | undefined): void {
   if (text) btn.appendChild(make('span', 'gallerist-thumb-caption', text))
 }
@@ -332,8 +338,7 @@ function appendCaption(btn: HTMLElement, text: string | undefined): void {
  *  instead: a node's `aria-label`, else its text. `null` when there's nothing to draw. */
 function decoration(d: Decoration, cls: string): [HTMLElement, string] | null {
   if (d == null || d === '') return null
-  const el = make('span', cls)
-  el.setAttribute('aria-hidden', 'true')
+  const el = mute(make('span', cls))
   el.append(d)
   // from the wrapper: a fragment is empty once appended, and a number has no text of its own
   const text = (d as Element).getAttribute?.('aria-label') ?? el.textContent
@@ -405,10 +410,11 @@ function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefi
   if (!target.width && !target.height) return // hidden (an index chip's items): nothing to reveal
   for (let box = btn.parentElement; box; box = box.parentElement) {
     if (box.classList.contains('gallerist')) return
-    const cs = getComputedStyle(box)
-    for (const axis of ['x', 'y'] as const)
-      if (/auto|scroll/.test(cs[axis === 'x' ? 'overflowX' : 'overflowY']))
-        scrollWhole(box, axis, centreBy(box, btn, around, axis))
+    for (const axis of ['x', 'y'] as const) {
+      const by = centreBy(box, btn, around, axis)
+      // nothing to move (or no scroll that way): no scroll, and what the last re-window owes stays owed
+      if (by) scrollWhole(box, axis, by)
+    }
   }
 }
 
@@ -420,22 +426,25 @@ function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefi
  *  marker or a label line wider than its cards, and centred `btn` between evenly spaced cards).
  *  Where the two don't fit either, `btn` centred. A neighbour with no box (not laid out, hidden)
  *  doesn't count. `btn` itself shows clear of `box`'s scroll-padding (0.4.1: the rail's end
- *  fades): the scroll moves on as little as clears it, and 0 needs it clear too. */
+ *  fades): the scroll moves on as little as clears it, and 0 needs it clear too. 0 where `box`
+ *  doesn't scroll along `axis` (reveal walks every box up to the viewer's root). */
 function centreBy(
   box: HTMLElement,
   btn: HTMLElement,
   around: Array<HTMLElement | undefined>,
   axis: Axis,
 ): number {
-  const [lo, hi] = axis === 'x' ? (['left', 'right'] as const) : (['top', 'bottom'] as const)
+  const [lo, hi, overflow, pad] =
+    axis === 'x'
+      ? (['left', 'right', 'overflowX', 'scrollPaddingLeft'] as const)
+      : (['top', 'bottom', 'overflowY', 'scrollPaddingTop'] as const)
+  const cs = getComputedStyle(box)
+  if (!/auto|scroll/.test(cs[overflow])) return 0 // it doesn't scroll that way
   const edge = box.getBoundingClientRect()
   const r = btn.getBoundingClientRect()
   // the scrolls that show `btn` clear of the scroll-padding (the theme's is the rail's end fade,
   // symmetric: one side read): c0 to c1
-  const f =
-    Number.parseFloat(
-      getComputedStyle(box)[axis === 'x' ? 'scrollPaddingLeft' : 'scrollPaddingTop'],
-    ) || 0
+  const f = Number.parseFloat(cs[pad]) || 0
   const c0 = r[hi] - edge[hi] + f
   const c1 = r[lo] - edge[lo] - f
   // the one that centres it, midway (the padding cancels out)
@@ -619,11 +628,9 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       setPos(btn, iIndex + 1, viewer.getCollection().groups[gIndex]?.items.length ?? 0)
       btn.dataset.item = item.id
       btn.appendChild(lazyImg(thumbUrl(item.thumb) ?? thumbUrl(item.source), observer))
-      if (o.numberItems) {
-        const num = make('span', 'gallerist-thumb-num', String(iIndex + 1))
-        num.setAttribute('aria-hidden', 'true') // the label already says "Item n"
-        btn.appendChild(num)
-      }
+      // the label already says "Item n"
+      if (o.numberItems)
+        btn.appendChild(mute(make('span', 'gallerist-thumb-num', String(iIndex + 1))))
       appendCaption(btn, captionOf(item))
       decorateItem(btn, item, gIndex, iIndex)
       return btn
@@ -739,10 +746,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       const cover = groupThumb(group)
       coverUrls.set(group.id, cover)
       btn.appendChild(lazyImg(cover, observer))
-      if (multi) {
-        const badge = make('span', 'gallerist-thumb-count', String(group.items.length))
-        btn.appendChild(badge)
-      }
+      if (multi) btn.appendChild(make('span', 'gallerist-thumb-count', String(group.items.length)))
       appendCaption(btn, captionOf(group))
 
       // peek wiring (multi-item groups only) — `host` is the node appended to the rail, so the
@@ -760,8 +764,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       }
       if (timeLabel) {
         const wrap = wrapCard()
-        const label = make('span', 'gallerist-thumb-time')
-        label.setAttribute('aria-hidden', 'true') // folded into the card's name below
+        const label = mute(make('span', 'gallerist-thumb-time')) // folded into the card's name below
         const text = make('span', 'gallerist-thumb-time-text', time ?? '')
         // the whole label as its title while it's cut (past three card heights, the theme's cap)
         if (time) titleWhenCut(label, text, time)
@@ -909,9 +912,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
       el.setAttribute('role', 'group')
       el.setAttribute('aria-label', m.label)
       if (m.caption || timeLabel) {
-        const cap = make('span', 'gallerist-rail-marker-cap', m.caption ?? '')
-        cap.setAttribute('aria-hidden', 'true')
-        el.append(cap)
+        el.append(mute(make('span', 'gallerist-rail-marker-cap', m.caption ?? '')))
       }
       const body = decoration(m.render?.(m) ?? m.label, 'gallerist-rail-marker-body')
       if (body) el.append(body[0])
@@ -1213,8 +1214,7 @@ export function thumbnails(opts: ThumbnailsOptions = {}): Plugin {
         wrap.appendChild(line)
       }
       if (label) {
-        const cap = make('span', 'gallerist-thumb-group-cap', label)
-        cap.setAttribute('aria-hidden', 'true') // already in the group's name
+        const cap = mute(make('span', 'gallerist-thumb-group-cap', label)) // already in the group's name
         titleWhenCut(cap, cap, label) // one too long even for a widened group
         line.appendChild(cap)
       }

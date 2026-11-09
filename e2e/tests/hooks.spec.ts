@@ -228,6 +228,9 @@ test('stacked down a side rail: a time label keeps to the rail, cut, whole in it
 // through the rail gap to the next card's tick. 0.5.1 drew it behind the whole label, through the
 // text: a strikethrough on the Light scheme. The reviewer's short times leave a long leader; the
 // note counts' labels run past their cards, so theirs is only the bit in the gap.
+// Where the line is, is read from layout, not from the theme's numbers: only the label's `::after`
+// takes the pointer, so the points along the label's middle that hit the label are the line's (hit
+// testing goes by whole px: each end is read to within a px).
 for (const [name, url] of [
   ['ltr', '/hooks.html?display=stacked'],
   ['rtl', '/hooks.html?display=stacked&dir=rtl'],
@@ -239,7 +242,12 @@ for (const [name, url] of [
     await page.goto(url)
     await viewerSettled(page)
     await expect(page.locator('.gallerist-thumb-time').first()).toBeVisible()
-    const { gap, lines } = await page.evaluate(() => {
+    await page.addStyleTag({
+      content: `.gallerist-thumb-time, .gallerist-thumb-time * { pointer-events: none !important }
+        .gallerist-thumb-time::after { pointer-events: auto !important }`,
+    })
+    const STEP = 0.25
+    const { gap, lines } = await page.evaluate((step) => {
       const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
       const rtl = getComputedStyle(rail).direction === 'rtl'
       const W = document.documentElement.clientWidth
@@ -248,30 +256,48 @@ for (const [name, url] of [
         const r = el.getBoundingClientRect()
         return rtl ? [W - r.right, W - r.left] : [r.left, r.right]
       }
+      const gap = Number.parseFloat(getComputedStyle(rail).columnGap)
+      const [r0, r1] = x(rail)
       return {
-        gap: Number.parseFloat(getComputedStyle(rail).columnGap),
-        lines: [...rail.querySelectorAll('.gallerist-thumb-time')].map((label) => {
-          // the line is the label's last flex item: its border box ends its end margin past the label
-          const line = getComputedStyle(label, '::after')
-          const end = x(label)[1] - Number.parseFloat(line.marginInlineEnd)
-          return {
-            start: end - Number.parseFloat(line.width),
-            end,
-            label: x(label),
-            content: Math.max(...[...label.children].map((c) => x(c)[1])),
-          }
+        gap,
+        lines: [...rail.querySelectorAll('.gallerist-thumb-time')].flatMap((label) => {
+          const [a, z] = x(label)
+          // the line ends a gap past the label: scan a little further, all inside the rail's clip
+          const far = z + gap + 4
+          if (a < r0 || far > r1) return []
+          const box = label.getBoundingClientRect()
+          const y = box.top + box.height / 2
+          const on: number[] = []
+          for (let p = a; p <= far; p += step)
+            if (document.elementsFromPoint(rtl ? W - p : p, y).includes(label)) on.push(p)
+          // the next card's tick starts its label (none where a marker comes between)
+          const next = label
+            .closest('.gallerist-thumb-wrap')
+            ?.nextElementSibling?.querySelector(':scope > .gallerist-thumb-time')
+          return [
+            {
+              start: on[0] ?? Number.NaN,
+              end: (on.at(-1) ?? Number.NaN) + step,
+              hits: on.length,
+              label: [a, z],
+              content: Math.max(...[...label.children].map((c) => x(c)[1])),
+              tick: next ? x(next)[0] : z + gap,
+            },
+          ]
         }),
       }
-    })
+    }, STEP)
     expect(lines.length).toBeGreaterThan(4)
     let long = 0
     for (const [k, l] of lines.entries()) {
       const at = `label ${k}`
+      // one unbroken line
+      expect(l.hits, at).toBe(Math.round((l.end - l.start) / STEP))
       // clear of the text (and the meta), by a small gap
       expect(l.start - l.content, at).toBeGreaterThan(1.5)
       expect(l.start - l.content, at).toBeLessThan(4.5)
-      // through the rail gap to the next card (its tick's ring covers the end)
-      expect(Math.abs(l.end - (l.label[1] + gap)), at).toBeLessThan(0.5)
+      // through the rail gap to the next card's tick (its ring covers the end)
+      expect(Math.abs(l.end - l.tick), at).toBeLessThan(1 + STEP)
       if (l.end - l.start > gap + 4) long++
     }
     // the short times' leaders run most of a card

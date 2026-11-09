@@ -145,8 +145,11 @@
    the stacked rail's time text went sans and lost the current label's weight; the index rows, the
    position count, the View menu, the shortcut list and the loading pill's text took its family. Each
    one inherits both, unless a rule below sets its own: this comes before them all, and a class beats
-   the page's unlayered `*`. A button keeps the browser's font (an icon button sets none, and its
-   line box would change); a host's own nodes (a group's meta, a badge, a caption) keep the page's. */
+   the page's unlayered `*`. The root sets a family but no weight, so it takes the page's (as it takes
+   a body's): text drawn at the regular weight sets it (the caption's). A button keeps the browser's
+   font (an icon button sets none, and its line box would change); a host's own nodes (a group's
+   meta, a badge, a caption) keep the page's. It beats a host's layered font rules on these classes
+   too (no rule can beat an unlayered `*` but not those): see the 0.5.2 changelog. */
 [class^="gallerist-"]:where(:not(button)),
 .gallerist-shortcuts *,
 .gallerist-media-pill span {
@@ -1853,6 +1856,7 @@
 .gallerist-caption-text {
   font-family: var(--gallerist-caption-font);
   font-style: var(--gallerist-caption-style);
+  font-weight: 400; /* not the root's: a page's `* { font-weight }` sets that */
 }
 /* a caption renderer (plugin-captions, React <Gallerist.Caption>) owns the band: it grows with its
    content from the text band's height, and the stage gives up the room. A placard keeps its slot. */
