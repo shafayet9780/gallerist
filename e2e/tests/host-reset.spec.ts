@@ -219,17 +219,22 @@ const scenes: Record<string, (skin: string) => Scene> = {
   }),
 }
 
-async function look(page: Page, scene: Scene, reset: boolean) {
+/** The scene's page open, with `reset` in its <head> ahead of the theme (or none), not acted on. */
+async function show(page: Page, scene: Scene, reset?: string) {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   if (reset)
     await page.route(/\.html(\?.*)?$/, async (route) => {
       const res = await route.fetch()
-      const body = (await res.text()).replace('<head>', `<head><style>${RESET}</style>`)
+      const body = (await res.text()).replace('<head>', `<head><style>${reset}</style>`)
       await route.fulfill({ response: res, body })
     })
   await scene.route?.(page)
   await page.goto(scene.url)
   await expect(page.locator('.gallerist[data-gallerist-phase="open"]')).toBeVisible()
+}
+
+async function look(page: Page, scene: Scene, reset: boolean) {
+  await show(page, scene, reset ? RESET : undefined)
   // the reset is in force, or not (or this proves nothing)
   expect(await page.evaluate(() => getComputedStyle(document.body).boxSizing)).toBe(
     reset ? 'border-box' : 'content-box',
@@ -256,3 +261,92 @@ for (const skin of ['gallery', 'console', 'editorial'])
         })
       }
     })
+
+// ── a host's font rule (0.5.2): `* { font-family; font-weight }` on every element ──
+// Apploye's page sets Montserrat 500 on `*`, unlayered. It matches each element of the viewer, so
+// one that set no font of its own took the page's instead of its parent's: the stacked rail's time
+// text went sans and lost the current label's weight (it is in a span inside the label, which sets
+// both). So did the index rows, the position count, the View menu, the shortcut list and the
+// loading pill's text. Every element holding text keeps the family and weight it has without it.
+
+const FONT_RESET = '*{font-family:serif;font-weight:400}'
+
+/** Each visible element of the viewer that holds text of its own: its family and weight. */
+const fonts = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.gallerist *')]
+      .filter(
+        (e) =>
+          // drawn (not the 1px live region, whose text comes and goes)
+          e.getBoundingClientRect().width > 1 &&
+          [...e.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim()),
+      )
+      .map((e) => {
+        const cs = getComputedStyle(e)
+        return `${e.className || e.tagName}: ${cs.fontFamily} ${cs.fontWeight}`
+      }),
+  )
+
+const fontScenes: Record<string, (skin: string) => Scene> = {
+  ...scenes,
+  'the stacked timeline rail': (skin) => ({
+    url: `/layout.html?preset=reviewer&skin=${skin}&display=stacked&captions=1`,
+    sels: [],
+  }),
+}
+
+for (const skin of ['gallery', 'console', 'editorial'])
+  for (const [name, scene] of Object.entries(fontScenes))
+    test(`a host font rule: ${name} keep their font (${skin})`, async ({ page, context }) => {
+      const s = scene(skin)
+      await show(page, s)
+      await s.act?.(page)
+      const plain = await fonts(page)
+      const other = await context.newPage()
+      await show(other, s, FONT_RESET)
+      // the rule is in force (or this proves nothing): an element of the page's own takes it
+      const probe = await other.evaluate(() => {
+        const i = document.body.appendChild(document.createElement('i'))
+        const { fontFamily, fontWeight } = getComputedStyle(i)
+        i.remove()
+        return `${fontFamily} ${fontWeight}`
+      })
+      expect(probe).toBe('serif 400')
+      await s.act?.(other)
+      expect(plain.length, 'none to compare').toBeGreaterThan(0)
+      expect(await fonts(other)).toEqual(plain)
+    })
+
+// the reported case, as Apploye has it: the current label at 600, the time in the label's face
+for (const skin of ['gallery', 'console', 'editorial'])
+  test(`a host font rule: the stacked time text keeps its face and the current label its weight (${skin})`, async ({
+    page,
+  }) => {
+    await show(
+      page,
+      { url: `/layout.html?preset=reviewer&skin=${skin}&display=stacked`, sels: [] },
+      `${FONT_RESET}.gallerist{--gallerist-label-current-weight:600}`,
+    )
+    const labels = await page.locator('.gallerist-thumb-time').evaluateAll((els) =>
+      els.map((label) => {
+        const text = label.querySelector('.gallerist-thumb-time-text') as Element
+        const cs = getComputedStyle(text)
+        return {
+          current: !!label.closest('[data-active]'),
+          family: cs.fontFamily,
+          // the token, resolved: the face the label is drawn in
+          mono: getComputedStyle(label).getPropertyValue('--gallerist-mono').trim(),
+          weight: cs.fontWeight,
+        }
+      }),
+    )
+    expect(labels.length).toBeGreaterThan(3)
+    expect(labels.filter((l) => l.current)).toHaveLength(1)
+    for (const l of labels) {
+      expect(l.family).not.toBe('serif')
+      // (WebKit drops the quotes around a family name)
+      expect(l.family.replace(/["\s]/g, '')).toBe(l.mono.replace(/["\s]/g, ''))
+      expect(l.weight).toBe(l.current ? '600' : '500')
+    }
+    if (skin === 'console') expect(labels[0]?.family).toContain('IBM Plex Mono')
+  })

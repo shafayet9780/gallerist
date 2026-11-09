@@ -224,6 +224,60 @@ test('stacked down a side rail: a time label keeps to the rail, cut, whole in it
   await expect(label).toHaveAttribute('title', '11:00 – 11:10')
 })
 
+// The track is a leader: it starts a little past a label's text (and the meta at its end) and runs
+// through the rail gap to the next card's tick. 0.5.1 drew it behind the whole label, through the
+// text: a strikethrough on the Light scheme. The reviewer's short times leave a long leader; the
+// note counts' labels run past their cards, so theirs is only the bit in the gap.
+for (const [name, url] of [
+  ['ltr', '/hooks.html?display=stacked'],
+  ['rtl', '/hooks.html?display=stacked&dir=rtl'],
+  ['short times', '/layout.html?preset=reviewer&display=stacked&scheme=light'],
+] as const)
+  test(`stacked: the track starts past each label's text and reaches the next tick, ${name}`, async ({
+    page,
+  }) => {
+    await page.goto(url)
+    await viewerSettled(page)
+    await expect(page.locator('.gallerist-thumb-time').first()).toBeVisible()
+    const { gap, lines } = await page.evaluate(() => {
+      const rail = document.querySelector('.gallerist-thumbs') as HTMLElement
+      const rtl = getComputedStyle(rail).direction === 'rtl'
+      const W = document.documentElement.clientWidth
+      // along the inline axis, from its start
+      const x = (el: Element): [number, number] => {
+        const r = el.getBoundingClientRect()
+        return rtl ? [W - r.right, W - r.left] : [r.left, r.right]
+      }
+      return {
+        gap: Number.parseFloat(getComputedStyle(rail).columnGap),
+        lines: [...rail.querySelectorAll('.gallerist-thumb-time')].map((label) => {
+          // the line is the label's last flex item: its border box ends its end margin past the label
+          const line = getComputedStyle(label, '::after')
+          const end = x(label)[1] - Number.parseFloat(line.marginInlineEnd)
+          return {
+            start: end - Number.parseFloat(line.width),
+            end,
+            label: x(label),
+            content: Math.max(...[...label.children].map((c) => x(c)[1])),
+          }
+        }),
+      }
+    })
+    expect(lines.length).toBeGreaterThan(4)
+    let long = 0
+    for (const [k, l] of lines.entries()) {
+      const at = `label ${k}`
+      // clear of the text (and the meta), by a small gap
+      expect(l.start - l.content, at).toBeGreaterThan(1.5)
+      expect(l.start - l.content, at).toBeLessThan(4.5)
+      // through the rail gap to the next card (its tick's ring covers the end)
+      expect(Math.abs(l.end - (l.label[1] + gap)), at).toBeLessThan(0.5)
+      if (l.end - l.start > gap + 4) long++
+    }
+    // the short times' leaders run most of a card
+    if (name === 'short times') expect(long).toBe(lines.length)
+  })
+
 for (const display of ['flat', 'stacked'] as const) {
   test(`monitor badges: in the top end corner, named, clear of the number, ${display}`, async ({
     page,
