@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-captions",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Gallerist plugin — designed captions: render the caption bar for the current item with your own markup.",
   "license": "MIT",
   "type": "module",

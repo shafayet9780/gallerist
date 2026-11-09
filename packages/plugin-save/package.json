@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/plugin-save",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Gallerist plugin — download the current item, a whole group, or a bulk zip.",
   "license": "MIT",
   "type": "module",

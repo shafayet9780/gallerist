@@ -1,6 +1,6 @@
 {
   "name": "@gallerist/react",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "React adapter for Gallerist — <Gallerist> component, useGallerist() hook, JSX overlay/region portals.",
   "license": "MIT",
   "type": "module",
