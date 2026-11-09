@@ -19,7 +19,11 @@ by a px past the rail's edge where group widths are fractional. Peer ranges stay
   E.g. `@layer host { .gallerist-thumb-time-text { font-weight: 700 } }` worked on 0.5.1 and no
   longer does. It is the price of beating an unlayered `*`: no rule can, and still lose to a layer.
 - **theme-default**: the caption text is drawn at 400, its designed weight; it took the viewer
-  root's, which is the page's (a body or a `*` rule at another weight changed it).
+  root's, which is the page's (a body or a `*` rule at another weight changed it). Nor does a host's
+  rule on `.gallerist` or `.gallerist-caption` pass its weight on to the text any more, nor host
+  markup around the `span.gallerist-caption-text` in a rich caption (plugin-captions,
+  `<Gallerist.Caption>`): the text is 400 unless a host's unlayered rule on `.gallerist-caption-text`
+  loads after the theme or is more specific (`.gallerist .gallerist-caption-text`).
 - **theme-default**: a stacked card's wrapper (`.gallerist-thumb-wrap`) no longer isolates its
   stacking, nor is its time label positioned: a host's z-indexed content in a group's meta stacks
   with the rail's, and absolutely positioned content in a label's meta anchors to the wrapper.
@@ -45,8 +49,9 @@ by a px past the rail's edge where group widths are fractional. Peer ranges stay
   screen). The step's whole-px scroll and the re-window's after it each rounded, the re-window also
   making up a fraction left over from before the step; the step now hands its own fraction to the
   re-window, so the two land within half a px of the mark. The fraction is carried per axis (a
-  reveal scrolls a box both ways where it can), and a re-window that moves nothing settles it. Cards that overrun the rail by under a px
-  share it between both ends (stepping back, the card ahead took all of it).
+  reveal scrolls a box both ways where it can), and a re-window that moves nothing settles it.
+  Cards that overrun the rail by under a px share it between both ends (stepping back, the card
+  ahead took all of it).
 
 ### Sizes
 Unchanged: base.css 10.42 kB of 10.42 kB (a few rules merged or shortened to shorthands make room);

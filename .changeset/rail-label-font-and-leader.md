@@ -21,6 +21,13 @@ its specificity, and an unlayered one of a single class that loads before the th
 Such a rule must now be unlayered and load after the theme, or be more specific than one class
 (`.gallerist .gallerist-thumb-time-text`). No rule can beat an unlayered `*` and still lose to a layer.
 
+**theme-default (upgrading):** the caption text is drawn at 400 whatever weight the page sets (a body
+or a `*` rule), and a host's rule on `.gallerist` or `.gallerist-caption` no longer passes its weight
+on to it, nor does host markup around the `span.gallerist-caption-text` in a rich caption
+(plugin-captions, `<Gallerist.Caption>`). The text is 400 unless a host's unlayered rule on
+`.gallerist-caption-text` loads after the theme or is more specific
+(`.gallerist .gallerist-caption-text`).
+
 **theme-default (fixed):** the stacked rail's track line no longer strikes through the time labels.
 It ran behind the whole label, and nothing hid it under the text (plain to see on the Light scheme).
 It is now a leader from the end of the label's text (and of a host's meta in the label) to the next

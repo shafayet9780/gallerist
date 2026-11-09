@@ -229,8 +229,12 @@ test('stacked down a side rail: a time label keeps to the rail, cut, whole in it
 // text: a strikethrough on the Light scheme. The reviewer's short times leave a long leader; the
 // note counts' labels run past their cards, so theirs is only the bit in the gap.
 // Where the line is, is read from layout, not from the theme's numbers: only the label's `::after`
-// takes the pointer, so the points along the label's middle that hit the label are the line's (hit
-// testing goes by whole px: each end is read to within a px).
+// takes the pointer, so the points along the label's middle that hit the label are the line's. Hit
+// testing takes a point at x as the px from x to x + 1 (Chromium and WebKit alike): it hits a box
+// whose left edge is up to 1px past it. So the scan runs left to right on the page, a step at a
+// time, and puts the line's left edge 1px past its first hit and its right edge just past its last
+// (each half a step back from the last point that could be it): to within half a step, whichever way
+// the rail runs.
 for (const [name, url] of [
   ['ltr', '/hooks.html?display=stacked'],
   ['rtl', '/hooks.html?display=stacked&dir=rtl'],
@@ -267,19 +271,23 @@ for (const [name, url] of [
           if (a < r0 || far > r1) return []
           const box = label.getBoundingClientRect()
           const y = box.top + box.height / 2
+          // on the page, left to right: the label's span and the bit past its end
+          const [lo, hi] = rtl ? [W - far, box.right] : [box.left, far]
           const on: number[] = []
-          for (let p = a; p <= far; p += step)
-            if (document.elementsFromPoint(rtl ? W - p : p, y).includes(label)) on.push(p)
+          for (let p = lo - 2; p <= hi; p += step)
+            if (document.elementsFromPoint(p, y).includes(label)) on.push(p)
+          const left = (on[0] ?? Number.NaN) + 1 - step / 2
+          const right = (on.at(-1) ?? Number.NaN) + step / 2
           // the next card's tick starts its label (none where a marker comes between)
           const next = label
             .closest('.gallerist-thumb-wrap')
             ?.nextElementSibling?.querySelector(':scope > .gallerist-thumb-time')
           return [
             {
-              start: on[0] ?? Number.NaN,
-              end: (on.at(-1) ?? Number.NaN) + step,
+              start: rtl ? W - right : left,
+              end: rtl ? W - left : right,
               hits: on.length,
-              label: [a, z],
+              span: (on.at(-1) ?? Number.NaN) - (on[0] ?? Number.NaN),
               content: Math.max(...[...label.children].map((c) => x(c)[1])),
               tick: next ? x(next)[0] : z + gap,
             },
@@ -292,12 +300,12 @@ for (const [name, url] of [
     for (const [k, l] of lines.entries()) {
       const at = `label ${k}`
       // one unbroken line
-      expect(l.hits, at).toBe(Math.round((l.end - l.start) / STEP))
-      // clear of the text (and the meta), by a small gap
+      expect(l.hits, at).toBe(Math.round(l.span / STEP) + 1)
+      // clear of the text (and the meta), by a small gap (3px: into the label's 6px)
       expect(l.start - l.content, at).toBeGreaterThan(1.5)
       expect(l.start - l.content, at).toBeLessThan(4.5)
       // through the rail gap to the next card's tick (its ring covers the end)
-      expect(Math.abs(l.end - l.tick), at).toBeLessThan(1 + STEP)
+      expect(Math.abs(l.end - l.tick), at).toBeLessThan(0.5)
       if (l.end - l.start > gap + 4) long++
     }
     // the short times' leaders run most of a card
