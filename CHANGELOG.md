@@ -4,7 +4,8 @@
 
 A patch release: every package goes from 0.5.1 to 0.5.2 (one fixed version group). Two fixes to the
 stacked (timeline) rail's labels from Apploye: their font on a page that sets one on `*`, and a track
-line that struck through them. Peer ranges stay `>=0.3.0 <1`.
+line that struck through them; and one to the rail's step on a phone, which left the card ahead cut
+by a px past the rail's edge where group widths are fractional. Peer ranges stay `>=0.3.0 <1`.
 
 ### Upgrading: what looks different
 - **theme-default**: a host's meta in a stacked time label (`renderGroupMeta`, `place: 'label'`) sits
@@ -24,6 +25,13 @@ line that struck through them. Peer ranges stay `>=0.3.0 <1`.
   to see on the Light scheme). It is a leader from the end of the label's text (and a host's meta) to
   the next card's tick; a label as long as its text keeps its width, and shows its line only in the
   gap between the cards. A side rail still draws none.
+- **plugin-thumbnails**: on a rail whose cards and groups have fractional widths (a host's group meta,
+  Apploye's after its activity meter left the label line), a step no longer leaves the card ahead cut
+  by more than 1px at the rail's edge (1.1px on a 390px phone at 2x: the next timeframe's first
+  screen). The step's whole-px scroll and the re-window's after it each rounded, the re-window also
+  making up a fraction left over from before the step; the step now hands its own fraction to the
+  re-window, so the two land within half a px of the mark. Cards that overrun the rail by under a px
+  share it between both ends (stepping back, the card ahead took all of it).
 
 ### Sizes
 Unchanged: base.css 10.42 kB of 10.42 kB (a few rules merged or shortened to shorthands make room).

@@ -893,6 +893,67 @@ test.describe('on a phone', () => {
       })
     }
 
+  // 0.5.2 (Apploye, once its rail meta lost the activity meter): group widths fractional. A step's
+  // reveal scrolled in whole px to bring the card ahead just inside the rail's edge, and the
+  // re-window after it (dropping the cards far behind) made up a fraction owed from before the
+  // reveal on top of its own rounding: the card ahead ended up past the edge by as much as 1.5px
+  // (here 1.1px stepping forward, 1.25px stepping back; Apploye's step 12 of 24, 1.1px). Each label
+  // line a fractional room, the thumbs a fractional height, at 2x as Apploye's phone checks run.
+  test.describe('at 2x', () => {
+    test.use({ deviceScaleFactor: 2 })
+    for (const [room, h] of [
+      [159.48, 45.13],
+      [152.37, 45.13],
+    ] as const)
+      test(`fractional group widths: the cards that show whole stay inside the rail, ${room}px rooms, ${h}px thumbs`, async ({
+        page,
+      }) => {
+        test.setTimeout(60_000)
+        await page.goto('/hooks.html?rooms=1&display=flat')
+        await page.addStyleTag({
+          content: `.hk-room { inline-size: ${room}px !important } .gallerist { --gallerist-thumb-h: ${h}px !important }`,
+        })
+        await viewerSettled(page)
+        await page.evaluate(() =>
+          (window as unknown as { viewer: { goTo(g: number, i: number): void } }).viewer.goTo(0, 0),
+        )
+        await page.locator('.gallerist').focus()
+        const total = await page.evaluate(() =>
+          (
+            window as unknown as { viewer: { getCollection(): { groups: { items: unknown[] }[] } } }
+          ).viewer
+            .getCollection()
+            .groups.reduce((n, g) => n + g.items.length, 0),
+        )
+        for (const [key, step] of [
+          ['ArrowRight', 1],
+          ['ArrowLeft', -1],
+        ] as const)
+          for (let s = 0; s < total - 1; s++) {
+            await page.keyboard.press(key)
+            const n = await railNow(page, ITEMS)
+            const k = n.cards.findIndex((c) => c.id === n.id)
+            const [behind, cur, ahead] = [n.cards[k - step], n.cards[k] as Span, n.cards[k + step]]
+            const room = n.hi - n.lo
+            // how far past the rail's edge
+            const over = (c: Span) => Math.max(0, n.lo - c.a, c.z - n.hi)
+            const at = `${key} to ${cur.id}`
+            if (!ahead) continue
+            if (!behind || span(behind, cur, ahead) <= room - 1) {
+              for (const c of [behind, cur, ahead])
+                if (c) expect.soft(over(c), `${at}: ${c.id} past the edge`).toBeLessThanOrEqual(1)
+            } else if (span(cur, ahead) <= room - 1) {
+              // as above: the card ahead may run past the far edge by what the current card clear
+              // of the near fade leaves too little room for
+              const short = span(cur, ahead) - (room - (ahead.a > cur.a ? n.fLo : n.fHi))
+              expect
+                .soft(over(ahead), `${at}: ${ahead.id} ahead past the edge`)
+                .toBeLessThanOrEqual(Math.max(0, short) + 1)
+            }
+          }
+      })
+  })
+
   test('the rail and the notes sheet at 390px', async ({ page }) => {
     await open(page)
     await expect(page.locator('.gallerist-rail-marker')).toHaveCount(1)

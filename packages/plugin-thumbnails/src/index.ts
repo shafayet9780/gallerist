@@ -48,7 +48,15 @@ import type {
 import { ICONS, getInternals } from '@gallerist/core/internal'
 import { GLIDE, createGlides, sizeOf, toMs } from './motion'
 import { type Strip, attachStrip } from './scroll'
-import { type Axis, axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
+import {
+  type Axis,
+  axisOf,
+  keepPlace,
+  measureRun,
+  middleOf,
+  scrollWhole,
+  spanAround,
+} from './strip'
 
 /** Cards drawn beyond the visible ones on each side, so a step or a short scroll lands on drawn cards. */
 const MARGIN = 3
@@ -389,16 +397,18 @@ function thumbButton(label: string, className: string, onClick: () => void): HTM
 // page buttons sit too). The browser clamps that at either end of the rail, so the first and last
 // cards stop at their edges.
 // Instant, as every scroll of the rail is (there is no motion to take out under
-// prefers-reduced-motion).
+// prefers-reduced-motion). It scrolls whole px and owes the fraction it leaves out to the re-window
+// that follows (scrollWhole), so the cards land within half a px of where centreBy puts them.
 function reveal(btn: HTMLElement | undefined, around: Array<HTMLElement | undefined>): void {
   if (!btn) return
   const target = btn.getBoundingClientRect()
   if (!target.width && !target.height) return // hidden (an index chip's items): nothing to reveal
   for (let box = btn.parentElement; box; box = box.parentElement) {
     if (box.classList.contains('gallerist')) return
-    const { overflowX, overflowY } = getComputedStyle(box)
-    if (/auto|scroll/.test(overflowX)) box.scrollLeft += centreBy(box, btn, around, 'x')
-    if (/auto|scroll/.test(overflowY)) box.scrollTop += centreBy(box, btn, around, 'y')
+    const cs = getComputedStyle(box)
+    for (const axis of ['x', 'y'] as const)
+      if (/auto|scroll/.test(cs[axis === 'x' ? 'overflowX' : 'overflowY']))
+        scrollWhole(box, axis, centreBy(box, btn, around, axis))
   }
 }
 
@@ -420,7 +430,6 @@ function centreBy(
   const [lo, hi] = axis === 'x' ? (['left', 'right'] as const) : (['top', 'bottom'] as const)
   const edge = box.getBoundingClientRect()
   const r = btn.getBoundingClientRect()
-  const by = (r[lo] + r[hi] - edge[lo] - edge[hi]) / 2
   // the scrolls that show `btn` clear of the scroll-padding (the theme's is the rail's end fade,
   // symmetric: one side read): c0 to c1
   const f =
@@ -429,6 +438,8 @@ function centreBy(
     ) || 0
   const c0 = r[hi] - edge[hi] + f
   const c1 = r[lo] - edge[lo] - f
+  // the one that centres it, midway (the padding cancels out)
+  const by = (c0 + c1) / 2
   // a neighbour's box (none, or not laid out: btn's own, which changes nothing below)
   const [b, a] = around.map((el) => {
     const q = el?.getBoundingClientRect()
@@ -440,17 +451,22 @@ function centreBy(
     [r, a],
   ]) {
     // the scrolls that show them whole run from `from` to `to` (none: they don't fit); 0 among
-    // them: they show already, nothing moves. In whole px: WebKit drops a scroll's fraction, and
-    // with keepPlace's after it a card at the edge could lose up to 2px.
+    // them: they show already, nothing moves. Not rounded: reveal scrolls whole px and owes the
+    // rest, which the re-window after it makes up (0.5.2: rounded here, then again by the
+    // re-window with a fraction owed from before, a card brought to the edge ended past it).
     const from = Math.max(...rs.map((q) => q[hi])) - edge[hi]
     const to = Math.min(...rs.map((q) => q[lo])) - edge[lo]
+    const mid = (from + to) / 2
     if (from <= to + 1)
       return from <= 1 && to >= -1 && c0 <= 1 && c1 >= -1
         ? 0
-        : // then as near as that keeps btn clear (where it can: not past its start)
-          Math.round(clamp(clamp(rs[2] ? by : (from + to) / 2, from, to), c0, c1))
+        : // then as near as that keeps btn clear (where it can: not past its start). Where they
+          // overrun the rail by under a px (they count as fitting), both ends share it: 0.5.2,
+          // the one at the far end showed whole and the other was cut by all of it and the
+          // scroll's rounding, past 1px (the card ahead, stepping back at 1x)
+          clamp(from > to ? mid : clamp(rs[2] ? by : mid, from, to), c0, c1)
   }
-  return Math.round(by)
+  return by
 }
 
 /** `x` within `lo`..`hi`; `lo` where they cross. */

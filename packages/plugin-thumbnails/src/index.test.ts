@@ -5,7 +5,7 @@ import { getInternals } from '@gallerist/core/internal'
 import { type PresetName, mount } from '@gallerist/renderer-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type ThumbnailsInstance, getGroupDisplay, setGroupDisplay, thumbnails } from './index'
-import { axisOf, keepPlace, measureRun, middleOf, spanAround } from './strip'
+import { axisOf, keepPlace, measureRun, middleOf, scrollWhole, spanAround } from './strip'
 
 const item = (id: string): Item => ({ id, type: 'image', source: `${id}.jpg` })
 const collection = (): Collection => ({
@@ -2387,6 +2387,52 @@ describe('strip helpers', () => {
         `re-window ${k}`,
       ).toBeLessThanOrEqual(0.5 + 1e-9)
     }
+  })
+
+  // 0.5.2 (Apploye): a reveal's scroll, between re-windows, was rounded on its own and left the carry
+  // as it was; the re-window after it then made up that stale fraction on top of its own rounding and
+  // the reveal's, and a card brought to the rail's edge ended past it by over 1px. scrollWhole owes
+  // what it leaves out instead, settling what was owed before (its `by` was measured from where the
+  // cards are), so the reveal and the re-window together land within half a px of the reveal's mark.
+  it('scrollWhole: a reveal between re-windows lands within half a px of its mark', () => {
+    const scroller = document.createElement('div')
+    let scroll = 0
+    Object.defineProperty(scroller, 'scrollLeft', {
+      configurable: true,
+      get: () => scroll,
+      set: (v: number) => {
+        scroll = Math.trunc(v) // whole px, as WebKit keeps them
+      },
+    })
+    let drawn = 0 // what the re-windows put before the reference
+    const ref = document.createElement('span')
+    scroller.appendChild(ref)
+    document.body.appendChild(scroller)
+    const left = () => 500 + drawn - scroll
+    ref.getBoundingClientRect = () => ({ left: left(), top: 0 }) as DOMRect
+    const rewindow = (by: number) =>
+      keepPlace(scroller, ref, 'x', () => {
+        drawn += by
+      })
+    // re-windows that leave a fraction owed: the reference 0.4px short of where it was
+    rewindow(100.4)
+    rewindow(-200.8)
+    expect(left() - 500).toBeCloseTo(-0.4)
+    // the reveal: the reference to 120.3 exactly, then a re-window drops 162.37px of cards before it
+    scrollWhole(scroller, 'x', left() - 120.3)
+    rewindow(-162.37)
+    expect(Math.abs(left() - 120.3)).toBeLessThanOrEqual(0.5 + 1e-9)
+    // a scroll stopped short at the strip's end owes only its fraction: the re-window after it
+    // doesn't run on to make up the rest
+    scroll = 0
+    Object.defineProperty(scroller, 'scrollLeft', {
+      configurable: true,
+      get: () => scroll,
+      set: () => {}, // at its end: it doesn't move
+    })
+    scrollWhole(scroller, 'x', 40.4)
+    rewindow(0)
+    expect(left()).toBeCloseTo(500 + drawn)
   })
 })
 
